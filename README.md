@@ -1,14 +1,47 @@
 # ZCounting
 
-This code is to run over Z Counting histograms produced in DQM and produce a CSV file with Z rates. The output file format has been agreed upon with ATLAS in 2016.
+This code is to run over Z Counting histograms produced in DQM Offline and produce a CSV file with Z rates. 
+The output file format has been agreed upon with ATLAS in 2016. 
+It can be used to generate plots of the Z rate ratio of CMS/ATLAS. 
+There are also python files to produce control plots of the Z reconstruction efficiencies and Z fiducial cross section.
 
 A CMSSW environment needs to be set up to have the pandas library available.
 
-The python file "testZCounting(versionnumber).py" is the file to be executed. Parameters such as the time granularity, DQM file location and the brilcalc CSV input file can be changed.
+## Z Rate Production
+The ZCounting.py is the file to be executed to generate a CSV file with Z rates and additional information. 
+Following parameters should be specified:
 
-Many aspects in the code can be improved.
+**--dirDQM DIRECTORY**\
+Directory to the input root files from the DQM Offline module. 
+Eg. the DQM Offline root files of the 2018 prompt-reco can be found here:\
+- https://cmsweb.cern.ch/dqm/offline/data/browse/ROOT/OfflineData/Run2018/SingleMuon/
 
-Notes: so far we keep mutiple versions, in order to use in various purpose:
-testZCounting3.py: used for 2017 data, in a "semi-automatic" way
-testZCounting4.py: the MAIN one, aim to be used with cron jobs for 2018 data, in a fully automatic way
-testZCounting5.py: used for optimization purpose/tests, not with cron jobs, for 2018 data
+**--ByLsCSV BRILCALC.csv**\
+A csv file with the information of run, fill, ls, time, delivered and recorded luminosity and avgpu is needed. The luminosity is used to produce control plots, the avgpu is needed for pileup corrections. A BRILCALC.csv file can be produced with 
+'''
+./brilcalc\_makeByLs
+'''
+
+**--dirCSV DIRECTORY**\
+Specify a directory to store the output .csv file.
+
+**--dirEff DIRECTORY**\
+Specify a directory to store control plots of fits for the efficiency calculation.
+
+**--dirMC DIRECTORY**\
+The Sta efficiency is calculated by fitting a template function. The directory for the root files for generating this template have to be specified. For now, the default directory can be used.
+
+**--dirMCShape DIRECTORY**\
+Same as --dirMC
+
+## Batch Processing
+The script submit\_ZCounting can be used to run ZCounting.py on HTCondor.
+
+## Plotting
+The script cronMakePlots can be used to produce nice plots. The output csv files from ZCounting.py (and the ones from ATLAS) have to be specified.
+
+
+## Useful Links
+- https://jsalfeld.web.cern.ch/jsalfeld/Z-Counting/
+- https://dwalter.web.cern.ch/dwalter/ZCounting/
+- https://indico.cern.ch/event/807367/contributions/3360470/attachments/1814586/2965226/ZCounting.pdf
