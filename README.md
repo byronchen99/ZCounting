@@ -13,7 +13,7 @@ Following parameters should be specified:
 
 **--dirDQM DIRECTORY**\
 Directory to the input root files from the DQM Offline module. 
-Eg. the DQM Offline root files of the 2018 prompt-reco can be found here:\
+Eg. the DQM Offline root files of the 2018 prompt-reco can be found here:
 - https://cmsweb.cern.ch/dqm/offline/data/browse/ROOT/OfflineData/Run2018/SingleMuon/
 
 **--ByLsCSV BRILCALC.csv**\
@@ -38,7 +38,7 @@ Same as --dirMC
 The script submit\_ZCounting can be used to run ZCounting.py on HTCondor.
 
 ## Plotting
-The script cronMakePlots can be used to produce nice plots. The output csv files from ZCounting.py (and the ones from ATLAS) have to be specified.
+The script cronMakePlots can be used to produce nice plots. The csv files from ZCounting.py output (and the ones from ATLAS) have to be specified. 
 
 
 ## Useful Links

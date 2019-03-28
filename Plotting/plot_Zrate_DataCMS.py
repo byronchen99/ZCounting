@@ -35,17 +35,12 @@ print args.cms
 
 ########## Constants ##########
 
-# total cross section from theory in NNLO [pb] (from http://inspirehep.net/record/1404393)
-ZCrossSec = 1870
-ZCrossSec_Unc = [50,40] # [+,-]
-
-# Fiducial face space for muon p_t > 27 GeV && |eta| < 2.4 && 66GeV < M(mumu) < 116 (from Jakob)
-Acceptance = 0.342367
-
-ZCrossSec *= Acceptance
-ZCrossSec_Unc *= Acceptance
-
 ZeffUnc=0.03
+
+### For plot labeling ###
+ptCut = 27
+etaCut = 2.4
+trigger='IsoMu24_v* Or IsoMuTk24_v*'
 
 ########## Data Acquisition ##########
 
@@ -69,7 +64,6 @@ if "Central" in str(args.cms):
 else:
 	suffix="Inclusive"
 
-print suffix
 
 linescms=cmsfile.readlines()
 
@@ -221,7 +215,7 @@ for fill in fills:
         text=ROOT.TText(0.3,0.83,"CMS Automatic, produced: "+datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 	text.SetNDC()
 	text.Draw()
-	text2=ROOT.TLatex(0.6,0.23,"#splitline{66 GeV<M(#mu#mu) < 116 GeV}{p_{T}(#mu)>27 GeV, |#eta(#mu)|<2.4}")
+	text2=ROOT.TLatex(0.6,0.23,"#splitline{66 GeV<M(#mu#mu) < 116 GeV}{p_{T}(#mu)>"+str(ptCut)+" GeV, |#eta(#mu)|<"+str(etaCut)+"}")
 	text2.SetNDC()
 	text2.SetTextSize(0.04)
 	text2.Draw()
@@ -264,13 +258,10 @@ c3.SetGrid()
 graph_metacmsXsec.Draw("AP")
 
 
-
-print(suffix)
-
 text=ROOT.TLatex(0.3,0.83,"CMS Automatic, produced: "+datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 text.SetNDC()
 text.Draw()
-text2=ROOT.TLatex(0.6,0.23,"#splitline{66 GeV<M(#mu#mu) < 116 GeV}{p_{T}(#mu)>27 GeV, |#eta(#mu)|<2.4}")
+text2=ROOT.TLatex(0.6,0.23,"#splitline{66 GeV<M(#mu#mu) < 116 GeV}{p_{T}(#mu)>"+str(ptCut)+" GeV, |#eta(#mu)|<"+str(etaCut)+"}")
 text2.SetNDC()
 text2.SetTextSize(0.04)
 text2.Draw()
@@ -304,11 +295,11 @@ graph_zcount.Draw("AP")
 text=ROOT.TLatex(0.3,0.83,"CMS Automatic, produced: "+datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 text.SetNDC()
 text.Draw()
-text2=ROOT.TLatex(0.6,0.23,"#splitline{66 GeV<M(#mu#mu) < 116 GeV}{p_{T}(#mu)>27 GeV, |#eta(#mu)|<2.4}")
+text2=ROOT.TLatex(0.6,0.23,"#splitline{66 GeV<M(#mu#mu) < 116 GeV}{p_{T}(#mu)>"+str(ptCut)+" GeV, |#eta(#mu)|<"+str(etaCut)+"}")
 text2.SetNDC()
 text2.SetTextSize(0.04)
 text2.Draw()
-text3=ROOT.TLatex(0.7,0.33,"#color[4]{IsoMu24_v*}")
+text3=ROOT.TLatex(0.6,0.33,"#color[4]{"+trigger+"}")
 text3.SetNDC()
 text3.SetTextSize(0.04)
 text3.Draw()
@@ -342,11 +333,11 @@ graph_zcountA.Draw("AP")
 text=ROOT.TLatex(0.3,0.83,"CMS Automatic, produced: "+datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 text.SetNDC()
 text.Draw()
-text2=ROOT.TLatex(0.6,0.23,"#splitline{66 GeV<M(#mu#mu) < 116 GeV}{p_{T}(#mu)>27 GeV, |#eta(#mu)|<2.4}")
+text2=ROOT.TLatex(0.6,0.23,"#splitline{66 GeV<M(#mu#mu) < 116 GeV}{p_{T}(#mu)>"+str(ptCut)+" GeV, |#eta(#mu)|<"+str(etaCut)+"}")
 text2.SetNDC()
 text2.SetTextSize(0.04)
 text2.Draw()
-text3=ROOT.TLatex(0.7,0.33,"#color[4]{IsoMu24_v*}")
+text3=ROOT.TLatex(0.6,0.33,"#color[4]{"+trigger+"}")
 text3.SetNDC()
 text3.SetTextSize(0.04)
 text3.Draw()

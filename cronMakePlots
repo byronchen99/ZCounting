@@ -4,16 +4,29 @@ cmsswRel=/afs/cern.ch/work/d/dwalter/CMSSW_9_2_8/src
 cd $cmsswRel
 source /cvmfs/cms.cern.ch/cmsset_default.sh
 eval `scramv1 runtime -sh`
-cd ZCounting
+cd -
 
-cmsCSV=/eos/home-d/dwalter/www/ZCounting/CMS-2018-ZRateData/csvFiles/Mergedcsvfile.csv
-cmsEffCSV=/eos/home-d/dwalter/www/ZCounting/CMS-2018-ZRateData/csvFiles/Mergedeffcsvfile.csv
-atlasCSV=/afs/cern.ch/user/p/ponyisi/public/zlumi/atlas_2018.csv
+### Input ###
 
-python Plotting/plot_Zrate_DataCMS.py --cms $cmsEffCSV --saveDir /eos/home-d/dwalter/www/ZCounting/CMS-2018-ZRateData/ZCrossSectionMonitoring/
+cmsCSV=/eos/home-d/dwalter/www/ZCounting/CMS-2016-ZRateData/csvFiles/Mergedcsvfile.csv
+cmsEffCSV=/eos/home-d/dwalter/www/ZCounting/CMS-2016-ZRateData/csvFiles/Mergedeffcsvfile.csv
+#atlasCSV=/afs/cern.ch/user/p/ponyisi/public/zlumi/atlas_2018.csv
 
-python Plotting/plot_ZEfficiency_DataCMS.py --cms $cmsEffCSV --saveDir /eos/home-d/dwalter/www/ZCounting/CMS-2018-ZRateData/ZAndMuonEfficiencies/
+### Output ###
 
-python Plotting/makeZvsL.py --cms $cmsCSV --saveDir /eos/home-d/dwalter/www/ZCounting/CMS-2018-ZRateData/ZCrossSectionMonitoring/
+out=/eos/home-d/dwalter/www/ZCounting/CMS-2016-ZRateData/
+logFile=/eos/home-d/dwalter/www/ZCounting/CMS-2016-ZRateData/ZCrossSectionMonitoring/README.txt
 
-python Plotting/plot_Zrate_Data_CMSvsATLAS.py --cms $cmsCSV --atlas $atlasCSV -s /eos/home-d/dwalter/www/ZCounting/CMS-2018-ZRateData/ZCrossSectionMonitoring/
+mkdir -p ${out}/ZCrossSectionMonitoring
+mkdir -p ${out}/ZAndMuonEfficiencies
+mkdir -p ${out}/ZAndMuonEfficiencies/ATLAS_CMS_Comparison
+
+### Plotting ###
+
+python Plotting/plot_Zrate_DataCMS.py --cms $cmsEffCSV --saveDir ${out}/ZCrossSectionMonitoring/
+
+python Plotting/plot_ZEfficiency_DataCMS.py --cms $cmsEffCSV --saveDir ${out}/ZAndMuonEfficiencies/
+
+python Plotting/makeZvsL.py --cms $cmsCSV --saveDir $out/ZCrossSectionMonitoring/ | tee -a $logFile
+
+python Plotting/plot_Zrate_Data_CMSvsATLAS.py --cms $cmsCSV --atlas $atlasCSV -s $out/ZCrossSectionMonitoring/

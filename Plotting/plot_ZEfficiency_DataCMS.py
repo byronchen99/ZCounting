@@ -23,7 +23,6 @@ args = parser.parse_args()
 if args.cms=="nothing":
 	print "please provide cms input files"
 	sys.exit()
-print args.cms
 
 def plotPerFillEff(nMeas,nFill,effArray,times,suffixN, isInterFill,dirStore):
 	#print "start graph init"+str(nMeas)+"  "+str(times)+"  "+str(effArray)
@@ -38,7 +37,6 @@ def plotPerFillEff(nMeas,nFill,effArray,times,suffixN, isInterFill,dirStore):
 	if isInterFill:
  		graph_cms.GetXaxis().SetTimeDisplay(1)
 	if not isInterFill:
-		print "here"
 		graph_cms.GetXaxis().SetTitle("Fill")
 	else:
 		graph_cms.GetXaxis().SetTitle("Time")
@@ -204,8 +202,8 @@ for fill in fills:
 
 
 #	plotPerFillEff(nMeas,nFill,effArray,times,suffixN)
-	avrgHLTBEff.append(plotPerFillEff(k,fill,HLTBeff,cmsTimes,"_IsoMu24_Barrel_Efficiency",True,args.saveDir+"PlotsFill_"+str(fill)))
-	avrgHLTEEff.append(plotPerFillEff(k,fill,HLTEeff,cmsTimes,"_IsoMu24_Endcap_Efficiency",True,args.saveDir+"PlotsFill_"+str(fill)))
+	avrgHLTBEff.append(plotPerFillEff(k,fill,HLTBeff,cmsTimes,"_HLT_Barrel_Efficiency",True,args.saveDir+"PlotsFill_"+str(fill)))
+	avrgHLTEEff.append(plotPerFillEff(k,fill,HLTEeff,cmsTimes,"_HLT_Endcap_Efficiency",True,args.saveDir+"PlotsFill_"+str(fill)))
 	avrgSITBEff.append(plotPerFillEff(k,fill,SITBeff,cmsTimes,"_SelAndTrack_Barrel_Efficiency",True,args.saveDir+"PlotsFill_"+str(fill)))
 	avrgSITEEff.append(plotPerFillEff(k,fill,SITEeff,cmsTimes,"_SelAndTrack_Endcap_Efficiency",True,args.saveDir+"PlotsFill_"+str(fill)))
 	avrgStaBEff.append(plotPerFillEff(k,fill,StaBeff,cmsTimes,"_Standalone_Barrel_Efficiency",True,args.saveDir+"PlotsFill_"+str(fill)))
@@ -221,8 +219,8 @@ for fill in fills:
 
 	metaFills.append(float(fill))
 
-plotPerFillEff(len(avrgHLTBEff),"all",avrgHLTBEff,metaFills,"SummaryIsoMu24_Barrel_Efficiency",False,args.saveDir)
-plotPerFillEff(len(avrgHLTEEff),"all",avrgHLTEEff,metaFills,"SummaryIsoMu24_Endcap_Efficiency",False,args.saveDir)
+plotPerFillEff(len(avrgHLTBEff),"all",avrgHLTBEff,metaFills,"SummaryHLT_Barrel_Efficiency",False,args.saveDir)
+plotPerFillEff(len(avrgHLTEEff),"all",avrgHLTEEff,metaFills,"SummaryHLT_Endcap_Efficiency",False,args.saveDir)
 plotPerFillEff(len(avrgSITBEff),"all",avrgSITBEff,metaFills,"SummarySelAndTrack_Barrel_Efficiency",False,args.saveDir)
 plotPerFillEff(len(avrgSITEEff),"all",avrgSITEEff,metaFills,"SummarySelAndTrack_Endcap_Efficiency",False,args.saveDir)
 plotPerFillEff(len(avrgStaBEff),"all",avrgStaBEff,metaFills,"SummaryStandalone_Barrel_Efficiency",False,args.saveDir)
