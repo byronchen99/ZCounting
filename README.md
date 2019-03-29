@@ -13,14 +13,13 @@ Following parameters should be specified:
 
 **--dirDQM DIRECTORY**\
 Directory to the input root files from the DQM Offline module. 
-Eg. the DQM Offline root files of the 2018 prompt-reco can be found here:
-- https://cmsweb.cern.ch/dqm/offline/data/browse/ROOT/OfflineData/Run2018/SingleMuon/
+Eg. the DQM Offline root files of the 2018 prompt-reco can be found [here](https://cmsweb.cern.ch/dqm/offline/data/browse/ROOT/OfflineData/Run2018/SingleMuon/).
 
 **--ByLsCSV BRILCALC.csv**\
-A csv file with the information of run, fill, ls, time, delivered and recorded luminosity and avgpu is needed. The luminosity is used to produce control plots, the avgpu is needed for pileup corrections. A BRILCALC.csv file can be produced with 
-'''
+A csv file with the information of run, fill, lumisection, time, delivered and recorded luminosity and avgpu is needed. The luminosity is used to produce control plots, the avgpu is needed for pileup corrections. A BRILCALC.csv file can be produced with 
+```
 ./brilcalc\_makeByLs
-'''
+```
 
 **--dirCSV DIRECTORY**\
 Specify a directory to store the output .csv file.

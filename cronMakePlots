@@ -10,7 +10,8 @@ cd -
 
 cmsCSV=/eos/home-d/dwalter/www/ZCounting/CMS-2016-ZRateData/csvFiles/Mergedcsvfile.csv
 cmsEffCSV=/eos/home-d/dwalter/www/ZCounting/CMS-2016-ZRateData/csvFiles/Mergedeffcsvfile.csv
-#atlasCSV=/afs/cern.ch/user/p/ponyisi/public/zlumi/atlas_2018.csv
+atlasCSV=/afs/cern.ch/user/p/ponyisi/public/zlumi/atlas_2018.csv
+refCSV=/afs/cern.ch/work/d/dwalter/CMSSW_9_2_8/src/ZCounting/Stuff/ByLs_2016_IsoMu24OrIsoTkMu24_pcc16PaperV2.csv
 
 ### Output ###
 
@@ -23,7 +24,7 @@ mkdir -p ${out}/ZAndMuonEfficiencies/ATLAS_CMS_Comparison
 
 ### Plotting ###
 
-python Plotting/plot_Zrate_DataCMS.py --cms $cmsEffCSV --saveDir ${out}/ZCrossSectionMonitoring/
+python Plotting/plot_Zrate_DataCMS.py --cms $cmsEffCSV --refLumi $refCSV --saveDir ${out}/ZCrossSectionMonitoring/
 
 python Plotting/plot_ZEfficiency_DataCMS.py --cms $cmsEffCSV --saveDir ${out}/ZAndMuonEfficiencies/
 
