@@ -1,19 +1,12 @@
 import ROOT
 import os,sys
-from ROOT import TGraphAsymmErrors
-from ROOT import TGraphErrors
-from ROOT import TColor
 from array import array
 from operator import truediv
-import random
-import math
 import pandas
 import numpy as np
-import os.path
 import glob
 import logging as log
 import argparse
-import pdb
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-b","--beginRun",help="first run to analyze [%default]",default=299918)
@@ -152,7 +145,7 @@ for run in data.drop_duplicates('run')['run'].values:
     beginTime=[]
     endTime=[]
     Zrate=array('d')
-    ZrateUnCorr=array('d')
+    ZRateUncorrected=array('d')
     instDel=array('d')
     lumiDel=array('d')
     pileUp=array('d')
@@ -315,8 +308,9 @@ for run in data.drop_duplicates('run')['run'].values:
 
 	#End products (about 1% fake rate)
         ZMCXSec  = Zyield_m*(1-ZfpRate)/(ZMCEff*recLumi_m)
-        ZRateUnCorr  = Zyield_m*(1-ZfpRate)/(ZEff*timeWindow_m*deadtime_m)
+        ZRateUncorrected  = Zyield_m*(1-ZfpRate)/(ZEff*timeWindow_m*deadtime_m)
         ZRate  = Zyield_m*(1-ZfpRate)/(ZMCEff*timeWindow_m*deadtime_m)
+        
         log.debug("======ZMCXSec: %f",ZMCXSec)
         log.debug("======ZRate: %f",ZRate)
 
@@ -325,7 +319,7 @@ for run in data.drop_duplicates('run')['run'].values:
 
         beginTime.append(data_run.loc[data_run['ls'] == goodLSlist[0]]['time'].values[0])
         endTime.append(data_run.loc[data_run['ls'] == goodLSlist[-1]]['time'].values[0])
-        ZrateUnCorr.append(ZRateUnCorr)
+        ZRateUncorrected.append(ZRateUncorrected)
         Zrate.append(ZRate)
         instDel.append(delLumi_m/timeWindow_m)
         lumiDel.append(delLumi_m)
@@ -362,7 +356,7 @@ for run in data.drop_duplicates('run')['run'].values:
     print "Writing per Run CSV file"
     with open(args.dirCSV+'csvfile'+str(run)+'.csv','wb') as file:
         for c in range(0,nMeasurements):
-		wline = str(int(fillarray[c]))+","+str(beginTime[c])+","+str(endTime[c])+","+str(Zrate[c])+","+str(instDel[c])+","+str(lumiDel[c])+","+str(ZyieldDel[c])+","+str(ZrateUnCorr[c]) 
+		wline = str(int(fillarray[c]))+","+str(beginTime[c])+","+str(endTime[c])+","+str(Zrate[c])+","+str(instDel[c])+","+str(lumiDel[c])+","+str(ZyieldDel[c])+","+str(ZRateUncorrected[c]) 
                 print(wline)
                 file.write(wline + '\n')
 
@@ -377,7 +371,7 @@ print "Writing overall CSV file"
 if args.writeSummaryCSV:
 	rateFileList=sorted(glob.glob(args.dirCSV+'csvfile*.csv'))	
 	with open(args.dirCSV+'Mergedcsvfile.csv','w') as file:
-		file.write("fill,beginTime,endTime,ZRate,instDelLumi,delLumi,delZCount,ZrateUnCorr")
+		file.write("fill,beginTime,endTime,ZRate,instDelLumi,delLumi,delZCount,ZRateUncorrected")
 		file.write('\n')
 		print "There are "+str(len(rateFileList))+" runs in the directory"
 		for m in range(0,len(rateFileList)):						

@@ -1,5 +1,6 @@
 import ROOT
 import pandas
+import numpy as np
 import argparse
 
 ROOT.gROOT.SetBatch(True)
@@ -13,18 +14,20 @@ args = parser.parse_args()
 
 cmsfile=args.cms
 # key words for columns of csv file
+#ZRate='ZrateUnCorr'
 ZRate='ZRate'
 Lumi='instDelLumi'
 
-data = pandas.read_csv(cmsfile, sep=',')[[ZRate,Lumi]]
+data = pandas.read_csv(cmsfile, sep=',')[[ZRate,Lumi,'delZCount']]
 data['sigma'] = data[ZRate]/data[Lumi]
+data['sigmaE'] = data['sigma']/np.sqrt(data['delZCount']) 
 
 #remove outliers
 data = data[data['sigma'] > 500]
 data = data[data['sigma'] < 900]
 
 
-graphXsecL=ROOT.TGraph(len(data),data[Lumi].values,data['sigma'].values)
+graphXsecL=ROOT.TGraphErrors(len(data),data[Lumi].values,data['sigma'].values,np.zeros(len(data)),data['sigmaE'].values)
 graphXsecL.SetName("graph_metaXsecAtlas")
 graphXsecL.SetMarkerStyle(23)
 graphXsecL.SetMarkerColor(ROOT.kAzure-4)
@@ -32,10 +35,16 @@ graphXsecL.SetMarkerSize(1.5)
 graphXsecL.SetTitle("Z cross section VS Lumi")
 graphXsecL.GetXaxis().SetTitle("instantaneous luminosity [Hz/pb]")
 graphXsecL.GetYaxis().SetTitle("#sigma^{fid}_{Z} [pb]")
+graphXsecL.GetYaxis().SetTitleOffset(1.0)
 
 print "the simple average cross section is "+str(sum(data['sigma'].values)/len(data))
-graphXsecL.Fit("pol1","","",0.0045,0.018)
+graphXsecL.Fit("pol1","","",0.0,0.025)
 c3=ROOT.TCanvas("c3","c3",1000,600)
 c3.SetGrid()
 graphXsecL.Draw("AP")
+
+legend=ROOT.TLegend(0.2,0.8,0.4,0.9)
+legend.AddEntry(graphXsecL,"Measurement (#pm stat.)","pe")
+legend.Draw("same")
+
 c3.SaveAs(args.saveDir+""+ZRate+"_vs_"+Lumi+".png")

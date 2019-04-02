@@ -39,7 +39,7 @@ cs_file.write("executable  = runZCountingOnBatch.sh \n")
 cs_file.write("output      = condor/output/$(ClusterId).$(ProcId).out \n")
 cs_file.write("error       = condor/error/$(ClusterId).$(ProcId).err \n")
 cs_file.write("log         = condor/log/$(ClusterId).$(ProcId).log \n")
-cs_file.write("+JobFlavour =\"longlunch\" \n")
+cs_file.write("+JobFlavour =\"workday\" \n")
 for run in runlist:
     cs_file.write("arguments  = {0} {1} {2} {3} {4} {5} {6}\n".format(str(run),
         dirDQM,

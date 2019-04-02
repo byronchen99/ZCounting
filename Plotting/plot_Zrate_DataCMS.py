@@ -29,7 +29,7 @@ print args.cms
 
 secPerLS=float(23.3)
 
-sigmaZ = 1870       
+sigmaZ = 1870       # theory prediction from CMS PAS SMP-15-004  
 acceptanceZ = 0.342367
 sigmaZfid = sigmaZ * acceptanceZ
 
@@ -37,9 +37,11 @@ ZeffE=0.03          # systematic uncertainty of Z reconstruction efficiency
 sigmaZfidE = 0.05   # systematic uncertainty of fiducial Z cross section
 
 ### For plot labeling ###
+
 ptCut = 27
 etaCut = 2.4
-trigger='IsoMu24_v* Or IsoMuTk24_v*'
+trigger='IsoMu24_v*'
+refLumiSource='hfoc18v5'
 
 ########## Data Acquisition ##########
 
@@ -109,8 +111,6 @@ if "Central" in str(args.cms):
 	suffix="Barrel"
 else:
 	suffix="Inclusive"
-
-
 
 metaFills=array('d')
 metaXsecCMS=array('d')
@@ -206,7 +206,7 @@ for fill in data.drop_duplicates('fill')['fill'].values:
 
         legend=ROOT.TLegend(0.65,0.65,0.9,0.8)
         legend.AddEntry(graph_ZLumi,"Z Lumi","p")
-        legend.AddEntry(graph_Lumi,"reference Lumi","l")
+        legend.AddEntry(graph_Lumi,refLumiSource+" Lumi","l")
         legend.Draw("same")
 
         text1=ROOT.TText(0.3,0.83,"CMS Automatic, produced: "+datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
