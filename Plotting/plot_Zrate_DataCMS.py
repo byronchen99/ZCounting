@@ -86,10 +86,19 @@ data = data[data['delZCount'] > 1000.]
 data[['date','time']] = data['beginTime'].str.split(" ",expand=True)
 data[['month','day','year']] = (data['date'].str.split("/",expand=True))
 data[['hour','min','sec']] = (data['time'].str.split(":",expand=True))
-data['tdate'] = "20"+data['year']+"-"+data['month']+"-"+data['day']+" "+data['hour']+":"+data['min']+":"+data['sec']
-data['tdate'] = data['tdate'].apply(ROOT.TDatime)
-data['tdate'] = data['tdate'].apply(lambda x: x.Convert()).astype(float)
-data['tdateE'] = data['tdate'] - data['tdate']
+data['tdate_begin'] = "20"+data['year']+"-"+data['month']+"-"+data['day']+" "+data['hour']+":"+data['min']+":"+data['sec']
+data['tdate_begin'] = data['tdate_begin'].apply(ROOT.TDatime)
+data['tdate_begin'] = data['tdate_begin'].apply(lambda x: x.Convert()).astype(float)
+data[['date','time']] = data['endTime'].str.split(" ",expand=True)
+data[['month','day','year']] = (data['date'].str.split("/",expand=True))
+data[['hour','min','sec']] = (data['time'].str.split(":",expand=True))
+data['tdate_end'] = "20"+data['year']+"-"+data['month']+"-"+data['day']+" "+data['hour']+":"+data['min']+":"+data['sec']
+data['tdate_end'] = data['tdate_end'].apply(ROOT.TDatime)
+data['tdate_end'] = data['tdate_end'].apply(lambda x: x.Convert()).astype(float)
+
+data['tdate'] = data['tdate_begin'] + (data['tdate_end'] - data['tdate_begin'])/2
+
+data['tdateE'] = (data['tdate_end'] - data['tdate_begin'])/2
 data = data.drop(['date','time','month','day','year','hour','min','sec'],axis=1)
 
 data['ZRateE'] = data['ZRate'] * np.sqrt( 1./data['delZCount'] + ZeffE**2 )
@@ -161,7 +170,7 @@ for fill in data.drop_duplicates('fill')['fill'].values:
 	graph_cms.Draw("AP")
 
 	legend=ROOT.TLegend(0.65,0.65,0.9,0.9)
-	legend.AddEntry(graph_cms,"CMS","p")
+	legend.AddEntry(graph_cms,"CMS","pe")
 
 	text1=ROOT.TText(0.3,0.83,"CMS Automatic, produced: "+datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 	text1.SetNDC()
@@ -205,7 +214,7 @@ for fill in data.drop_duplicates('fill')['fill'].values:
         graph_Lumi.Draw("l same")
 
         legend=ROOT.TLegend(0.65,0.65,0.9,0.8)
-        legend.AddEntry(graph_ZLumi,"Z Lumi","p")
+        legend.AddEntry(graph_ZLumi,"Z Lumi","pe")
         legend.AddEntry(graph_Lumi,refLumiSource+" Lumi","l")
         legend.Draw("same")
 
