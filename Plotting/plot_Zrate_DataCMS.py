@@ -23,6 +23,8 @@ if args.cms=="nothing":
 	print "please provide cms input files"
 	sys.exit()
 
+outDir = args.saveDir
+
 print args.cms
 
 ########## Constants ##########
@@ -33,8 +35,8 @@ sigmaZ = 1870       # theory prediction from CMS PAS SMP-15-004
 acceptanceZ = 0.342367
 sigmaZfid = sigmaZ * acceptanceZ
 
-ZeffE=0.03          # systematic uncertainty of Z reconstruction efficiency
-sigmaZfidE = 0.05   # systematic uncertainty of fiducial Z cross section
+ZeffE=0.01          # systematic uncertainty of Z reconstruction efficiency
+sigmaZfidE = 0.03   # systematic uncertainty of fiducial Z cross section
 
 ### For plot labeling ###
 
@@ -124,6 +126,8 @@ else:
 metaFills=array('d')
 metaXsecCMS=array('d')
 
+slope = dict()
+
 zcountsAccu=0
 metazcountsAccu=array('d')
 metazcountsoverlumi=array('d')
@@ -145,37 +149,101 @@ for fill in data.drop_duplicates('fill')['fill'].values:
         shutil.rmtree(args.saveDir+"PlotsFill_"+str(fill), ignore_errors=True)
 	os.makedirs(args.saveDir+"PlotsFill_"+str(fill))
 	
+        ### Efficiency vs Pileup plots ###
+
+        for eff, name in (('ZMCeff',  'corrected Z-Reconstruction efficitency'),
+                          ('ZMCeffBB','corrected Z-BB-Reconstruction efficitency'),
+                          ('ZMCeffBE','corrected Z-BE-Reconstruction efficitency'),
+                          ('ZMCeffEE','corrected Z-EE-Reconstruction efficitency'),
+                          ('ZBBeff',  'Z-BB-Reconstruction efficitency'),
+                          ('ZBEeff',  'Z-BE-Reconstruction efficitency'),
+                          ('ZEEeff',  'Z-EE-Reconstruction efficitency'),
+                          ('HLTeffB', 'Muon HLT-B efficiency'),
+                          ('HLTeffE', 'Muon HLT-E efficiency'),
+                          ('SITeffB', 'Muon SIT-B efficiency'),
+                          ('SITeffE', 'Muon SIT-E efficiency'),
+                          ('StaeffB', 'Muon Sta-B efficiency'),
+                          ('StaeffE', 'Muon Sta-E efficiency'),
+                         ):
+            graph_Zeff = ROOT.TGraph(len(dFill),dFill['pileUp'].values,dFill[eff].values )
+            graph_Zeff.SetName("graph_Zeff")
+            graph_Zeff.SetMarkerStyle(22)
+            graph_Zeff.SetMarkerColor(ROOT.kOrange+8)
+            graph_Zeff.SetFillStyle(0)
+            graph_Zeff.SetMarkerSize(1.5)
+            graph_Zeff.SetTitle(name+", Fill "+str(fill))
+            graph_Zeff.GetYaxis().SetTitle(eff)
+            graph_Zeff.GetYaxis().SetTitleSize(0.07)
+            graph_Zeff.GetYaxis().SetTitleOffset(1.1)
+            graph_Zeff.GetXaxis().SetTitle("avg. PU")
+            graph_Zeff.GetXaxis().SetTitleSize(0.06)
+            graph_Zeff.GetXaxis().SetTitleOffset(0.75)
+            graph_Zeff.GetXaxis().SetLabelSize(0.05)
+            graph_Zeff.GetYaxis().SetLabelSize(0.05)
+
+            fr = graph_Zeff.Fit("pol1","S")
+
+            if eff in slope.keys():
+                slope[eff].append(fr.Parameter(1))
+            else:
+                slope[eff] = [fr.Parameter(1)]
+
+            c1=ROOT.TCanvas("c1","c1",1000,600)
+            c1.cd(1)
+            graph_Zeff.Draw("AP")
+
+            legend=ROOT.TLegend(0.65,0.65,0.9,0.9)
+            legend.AddEntry(graph_Zeff,"CMS","pe")
+
+            text1=ROOT.TText(0.3,0.83,"CMS Automatic, produced: "+datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            text1.SetNDC()
+            text1.Draw()
+
+            text_fr =  ROOT.TText(0.2,0.30,"p0 = "+str(round(fr.Parameter(0),5))+" \pm "+str(round(fr.ParError(0),5)) )
+            text_fr1 = ROOT.TText(0.2,0.23,"p1 = "+str(round(fr.Parameter(1),5))+" \pm "+str(round(fr.ParError(1),5)))
+            text_fr2 = ROOT.TText(0.2,0.16,"Chi2: "+str(round(fr.Chi2(),5))+" Ndf: "+str(fr.Ndf()))
+            text_fr.SetNDC()
+            text_fr.Draw()
+            text_fr1.SetNDC()
+            text_fr1.Draw()
+            text_fr2.SetNDC()
+            text_fr2.Draw() 
+
+            c1.SaveAs(outDir+"PlotsFill_"+str(fill)+"/"+str(eff)+"_PU"+str(fill)+".png")
+            c1.Close()
+
+
         ### Z Rates ###
         
-        graph_cms=ROOT.TGraphErrors(len(dFill),dFill['tdate'].values,dFill['ZRate'].values, dFill['tdateE'].values, dFill['ZRateE'].values )
-        graph_cms.SetName("graph_cms")
-        graph_cms.SetMarkerStyle(22)
-        graph_cms.SetMarkerColor(ROOT.kOrange+8)
-        graph_cms.SetFillStyle(0)
-        graph_cms.SetMarkerSize(1.5)
-	graph_cms.GetXaxis().SetTimeDisplay(1)
-	graph_cms.SetTitle(suffix+" Z-Rates, Fill "+str(fill))
-	graph_cms.GetYaxis().SetTitle("Z-Rate [Hz]")
-	graph_cms.GetYaxis().SetTitleSize(0.07)
-	graph_cms.GetYaxis().SetTitleOffset(0.7)
-        graph_cms.GetXaxis().SetTitle("Time")
-	graph_cms.GetXaxis().SetTitleSize(0.06)
-	graph_cms.GetXaxis().SetTitleOffset(0.75)
-	graph_cms.GetXaxis().SetLabelSize(0.05)
-	graph_cms.GetYaxis().SetLabelSize(0.05)
-	graph_cms.GetXaxis().SetRangeUser(startTime,endTime)
+        graph_zrates=ROOT.TGraphErrors(len(dFill),dFill['tdate'].values,dFill['ZRate'].values, dFill['tdateE'].values, dFill['ZRateE'].values )
+        graph_zrates.SetName("graph_zrates")
+        graph_zrates.SetMarkerStyle(22)
+        graph_zrates.SetMarkerColor(ROOT.kOrange+8)
+        graph_zrates.SetFillStyle(0)
+        graph_zrates.SetMarkerSize(1.5)
+	graph_zrates.GetXaxis().SetTimeDisplay(1)
+	graph_zrates.SetTitle(suffix+" Z-Rates, Fill "+str(fill))
+	graph_zrates.GetYaxis().SetTitle("Z-Rate [Hz]")
+	graph_zrates.GetYaxis().SetTitleSize(0.07)
+	graph_zrates.GetYaxis().SetTitleOffset(0.7)
+        graph_zrates.GetXaxis().SetTitle("Time")
+	graph_zrates.GetXaxis().SetTitleSize(0.06)
+	graph_zrates.GetXaxis().SetTitleOffset(0.75)
+	graph_zrates.GetXaxis().SetLabelSize(0.05)
+	graph_zrates.GetYaxis().SetLabelSize(0.05)
+	graph_zrates.GetXaxis().SetRangeUser(startTime,endTime)
 		
         c1=ROOT.TCanvas("c1","c1",1000,600)
 	c1.cd(1)
-	graph_cms.Draw("AP")
+	graph_zrates.Draw("AP")
 
 	legend=ROOT.TLegend(0.65,0.65,0.9,0.9)
-	legend.AddEntry(graph_cms,"CMS","pe")
+	legend.AddEntry(graph_zrates,"CMS","pe")
 
 	text1=ROOT.TText(0.3,0.83,"CMS Automatic, produced: "+datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 	text1.SetNDC()
 	text1.Draw()
-	c1.SaveAs(args.saveDir+"PlotsFill_"+str(fill)+"/zrates"+str(fill)+suffix+".png")
+	c1.SaveAs(outDir+"PlotsFill_"+str(fill)+"/zrates"+str(fill)+suffix+".png")
 	c1.Close()
 
         ### Z Luminosity vs reference Luminosity ###
@@ -221,7 +289,7 @@ for fill in data.drop_duplicates('fill')['fill'].values:
         text1=ROOT.TText(0.3,0.83,"CMS Automatic, produced: "+datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         text1.SetNDC()
         text1.Draw()
-        c2.SaveAs(args.saveDir+"PlotsFill_"+str(fill)+"/ZLumi"+str(fill)+suffix+".png")
+        c2.SaveAs(outDir+"PlotsFill_"+str(fill)+"/ZLumi"+str(fill)+suffix+".png")
         c2.Close()
 
         ### Cross sections ###
@@ -229,30 +297,30 @@ for fill in data.drop_duplicates('fill')['fill'].values:
 	metaXsecCMS.append(sum(dFill['Xsec'].values)/len(dFill))	
 	metaFills.append(float(fill))	
 
-	graph_cmsXsec=ROOT.TGraph(len(dFill),dFill['tdate'].values,dFill['Xsec'].values)
-        graph_cmsXsec.SetName("graph_cmsXsec")
-        graph_cmsXsec.SetMarkerStyle(22)
-        graph_cmsXsec.SetMarkerColor(ROOT.kOrange+8)
-        graph_cmsXsec.SetFillStyle(0)
-        graph_cmsXsec.SetMarkerSize(1.5)
-	graph_cmsXsec.SetFillStyle(0)
-	graph_cmsXsec.SetTitle(" cross section, Fill "+str(fill))
-        graph_cmsXsec.GetXaxis().SetTimeDisplay(1)
-	graph_cmsXsec.GetYaxis().SetTitle("#sigma^{fid}_{Z} [pb]")
-	graph_cmsXsec.GetYaxis().SetTitleSize(0.06)
-	graph_cmsXsec.GetYaxis().SetTitleOffset(0.80)
-	graph_cmsXsec.GetXaxis().SetTitle("Time")
-	graph_cmsXsec.GetXaxis().SetTitleSize(0.06)
-	graph_cmsXsec.GetXaxis().SetTitleOffset(0.72)
-	graph_cmsXsec.GetXaxis().SetLabelSize(0.05)
-	graph_cmsXsec.GetYaxis().SetLabelSize(0.05)	
+	graph_xsec=ROOT.TGraph(len(dFill),dFill['tdate'].values,dFill['Xsec'].values)
+        graph_xsec.SetName("graph_xsec")
+        graph_xsec.SetMarkerStyle(22)
+        graph_xsec.SetMarkerColor(ROOT.kOrange+8)
+        graph_xsec.SetFillStyle(0)
+        graph_xsec.SetMarkerSize(1.5)
+	graph_xsec.SetFillStyle(0)
+	graph_xsec.SetTitle(" cross section, Fill "+str(fill))
+        graph_xsec.GetXaxis().SetTimeDisplay(1)
+	graph_xsec.GetYaxis().SetTitle("#sigma^{fid}_{Z} [pb]")
+	graph_xsec.GetYaxis().SetTitleSize(0.06)
+	graph_xsec.GetYaxis().SetTitleOffset(0.80)
+	graph_xsec.GetXaxis().SetTitle("Time")
+	graph_xsec.GetXaxis().SetTitleSize(0.06)
+	graph_xsec.GetXaxis().SetTitleOffset(0.72)
+	graph_xsec.GetXaxis().SetLabelSize(0.05)
+	graph_xsec.GetYaxis().SetLabelSize(0.05)	
 
 	c4=ROOT.TCanvas("c4","c4",1000,600)
 	c4.SetGrid()	
-	graph_cmsXsec.Draw("AP")		
+	graph_xsec.Draw("AP")		
 	
 	legend=ROOT.TLegend(0.75,0.75,0.9,0.9)
-	legend.AddEntry(graph_cmsXsec,"CMS","p")
+	legend.AddEntry(graph_xsec,"CMS","p")
 	
         text=ROOT.TText(0.3,0.83,"CMS Automatic, produced: "+datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 	text.SetNDC()
@@ -261,10 +329,40 @@ for fill in data.drop_duplicates('fill')['fill'].values:
 	text2.SetNDC()
 	text2.SetTextSize(0.04)
 	text2.Draw()
-	c4.SaveAs(args.saveDir+"PlotsFill_"+str(fill)+"/ZStability"+str(fill)+suffix+".png")
+	c4.SaveAs(outDir+"PlotsFill_"+str(fill)+"/ZStability"+str(fill)+suffix+".png")
 		
 	c4.Close()
+
 	
+### Efficiency-vs-Pileup slopes per fill
+for key in slope.keys():
+    graph_slopesEffPu = ROOT.TGraph(len(metaFills),metaFills,np.array(slope[key]))
+    graph_slopesEffPu.SetName("graph_slopesEffPu")
+    graph_slopesEffPu.SetMarkerStyle(22)
+    graph_slopesEffPu.SetMarkerColor(ROOT.kOrange+8)
+    graph_slopesEffPu.SetMarkerSize(2.5)
+    graph_slopesEffPu.SetTitle(key+" efficiency-vs-pileup slope")
+
+    graph_slopesEffPu.GetXaxis().SetTitle("Fill")
+    graph_slopesEffPu.GetYaxis().SetTitle("d"+key+"/dPU")
+    graph_slopesEffPu.GetXaxis().SetTitleSize(0.06)
+    graph_slopesEffPu.GetYaxis().SetTitleSize(0.06)
+    graph_slopesEffPu.GetXaxis().SetTitleOffset(0.72)
+    graph_slopesEffPu.GetYaxis().SetTitleOffset(0.8)
+    graph_slopesEffPu.GetXaxis().SetLabelSize(0.05)
+    graph_slopesEffPu.GetYaxis().SetLabelSize(0.05)
+
+    c3=ROOT.TCanvas("c3","c3",1000,600)
+    c3.SetGrid()
+
+    graph_slopesEffPu.Draw("AP")
+
+    text=ROOT.TLatex(0.3,0.83,"CMS Automatic, produced: "+datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    text.SetNDC()
+    text.Draw()
+    c3.SaveAs(outDir+"slopes"+key+"vsPU.png")
+    c3.Close()
+
 
 ### fiducial cross section per fill
 	
@@ -307,7 +405,7 @@ text2=ROOT.TLatex(0.6,0.23,"#splitline{66 GeV<M(#mu#mu) < 116 GeV}{p_{T}(#mu)>"+
 text2.SetNDC()
 text2.SetTextSize(0.04)
 text2.Draw()
-c3.SaveAs(args.saveDir+"summaryZStability"+suffix+".png")
+c3.SaveAs(outDir+"summaryZStability"+suffix+".png")
 c3.Close()
 
 ### corrected Z Counts per fill
@@ -345,7 +443,7 @@ text3=ROOT.TLatex(0.6,0.33,"#color[4]{"+trigger+"}")
 text3.SetNDC()
 text3.SetTextSize(0.04)
 text3.Draw()
-c5.SaveAs(args.saveDir+"ZCountPerFill"+suffix+".png")
+c5.SaveAs(outDir+"ZCountPerFill"+suffix+".png")
 c5.Close()
 
 
@@ -385,5 +483,5 @@ text3=ROOT.TLatex(0.6,0.33,"#color[4]{"+trigger+"}")
 text3.SetNDC()
 text3.SetTextSize(0.04)
 text3.Draw()
-c6.SaveAs(args.saveDir+"ZCountAccumulated"+suffix+".png")
+c6.SaveAs(outDir+"ZCountAccumulated"+suffix+".png")
 c6.Close()
