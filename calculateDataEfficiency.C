@@ -45,7 +45,7 @@ const Float_t massLo  = 66.;
 const Float_t massHi  = 116.;
 const UInt_t  massBin = 50;
 
-const Float_t ptCut    = 30.;
+const Float_t ptCut    = 27.;
 const Float_t etaCut   = 2.4;
 const Float_t etaBound = 0.9;
 
@@ -73,13 +73,33 @@ float getZyield(
                 const TString hName,        //Name of the histogram to take the Z yield from
                 const TString runNum,
                 const Int_t   startLS,
-                const Int_t   endLS
+                const Int_t   endLS,
+                const Int_t   sigMod=0,
+                const Int_t   bkgMod=0
 ){
   TFile *infile = new TFile(inputFile);
 
+
   TH1F *h_yield = (TH1F*)infile->Get("DQMData/Run "+runNum+"/ZCounting/Run summary/Histograms/"+hName);
 
-  return h_yield->Integral(startLS,endLS);
+  if(sifMod == 0){          // perform count
+    return h_yield->Integral(startLS,endLS);
+  }                         
+  else if(sigMod == 1){     // perform fit -- under construction
+    CSignalModel     *sigModel = 0;
+    CBackgroundModel *bkgModel = 0;
+
+    sigModel = new CBreitWignerConvCrystalBall(m,kTRUE);
+    if(bkgMod == 1){
+      bkgModel = new CExponential(m, kTRUE, etaRegion);
+    }
+    else{
+      std::cout <<"ERROR: unvalid background mode for computing Z yield"<< std::endl;
+    }
+  }
+  else{
+    std::cout <<"ERROR: unvalid signal mode for computing Z yield"<< std::endl;
+    return 0;
 }
 
 
@@ -202,8 +222,7 @@ void generateTemplate(
     if(fabs(eta) > etaCut) continue;
 
     wgt = weight;
-    wgt *= h_rw->GetBinContent(h_rw->FindBin(npu));
-
+    //no pileup reweighting:  wgt *= h_rw->GetBinContent(h_rw->FindBin(npu)); 
     if(fabs(eta) < etaBound){
       if(pass) h_mass_pass_central->Fill(mass, wgt);
       else     h_mass_fail_central->Fill(mass, wgt);

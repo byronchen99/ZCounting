@@ -2,11 +2,12 @@ import ROOT
 import os,sys
 from array import array
 from operator import truediv
-import pandas
+import pandas as pd
 import numpy as np
 import glob
 import logging as log
 import argparse
+import pdb
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-b","--beginRun",help="first run to analyze [%default]",default=299918)
@@ -98,13 +99,13 @@ ROOT.gROOT.SetBatch(True)
 log.info("Loading input byls csv...")
 lumiFile=open(str(inFile))
 lumiLines=lumiFile.readlines()
-data=pandas.read_csv(inFile, sep=',',low_memory=False, skiprows=lambda x: lumiLines[x].startswith('#') and not lumiLines[x].startswith('#run'))
+data=pd.read_csv(inFile, sep=',',low_memory=False, skiprows=lambda x: lumiLines[x].startswith('#') and not lumiLines[x].startswith('#run'))
 log.debug("%s",data.axes)
 log.info("Loading input byls csv DONE...")
 #formatting the csv
-data['fill'] = pandas.to_numeric(data['#run:fill'].str.split(':',expand=True)[1])
-data['run'] = pandas.to_numeric(data['#run:fill'].str.split(':',expand=True)[0])
-data['ls'] = pandas.to_numeric(data['ls'].str.split(':',expand=True)[0])
+
+data[['run','fill']] = data['#run:fill'].str.split(':',expand=True).apply(pd.to_numeric)
+data['ls'] = data['ls'].str.split(':',expand=True)[0].apply(pd.to_numeric)
 data = data.drop(['#run:fill','hltpath','source'],axis=1)
 
 if 'delivered(/ub)' in data.columns.tolist():      #convert to /pb
@@ -132,7 +133,6 @@ for run in data.drop_duplicates('run')['run'].values:
     if len(processedRun)>0:
         print "Run "+str(run)+" was already processed, skipping and going to next run"
         continue
-    
 
     #era split follows here:https://twiki.cern.ch/twiki/bin/viewauth/CMS/PdmV2017Analysis#DATA
 
@@ -141,8 +141,8 @@ for run in data.drop_duplicates('run')['run'].values:
         
     log.debug("===Setting up arrays for output csv...")
     fillarray=array('d')
-    beginTime=[]
-    endTime=[]
+    tdate_begin=[]
+    tdate_end=[]
     Zrate=array('d')
     Zrate_EStatUp=array('d')
     Zrate_EStatDown=array('d')
@@ -167,6 +167,10 @@ for run in data.drop_duplicates('run')['run'].values:
     StaeffB=array('d')
     StaeffE=array('d')
 
+    HLTeffB_chi2pass=array('d')
+    HLTeffB_chi2fail=array('d')
+    HLTeffE_chi2pass=array('d')
+    HLTeffE_chi2fail=array('d')
     SITeffB_chi2pass=array('d')
     SITeffB_chi2fail=array('d')
     SITeffE_chi2pass=array('d')
@@ -181,6 +185,7 @@ for run in data.drop_duplicates('run')['run'].values:
     ZMCeffBE=array('d')
     ZMCeffEE=array('d')
 
+    Zeff=array('d')
     ZBBeff=array('d')
     ZBEeff=array('d')
     ZEEeff=array('d')
@@ -246,12 +251,13 @@ for run in data.drop_duplicates('run')['run'].values:
         log.debug("======endTime: %s",dateUp_m.Convert())
         log.debug("======timeWindow: %f",timeWindow_m)
 
-        HLTeffresB_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0]+1,goodLSlist[-1]+1,avgpu_m,"HLT",0,0,0,0,0,recLumi_m)
-        HLTeffresE_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0]+1,goodLSlist[-1]+1,avgpu_m,"HLT",1,0,0,0,0,recLumi_m)
+        HLTeffresB_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0]+1,goodLSlist[-1]+1,avgpu_m,"HLT",0,1,1,1,1,recLumi_m)
+        HLTeffresE_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0]+1,goodLSlist[-1]+1,avgpu_m,"HLT",1,1,1,1,1,recLumi_m)
         SITeffresB_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0]+1,goodLSlist[-1]+1,avgpu_m,"SIT",0,1,1,1,1,recLumi_m)#,mcDir+mcShapeSubDir+"MuStaEff/MC/probes.root",mcDir)
         SITeffresE_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0]+1,goodLSlist[-1]+1,avgpu_m,"SIT",1,1,1,1,1,recLumi_m)#,mcDir+mcShapeSubDir+"MuStaEff/MC/probes.root",mcDir)
         StaeffresB_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0]+1,goodLSlist[-1]+1,avgpu_m,"Sta",0,2,2,2,2,recLumi_m,mcDir+mcShapeSubDir+"MuStaEff/MC/probes.root",mcDir)
         StaeffresE_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0]+1,goodLSlist[-1]+1,avgpu_m,"Sta",1,2,2,2,2,recLumi_m,mcDir+mcShapeSubDir+"MuStaEff/MC/probes.root",mcDir)
+        
         
         #Zyield_m=ROOT.getZyield(str(eosFile),"h_yield_Z",str(run),LSchunks[chunk_m][0],LSchunks[chunk_m][-1])
         #Zyield_BB_m = ROOT.getZyield(str(eosFile),"h_yieldBB_Z",str(run),LSchunks[chunk_m][0],LSchunks[chunk_m][-1])
@@ -331,8 +337,8 @@ for run in data.drop_duplicates('run')['run'].values:
 	#Variables to write in csv file
         fillarray.append(fill)
 
-        beginTime.append(data_run.loc[data_run['ls'] == goodLSlist[0]]['time'].values[0])
-        endTime.append(data_run.loc[data_run['ls'] == goodLSlist[-1]]['time'].values[0])
+        tdate_begin.append(dateLow_m)
+        tdate_end.append(dateUp_m)
         ZrateUncorrected.append(ZRateUncorrected)
         Zrate.append(ZRate)
         Zrate_EStatUp.append(ZRate_EStat[0])
@@ -358,6 +364,10 @@ for run in data.drop_duplicates('run')['run'].values:
         StaeffB.append(StaeffB_m)
         StaeffE.append(StaeffE_m)
 
+        HLTeffB_chi2pass.append(HLTeffresB_m[3])
+        HLTeffB_chi2fail.append(HLTeffresB_m[4])
+        HLTeffE_chi2pass.append(HLTeffresE_m[3])
+        HLTeffE_chi2fail.append(HLTeffresE_m[4])
         SITeffB_chi2pass.append(SITeffresB_m[3])
         SITeffB_chi2fail.append(SITeffresB_m[4])
         SITeffE_chi2pass.append(SITeffresE_m[3])
@@ -372,6 +382,7 @@ for run in data.drop_duplicates('run')['run'].values:
         ZMCeffBE.append(ZMCEffBE)
         ZMCeffEE.append(ZMCEffEE)
 
+        Zeff.append(ZEff)
         ZBBeff.append(ZBBEff)
         ZBEeff.append(ZBEEff)
         ZEEeff.append(ZEEEff)
@@ -383,7 +394,7 @@ for run in data.drop_duplicates('run')['run'].values:
     print "Writing per Run CSV file"
     with open(args.dirCSV+'csvfile'+str(run)+'.csv','wb') as file:
         for c in range(0,nMeasurements):
-		wline = (str(int(fillarray[c]))+","	+str(beginTime[c])+","		+str(endTime[c])+","
+		wline = (str(int(fillarray[c]))+","	+str(tdate_begin[c])+","	+str(tdate_end[c])+","
                         +str(Zrate[c])+","		+str(Zrate_EStatUp[c])+","	+str(Zrate_EStatDown[c])+","
                         +str(instDel[c])+","		+str(lumiDel[c])+","		+str(ZyieldDel[c])+","
                         +str(ZrateUncorrected[c]) )
@@ -392,19 +403,22 @@ for run in data.drop_duplicates('run')['run'].values:
     print "Writing per Run eff CSV file"
     with open(args.dirCSV+'effcsvfile'+str(run)+'.csv','wb') as file:
         for c in range(0,nMeasurements):
-		wline = (str(int(fillarray[c]))+","	+str(beginTime[c])+"," 		+str(endTime[c])+","
+		wline = (str(int(fillarray[c]))+","	+str(tdate_begin[c])+"," 	+str(tdate_end[c])+","
                         +str(Zrate[c])+","         	+str(Zrate_EStatUp[c])+","	+str(Zrate_EStatDown[c])+","
                         +str(instDel[c])+","      	+str(lumiDel[c])+","   		+str(ZyieldDel[c])+","
                         +str(beginLS[c])+","       	+str(endLS[c])+","     		+str(lumiRec[c])+","  	+str(windowarray[c])+","
                         +str(HLTeffB[c])+","       	+str(HLTeffE[c])+","   
                         +str(SITeffB[c])+","       	+str(SITeffE[c])+","
                         +str(StaeffB[c])+","       	+str(StaeffE[c])+","
+                        +str(HLTeffB_chi2pass[c])+","   +str(HLTeffB_chi2fail[c])+","
+                        +str(HLTeffE_chi2pass[c])+","   +str(HLTeffE_chi2fail[c])+","
                         +str(SITeffB_chi2pass[c])+","	+str(SITeffB_chi2fail[c])+"," 
                         +str(SITeffE_chi2pass[c])+"," 	+str(SITeffE_chi2fail[c])+","
                         +str(StaeffB_chi2pass[c])+","	+str(StaeffB_chi2fail[c])+"," 
                         +str(StaeffE_chi2pass[c])+","  	+str(StaeffE_chi2fail[c])+","
                         +str(ZMCeff[c])+","        	+str(ZMCeffBB[c])+","  		+str(ZMCeffBE[c])+"," 	+str(ZMCeffEE[c])+","
-                        +str(ZBBeff[c])+","        	+str(ZBEeff[c])+","    		+str(ZEEeff[c])+","   	+str(pileUp[c]))
+                        +str(Zeff[c])+","               +str(ZBBeff[c])+","             +str(ZBEeff[c])+","    	+str(ZEEeff[c])+","
+                        +str(pileUp[c]))
                 file.write(wline + '\n')
 
 
@@ -413,7 +427,7 @@ print "Writing overall CSV file"
 if args.writeSummaryCSV:
 	rateFileList=sorted(glob.glob(args.dirCSV+'csvfile*.csv'))	
 	with open(args.dirCSV+'Mergedcsvfile.csv','w') as file:
-		file.write("fill,beginTime,endTime,ZRate,ZRate_EStatUp,ZRate_EStatDown,instDelLumi,delLumi,delZCount,ZRateUncorrected")
+		file.write("fill,tdate_end,tdate_begin,ZRate,ZRate_EStatUp,ZRate_EStatDown,instDelLumi,delLumi,delZCount,ZRateUncorrected")
 		file.write('\n')
 		print "There are "+str(len(rateFileList))+" runs in the directory"
 		for m in range(0,len(rateFileList)):						
@@ -434,7 +448,7 @@ if args.writeSummaryCSV:
         effFileList=sorted(glob.glob(args.dirCSV+'effcsvfile*.csv'))
 	print "Starting to write efficiency files."	
         with open(args.dirCSV+'Mergedeffcsvfile.csv','wb') as fileTwo:
-		fileTwo.write("fill,beginTime,endTime,ZRate,ZRate_EStatUp,ZRate_EStatDown,instDelLumi,delLumi,delZCount,beginLS,endLS,recLumi,windowarray,HLTeffB,HLTeffE,SITeffB,SITeffE,StaeffB,StaeffE,SITeffB_chi2pass,SITeffB_chi2fail,SITeffE_chi2pass,SITeffE_chi2fail,StaeffB_chi2pass,StaeffB_chi2fail,StaeffE_chi2pass,StaeffE_chi2fail,ZMCeff,ZMCeffBB,ZMCeffBE,ZMCeffEE,ZBBeff,ZBEeff,ZEEeff,pileUp")
+		fileTwo.write("fill,tdate_begin,tdate_end,ZRate,ZRate_EStatUp,ZRate_EStatDown,instDelLumi,delLumi,delZCount,beginLS,endLS,recLumi,windowarray,HLTeffB,HLTeffE,SITeffB,SITeffE,StaeffB,StaeffE,SITeffB_chi2pass,SITeffB_chi2fail,SITeffE_chi2pass,SITeffE_chi2fail,StaeffB_chi2pass,StaeffB_chi2fail,StaeffE_chi2pass,StaeffE_chi2fail,ZMCeff,ZMCeffBB,ZMCeffBE,ZMCeffEE,Zeff,ZBBeff,ZBEeff,ZEEeff,pileUp")
 		fileTwo.write('\n')
 		for m in range(0,len(effFileList)):
 
