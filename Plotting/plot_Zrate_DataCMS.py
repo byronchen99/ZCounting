@@ -272,7 +272,7 @@ for fill in data.drop_duplicates('fill')['fill'].values:
         graph_ZLumi.GetXaxis().SetTitleOffset(0.75)
         graph_ZLumi.GetXaxis().SetLabelSize(0.05)
         graph_ZLumi.GetYaxis().SetLabelSize(0.05)
-        graph_ZLumi.GetXaxis().SetRangeUser(startTime,endTime)
+        #graph_ZLumi.GetXaxis().SetRangeUser(startTime,endTime)
 
         graph_ZLumi.SetTitle(suffix+" inst. Luminosity, Fill "+str(fill))
 
@@ -330,13 +330,14 @@ for fill in data.drop_duplicates('fill')['fill'].values:
 	text2.SetTextSize(0.04)
 	text2.Draw()
 	c4.SaveAs(outDir+"PlotsFill_"+str(fill)+"/ZStability"+str(fill)+suffix+".png")
-		
+
 	c4.Close()
 
 	
 ### Efficiency-vs-Pileup slopes per fill
 for key in slope.keys():
-    graph_slopesEffPu = ROOT.TGraph(len(metaFills),metaFills,np.array(slope[key]))
+    i_slope = np.array(slope[key])
+    graph_slopesEffPu = ROOT.TGraph(len(metaFills),metaFills,i_slope)
     graph_slopesEffPu.SetName("graph_slopesEffPu")
     graph_slopesEffPu.SetMarkerStyle(22)
     graph_slopesEffPu.SetMarkerColor(ROOT.kOrange+8)
@@ -348,18 +349,25 @@ for key in slope.keys():
     graph_slopesEffPu.GetXaxis().SetTitleSize(0.06)
     graph_slopesEffPu.GetYaxis().SetTitleSize(0.06)
     graph_slopesEffPu.GetXaxis().SetTitleOffset(0.72)
-    graph_slopesEffPu.GetYaxis().SetTitleOffset(0.8)
+    graph_slopesEffPu.GetYaxis().SetTitleOffset(1.1)
     graph_slopesEffPu.GetXaxis().SetLabelSize(0.05)
     graph_slopesEffPu.GetYaxis().SetLabelSize(0.05)
-
+    graph_slopesEffPu.GetYaxis().SetRangeUser(-0.01,0.01)
     c3=ROOT.TCanvas("c3","c3",1000,600)
     c3.SetGrid()
+
+    # mean, where outlier with sigma > 1 are rejected
+    avg_slope = np.mean(i_slope[abs(i_slope - np.mean(i_slope)) < np.std(i_slope)])
 
     graph_slopesEffPu.Draw("AP")
 
     text=ROOT.TLatex(0.3,0.83,"CMS Automatic, produced: "+datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     text.SetNDC()
     text.Draw()
+    text2=ROOT.TLatex(0.2,0.23,"avg slope: "+str(avg_slope))
+    text2.SetNDC()
+    text2.Draw()
+
     c3.SaveAs(outDir+"slopes"+key+"vsPU.png")
     c3.Close()
 

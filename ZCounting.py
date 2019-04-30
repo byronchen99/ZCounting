@@ -251,8 +251,8 @@ for run in data.drop_duplicates('run')['run'].values:
         log.debug("======endTime: %s",dateUp_m.Convert())
         log.debug("======timeWindow: %f",timeWindow_m)
 
-        HLTeffresB_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0]+1,goodLSlist[-1]+1,avgpu_m,"HLT",0,1,1,1,1,recLumi_m)
-        HLTeffresE_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0]+1,goodLSlist[-1]+1,avgpu_m,"HLT",1,1,1,1,1,recLumi_m)
+        HLTeffresB_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0]+1,goodLSlist[-1]+1,avgpu_m,"HLT",0,1,2,1,2,recLumi_m)
+        HLTeffresE_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0]+1,goodLSlist[-1]+1,avgpu_m,"HLT",1,1,2,1,2,recLumi_m)
         SITeffresB_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0]+1,goodLSlist[-1]+1,avgpu_m,"SIT",0,1,1,1,1,recLumi_m)#,mcDir+mcShapeSubDir+"MuStaEff/MC/probes.root",mcDir)
         SITeffresE_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0]+1,goodLSlist[-1]+1,avgpu_m,"SIT",1,1,1,1,1,recLumi_m)#,mcDir+mcShapeSubDir+"MuStaEff/MC/probes.root",mcDir)
         StaeffresB_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0]+1,goodLSlist[-1]+1,avgpu_m,"Sta",0,2,2,2,2,recLumi_m,mcDir+mcShapeSubDir+"MuStaEff/MC/probes.root",mcDir)
@@ -337,8 +337,8 @@ for run in data.drop_duplicates('run')['run'].values:
 	#Variables to write in csv file
         fillarray.append(fill)
 
-        tdate_begin.append(dateLow_m)
-        tdate_end.append(dateUp_m)
+        tdate_begin.append(dateLow_m.Convert())
+        tdate_end.append(dateUp_m.Convert())
         ZrateUncorrected.append(ZRateUncorrected)
         Zrate.append(ZRate)
         Zrate_EStatUp.append(ZRate_EStat[0])
@@ -448,7 +448,7 @@ if args.writeSummaryCSV:
         effFileList=sorted(glob.glob(args.dirCSV+'effcsvfile*.csv'))
 	print "Starting to write efficiency files."	
         with open(args.dirCSV+'Mergedeffcsvfile.csv','wb') as fileTwo:
-		fileTwo.write("fill,tdate_begin,tdate_end,ZRate,ZRate_EStatUp,ZRate_EStatDown,instDelLumi,delLumi,delZCount,beginLS,endLS,recLumi,windowarray,HLTeffB,HLTeffE,SITeffB,SITeffE,StaeffB,StaeffE,SITeffB_chi2pass,SITeffB_chi2fail,SITeffE_chi2pass,SITeffE_chi2fail,StaeffB_chi2pass,StaeffB_chi2fail,StaeffE_chi2pass,StaeffE_chi2fail,ZMCeff,ZMCeffBB,ZMCeffBE,ZMCeffEE,Zeff,ZBBeff,ZBEeff,ZEEeff,pileUp")
+		fileTwo.write("fill,tdate_begin,tdate_end,ZRate,ZRate_EStatUp,ZRate_EStatDown,instDelLumi,delLumi,delZCount,beginLS,endLS,recLumi,windowarray,HLTeffB,HLTeffE,SITeffB,SITeffE,StaeffB,StaeffE,HLTeffB_chi2pass,HLTeffB_chi2fail,HLTeffE_chi2pass,HLTeffE_chi2fail,SITeffB_chi2pass,SITeffB_chi2fail,SITeffE_chi2pass,SITeffE_chi2fail,StaeffB_chi2pass,StaeffB_chi2fail,StaeffE_chi2pass,StaeffE_chi2fail,ZMCeff,ZMCeffBB,ZMCeffBE,ZMCeffEE,Zeff,ZBBeff,ZBEeff,ZEEeff,pileUp")
 		fileTwo.write('\n')
 		for m in range(0,len(effFileList)):
 
