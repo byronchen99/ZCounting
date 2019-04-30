@@ -25,15 +25,26 @@ class CQuadratic : public CBackgroundModel
 public:
   CQuadratic(RooRealVar &m, const Bool_t pass, const int ibin, const float p0, const float e0, const float p1, const float e1, const float p2, const float e2);
   ~CQuadratic();
-  RooRealVar *a0, *a1, *a2;
+  RooRealVar *a0;
+  RooRealVar *a1;
+  RooRealVar *a2;
+};
+
+class CExpQuad : public CBackgroundModel
+{
+public:
+  CExpQuad(RooRealVar &m, const Bool_t pass, const int ibin, const float p0, const float e0, const float p1, const float e1, const float p2, const float e2);
+  CExponential *exp;
+  CQuadratic *quad;
+  ~CExpQuad();
 };
 
 //--------------------------------------------------------------------------------------------------
 CExponential::CExponential(RooRealVar &m, const Bool_t pass, const int ibin)
 {
   char name[10];
-  if(pass) sprintf(name,"%s_%d","Pass",ibin);
-  else     sprintf(name,"%s_%d","Fail",ibin);
+  if(pass) sprintf(name,"Ex%s_%d","Pass",ibin);
+  else     sprintf(name,"Ex%s_%d","Fail",ibin);
   
   char vname[50];
   
@@ -53,8 +64,8 @@ CExponential::~CExponential()
 CQuadratic::CQuadratic(RooRealVar &m, const Bool_t pass, const int ibin, const float p0, const float e0, const float p1, const float e1, const float p2, const float e2)
 { 
   char name[10];
-  if(pass) sprintf(name,"%s_%d","Pass",ibin);
-  else     sprintf(name,"%s_%d","Fail",ibin);
+  if(pass) sprintf(name,"Q%s_%d","Pass",ibin);
+  else     sprintf(name,"Q%s_%d","Fail",ibin);
 
   char a0name[50];
   sprintf(a0name,"a0%s",name); 
@@ -95,3 +106,29 @@ CQuadratic::~CQuadratic()
   delete a1;
   delete a2;
 }
+
+//--------------------------------------------------------------------------------------------------
+CExpQuad::CExpQuad(RooRealVar &m, const Bool_t pass, const int ibin, const float p0, const float e0, const float p1, const float e1, const float p2, const float e2)
+{
+  char name[10];
+  if(pass) sprintf(name,"ExQ_%s_%d","Pass",ibin);
+  else     sprintf(name,"ExQ_%s_%d","Fail",ibin);
+  char vname[50];
+  sprintf(vname,"background%s",name);
+  
+  quad = new CQuadratic(m, pass, ibin, p0, e0, p1, e1, p2, e2);
+  exp = new CExponential(m, pass, ibin);
+  
+  std::cout<<quad->model<<std::endl;
+  std::cout<<exp->model<<std::endl;
+
+  model = new RooGenericPdf(vname,vname,"@0+@1",RooArgList(*(quad->model),*(exp->model)));
+  std::cout<<model<<std::endl;
+}
+
+CExpQuad::~CExpQuad()
+{
+  delete quad;
+  delete exp;
+}
+

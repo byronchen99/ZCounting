@@ -82,10 +82,10 @@ float getZyield(
 
   TH1F *h_yield = (TH1F*)infile->Get("DQMData/Run "+runNum+"/ZCounting/Run summary/Histograms/"+hName);
 
-  if(sifMod == 0){          // perform count
-    return h_yield->Integral(startLS,endLS);
-  }                         
-  else if(sigMod == 1){     // perform fit -- under construction
+  //if(sigMod == 0){          // perform count
+  return h_yield->Integral(startLS,endLS);
+  /*}                         
+  /else if(sigMod == 1){     // perform fit -- under construction
     CSignalModel     *sigModel = 0;
     CBackgroundModel *bkgModel = 0;
 
@@ -100,6 +100,7 @@ float getZyield(
   else{
     std::cout <<"ERROR: unvalid signal mode for computing Z yield"<< std::endl;
     return 0;
+  }*/
 }
 
 
@@ -337,6 +338,7 @@ void performFit(
 // Background Model:
 //  	1: exponential model
 //  	2: quadratic model
+//  	3: exponential + quadratic model
 
   TFile *histfile = 0;
   if(sigpass==2 || sigfail==2) {
@@ -364,9 +366,14 @@ void performFit(
   if(bkgpass==1) {
     bkgPass = new CExponential(m, kTRUE, etaRegion);
     nflpass += 1;
-  } else if(bkgpass==2) {
+  } 
+  else if(bkgpass==2) {
     bkgPass = new CQuadratic(m, kTRUE, etaRegion, 0.,0.,0.,0.,0.,0.);
     nflpass += 3;
+  }
+  else if(bkgpass==3) {
+    bkgPass = new CExpQuad(m, kTRUE, etaRegion, 0.,0.,0.,0.,0.,0.);
+    nflpass += 4;
   }
 
   if(sigfail==1) {
@@ -382,13 +389,19 @@ void performFit(
   if(bkgfail==1) {
     bkgFail = new CExponential(m, kFALSE, etaRegion);
     nflfail += 1;
-  } else if(bkgfail==2) {
+  } 
+  else if(bkgfail==2) {
     auto vBkgPars = preFit(failHist);
 
     bkgFail = new CQuadratic(m, kFALSE, etaRegion, vBkgPars[0], vBkgPars[1], vBkgPars[2], vBkgPars[3], vBkgPars[4], vBkgPars[5]);
-//    bkgFail = new CQuadratic(m, kFALSE, etaRegion, 0.,0.,0.,0.,0.,0.);
     nflfail += 3;
   }
+  else if(bkgfail==3) {
+    auto vBkgPars = preFit(failHist);
+    bkgFail = new CExpQuad(m, kFALSE, etaRegion, vBkgPars[0], vBkgPars[1], vBkgPars[2], vBkgPars[3], vBkgPars[4], vBkgPars[5]);
+    nflfail += 4;
+  }
+
 
 
   Double_t NsigMax     = passHist->Integral()+failHist->Integral();
@@ -407,7 +420,6 @@ void performFit(
   modelPass = new RooAddPdf("modelPass","Model for PASS sample",
                               (bkgpass>0) ? RooArgList(*(sigPass->model),*(bkgPass->model)) :  RooArgList(*(sigPass->model)),
                               (bkgpass>0) ? RooArgList(NsigPass,NbkgPass) : RooArgList(NsigPass));
-
   modelFail = new RooAddPdf("modelFail","Model for FAIL sample",RooArgList(*(sigFail->model),*(bkgFail->model)),RooArgList(NsigFail,NbkgFail));
 
   RooSimultaneous totalPdf("totalPdf","totalPdf",sample);
@@ -539,7 +551,6 @@ void performFit(
   delete sigFail;
   delete bkgFail;
   delete histfile;
-//  delete datfile;
 }
 
 //--------------------------------------------------------------------------------------------------
