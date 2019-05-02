@@ -48,10 +48,10 @@ refLumiSource='hfoc18v5'
 ########## Data Acquisition ##########
 
 data = pandas.read_csv(str(args.cms), sep=',',low_memory=False)#, skiprows=[1,2,3,4,5])
-data = data.sort_values(['fill','beginTime','endTime'])
+data = data.sort_values(['fill','tdate_begin','tdate_end'])
 zcountlist = data.groupby('fill')['delZCount'].apply(list)
 delLumilist = data.groupby('fill')['delLumi'].apply(list)
-timelist = data.groupby('fill')['endTime'].apply(list)
+#timelist = data.groupby('fill')['endTime'].apply(list)
 
 # convert reference data from ByLs.csv file
 lumiFile=open(str(args.refLumi))
@@ -75,6 +75,7 @@ data_ref[['hour','min','sec']] = (data_ref['time'].str.split(":",expand=True))
 data_ref['tdate'] = "20"+data_ref['year']+"-"+data_ref['month']+"-"+data_ref['day']+" "+data_ref['hour']+":"+data_ref['min']+":"+data_ref['sec']
 data_ref['tdate'] = data_ref['tdate'].apply(ROOT.TDatime)
 data_ref['tdate'] = data_ref['tdate'].apply(lambda x: x.Convert()).astype(float)
+#data_ref['tdate'] = data['tdate_begin'] + (data['tdate_end'] - data['tdate_begin'])/2
 data_ref['tdateE'] = data_ref['tdate'] - data_ref['tdate']
 data_ref['dLdel(/pb)'] = data_ref['delivered(/pb)']/secPerLS 	#delivered instantanious luminosity
 data_ref = data_ref[['fill','dLdel(/pb)','tdate']]		#Keep only what you need 
@@ -85,23 +86,23 @@ data = data[np.isfinite(data['ZRate'])]
 data = data[data['delZCount'] > 1000.]
 
 # convert time into root TDatime format
-data[['date','time']] = data['beginTime'].str.split(" ",expand=True)
-data[['month','day','year']] = (data['date'].str.split("/",expand=True))
-data[['hour','min','sec']] = (data['time'].str.split(":",expand=True))
-data['tdate_begin'] = "20"+data['year']+"-"+data['month']+"-"+data['day']+" "+data['hour']+":"+data['min']+":"+data['sec']
-data['tdate_begin'] = data['tdate_begin'].apply(ROOT.TDatime)
-data['tdate_begin'] = data['tdate_begin'].apply(lambda x: x.Convert()).astype(float)
-data[['date','time']] = data['endTime'].str.split(" ",expand=True)
-data[['month','day','year']] = (data['date'].str.split("/",expand=True))
-data[['hour','min','sec']] = (data['time'].str.split(":",expand=True))
-data['tdate_end'] = "20"+data['year']+"-"+data['month']+"-"+data['day']+" "+data['hour']+":"+data['min']+":"+data['sec']
-data['tdate_end'] = data['tdate_end'].apply(ROOT.TDatime)
-data['tdate_end'] = data['tdate_end'].apply(lambda x: x.Convert()).astype(float)
+#data[['date','time']] = data['beginTime'].str.split(" ",expand=True)
+#data[['month','day','year']] = (data['date'].str.split("/",expand=True))
+#data[['hour','min','sec']] = (data['time'].str.split(":",expand=True))
+#data['tdate_begin'] = "20"+data['year']+"-"+data['month']+"-"+data['day']+" "+data['hour']+":"+data['min']+":"+data['sec']
+#data['tdate_begin'] = data['tdate_begin'].apply(ROOT.TDatime)
+#data['tdate_begin'] = data['tdate_begin'].apply(lambda x: x.Convert()).astype(float)
+#data[['date','time']] = data['endTime'].str.split(" ",expand=True)
+#data[['month','day','year']] = (data['date'].str.split("/",expand=True))
+#data[['hour','min','sec']] = (data['time'].str.split(":",expand=True))
+#data['tdate_end'] = "20"+data['year']+"-"+data['month']+"-"+data['day']+" "+data['hour']+":"+data['min']+":"+data['sec']
+#data['tdate_end'] = data['tdate_end'].apply(ROOT.TDatime)
+#data['tdate_end'] = data['tdate_end'].apply(lambda x: x.Convert()).astype(float)
 
 data['tdate'] = data['tdate_begin'] + (data['tdate_end'] - data['tdate_begin'])/2
 
 data['tdateE'] = (data['tdate_end'] - data['tdate_begin'])/2
-data = data.drop(['date','time','month','day','year','hour','min','sec'],axis=1)
+#data = data.drop(['date','time','month','day','year','hour','min','sec'],axis=1)
 
 data['ZRateE'] = data['ZRate'] * np.sqrt( 1./data['delZCount'] + ZeffE**2 )
 
@@ -127,6 +128,7 @@ metaFills=array('d')
 metaXsecCMS=array('d')
 
 slope = dict()
+chi2 = dict()
 
 zcountsAccu=0
 metazcountsAccu=array('d')
@@ -134,6 +136,54 @@ metazcountsoverlumi=array('d')
 
 ########## Plot ##########
 
+### chi2 values of each category
+
+for c in ('HLTeffB_chi2pass', 'HLTeffB_chi2fail', 'HLTeffE_chi2pass', 'HLTeffE_chi2fail',
+          'SITeffB_chi2pass', 'SITeffB_chi2fail', 'SITeffE_chi2pass', 'SITeffE_chi2fail',
+          'StaeffB_chi2pass', 'StaeffB_chi2fail', 'StaeffE_chi2pass', 'StaeffE_chi2fail'
+         ):
+    graph_chi2 = ROOT.TGraph(len(data),data['tdate'].values,data[c].values)
+    graph_chi2.SetName("graph_chi2")
+    graph_chi2.SetMarkerStyle(23)
+    graph_chi2.SetMarkerColor(ROOT.kAzure-4)
+    graph_chi2.SetMarkerSize(1.5)
+    graph_chi2.SetTitle(c)
+
+    graph_chi2.GetYaxis().SetTitle("#chi^{2}/ndf")
+    graph_chi2.GetXaxis().SetTitle("Time")
+    graph_chi2.GetXaxis().SetTimeDisplay(1)
+    graph_chi2.GetXaxis().SetTimeOffset(0,"gmt")
+    graph_chi2.GetXaxis().SetTitleSize(0.06)
+    graph_chi2.GetYaxis().SetTitleSize(0.06)
+    graph_chi2.GetXaxis().SetTitleOffset(0.72)
+    graph_chi2.GetYaxis().SetTitleOffset(1.1)
+    graph_chi2.GetXaxis().SetLabelSize(0.05)
+    graph_chi2.GetYaxis().SetLabelSize(0.05)
+    #graph_chi2.GetYaxis().SetRangeUser(-0.01,0.01)
+    c3=ROOT.TCanvas("c3","c3",1000,600)
+    c3.SetGrid()
+
+    # mean, where outlier with sigma > 1 are rejected
+    avg_chi2 = np.mean(data[c][abs(data[c] - np.mean(data[c])) < np.std(data[c])])
+
+    graph_chi2.Draw("AP")
+
+    legend=ROOT.TLegend(0.2,0.6,0.4,0.7)
+    legend.AddEntry(graph_chi2,"Measurement","p")
+    legend.Draw("same")
+
+    text=ROOT.TLatex(0.3,0.83,"CMS Automatic, produced: "+datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    text.SetNDC()
+    text.Draw()
+    text2=ROOT.TLatex(0.2,0.23,"avg chi2: "+str(avg_chi2))
+    text2.SetNDC()
+    text2.Draw()
+
+    c3.SaveAs(outDir+c+".png")
+    c3.Close()
+    
+
+##### loop over Fills and produce fill specific plots
 for fill in data.drop_duplicates('fill')['fill'].values:
 	dFill = data.loc[data['fill'] == fill]
         
@@ -142,7 +192,6 @@ for fill in data.drop_duplicates('fill')['fill'].values:
 	metazcountsAccu.append(zcountsAccu)
 	timel.append(dFill.iloc[-1]['tdate'])
   
-	
 	startTime=dFill.iloc[0]['tdate']
 	endTime = dFill.iloc[-1]['tdate']
 	
@@ -334,7 +383,7 @@ for fill in data.drop_duplicates('fill')['fill'].values:
 	c4.Close()
 
 	
-### Efficiency-vs-Pileup slopes per fill
+### Efficiency-vs-Pileup slopes vs fill
 for key in slope.keys():
     i_slope = np.array(slope[key])
     graph_slopesEffPu = ROOT.TGraph(len(metaFills),metaFills,i_slope)
@@ -372,7 +421,7 @@ for key in slope.keys():
     c3.Close()
 
 
-### fiducial cross section per fill
+### fiducial cross section vs fill
 	
 ROOT.gROOT.SetBatch(True)
 metaXsecCMS2=array('d')
@@ -416,7 +465,7 @@ text2.Draw()
 c3.SaveAs(outDir+"summaryZStability"+suffix+".png")
 c3.Close()
 
-### corrected Z Counts per fill
+### corrected Z Counts vs fill
 
 graph_zcount=ROOT.TGraph(len(metaFills),metaFills,zcountl)
 graph_zcount.SetName("graph_zcount")
