@@ -339,12 +339,18 @@ void performFit(
 // Background Model:
 //  	1: exponential model
 //  	2: quadratic model
-//  	3: Das = decaying exponential + wide gaussian with exponential tail
+//  	3: exponential + quadratic model
+//  	4: Das (wide gaussian with exponential tails) model
+//  	5: Das + decaying exponential model
 
   TFile *histfile = 0;
   if(sigpass==2 || sigfail==2) {
     histfile = new TFile("histTemplates.root");
     assert(histfile);
+  }
+  std::vector<double> vBkgPars;
+  if(bkgfail== 2 or bkgfail==3){
+    vBkgPars = preFit(failHist);
   }
 
   CSignalModel     *sigPass = 0;
@@ -354,50 +360,63 @@ void performFit(
 
   Int_t nflpass=0, nflfail=0;
 
-  if(sigpass==1) {
-    sigPass = new CBreitWignerConvCrystalBall(m,kTRUE);
-    nflpass += 4;
-  } else if(sigpass==2) {
-    TH1D *h = (TH1D*)histfile->Get(Form("h_mass_pass_%s", etaRegion ? "forward" : "central"));
-    assert(h);
-    sigPass = new CMCTemplateConvGaussian(m,h,kTRUE,etaRegion);
-    nflpass += 2;
+  switch(sigpass) {
+    case 1:
+      sigPass = new CBreitWignerConvCrystalBall(m,kTRUE);
+      nflpass += 4; break;
+    case 2:
+      TH1D *h = (TH1D*)histfile->Get(Form("h_mass_pass_%s", etaRegion ? "forward" : "central"));
+      assert(h);
+      sigPass = new CMCTemplateConvGaussian(m,h,kTRUE,etaRegion);
+      nflpass += 2; break;
   }
 
-  if(bkgpass==1) {
-    bkgPass = new CExponential(m, kTRUE, etaRegion);
-    nflpass += 1;
-  } else if(bkgpass==2) {
-    bkgPass = new CQuadratic(m, kTRUE, etaRegion, 0.,0.,0.,0.,0.,0.);
-    nflpass += 3;
-  } else if(bkgpass==3) {
-    bkgPass = new CDasPlusExp(m, kTRUE, etaRegion);
-    nflpass += 6;
+  switch(bkgpass) {
+    case 1:
+      bkgPass = new CExponential(m, kTRUE, etaRegion);
+      nflpass += 1; break;
+    case 2:
+      bkgPass = new CQuadratic(m, kTRUE, etaRegion, 0.,0.,0.,0.,0.,0.);
+      nflpass += 3; break;
+    case 3:
+      bkgPass = new CQuadPlusExp(m, kTRUE, etaRegion, 0.,0.,0.,0.,0.,0.);
+      nflpass += 4; break;
+    case 4:
+      bkgPass = new CDas(m, kTRUE, etaRegion);
+      nflpass += 4; break;
+    case 5:
+      bkgPass = new CDasPlusExp(m, kTRUE, etaRegion);
+      nflpass += 6; break;
   }
 
-  if(sigfail==1) {
-    sigFail = new CBreitWignerConvCrystalBall(m,kFALSE);
-    nflfail += 4;
-  } else if(sigfail==2) {
-    TH1D *h = (TH1D*)histfile->Get(Form("h_mass_fail_%s", etaRegion ? "forward" : "central"));
-    assert(h);
-    sigFail = new CMCTemplateConvGaussian(m,h,kFALSE,etaRegion);
-    nflfail += 2;
+  switch(sigfail) {
+    case 1:
+      sigFail = new CBreitWignerConvCrystalBall(m,kFALSE);
+      nflfail += 4; break;
+    case 2:
+      TH1D *h = (TH1D*)histfile->Get(Form("h_mass_fail_%s", etaRegion ? "forward" : "central"));
+      assert(h);
+      sigFail = new CMCTemplateConvGaussian(m,h,kFALSE,etaRegion);
+      nflfail += 2; break;
   }
 
-  if(bkgfail==1) {
-    bkgFail = new CExponential(m, kFALSE, etaRegion);
-    nflfail += 1;
-  } else if(bkgfail==2) {
-    auto vBkgPars = preFit(failHist);
-    bkgFail = new CQuadratic(m, kFALSE, etaRegion, vBkgPars[0], vBkgPars[1], vBkgPars[2], vBkgPars[3], vBkgPars[4], vBkgPars[5]);
-    nflfail += 3;
-  }  else if(bkgfail==3) {
-    auto vBkgPars = preFit(failHist);
-    bkgFail = new CDasPlusExp(m, kFALSE, etaRegion);
-    nflfail += 6;
+  switch(bkgfail) {
+    case 1:
+      bkgFail = new CExponential(m, kFALSE, etaRegion);
+      nflfail += 1; break;
+    case 2:
+      bkgFail = new CQuadratic(m, kFALSE, etaRegion, vBkgPars[0], vBkgPars[1], vBkgPars[2], vBkgPars[3], vBkgPars[4], vBkgPars[5]);
+      nflfail += 3; break;
+    case 3: 
+      bkgFail = new CQuadPlusExp(m, kFALSE, etaRegion, vBkgPars[0], vBkgPars[1], vBkgPars[2], vBkgPars[3], vBkgPars[4], vBkgPars[5]);
+      nflfail += 4; break;
+    case 4:
+      bkgFail = new CDas(m, kTRUE, etaRegion);
+      nflfail += 4; break;
+    case 5:
+      bkgFail = new CDasPlusExp(m, kFALSE, etaRegion);
+      nflfail += 6; break;
   }
-
 
 
   Double_t NsigMax     = passHist->Integral()+failHist->Integral();
@@ -518,6 +537,7 @@ void performFit(
   }
   plotPass.AddTextBox("CMS Preliminary",0.19,0.83,0.54,0.89,0);
   plotPass.AddTextBox(lumitext,0.62,0.92,0.94,0.99,0,kBlack,-1);
+
   plotPass.Draw(cpass,kTRUE,format);
 
   double f = NsigFail.getVal(), d = NbkgFail.getVal();
