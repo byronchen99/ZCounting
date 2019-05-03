@@ -411,7 +411,7 @@ void performFit(
       bkgFail = new CQuadPlusExp(m, kFALSE, etaRegion, vBkgPars[0], vBkgPars[1], vBkgPars[2], vBkgPars[3], vBkgPars[4], vBkgPars[5]);
       nflfail += 4; break;
     case 4:
-      bkgFail = new CDas(m, kTRUE, etaRegion);
+      bkgFail = new CDas(m, kFALSE, etaRegion);
       nflfail += 4; break;
     case 5:
       bkgFail = new CDasPlusExp(m, kFALSE, etaRegion);

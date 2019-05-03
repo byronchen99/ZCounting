@@ -177,7 +177,7 @@ CDas::CDas(RooRealVar &m, const Bool_t pass, const int ibin)
   sigma  = new RooRealVar("bkg_sigma", "bkg_sigma",   12,    10, 60);
   kLo    = new RooRealVar("bkg_kLo"  , "bkg_kLo"  ,  1.5,   .02, 10);
   kHi    = new RooRealVar("bkg_kHi"  , "bkg_kHi"  ,  1.5,   .02, 10);
-  model  = new RooGaussDoubleSidedExp("bkgDas","bkgDas",m,*mean,*sigma,*kLo,*kHi);
+  model  = new RooGaussDoubleSidedExp(vname,vname,m,*mean,*sigma,*kLo,*kHi);
 }
 
 CDas::~CDas()
