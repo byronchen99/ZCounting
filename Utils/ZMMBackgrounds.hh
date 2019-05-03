@@ -3,6 +3,7 @@
 #include "RooRealVar.h"
 #include "RooExponential.h"
 #include "RooGenericPdf.h"
+#include "RooGaussDoubleSidedExp.h"
 
 class CBackgroundModel
 {
@@ -39,12 +40,23 @@ public:
   ~CExpQuad();
 };
 
+class CDasPlusExp: public CBackgroundModel 
+{
+public:
+  CDasPlusExp(RooRealVar &m, const Bool_t pass, const int ibin);
+  RooRealVar *mean,*sigma,*kLo,*kHi,*t1, *frac;
+  RooGaussDoubleSidedExp *dd;
+  RooExponential *exp1;
+  ~CDasPlusExp();
+};
+
+
 //--------------------------------------------------------------------------------------------------
 CExponential::CExponential(RooRealVar &m, const Bool_t pass, const int ibin)
 {
   char name[10];
-  if(pass) sprintf(name,"Ex%s_%d","Pass",ibin);
-  else     sprintf(name,"Ex%s_%d","Fail",ibin);
+  if(pass) sprintf(name,"%s_%d","Pass",ibin);
+  else     sprintf(name,"%s_%d","Fail",ibin);
   
   char vname[50];
   
@@ -64,8 +76,8 @@ CExponential::~CExponential()
 CQuadratic::CQuadratic(RooRealVar &m, const Bool_t pass, const int ibin, const float p0, const float e0, const float p1, const float e1, const float p2, const float e2)
 { 
   char name[10];
-  if(pass) sprintf(name,"Q%s_%d","Pass",ibin);
-  else     sprintf(name,"Q%s_%d","Fail",ibin);
+  if(pass) sprintf(name,"%s_%d","Pass",ibin);
+  else     sprintf(name,"%s_%d","Fail",ibin);
 
   char a0name[50];
   sprintf(a0name,"a0%s",name); 
@@ -111,19 +123,15 @@ CQuadratic::~CQuadratic()
 CExpQuad::CExpQuad(RooRealVar &m, const Bool_t pass, const int ibin, const float p0, const float e0, const float p1, const float e1, const float p2, const float e2)
 {
   char name[10];
-  if(pass) sprintf(name,"ExQ_%s_%d","Pass",ibin);
-  else     sprintf(name,"ExQ_%s_%d","Fail",ibin);
+  if(pass) sprintf(name,"%s_%d","Pass",ibin);
+  else     sprintf(name,"%s_%d","Fail",ibin);
   char vname[50];
   sprintf(vname,"background%s",name);
   
   quad = new CQuadratic(m, pass, ibin, p0, e0, p1, e1, p2, e2);
   exp = new CExponential(m, pass, ibin);
   
-  std::cout<<quad->model<<std::endl;
-  std::cout<<exp->model<<std::endl;
-
   model = new RooGenericPdf(vname,vname,"@0+@1",RooArgList(*(quad->model),*(exp->model)));
-  std::cout<<model<<std::endl;
 }
 
 CExpQuad::~CExpQuad()
@@ -132,3 +140,34 @@ CExpQuad::~CExpQuad()
   delete exp;
 }
 
+//--------------------------------------------------------------------------------------------------
+CDasPlusExp::CDasPlusExp(RooRealVar &m, const Bool_t pass, const int ibin)
+{
+  char name[10];
+  if(pass) sprintf(name,"%s_%d","Pass",ibin);
+  else     sprintf(name,"%s_%d","Fail",ibin);
+  char vname[50];
+  sprintf(vname,"background%s",name);
+
+  mean   = new RooRealVar("bkg_mean" , "bkg_mean" ,   90,    30,200);
+  sigma  = new RooRealVar("bkg_sigma", "bkg_sigma",   12,    10, 60);
+  kLo    = new RooRealVar("bkg_kLo"  , "bkg_kLo"  ,  1.5,   .02, 10);
+  kHi    = new RooRealVar("bkg_kHi"  , "bkg_kHi"  ,  1.5,   .02, 10);
+  dd     = new RooGaussDoubleSidedExp("bkgDas","bkgDas",m,*mean,*sigma,*kLo,*kHi);
+  t1     = new RooRealVar("bkg_t1"  ,"bkg_t1"  ,-0.20,-.4,.4);
+  frac   = new RooRealVar("bkg_frac","bkg_frac", 0.05, 0.,1.);
+  exp1   = new RooExponential("bkg_exp1","bkg_exp1",m,*t1);
+  model  = new RooAddPdf(vname,vname,RooArgList(*dd,*exp1),RooArgList(*frac));
+}
+
+CDasPlusExp::~CDasPlusExp() 
+{
+  delete mean;
+  delete sigma; 
+  delete kLo; 
+  delete kHi;
+  delete t1;
+  delete frac;
+  delete exp1;
+  delete dd;
+}

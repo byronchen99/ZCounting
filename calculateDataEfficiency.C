@@ -22,6 +22,7 @@
 
 #include "Utils/ZMMSignals.hh"
 #include "Utils/ZMMBackgrounds.hh"
+#include "Utils/RooGaussDoubleSidedExp.h"
 #endif
 
 // RooFit headers
@@ -338,7 +339,7 @@ void performFit(
 // Background Model:
 //  	1: exponential model
 //  	2: quadratic model
-//  	3: exponential + quadratic model
+//  	3: Das = decaying exponential + wide gaussian with exponential tail
 
   TFile *histfile = 0;
   if(sigpass==2 || sigfail==2) {
@@ -366,14 +367,12 @@ void performFit(
   if(bkgpass==1) {
     bkgPass = new CExponential(m, kTRUE, etaRegion);
     nflpass += 1;
-  } 
-  else if(bkgpass==2) {
+  } else if(bkgpass==2) {
     bkgPass = new CQuadratic(m, kTRUE, etaRegion, 0.,0.,0.,0.,0.,0.);
     nflpass += 3;
-  }
-  else if(bkgpass==3) {
-    bkgPass = new CExpQuad(m, kTRUE, etaRegion, 0.,0.,0.,0.,0.,0.);
-    nflpass += 4;
+  } else if(bkgpass==3) {
+    bkgPass = new CDasPlusExp(m, kTRUE, etaRegion);
+    nflpass += 6;
   }
 
   if(sigfail==1) {
@@ -389,17 +388,14 @@ void performFit(
   if(bkgfail==1) {
     bkgFail = new CExponential(m, kFALSE, etaRegion);
     nflfail += 1;
-  } 
-  else if(bkgfail==2) {
+  } else if(bkgfail==2) {
     auto vBkgPars = preFit(failHist);
-
     bkgFail = new CQuadratic(m, kFALSE, etaRegion, vBkgPars[0], vBkgPars[1], vBkgPars[2], vBkgPars[3], vBkgPars[4], vBkgPars[5]);
     nflfail += 3;
-  }
-  else if(bkgfail==3) {
+  }  else if(bkgfail==3) {
     auto vBkgPars = preFit(failHist);
-    bkgFail = new CExpQuad(m, kFALSE, etaRegion, vBkgPars[0], vBkgPars[1], vBkgPars[2], vBkgPars[3], vBkgPars[4], vBkgPars[5]);
-    nflfail += 4;
+    bkgFail = new CDasPlusExp(m, kFALSE, etaRegion);
+    nflfail += 6;
   }
 
 
