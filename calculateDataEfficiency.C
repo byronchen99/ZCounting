@@ -113,7 +113,7 @@ std::vector<float> calculateDataEfficiency(
 		const Int_t   startLS,      // starting LS for currect measurement
 		const Int_t   endLS,        // ending LS for currect measurement
 		const Float_t meanPU,       // mean #PU, only needed if use MC template as fitting model
-		const TString effType,      // "HLT" or "SIT" or "Sta"
+		const TString effType,      // "HLT" or "SIT" or "Glo" or "Sta" or "Trk"
 		const Bool_t  etaRegion,    // 0 for barrel, 1 for forward 
 		const Int_t   sigModPass,   // signal extraction method for PASS sample
 		const Int_t   bkgModPass,   // background model for PASS sample
