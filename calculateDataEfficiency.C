@@ -443,7 +443,7 @@ void performFit(
 
   RooFitResult *fitResult=0;
   Int_t strategy = 2;
-  if(effType == "SIT") {Nsig.setRange(0,2.0*NsigMax);strategy=1;} 
+  if(effType == "SIT" or effType == "HLT") {Nsig.setRange(0,2.0*NsigMax);strategy=1;} 
   RooMsgService::instance().setSilentMode(kTRUE);
   fitResult = totalPdf.fitTo(*dataCombined,
                              RooFit::PrintEvalErrors(-1),

@@ -203,7 +203,7 @@ CDasPlusExp::CDasPlusExp(RooRealVar &m, const Bool_t pass, const int ibin)
   kHi    = new RooRealVar("bkg_kHi"  , "bkg_kHi"  ,  1.5,   .02, 10);
   dd     = new RooGaussDoubleSidedExp("bkgDas","bkgDas",m,*mean,*sigma,*kLo,*kHi);
   t1     = new RooRealVar("bkg_t1"  ,"bkg_t1"  ,-0.20,-.4,.4);
-  frac   = new RooRealVar("bkg_frac","bkg_frac", 0.05, 0.,1.);
+  frac   = new RooRealVar("bkg_frac","bkg_frac", .95, 0.,1.);
   exp1   = new RooExponential("bkg_exp1","bkg_exp1",m,*t1);
   model  = new RooAddPdf(vname,vname,RooArgList(*dd,*exp1),RooArgList(*frac));
 }
