@@ -50,7 +50,7 @@ mcShapeSubDir= args.dirMCShape# "MCFiles/92X_norw_IsoMu27_noIso/"
 secPerLS=float(23.3)
 currentYear=2018
 maximumLS=2500
-ZperMeasurement=7500 #required number of Z per measurement
+LSperMeasurement=100 #required number of lumi sections per measurement
 staFitChi2Th=2.      #threshold on chi2 to trigger protection mechanism
 staFitEffThHi=0.999  #threshold on eff. to trigger protection mechanism
 staFitEffThLo=0.95   #threshold on eff. to trigger protection mechanism
@@ -226,13 +226,10 @@ for run in data.drop_duplicates('run')['run'].values:
         # number of events in each ls (which may or may not have a Z candidate)
         h_n0 = f1.Get("DQMData/Run "+str(run)+"/ZCounting/Run summary/Histograms/h_npv").ProjectionX() 
         # produce goodLSlist with ls that are used for one measurement
-        # Each measurement should have more than 'ZperMeasurement' Z's, If the last measurement is smaller, combine it
-        # Note: lumisection 'n' is stored in histogram bin 'n+1'
-        #   therefore we have to add 1 to the lumisection in question
         Zyield_m = 0
         n0list = []
         goodLSlist = []
-        while Zyield_m < ZperMeasurement or (len(LSlist) > 0 and h_yield_Z.Integral(LSlist[0]+1,LSlist[-1]+1) < ZperMeasurement): 
+        while len(goodLSlist) < LSperMeasurement and len(LSlist) > 0:
             if len(LSlist) < 1:
                 print("No more lumi sections in current run")
                 break
