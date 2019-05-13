@@ -159,6 +159,9 @@ for run in data.drop_duplicates('run')['run'].values:
     beginLS=array('i')
     endLS=array('i')
 
+    Zyield_fpr=array('d')    # Z fals positive rate: fraction of bkg events in reconstructed Zs: bkg/(sig+bkg)
+    Zyield_chi2=array('d')
+
     # Efficiency related
     HLTeffB=array('d')
     HLTeffE=array('d')
@@ -222,11 +225,10 @@ for run in data.drop_duplicates('run')['run'].values:
         log.debug("Openning DQMIO.root file: %s", eosFile)
 
         f1 = ROOT.TFile(eosFile)
-        h_yield_Z = f1.Get("DQMData/Run "+str(run)+"/ZCounting/Run summary/Histograms/h_yield_Z")
+        h_yield_Z = f1.Get("DQMData/Run "+str(run)+"/ZCounting/Run summary/Histograms/h_mass_yield_Z").ProjectionX()
         # number of events in each ls (which may or may not have a Z candidate)
         h_n0 = f1.Get("DQMData/Run "+str(run)+"/ZCounting/Run summary/Histograms/h_npv").ProjectionX() 
         # produce goodLSlist with ls that are used for one measurement
-        Zyield_m = 0
         n0list = []
         goodLSlist = []
         while len(goodLSlist) < LSperMeasurement and len(LSlist) > 0:
@@ -238,7 +240,6 @@ for run in data.drop_duplicates('run')['run'].values:
                 break
             n0_ls = h_n0.GetBinContent(LSlist[0]+1)
             if n0_ls > 0:
-                Zyield_m += h_yield_Z.GetBinContent(LSlist[0]+1)
                 n0list.append(n0_ls)
                 goodLSlist.append(LSlist[0])
             del LSlist[0]
@@ -260,22 +261,18 @@ for run in data.drop_duplicates('run')['run'].values:
         log.debug("======endTime: %s",dateUp_m.Convert())
         log.debug("======timeWindow: %f",timeWindow_m)
 
+        Zyieldres_m = ROOT.getZyield(str(eosFile),args.dirEff,"h_mass_yield_Z",str(run),nMeasurements,goodLSlist[0],goodLSlist[-1],1,5,recLumi_m);
         HLTeffresB_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0],goodLSlist[-1],avgpu_m,"HLT",0,1,5,1,5,recLumi_m)
         HLTeffresE_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0],goodLSlist[-1],avgpu_m,"HLT",1,1,5,1,5,recLumi_m)
         SITeffresB_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0],goodLSlist[-1],avgpu_m,"SIT",0,1,1,1,1,recLumi_m)
         SITeffresE_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0],goodLSlist[-1],avgpu_m,"SIT",1,1,1,1,1,recLumi_m)
-        GloeffresB_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0],goodLSlist[-1],avgpu_m,"Glo",0,2,2,2,2,recLumi_m,mcDir+mcShapeSubDir+"MuStaEff/MC/probes.root",mcDir)
-        GloeffresE_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0],goodLSlist[-1],avgpu_m,"Glo",1,2,2,2,2,recLumi_m,mcDir+mcShapeSubDir+"MuStaEff/MC/probes.root",mcDir)
         StaeffresB_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0],goodLSlist[-1],avgpu_m,"Sta",0,2,2,2,2,recLumi_m,mcDir+mcShapeSubDir+"MuStaEff/MC/probes.root",mcDir)
         StaeffresE_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0],goodLSlist[-1],avgpu_m,"Sta",1,2,2,2,2,recLumi_m,mcDir+mcShapeSubDir+"MuStaEff/MC/probes.root",mcDir)
         TrkeffresB_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0],goodLSlist[-1],avgpu_m,"Trk",0,2,2,2,2,recLumi_m,mcDir+mcShapeSubDir+"MuStaEff/MC/probes.root",mcDir)
         TrkeffresE_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0],goodLSlist[-1],avgpu_m,"Trk",1,2,2,2,2,recLumi_m,mcDir+mcShapeSubDir+"MuStaEff/MC/probes.root",mcDir)
 
         
-        #Zyield_m=ROOT.getZyield(str(eosFile),"h_yield_Z",str(run),LSchunks[chunk_m][0],LSchunks[chunk_m][-1])
-        #Zyield_BB_m = ROOT.getZyield(str(eosFile),"h_yieldBB_Z",str(run),LSchunks[chunk_m][0],LSchunks[chunk_m][-1])
-        #Zyield_EE_m = ROOT.getZyield(str(eosFile),"h_yieldEE_Z",str(run),LSchunks[chunk_m][0],LSchunks[chunk_m][-1])
-
+        Zyield_m = Zyieldres_m[0]
         HLTeffB_m = HLTeffresB_m[0]
         HLTeffE_m = HLTeffresE_m[0]
         SITeffB_m = SITeffresB_m[0]
@@ -367,7 +364,7 @@ for run in data.drop_duplicates('run')['run'].values:
         ZRate  = Zyield_m*(1-ZfpRate)/(ZMCEff*timeWindow_m*deadtime_m)
         ZRate_EStat = [0.,0.]
         for i in (0,1):
-            ZRate_EStat[i] = ZRate * ( 1./np.sqrt(Zyield_m) + ZEff_EStat[i]/ZMCEff )
+            ZRate_EStat[i] = ZRate * ( Zyieldres_m[i]/Zyield_m + ZEff_EStat[i]/ZMCEff )
  
         log.debug("======ZMCXSec: %f",ZMCXSec)
         log.debug("======ZRate: %f",ZRate)
@@ -384,15 +381,18 @@ for run in data.drop_duplicates('run')['run'].values:
         instDel.append(delLumi_m/timeWindow_m)
         lumiDel.append(delLumi_m)
 	pileUp.append(avgpu_m)
-        ZyieldDel.append(Zyield_m*(1-ZfpRate)/(ZMCEff*deadtime_m))
+        ZyieldDel.append(Zyield_m/(ZMCEff*deadtime_m))
 
 	#Additional variables to write in efficiency csv file
-        ZyieldRec.append(Zyield_m*(1-ZfpRate))
+        ZyieldRec.append(Zyield_m)
         lumiRec.append(recLumi_m)
         windowarray.append(timeWindow_m)
         deadTime.append(deadtime_m)
         beginLS.append(goodLSlist[0])
         endLS.append(goodLSlist[-1])
+
+        Zyield_fpr.append(Zyieldres_m[4])
+        Zyield_chi2.append(Zyieldres_m[3])
 
 	#Efficiency related
     	HLTeffB.append(HLTeffB_m)
@@ -457,6 +457,7 @@ for run in data.drop_duplicates('run')['run'].values:
                         +str(Zrate[c])+","         	+str(Zrate_EStatUp[c])+","	+str(Zrate_EStatDown[c])+","
                         +str(instDel[c])+","      	+str(lumiDel[c])+","   		+str(ZyieldDel[c])+","
                         +str(beginLS[c])+","       	+str(endLS[c])+","     		+str(lumiRec[c])+","  	+str(windowarray[c])+","
+                        +str(Zyield_fpr[c])+","         +str(Zyield_chi2[c])+","
                         +str(HLTeffB[c])+","       	+str(HLTeffE[c])+","   
                         +str(SITeffB[c])+","       	+str(SITeffE[c])+","
                         +str(GloeffB[c])+","       	+str(GloeffE[c])+","
@@ -504,7 +505,7 @@ if args.writeSummaryCSV:
         effFileList=sorted(glob.glob(args.dirCSV+'effcsvfile*.csv'))
 	print "Starting to write efficiency files."	
         with open(args.dirCSV+'Mergedeffcsvfile.csv','wb') as fileTwo:
-		fileTwo.write("fill,tdate_begin,tdate_end,ZRate,ZRate_EStatUp,ZRate_EStatDown,instDelLumi,delLumi,delZCount,beginLS,endLS,recLumi,windowarray,HLTeffB,HLTeffE,SITeffB,SITeffE,GloeffB,GloeffE,StaeffB,StaeffE,TrkeffB,TrkeffE,HLTeffB_chi2pass,HLTeffB_chi2fail,HLTeffE_chi2pass,HLTeffE_chi2fail,SITeffB_chi2pass,SITeffB_chi2fail,SITeffE_chi2pass,SITeffE_chi2fail,GloeffB_chi2pass,GloeffB_chi2fail,GloeffE_chi2pass,GloeffE_chi2fail,StaeffB_chi2pass,StaeffB_chi2fail,StaeffE_chi2pass,StaeffE_chi2fail,TrkeffB_chi2pass,TrkeffB_chi2fail,TrkeffE_chi2pass,TrkeffE_chi2fail,ZMCeff,ZMCeffBB,ZMCeffBE,ZMCeffEE,Zeff,ZBBeff,ZBEeff,ZEEeff,pileUp")
+		fileTwo.write("fill,tdate_begin,tdate_end,ZRate,ZRate_EStatUp,ZRate_EStatDown,instDelLumi,delLumi,delZCount,beginLS,endLS,Zfpr,Zchi2,recLumi,windowarray,HLTeffB,HLTeffE,SITeffB,SITeffE,GloeffB,GloeffE,StaeffB,StaeffE,TrkeffB,TrkeffE,HLTeffB_chi2pass,HLTeffB_chi2fail,HLTeffE_chi2pass,HLTeffE_chi2fail,SITeffB_chi2pass,SITeffB_chi2fail,SITeffE_chi2pass,SITeffE_chi2fail,GloeffB_chi2pass,GloeffB_chi2fail,GloeffE_chi2pass,GloeffE_chi2fail,StaeffB_chi2pass,StaeffB_chi2fail,StaeffE_chi2pass,StaeffE_chi2fail,TrkeffB_chi2pass,TrkeffB_chi2fail,TrkeffE_chi2pass,TrkeffE_chi2fail,ZMCeff,ZMCeffBB,ZMCeffBE,ZMCeffEE,Zeff,ZBBeff,ZBEeff,ZEEeff,pileUp")
 		fileTwo.write('\n')
 		for m in range(0,len(effFileList)):
 

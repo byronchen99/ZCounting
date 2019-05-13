@@ -69,30 +69,55 @@ void performFit(
 std::vector<double> preFit(TH1D *failHist);
 
 
-float getZyield(
+std::vector<float> getZyield(
                 const TString inputFile,
-                const TString hName,        //Name of the histogram to take the Z yield from
+                const TString outputDir,    // output directory
+                const TString hName,        // Name of the histogram to take the Z yield from
                 const TString runNum,
+                const Int_t   iBin,         // Label of measurement in currect run
                 const Int_t   startLS,
                 const Int_t   endLS,
                 const Int_t   sigMod=0,
-                const Int_t   bkgMod=0
+                const Int_t   bkgMod=0,
+                const Float_t lumi=10.,     // luminosity for plot label
+                const TString format="png"  // plot format
 ){
+
+  gSystem->mkdir(outputDir,kTRUE);
+  CPlot::sOutDir = outputDir + TString("/Run") + runNum + TString("/plots");
+
+  TCanvas *cyield = MakeCanvas("cyield","cyield",720,540);
+  cyield->SetWindowPosition(cyield->GetWindowTopX()+cyield->GetBorderSize()+800,0);
+
   TFile *infile = new TFile(inputFile);
 
+  TH2F *h_mass_yield = (TH2F*)infile->Get("DQMData/Run "+runNum+"/ZCounting/Run summary/Histograms/"+hName);
+  TH1D *h_yield = h_mass_yield->ProjectionY("h_yield", startLS, endLS, "e");
 
-  TH1F *h_yield = (TH1F*)infile->Get("DQMData/Run "+runNum+"/ZCounting/Run summary/Histograms/"+hName);
+  if(sigMod == 0){      // perform count - not supported
+    std::vector<float> resultEff = {};
+    resultEff.push_back(h_yield->GetEntries());
+    return resultEff;
+  } 
 
-  //if(sigMod == 0){          // perform count
-  return h_yield->Integral(startLS,endLS);
-  /*}                         
-  /else if(sigMod == 1){     // perform fit -- under construction
-    CSignalModel     *sigModel = 0;
-    CBackgroundModel *bkgModel = 0;
+  RooRealVar m("m","mass",massLo,massHi);
+  m.setBins(10000);
 
+  CSignalModel     *sigModel = 0;
+  CBackgroundModel *bkgModel = 0;                        
+
+  Int_t nfl=0;
+
+  if(sigMod == 1){     // perform fit
     sigModel = new CBreitWignerConvCrystalBall(m,kTRUE);
+    nfl += 4;
     if(bkgMod == 1){
-      bkgModel = new CExponential(m, kTRUE, etaRegion);
+      bkgModel = new CExponential(m, kTRUE, 0);
+      nfl += 6;
+    }
+    if(bkgMod == 5){
+      bkgModel = new CDasPlusExp(m, kTRUE, 0);
+      nfl += 6;
     }
     else{
       std::cout <<"ERROR: unvalid background mode for computing Z yield"<< std::endl;
@@ -100,8 +125,96 @@ float getZyield(
   }
   else{
     std::cout <<"ERROR: unvalid signal mode for computing Z yield"<< std::endl;
-    return 0;
-  }*/
+  }
+
+  RooAbsData *data = 0;
+  data = new RooDataHist("ZReco","ZReco",RooArgList(m),h_yield);
+
+  Double_t NsigMax = h_yield->GetEntries();
+  RooRealVar Nsig("Nsig","sigYield",NsigMax,0.,1.5*NsigMax);
+  RooRealVar Nbkg("Nbkg","bkgYield",0.01*NsigMax,0.,NsigMax);
+  RooAddPdf modelPdf("model","Z sig+bkg",RooArgList(*(sigModel->model),*(bkgModel->model)),RooArgList(Nsig,Nbkg));
+
+  RooFitResult *fitResult=0;
+  fitResult = modelPdf.fitTo(*data,
+                             RooFit::PrintEvalErrors(-1),
+                             RooFit::PrintLevel(-1),
+                             RooFit::Warnings(0),
+                             RooFit::Extended(),
+                             RooFit::Strategy(1), // MINOS STRATEGY
+                             //RooFit::Minos(RooArgSet()),
+                             RooFit::Save());
+
+  double resNsig  = Nsig.getVal();
+  double resErrl = fabs(Nsig.getErrorLo());
+  double resErrh = Nsig.getErrorHi();
+  double resChi2 = 0.;
+
+  char binlabelx[100];
+  char binlabely[100];
+  char effstr[100];
+  char lumitext[100];
+  char ylabel[50];
+  char pname[50];
+  char yield[50];
+  char nsigstr[100];
+  char nbkgstr[100];
+  char chi2str[100];
+
+  sprintf(binlabelx, "0.0 < |#eta| < 2.4");
+  sprintf(binlabely, "27 GeV/c < p_{T} < 13000 GeV/c");
+  sprintf(lumitext,"%.1f pb^{-1}  at  #sqrt{s} = 13 TeV",lumi);
+  sprintf(ylabel,"Events / 1 GeV/c^{2}");
+
+  RooPlot *mframe = m.frame(Bins(massBin));
+  data->plotOn(mframe,MarkerStyle(kFullCircle),MarkerSize(0.8),DrawOption("ZP"));
+  if(bkgMod>0)
+    modelPdf.plotOn(mframe,Components("backgroundPass_0"),LineStyle(kDashed),LineColor(kRed));
+  modelPdf.plotOn(mframe);
+
+  double a = Nsig.getVal(), aErr = Nsig.getPropagatedError(*fitResult);
+  double b = Nbkg.getVal(), bErr = Nbkg.getPropagatedError(*fitResult);
+  double fpr = b/(a+b);
+  sprintf(effstr,"#frac{bkg}{sig+bkg} = %.4f #pm %.4f",fpr,1./((a+b)*(a+b))*(std::abs(b*aErr) + std::abs(a*bErr)));
+  sprintf(pname,"ZYield_inclusive_%d", iBin);
+  sprintf(yield,"%u Events",(Int_t)h_yield->GetEntries());
+  sprintf(nsigstr,"N_{sig} = %.1f #pm %.1f",a,aErr);
+  resChi2 = mframe->chiSquare(nfl);
+  sprintf(chi2str,"#chi^{2}/DOF = %.3f",resChi2);  
+
+  if(bkgMod>0)
+    sprintf(nbkgstr,"N_{bkg} = %.1f #pm %.1f",b,bErr);
+  CPlot plotPass(pname,mframe,"Z Yield","tag-probe mass [GeV/c^{2}]",ylabel);
+  plotPass.AddTextBox(binlabelx,0.21,0.78,0.51,0.83,0,kBlack,-1);
+  plotPass.AddTextBox(binlabely,0.21,0.73,0.51,0.78,0,kBlack,-1);
+  plotPass.AddTextBox(yield,0.21,0.69,0.51,0.73,0,kBlack,-1);
+  plotPass.AddTextBox(effstr,0.70,0.85,0.94,0.90,0,kBlack,-1);
+  if(bkgMod>0) {
+    plotPass.AddTextBox(0.70,0.68,0.94,0.83,0,kBlack,-1,2,nsigstr,nbkgstr);
+    plotPass.AddTextBox(chi2str,0.70,0.62,0.94,0.67,0,kBlack,0);
+  } else {
+    plotPass.AddTextBox(0.70,0.73,0.94,0.83,0,kBlack,-1,1,nsigstr);
+    plotPass.AddTextBox(chi2str,0.70,0.62,0.94,0.67,0,kBlack,0);
+  }
+  plotPass.AddTextBox("CMS Preliminary",0.19,0.83,0.54,0.89,0);
+  plotPass.AddTextBox(lumitext,0.62,0.92,0.94,0.99,0,kBlack,-1);
+
+  plotPass.Draw(cyield,kTRUE,format);
+
+  delete sigModel;
+  delete bkgModel;
+  delete data;
+  delete cyield;
+
+  std::vector<float> resultEff = {};
+
+  resultEff.push_back(resNsig);
+  resultEff.push_back(resErrl);
+  resultEff.push_back(resErrh);
+  resultEff.push_back(resChi2);
+  resultEff.push_back(fpr);
+
+  return resultEff;
 }
 
 
