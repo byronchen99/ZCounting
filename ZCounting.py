@@ -243,7 +243,7 @@ for run in data.drop_duplicates('run')['run'].values:
                 n0list.append(n0_ls)
                 goodLSlist.append(LSlist[0])
             del LSlist[0]
- 
+
         avgpu_m = sum(data_run.loc[data_run['ls'].isin(goodLSlist)]['avgpu'].values * np.array(n0list))/sum(n0list)
         
         recLumi_m = sum(data_run.loc[data_run['ls'].isin(goodLSlist)]['recorded(/pb)'].values)
@@ -266,6 +266,8 @@ for run in data.drop_duplicates('run')['run'].values:
         HLTeffresE_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0],goodLSlist[-1],avgpu_m,"HLT",1,1,5,1,5,recLumi_m)
         SITeffresB_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0],goodLSlist[-1],avgpu_m,"SIT",0,1,1,1,1,recLumi_m)
         SITeffresE_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0],goodLSlist[-1],avgpu_m,"SIT",1,1,1,1,1,recLumi_m)
+        GloeffresB_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0],goodLSlist[-1],avgpu_m,"Glo",0,2,2,2,2,recLumi_m,mcDir+mcShapeSubDir+"MuStaEff/MC/probes.root",mcDir)
+        GloeffresE_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0],goodLSlist[-1],avgpu_m,"Glo",1,2,2,2,2,recLumi_m,mcDir+mcShapeSubDir+"MuStaEff/MC/probes.root",mcDir)
         StaeffresB_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0],goodLSlist[-1],avgpu_m,"Sta",0,2,2,2,2,recLumi_m,mcDir+mcShapeSubDir+"MuStaEff/MC/probes.root",mcDir)
         StaeffresE_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0],goodLSlist[-1],avgpu_m,"Sta",1,2,2,2,2,recLumi_m,mcDir+mcShapeSubDir+"MuStaEff/MC/probes.root",mcDir)
         TrkeffresB_m=ROOT.calculateDataEfficiency(str(eosFile),args.dirEff,str(run),nMeasurements,goodLSlist[0],goodLSlist[-1],avgpu_m,"Trk",0,2,2,2,2,recLumi_m,mcDir+mcShapeSubDir+"MuStaEff/MC/probes.root",mcDir)
@@ -284,17 +286,17 @@ for run in data.drop_duplicates('run')['run'].values:
         TrkeffB_m = TrkeffresB_m[0]
         TrkeffE_m = TrkeffresE_m[0]
 
-        if StaeffresB_m[3] > staFitChi2Th or StaeffresB_m[4] > staFitChi2Th or StaeffB_m >= staFitEffThHi or StaeffB_m <= staFitEffThLo:
-            StaeffB_m = prevStaEffB
-            log.warning("======Bad fit might happen, origin eff = %f, with chi2 = %f, %f",StaeffresB_m[0],StaeffresB_m[3],StaeffresB_m[4])
-        else:
-            prevStaEffB = StaeffB_m
+        #if StaeffresB_m[3] > staFitChi2Th or StaeffresB_m[4] > staFitChi2Th or StaeffB_m >= staFitEffThHi or StaeffB_m <= staFitEffThLo:
+        #    StaeffB_m = prevStaEffB
+        #    log.warning("======Bad fit might happen, origin eff = %f, with chi2 = %f, %f",StaeffresB_m[0],StaeffresB_m[3],StaeffresB_m[4])
+        #else:
+        #    prevStaEffB = StaeffB_m
 
-        if StaeffresE_m[3] > staFitChi2Th or StaeffresE_m[4] > staFitChi2Th or StaeffE_m >= staFitEffThHi or StaeffE_m <= staFitEffThLo:
-            StaeffE_m = prevStaEffE
-            log.warning("======Bad fit might happen, origin eff = %f, with chi2 = %f, %f",StaeffresE_m[0],StaeffresE_m[3],StaeffresE_m[4])
-        else:
-            prevStaEffE = StaeffE_m
+        #if StaeffresE_m[3] > staFitChi2Th or StaeffresE_m[4] > staFitChi2Th or StaeffE_m >= staFitEffThHi or StaeffE_m <= staFitEffThLo:
+        #    StaeffE_m = prevStaEffE
+        #    log.warning("======Bad fit might happen, origin eff = %f, with chi2 = %f, %f",StaeffresE_m[0],StaeffresE_m[3],StaeffresE_m[4])
+        #else:
+        #    prevStaEffE = StaeffE_m
 
 
         log.debug("======perMuonEff: %f, %f ,%f, %f, %f, %f",HLTeffB_m,HLTeffE_m,SITeffB_m,SITeffE_m,StaeffB_m,StaeffE_m)
@@ -302,8 +304,11 @@ for run in data.drop_duplicates('run')['run'].values:
 
 	#ZtoMuMu efficiency purely from data
         ZBBEff=(TrkeffB_m*TrkeffB_m * StaeffB_m*StaeffB_m * SITeffB_m*SITeffB_m * (1-(1-HLTeffB_m)*(1-HLTeffB_m)))
+#        ZBBEff=(GloeffB_m*GloeffB_m * SITeffB_m*SITeffB_m * (1-(1-HLTeffB_m)*(1-HLTeffB_m)))
         ZBEEff=(TrkeffB_m*TrkeffE_m * StaeffB_m*StaeffE_m * SITeffB_m*SITeffE_m * (1-(1-HLTeffB_m)*(1-HLTeffE_m)))
+#        ZBEEff=(GloeffB_m*GloeffE_m * SITeffB_m*SITeffE_m * (1-(1-HLTeffB_m)*(1-HLTeffE_m)))
         ZEEEff=(TrkeffE_m*TrkeffE_m * StaeffE_m*StaeffE_m * SITeffE_m*SITeffE_m * (1-(1-HLTeffE_m)*(1-HLTeffE_m)))
+#        ZEEEff=(GloeffE_m*GloeffE_m * SITeffE_m*SITeffE_m * (1-(1-HLTeffE_m)*(1-HLTeffE_m)))
 
         #Statistic Uncertainties (low,high) error propagation 
         ZBBEff_EStat = [0.,0.]
@@ -311,26 +316,30 @@ for run in data.drop_duplicates('run')['run'].values:
         ZEEEff_EStat = [0.,0.]
         for i in (1,2):
             ZBBEff_EStat[i-1] = 2 * ZBBEff * np.sqrt( 
-                            (TrkeffresB_m[i]/TrkeffB_m)**2 
-                          + (StaeffresB_m[i]/StaeffB_m)**2 
-                          + (SITeffresB_m[i]/SITeffB_m)**2 
-                          + ((1-HLTeffB_m)/(1-(1-HLTeffB_m)**2)*HLTeffresB_m[i])**2 
+                            (TrkeffresB_m[i]/TrkeffB_m)**2 +
+                            (StaeffresB_m[i]/StaeffB_m)**2 +
+#                            (GloeffresB_m[i]/GloeffB_m)**2 +
+                            (SITeffresB_m[i]/SITeffB_m)**2 + 
+                            ((1-HLTeffB_m)/(1-(1-HLTeffB_m)**2)*HLTeffresB_m[i])**2 
                           )
             ZEEEff_EStat[i-1] = 2 * ZEEEff * np.sqrt(
-                            (TrkeffresE_m[i]/TrkeffE_m)**2
-                          + (StaeffresE_m[i]/StaeffE_m)**2
-                          + (SITeffresE_m[i]/SITeffE_m)**2
-                          + ((1-HLTeffE_m)/(1-(1-HLTeffE_m)**2)*HLTeffresE_m[i])**2 
+                            (TrkeffresE_m[i]/TrkeffE_m)**2 +
+                            (StaeffresE_m[i]/StaeffE_m)**2 +
+#                            (GloeffresE_m[i]/GloeffE_m)**2 +
+                            (SITeffresE_m[i]/SITeffE_m)**2 +
+                            ((1-HLTeffE_m)/(1-(1-HLTeffE_m)**2)*HLTeffresE_m[i])**2 
                           )
             ZBEEff_EStat[i-1] = ZBEEff * np.sqrt( 
-                            (TrkeffresB_m[i]/TrkeffB_m)**2                           
-                          + (TrkeffresE_m[i]/TrkeffE_m)**2
-                          + (StaeffresB_m[i]/StaeffB_m)**2
-                          + (StaeffresE_m[i]/StaeffE_m)**2
-                          + (SITeffresB_m[i]/SITeffB_m)**2
-                          + (SITeffresE_m[i]/SITeffE_m)**2
-                          + ((1-HLTeffE_m)/(1-(1-HLTeffB_m)*(1-HLTeffE_m))*HLTeffresB_m[i])**2 
-                          + ((1-HLTeffB_m)/(1-(1-HLTeffB_m)*(1-HLTeffE_m))*HLTeffresE_m[i])**2 
+                            (TrkeffresB_m[i]/TrkeffB_m)**2 +                      
+                            (TrkeffresE_m[i]/TrkeffE_m)**2 +
+                            (StaeffresB_m[i]/StaeffB_m)**2 +
+                            (StaeffresE_m[i]/StaeffE_m)**2 +
+#                            (GloeffresB_m[i]/GloeffB_m)**2 +
+#                            (GloeffresE_m[i]/GloeffE_m)**2 +
+                            (SITeffresB_m[i]/SITeffB_m)**2 +
+                            (SITeffresE_m[i]/SITeffE_m)**2 +
+                            ((1-HLTeffE_m)/(1-(1-HLTeffB_m)*(1-HLTeffE_m))*HLTeffresB_m[i])**2 +
+                            ((1-HLTeffB_m)/(1-(1-HLTeffB_m)*(1-HLTeffE_m))*HLTeffresE_m[i])**2 
                           )
 
 	#ZtoMuMu efficiency correction as a parametrized function of pile-up
@@ -359,9 +368,14 @@ for run in data.drop_duplicates('run')['run'].values:
         log.debug("======ZToMuMuEff: %f, %f ,%f, %f, %f, %f",ZMCEffBB, ZMCEffBE, ZMCEffEE, ZBBEff, ZBEEff, ZEEEff)
 
 	#End products (about 1% fake rate)
-        ZMCXSec  = Zyield_m*(1-ZfpRate)/(ZMCEff*recLumi_m)
-        ZRateUncorrected  = Zyield_m*(1-ZfpRate)/(ZEff*timeWindow_m*deadtime_m)
-        ZRate  = Zyield_m*(1-ZfpRate)/(ZMCEff*timeWindow_m*deadtime_m)
+#        ZMCXSec  = Zyield_m*(1-ZfpRate)/(ZMCEff*recLumi_m)
+#        ZRateUncorrected  = Zyield_m*(1-ZfpRate)/(ZEff*timeWindow_m*deadtime_m)
+#        ZRate  = Zyield_m*(1-ZfpRate)/(ZMCEff*timeWindow_m*deadtime_m)
+
+        ZMCXSec  = Zyield_m/(ZMCEff*recLumi_m)
+        ZRateUncorrected  = Zyield_m/(ZEff*timeWindow_m*deadtime_m)
+        ZRate  = Zyield_m/(ZMCEff*timeWindow_m*deadtime_m)
+
         ZRate_EStat = [0.,0.]
         for i in (0,1):
             ZRate_EStat[i] = ZRate * ( Zyieldres_m[i]/Zyield_m + ZEff_EStat[i]/ZMCEff )
@@ -505,7 +519,7 @@ if args.writeSummaryCSV:
         effFileList=sorted(glob.glob(args.dirCSV+'effcsvfile*.csv'))
 	print "Starting to write efficiency files."	
         with open(args.dirCSV+'Mergedeffcsvfile.csv','wb') as fileTwo:
-		fileTwo.write("fill,tdate_begin,tdate_end,ZRate,ZRate_EStatUp,ZRate_EStatDown,instDelLumi,delLumi,delZCount,beginLS,endLS,Zfpr,Zchi2,recLumi,windowarray,HLTeffB,HLTeffE,SITeffB,SITeffE,GloeffB,GloeffE,StaeffB,StaeffE,TrkeffB,TrkeffE,HLTeffB_chi2pass,HLTeffB_chi2fail,HLTeffE_chi2pass,HLTeffE_chi2fail,SITeffB_chi2pass,SITeffB_chi2fail,SITeffE_chi2pass,SITeffE_chi2fail,GloeffB_chi2pass,GloeffB_chi2fail,GloeffE_chi2pass,GloeffE_chi2fail,StaeffB_chi2pass,StaeffB_chi2fail,StaeffE_chi2pass,StaeffE_chi2fail,TrkeffB_chi2pass,TrkeffB_chi2fail,TrkeffE_chi2pass,TrkeffE_chi2fail,ZMCeff,ZMCeffBB,ZMCeffBE,ZMCeffEE,Zeff,ZBBeff,ZBEeff,ZEEeff,pileUp")
+		fileTwo.write("fill,tdate_begin,tdate_end,ZRate,ZRate_EStatUp,ZRate_EStatDown,instDelLumi,delLumi,delZCount,beginLS,endLS,recLumi,windowarray,Zfpr,Zchi2,HLTeffB,HLTeffE,SITeffB,SITeffE,GloeffB,GloeffE,StaeffB,StaeffE,TrkeffB,TrkeffE,HLTeffB_chi2pass,HLTeffB_chi2fail,HLTeffE_chi2pass,HLTeffE_chi2fail,SITeffB_chi2pass,SITeffB_chi2fail,SITeffE_chi2pass,SITeffE_chi2fail,GloeffB_chi2pass,GloeffB_chi2fail,GloeffE_chi2pass,GloeffE_chi2fail,StaeffB_chi2pass,StaeffB_chi2fail,StaeffE_chi2pass,StaeffE_chi2fail,TrkeffB_chi2pass,TrkeffB_chi2fail,TrkeffE_chi2pass,TrkeffE_chi2fail,ZMCeff,ZMCeffBB,ZMCeffBE,ZMCeffEE,Zeff,ZBBeff,ZBEeff,ZEEeff,pileUp")
 		fileTwo.write('\n')
 		for m in range(0,len(effFileList)):
 

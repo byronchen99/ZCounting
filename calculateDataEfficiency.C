@@ -94,9 +94,14 @@ std::vector<float> getZyield(
   TH2F *h_mass_yield = (TH2F*)infile->Get("DQMData/Run "+runNum+"/ZCounting/Run summary/Histograms/"+hName);
   TH1D *h_yield = h_mass_yield->ProjectionY("h_yield", startLS, endLS, "e");
 
+  Double_t NsigMax = h_yield->GetEntries();  
   if(sigMod == 0){      // perform count - not supported
     std::vector<float> resultEff = {};
-    resultEff.push_back(h_yield->GetEntries());
+    resultEff.push_back(NsigMax);
+    resultEff.push_back(std::sqrt(NsigMax));
+    resultEff.push_back(std::sqrt(NsigMax));
+    resultEff.push_back(0.);
+    resultEff.push_back(0.);
     return resultEff;
   } 
 
@@ -130,7 +135,6 @@ std::vector<float> getZyield(
   RooAbsData *data = 0;
   data = new RooDataHist("ZReco","ZReco",RooArgList(m),h_yield);
 
-  Double_t NsigMax = h_yield->GetEntries();
   RooRealVar Nsig("Nsig","sigYield",NsigMax,0.,1.5*NsigMax);
   RooRealVar Nbkg("Nbkg","bkgYield",0.01*NsigMax,0.,NsigMax);
   RooAddPdf modelPdf("model","Z sig+bkg",RooArgList(*(sigModel->model),*(bkgModel->model)),RooArgList(Nsig,Nbkg));
@@ -177,7 +181,7 @@ std::vector<float> getZyield(
   double fpr = b/(a+b);
   sprintf(effstr,"#frac{bkg}{sig+bkg} = %.4f #pm %.4f",fpr,1./((a+b)*(a+b))*(std::abs(b*aErr) + std::abs(a*bErr)));
   sprintf(pname,"ZYield_inclusive_%d", iBin);
-  sprintf(yield,"%u Events",(Int_t)h_yield->GetEntries());
+  sprintf(yield,"%u Events",(Int_t)NsigMax);
   sprintf(nsigstr,"N_{sig} = %.1f #pm %.1f",a,aErr);
   resChi2 = mframe->chiSquare(nfl);
   sprintf(chi2str,"#chi^{2}/DOF = %.3f",resChi2);  
