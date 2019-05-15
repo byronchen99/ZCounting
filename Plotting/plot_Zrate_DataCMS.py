@@ -140,7 +140,10 @@ metazcountsoverlumi=array('d')
 
 for c in ('HLTeffB_chi2pass', 'HLTeffB_chi2fail', 'HLTeffE_chi2pass', 'HLTeffE_chi2fail',
           'SITeffB_chi2pass', 'SITeffB_chi2fail', 'SITeffE_chi2pass', 'SITeffE_chi2fail',
-          'StaeffB_chi2pass', 'StaeffB_chi2fail', 'StaeffE_chi2pass', 'StaeffE_chi2fail'
+          'GloeffB_chi2pass', 'GloeffB_chi2fail', 'GloeffE_chi2pass', 'GloeffE_chi2fail',
+          'StaeffB_chi2pass', 'StaeffB_chi2fail', 'StaeffE_chi2pass', 'StaeffE_chi2fail',
+          'TrkeffB_chi2pass', 'TrkeffB_chi2fail', 'TrkeffE_chi2pass', 'TrkeffE_chi2fail'
+
          ):
     graph_chi2 = ROOT.TGraph(len(data),data['tdate'].values,data[c].values)
     graph_chi2.SetName("graph_chi2")
@@ -211,8 +214,12 @@ for fill in data.drop_duplicates('fill')['fill'].values:
                           ('HLTeffE', 'Muon HLT-E efficiency'),
                           ('SITeffB', 'Muon SIT-B efficiency'),
                           ('SITeffE', 'Muon SIT-E efficiency'),
+                          ('GloeffB', 'Muon Glo-B efficiency'),
+                          ('GloeffE', 'Muon Glo-E efficiency'),
                           ('StaeffB', 'Muon Sta-B efficiency'),
                           ('StaeffE', 'Muon Sta-E efficiency'),
+                          ('TrkeffB', 'Muon Trk-B efficiency'),
+                          ('TrkeffE', 'Muon Trk-E efficiency'),
                          ):
             graph_Zeff = ROOT.TGraph(len(dFill),dFill['pileUp'].values,dFill[eff].values )
             graph_Zeff.SetName("graph_Zeff")
