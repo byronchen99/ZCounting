@@ -228,7 +228,7 @@ std::vector<float> calculateDataEfficiency(
 		const TString runNum,       // Runnum
 		const Int_t   iBin,         // Label of measurement in currect run
 		const Int_t   startLS,      // starting LS for currect measurement
-		const Int_t   endLS,        // ending LS for currect measurement
+		const Int_t    endLS,        // ending LS for currect measurement
 		const Float_t meanPU,       // mean #PU, only needed if use MC template as fitting model
 		const TString effType,      // "HLT" or "SIT" or "Glo" or "Sta" or "Trk"
 		const Bool_t  etaRegion,    // 0 for barrel, 1 for forward 
@@ -239,7 +239,7 @@ std::vector<float> calculateDataEfficiency(
 		const Float_t lumi=10.,     // luminosity for plot label
                 const TString mcfilename="",// ROOT file containing MC events to generate templates from
                 const TString purwDir="",
-		const TString format="png" // plot format
+		const TString format="png"  // plot format
 ){
 
   gSystem->mkdir(outputDir,kTRUE);
@@ -306,7 +306,7 @@ void generateTemplate(
   if(modPU < minPU) modPU = minPU;
   else if(modPU > maxPU) modPU = maxPU;
 
-  TFile *f_rw = TFile::Open(Form("%s/ReweightHistogram/pileup_rw_%d.root", purwDir.Data(), modPU), "read");
+  TFile *f_rw = TFile::Open(Form("%s/pileup_rw_%d.root", purwDir.Data(), modPU), "read");
   TH1D *h_rw = (TH1D*) f_rw->Get("h_rw");
 
   Float_t mass, pt, eta, phi;

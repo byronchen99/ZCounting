@@ -2,9 +2,8 @@
 
 runNum=$1
 
-workdir="/afs/cern.ch/work/d/dwalter/CMSSW_9_2_8/src/ZCounting"
+workdir=${CMSSW_BASE}/src/ZCounting/
 
-CMSSW_BASE="/afs/cern.ch/work/d/dwalter/CMSSW_9_2_8/src/"
 TOP="$PWD"
 
 cd $CMSSW_BASE

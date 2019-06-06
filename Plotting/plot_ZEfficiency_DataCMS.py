@@ -67,7 +67,7 @@ for fill in fills:
                   ('StaeffE' ,'Muon Sta-E efficiency',0.9, 1.0),
                   ('TrkeffB' ,'Muon Trk-B efficiency',0.95,1.01),
                   ('TrkeffE' ,'Muon Trk-E efficiency',0.95,1.01),
-                  ('Zfpr'    ,'Z fake rate',0.0,0.05),
+                  ('Zfpr'    ,'Z fake rate',0.0,0.1),
                  ):
         graph_Zeff = ROOT.TGraph(len(dFill),dFill['tdate'].values,dFill[eff].values )
         graph_Zeff.SetName("graph_Zeff")
@@ -124,7 +124,7 @@ for eff, name, ymin, ymax in (('ZMCeff'  ,'corrected Z-Reconstruction efficitenc
                   ('StaeffE' ,'Muon Sta-E efficiency',0.9, 1.0),
                   ('TrkeffB' ,'Muon Trk-B efficiency',0.95,1.01),
                   ('TrkeffE' ,'Muon Trk-E efficiency',0.95,1.01),
-                  ('Zfpr'    ,'Z fake rate',0.0,0.05),
+                  ('Zfpr'    ,'Z fake rate',0.0,0.1),
                  ):
     graph_Zeff = ROOT.TGraph(len(meta),fills,np.array(meta[eff]))
     graph_Zeff.SetName("graph_Zeff")
