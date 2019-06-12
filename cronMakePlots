@@ -8,26 +8,23 @@ cd -
 
 ### Input ###
 
-cmsCSV=/eos/home-d/dwalter/www/ZCounting/development/CMS-2018-ZRateData-V2_2/csvFiles/Mergedcsvfile.csv
-cmsEffCSV=/eos/home-d/dwalter/www/ZCounting/development/CMS-2018-ZRateData-V2_2/csvFiles/Mergedeffcsvfile.csv
+cmsDir=/eos/home-d/dwalter/www/ZCounting/CMS-2016G-PromptReco-v2-ZRateData/
+
 atlasCSV=/afs/cern.ch/user/p/ponyisi/public/zlumi/atlas_2018.csv
-refCSV=/afs/cern.ch/work/d/dwalter/CMSSW_9_2_8/src/ZCounting/Stuff/ByLs_2018_IsoMu24_hfoc18v5.csv
+refCSV=/afs/cern.ch/work/d/dwalter/CMSSW_9_2_8/src/ZCounting/Stuff/ByLs_2016_IsoMu24OrIsoTkMu24_pcc16PaperV2.csv
 
 ### Output ###
 
-out=/eos/home-d/dwalter/www/ZCounting/development/CMS-2018-ZRateData-V2_2/
-logFile=/eos/home-d/dwalter/www/ZCounting/development/CMS-2018-ZRateData-V2_2/ZCrossSectionMonitoring/README.txt
-
-mkdir -p ${out}/ZCrossSectionMonitoring
-mkdir -p ${out}/ZAndMuonEfficiencies
-mkdir -p ${out}/ZAndMuonEfficiencies/ATLAS_CMS_Comparison
+mkdir -p $cmsDir/ZCrossSectionMonitoring
+mkdir -p ${cmsDir}/ZAndMuonEfficiencies
+mkdir -p ${cmsDir}/ZAndMuonEfficiencies/ATLAS_CMS_Comparison
 
 ### Plotting ###
 
-#python Plotting/plot_Zrate_DataCMS.py --cms $cmsEffCSV --refLumi $refCSV --saveDir ${out}/ZCrossSectionMonitoring/
+python Plotting/plot_Zrate_DataCMS.py --cms $cmsDir/csvFiles/Mergedeffcsvfile.csv --refLumi $refCSV --saveDir $cmsDir/ZCrossSectionMonitoring/
 
-python Plotting/plot_ZEfficiency_DataCMS.py --cms $cmsEffCSV --saveDir ${out}/ZAndMuonEfficiencies/
+python Plotting/plot_ZEfficiency_DataCMS.py --cms $cmsDir/csvFiles/Mergedeffcsvfile.csv --saveDir $cmsDir/ZAndMuonEfficiencies/
 
-#python Plotting/makeZvsL.py --cms $cmsCSV --saveDir $out/ZCrossSectionMonitoring/ #| tee -a $logFile
+python Plotting/makeZvsL.py --cms $cmsDir/csvFiles/Mergedcsvfile.csv --saveDir $cmsDir/ZCrossSectionMonitoring/ #| tee -a $cmsDir/ZCrossSectionMonitoring/README.txt
 
-#python Plotting/plot_Zrate_Data_CMSvsATLAS.py --cms $cmsCSV --atlas $atlasCSV -s $out/ZCrossSectionMonitoring/
+#python Plotting/plot_Zrate_Data_CMSvsATLAS.py --cms $cmsDir/csvFiles/Mergedcsvfile.csv --atlas $atlasCSV -s $cmsDir/ZCrossSectionMonitoring/
