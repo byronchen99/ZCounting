@@ -21,9 +21,9 @@ mkdir -p ${cmsDir}/ZAndMuonEfficiencies/ATLAS_CMS_Comparison
 
 ### Plotting ###
 
-python Plotting/plot_Zrate_DataCMS.py --cms $cmsDir/csvFiles/Mergedeffcsvfile.csv --refLumi $refCSV --saveDir $cmsDir/ZCrossSectionMonitoring/
+#python Plotting/plot_Zrate_DataCMS.py --cms $cmsDir/csvFiles/Mergedeffcsvfile.csv --refLumi $refCSV --saveDir $cmsDir/ZCrossSectionMonitoring/
 
-python Plotting/plot_ZEfficiency_DataCMS.py --cms $cmsDir/csvFiles/Mergedeffcsvfile.csv --saveDir $cmsDir/ZAndMuonEfficiencies/
+#python Plotting/plot_ZEfficiency_DataCMS.py --cms $cmsDir/csvFiles/Mergedeffcsvfile.csv --saveDir $cmsDir/ZAndMuonEfficiencies/
 
 python Plotting/makeZvsL.py --cms $cmsDir/csvFiles/Mergedcsvfile.csv --saveDir $cmsDir/ZCrossSectionMonitoring/ #| tee -a $cmsDir/ZCrossSectionMonitoring/README.txt
 

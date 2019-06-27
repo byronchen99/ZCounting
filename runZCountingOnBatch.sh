@@ -2,11 +2,11 @@
 
 runNum=$1
 
-workdir=${CMSSW_BASE}/src/ZCounting/
+workdir=$2/src/ZCounting/
 
 TOP="$PWD"
 
-cd $CMSSW_BASE
+cd $2
 eval `scramv1 runtime -sh`
 cd $TOP
 
@@ -16,5 +16,5 @@ cp ${workdir}/calculateDataEfficiency.C $TOP
 cp ${workdir}/calculateZEfficiency.C $TOP
 cp ${workdir}/ZCounting.py $TOP
 
-python ZCounting.py -b $runNum -e $(($runNum + 1)) -d $2 -f $3 -g $4 -t $5 -a $6 -x $7  
+python ZCounting.py -b $runNum -e $(($runNum + 1)) -d $3 -f $4 -a $5 -x $6
 

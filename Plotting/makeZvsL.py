@@ -15,8 +15,8 @@ args = parser.parse_args()
 
 cmsfile=args.cms
 # key words for columns of csv file
-#ZRate='ZRateUncorrected'
-ZRate='ZRate'
+ZRate='ZRateUncorrected'
+#ZRate='ZRate'
 Lumi='instDelLumi'
 
 data = pandas.read_csv(cmsfile, sep=',')[['fill',ZRate,Lumi,'delZCount']]
