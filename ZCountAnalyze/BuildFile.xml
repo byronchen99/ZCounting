@@ -1,10 +1,13 @@
 <use name="FWCore/Framework"/>
 <use name="FWCore/PluginManager"/>
 <use name="FWCore/ParameterSet"/>
+<use name="DataFormats/HLTReco"/>
 <use name="DataFormats/TrackReco"/>
 <use name="DataFormats/VertexReco"/>
+<use name="DataFormats/MuonReco"/>
 <use name="FWCore/ServiceRegistry"/>
 <use name="CommonTools/UtilAlgos"/>
+<use name="TrackingTools/IPTools"/>
 
 <use   name="root"/>
 <use   name="rootrflx"/>

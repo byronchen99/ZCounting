@@ -6,6 +6,9 @@
 
 // CMSSW includes
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
+#include "FWCore/Common/interface/TriggerNames.h"
+#include "DataFormats/Common/interface/TriggerResults.h"
+#include "DataFormats/HLTReco/interface/TriggerEvent.h"
 
 #include "ZCounting/ZCountAnalyze/plugins/ZCounting.h"
 
@@ -14,11 +17,26 @@
 //
 ZCounting::ZCounting(const edm::ParameterSet& iConfig)
 {
+    zcount_trigger *triggerModule = new zcount_trigger();
+    triggerModule->setTriggerResultsToken(consumes<edm::TriggerResults>(iConfig.getParameter<edm::InputTag>("TriggerResults")));
+    triggerModule->setTriggerEventToken(consumes<trigger::TriggerEvent>(iConfig.getParameter<edm::InputTag>("TriggerEvent")));
+
+    addModule(triggerModule);
 
     zcount_PV* pvModule = new zcount_PV();
     pvModule->setPVToken(consumes<reco::VertexCollection>(iConfig.getParameter<edm::InputTag>("edmPVName")));
 
     addModule(pvModule);
+
+    zcount_muons* muonModule = new zcount_muons();
+    muonModule->setMuonToken(consumes<reco::MuonCollection>(iConfig.getParameter<edm::InputTag>("edmMuonName")));
+    muonModule->setTrackToken(consumes<reco::TrackCollection>(iConfig.getParameter<edm::InputTag>("edmTrackName")));
+    muonModule->setPVModule(*pvModule);
+    muonModule->setTriggerModule(*triggerModule);
+
+    addModule(muonModule);
+
+    addModule(new zcount_eventInfo);
 
     for(auto& m: modules_){
         m->getInput(iConfig);
@@ -41,6 +59,7 @@ ZCounting::~ZCounting()
 void
 ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 {
+    edm::LogInfo("ZCounting")<<"analyze";
 
 
     for(auto& m:modules_){
@@ -49,7 +68,6 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
         m->fillBranches();
     }
 
-    edm::LogInfo("ZCounting") << "test ";
 
     tree_->Fill();
 }
@@ -60,7 +78,7 @@ void
 ZCounting::beginJob()
 {
     if( !fs ){
-        edm::LogError("ZCounting") << "TFile Service is not registered in cfg file" << std::endl;
+        edm::LogError("ZCounting") << "TFile Service is not registered in cfg file";
         return;
     }
 

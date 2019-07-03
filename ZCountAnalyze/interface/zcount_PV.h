@@ -11,6 +11,9 @@
 
 #include "ZCounting/ZCountAnalyze/interface/zcount_module.h"
 
+#include "DataFormats/VertexReco/interface/VertexFwd.h"
+#include "DataFormats/VertexReco/interface/Vertex.h"
+
 class zcount_PV: public zcount_module{
 public:
     zcount_PV();
@@ -26,8 +29,14 @@ public:
         fPVName_token = pvToken;
     }
 
+    const reco::Vertex* getPV(){
+        return pv;
+    }
+
 private:
-   
+
+    const reco::Vertex* pv;
+
     edm::EDGetTokenT<reco::VertexCollection> fPVName_token;
 
     edm::Handle<reco::VertexCollection> hVertexProduct;

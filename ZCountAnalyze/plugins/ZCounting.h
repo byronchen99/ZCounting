@@ -31,6 +31,7 @@
 
 #include "CommonTools/UtilAlgos/interface/TFileService.h"
 
+
 #include "DataFormats/VertexReco/interface/Vertex.h"
 #include "DataFormats/VertexReco/interface/VertexFwd.h"
 #include "DataFormats/TrackReco/interface/Track.h"
@@ -39,6 +40,9 @@
 // ZCounting Project includes
 #include "ZCounting/ZCountAnalyze/interface/zcount_module.h"
 #include "ZCounting/ZCountAnalyze/interface/zcount_PV.h"
+#include "ZCounting/ZCountAnalyze/interface/zcount_muons.h"
+#include "ZCounting/ZCountAnalyze/interface/zcount_eventInfo.h"
+
 
 // ROOT includes
 #include "TTree.h"
