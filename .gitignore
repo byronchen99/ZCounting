@@ -4,3 +4,4 @@
 *.cxx*
 *.sub
 *.root
+*.pyc
