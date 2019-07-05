@@ -8,7 +8,7 @@
 <use name="FWCore/ServiceRegistry"/>
 <use name="CommonTools/UtilAlgos"/>
 <use name="TrackingTools/IPTools"/>
-
+<use name="ZCounting/ZUtils"/>
 <use   name="root"/>
 <use   name="rootrflx"/>
 

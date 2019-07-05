@@ -74,16 +74,22 @@ void zcount_muons::initBranches(TTree* tree){
 bool zcount_muons::readEvent(const edm::Event& iEvent){
     edm::LogVerbatim("zcount_muons") << "zcount_muons: readEvent";
 
-    if(!isMuonTrigger())
+    if(!isMuonTrigger()){
+        edm::LogVerbatim("zcount_muons") << "zcount muons: event did not pass any muon trigger";
         return false;
+    }
 
     iEvent.getByToken(fTrackName_token, hTrackProduct);
-    if (!hTrackProduct.isValid())
+    if (!hTrackProduct.isValid()){
+        edm::LogWarning("zcount_muons") << "zcount_muons: no valid track product";
         return false;
+    }
 
     iEvent.getByToken(fMuonName_token, hMuonProduct);
-    if (!hMuonProduct.isValid())
+    if (!hMuonProduct.isValid()){
+        edm::LogWarning("zcount_muons") << "zcount_muons: no valid muon product";
         return false;
+    }
 
     TLorentzVector vTag(0., 0., 0., 0.);
     TLorentzVector vProbe(0., 0., 0., 0.);

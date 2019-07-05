@@ -24,10 +24,15 @@ bool zcount_trigger::readEvent(const edm::Event& iEvent){
     edm::LogVerbatim("zcount_triggers") << "zcount_triggers: readEvent";
 
     iEvent.getByToken(fHLTTag_token, hTrgRes);
-    if (!hTrgRes.isValid())
-        return false;
+    if (!hTrgRes.isValid()){
+        edm::LogWarning("zcount_trigger") << "No valid trigger result product found" ;
+    }
 
     iEvent.getByToken(fHLTObjTag_token, hTrgEvt);
+    if (!hTrgRes.isValid()){
+        edm::LogWarning("zcount_trigger") << "No valid trigger event product found" ;
+
+    }
 
     const edm::TriggerNames& triggerNames = iEvent.triggerNames(*hTrgRes);
     if (fTriggerNamesID != triggerNames.parameterSetID()) {

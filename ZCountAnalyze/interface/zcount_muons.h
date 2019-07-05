@@ -1,5 +1,5 @@
 /**
- * * Primary Vertex selection and content handling
+ * *
  *    
  * Created on: 29 June 2019
  *   Author: David Walter

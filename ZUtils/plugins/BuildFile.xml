@@ -1,0 +1,14 @@
+<use name="FWCore/Framework"/>
+<use name="FWCore/ParameterSet"/>
+<use name="FWCore/Utilities"/>
+<use name="FWCore/MessageLogger"/>
+<use name="DataFormats/Common"/>
+<use name="DataFormats/HepMCCandidate"/>
+<use name="DataFormats/PatCandidates"/>
+<use name="DataFormats/ParticleFlowCandidate"/>
+<use name="DataFormats/BTauReco"/>
+<use name="DataFormats/VertexReco"/>
+<library file="*.cc" name="ZUtilsPlugins">
+  <use name="ZCounting/ZUtils"/>
+  <flags EDM_PLUGIN="1"/>
+</library>

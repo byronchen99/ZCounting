@@ -42,6 +42,8 @@
 #include "ZCounting/ZCountAnalyze/interface/zcount_PV.h"
 #include "ZCounting/ZCountAnalyze/interface/zcount_muons.h"
 #include "ZCounting/ZCountAnalyze/interface/zcount_eventInfo.h"
+#include "ZCounting/ZCountAnalyze/interface/zcount_genInfo.h"
+
 
 
 // ROOT includes
@@ -71,6 +73,7 @@ private:
     edm::Service<TFileService> fs;
     TTree *tree_;
 
+    bool isData_;
 
     std::vector<zcount_module* > modules_;
     zcount_module * addModule(zcount_module *m){

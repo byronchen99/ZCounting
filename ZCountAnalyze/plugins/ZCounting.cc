@@ -10,6 +10,9 @@
 #include "DataFormats/Common/interface/TriggerResults.h"
 #include "DataFormats/HLTReco/interface/TriggerEvent.h"
 
+// includes from ZCounting project
+#include "ZCounting/ZUtils/interface/GenZDecayProperties.h"
+
 #include "ZCounting/ZCountAnalyze/plugins/ZCounting.h"
 
 //
@@ -17,6 +20,8 @@
 //
 ZCounting::ZCounting(const edm::ParameterSet& iConfig)
 {
+    isData_ = iConfig.getUntrackedParameter<bool>("isData");
+
     zcount_trigger *triggerModule = new zcount_trigger();
     triggerModule->setTriggerResultsToken(consumes<edm::TriggerResults>(iConfig.getParameter<edm::InputTag>("TriggerResults")));
     triggerModule->setTriggerEventToken(consumes<trigger::TriggerEvent>(iConfig.getParameter<edm::InputTag>("TriggerEvent")));
@@ -36,7 +41,15 @@ ZCounting::ZCounting(const edm::ParameterSet& iConfig)
 
     addModule(muonModule);
 
-    addModule(new zcount_eventInfo);
+    addModule(new zcount_eventInfo());
+
+    if(!isData_){
+        zcount_genInfo* genModule = new zcount_genInfo();
+        genModule->setGenInfoToken(consumes<GenEventInfoProduct>(iConfig.getParameter<edm::InputTag>("genEventInfo")));
+        genModule->setGenZInfoToken(consumes<std::vector<GenZDecayProperties>>(iConfig.getParameter<edm::InputTag>("genZCollection")));
+
+        addModule(genModule);
+    }
 
     for(auto& m: modules_){
         m->getInput(iConfig);
