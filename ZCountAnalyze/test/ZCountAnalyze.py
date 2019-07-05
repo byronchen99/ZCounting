@@ -11,7 +11,8 @@ process = cms.Process("zcounting")
 
 # initialize MessageLogger and output report
 process.load("FWCore.MessageLogger.MessageLogger_cfi")
-process.MessageLogger.cerr.threshold = 'INFO'
+process.MessageLogger.cerr.threshold = 'WARNING'
+process.MessageLogger.cerr.FwkReport.reportEvery = 100
 process.MessageLogger.categories.append('ZCounting')
 process.MessageLogger.cerr.INFO = cms.untracked.PSet(
     limit = cms.untracked.int32(-1)
@@ -19,7 +20,7 @@ process.MessageLogger.cerr.INFO = cms.untracked.PSet(
 process.options   = cms.untracked.PSet( wantSummary = cms.untracked.bool(True) )
 
 
-process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(100) )
+process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(-1) )
 
 process.source = cms.Source("PoolSource",
     fileNames = cms.untracked.vstring(
