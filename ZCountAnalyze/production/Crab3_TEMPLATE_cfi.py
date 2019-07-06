@@ -17,7 +17,7 @@ config.General.transferLogs = False
 
 config.JobType.pyCfgParams = ['isData=<False/True>','selectEvents=<False/True>']
 config.JobType.pluginName = 'Analysis'
-config.JobType.psetName = '<total path to project folder>/ZCounting/ZCountAnalyze/test/ZCountAnalyze.py'
+config.JobType.psetName = '<total path to project cfg file, e.g. /eos/home-d/<user>/CMSSW_9_4_13/src/ZCounting/ZCountAnalyze/test/ZCountAnalyze.py'
 #config.JobType.inputFiles = ['<specify, if resource files are needed>']
 
 config.Data.inputDataset = '<source file from https://cmsweb.cern.ch/das has to be /AODSIM (MC) /AOD (data)>'
