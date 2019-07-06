@@ -42,64 +42,73 @@ bool zcount_genInfo::readEvent(const edm::Event& iEvent){
     edm::Handle<std::vector<GenZDecayProperties>> hGenZInfoProduct;
     iEvent.getByToken(fGenZInfoName_token, hGenZInfoProduct);
     if (hGenZInfoProduct.failedToGet()){
-        edm::LogWarning("zcount_genInfo") << "zcount_genZInfo: no valid gen Z info product";
-        return false;
+         edm::LogWarning("zcount_genInfo") << "zcount_genZInfo: no valid gen Z info product";
+         return false;
     }
-    else if(hGenZInfoProduct->size() < 1){
-        edm::LogWarning("zcount_genInfo") << "zcount_genZInfo: no gen Z found";
-        return false;
+
+    if(hGenZInfoProduct->size() < 1){
+        // try GenZLeptonDecay
+        iEvent.getByToken(fGenZLepInfoName_token, hGenZInfoProduct);
+        if (hGenZInfoProduct.failedToGet()){
+             edm::LogWarning("zcount_genInfo") << "zcount_genZInfo: no valid gen Z info product";
+             return false;
+        }
+        else if(hGenZInfoProduct->size() < 1){
+            edm::LogWarning("zcount_genInfo") << "zcount_genZInfo: no gen Z Product found";
+            return false;
+        }
+    }
+
+    if(hGenZInfoProduct->size() > 1)
+        edm::LogWarning("zcount_genInfo") << "zcount_genZInfo: more then one gen Z found";
+
+    if(hGenZInfoProduct->at(0).z()){
+        ZPt_        = hGenZInfoProduct->at(0).z()->pt();
+        ZEta_       = hGenZInfoProduct->at(0).z()->eta();
+        ZPhi_       = hGenZInfoProduct->at(0).z()->phi();
+        ZM_         = hGenZInfoProduct->at(0).z()->mass();
     }
     else{
-        if(hGenZInfoProduct->size() > 1)
-            edm::LogWarning("zcount_genInfo") << "zcount_genZInfo: more then one gen Z found";
+        edm::LogVerbatim("zcount_genInfo") << "zcount_genZInfo: no gen Z found";
+        ZPt_        = 0;
+        ZEta_       = 0;
+        ZPhi_       = 0;
+        ZM_         = 0;
+    }
 
-        if(hGenZInfoProduct->at(0).z()){
-            ZPt_        = hGenZInfoProduct->at(0).z()->pt();
-            ZEta_       = hGenZInfoProduct->at(0).z()->eta();
-            ZPhi_       = hGenZInfoProduct->at(0).z()->phi();
-            ZM_         = hGenZInfoProduct->at(0).z()->mass();
-        }
-        else{
-            edm::LogWarning("zcount_genInfo") << "zcount_genZInfo: no gen Z found";
-            ZPt_        = 0;
-            ZEta_       = 0;
-            ZPhi_       = 0;
-            ZM_         = 0;
-        }
+    ZDecayMode_ = hGenZInfoProduct->at(0).decayMode();
 
-        ZDecayMode_ = hGenZInfoProduct->at(0).decayMode();
-        
-        if(hGenZInfoProduct->at(0).stableLepton()){
-            ZLeptonPt_        = hGenZInfoProduct->at(0).stableLepton()->pt();
-            ZLeptonEta_       = hGenZInfoProduct->at(0).stableLepton()->eta();
-            ZLeptonPhi_       = hGenZInfoProduct->at(0).stableLepton()->phi();
-        }
-        else{
-            edm::LogWarning("zcount_genInfo") << "zcount_genZInfo: no gen stable lepton found";
-            ZLeptonPt_  = 0;
-            ZLeptonEta_ = 0;
-            ZLeptonPhi_ = 0;
-        }
-        if(hGenZInfoProduct->at(0).stableAntiLepton()){
+    if(hGenZInfoProduct->at(0).stableLepton()){
+        ZLeptonPt_        = hGenZInfoProduct->at(0).stableLepton()->pt();
+        ZLeptonEta_       = hGenZInfoProduct->at(0).stableLepton()->eta();
+        ZLeptonPhi_       = hGenZInfoProduct->at(0).stableLepton()->phi();
+    }
+    else{
+        edm::LogVerbatim("zcount_genInfo") << "zcount_genZInfo: no gen stable lepton found";
+        ZLeptonPt_  = 0;
+        ZLeptonEta_ = 0;
+        ZLeptonPhi_ = 0;
+    }
+    if(hGenZInfoProduct->at(0).stableAntiLepton()){
         ZAntiLeptonPt_        = hGenZInfoProduct->at(0).stableAntiLepton()->pt();
         ZAntiLeptonEta_       = hGenZInfoProduct->at(0).stableAntiLepton()->eta();
         ZAntiLeptonPhi_       = hGenZInfoProduct->at(0).stableAntiLepton()->phi();
-        }
-        else{
-            edm::LogWarning("zcount_genInfo") << "zcount_genZInfo: no gen stable antilepton found";
-            ZAntiLeptonPt_  = 0;
-            ZAntiLeptonEta_ = 0;
-            ZAntiLeptonPhi_ = 0;
-        }
-        
-        if(hGenZInfoProduct->at(0).stableLepton() && hGenZInfoProduct->at(0).stableAntiLepton()){ 
-            ZStableMass_ = (hGenZInfoProduct->at(0).stableLepton()->polarP4() + hGenZInfoProduct->at(0).stableAntiLepton()->polarP4()).mass();
-        }
-        else{
-            ZStableMass_ = 0;
-        }
-
     }
+    else{
+        edm::LogVerbatim("zcount_genInfo") << "zcount_genZInfo: no gen stable antilepton found";
+        ZAntiLeptonPt_  = 0;
+        ZAntiLeptonEta_ = 0;
+        ZAntiLeptonPhi_ = 0;
+    }
+
+    if(hGenZInfoProduct->at(0).stableLepton() && hGenZInfoProduct->at(0).stableAntiLepton()){
+        ZStableMass_ = (hGenZInfoProduct->at(0).stableLepton()->polarP4() + hGenZInfoProduct->at(0).stableAntiLepton()->polarP4()).mass();
+    }
+    else{
+        ZStableMass_ = 0;
+    }
+
+
     eventWeight_ = hGenInfoProduct->weight();
 
     return true;

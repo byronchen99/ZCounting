@@ -74,6 +74,9 @@ void zcount_muons::initBranches(TTree* tree){
 bool zcount_muons::readEvent(const edm::Event& iEvent){
     edm::LogVerbatim("zcount_muons") << "zcount_muons: readEvent";
 
+    nTag_ = 0;
+    nProbe_ = 0;
+
     if(!isMuonTrigger()){
         edm::LogVerbatim("zcount_muons") << "zcount muons: event did not pass any muon trigger";
         return false;
@@ -101,8 +104,7 @@ bool zcount_muons::readEvent(const edm::Event& iEvent){
     edm::LogVerbatim("zcount_muons") << "zcount_muons: nTracks = "<<hTrackProduct->size();
 
 
-    nTag_ = 0;
-    nProbe_ = 0;
+
     // Tag loop
     for (auto const& itMu1 : *hMuonProduct) {
         if((unsigned int)nTag_ >= max_num_tags || (unsigned int)nProbe_ >= max_num_probes)

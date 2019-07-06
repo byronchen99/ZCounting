@@ -34,9 +34,12 @@ zcounting = cms.EDAnalyzer('ZCounting',
     MassMin = cms.untracked.double(66.0),
     MassMax = cms.untracked.double(116.0),
 
-    isData  = cms.untracked.bool(True),
+    isData       = cms.untracked.bool(True),
+    selectEvents = cms.untracked.bool(True),    #If 'False', store all events that are processed
 
     # For MC only
-    genEventInfo = cms.InputTag('generator'),
-    genZCollection = cms.InputTag('genZDecay'),
+    genEventInfo         = cms.InputTag('generator'),
+    genZCollection       = cms.InputTag('genZDecay'),
+    genZLeptonCollection = cms.InputTag('genZLeptonDecay'),
+
 )

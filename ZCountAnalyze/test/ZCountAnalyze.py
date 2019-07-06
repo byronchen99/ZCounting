@@ -6,6 +6,10 @@ options = VarParsing.VarParsing()
 
 options.register('outputFile','output',VarParsing.VarParsing.multiplicity.singleton,VarParsing.VarParsing.varType.string,"output File (w/o .root)")
 options.register('job', 0, VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.int, "job number")
+options.register('isData', False, VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.bool, "switch off generator Info")
+options.register('selectEvents', False, VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.bool, "switch off cuts ")
+options.register('max', -1, VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.int, "specify number of events")
+
 
 process = cms.Process("zcounting")
 
@@ -20,7 +24,7 @@ process.MessageLogger.cerr.INFO = cms.untracked.PSet(
 process.options   = cms.untracked.PSet( wantSummary = cms.untracked.bool(True) )
 
 
-process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(-1) )
+process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(options.max))
 
 process.source = cms.Source("PoolSource",
     fileNames = cms.untracked.vstring(
@@ -40,15 +44,21 @@ print ('Using output file ' + outFileName)
 process.TFileService = cms.Service("TFileService", 
     fileName = cms.string(outFileName))
 
+# if a good Z candidate is found
 from ZCounting.ZUtils.GenZDecay_cfi import genZDecay
 process.genZDecay = genZDecay.clone(
     src = "genParticles",
 )
-
-isData = False
+# if no good Z candidate is found. E.g. if gamma is found instead
+from ZCounting.ZUtils.GenZLeptonDecay_cfi import genZLeptonDecay
+process.genZLeptonDecay = genZLeptonDecay.clone(
+    src = "genParticles",
+)
 
 process.load("ZCounting.ZCountAnalyze.ZCounting_cfi")
-process.zcounting.isData = cms.untracked.bool(isData)
+process.zcounting.isData = cms.untracked.bool(options.isData)
+process.zcounting.selectEvents = cms.untracked.bool(options.selectEvents)
 process.zcounting.genZCollection = cms.InputTag("genZDecay")
+process.zcounting.genZLeptonCollection = cms.InputTag("genZLeptonDecay")
 
-process.p = cms.Path(process.genZDecay + process.zcounting)
+process.p = cms.Path(process.genZDecay + process.genZLeptonDecay + process.zcounting)

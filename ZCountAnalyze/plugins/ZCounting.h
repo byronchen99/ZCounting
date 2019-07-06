@@ -74,6 +74,7 @@ private:
     TTree *tree_;
 
     bool isData_;
+    bool selectEvents_;
 
     std::vector<zcount_module* > modules_;
     zcount_module * addModule(zcount_module *m){

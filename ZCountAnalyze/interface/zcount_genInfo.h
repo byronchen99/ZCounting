@@ -32,12 +32,16 @@ public:
     void setGenZInfoToken(edm::EDGetTokenT<std::vector<GenZDecayProperties>> genZInfoToken) {
         fGenZInfoName_token = genZInfoToken;
     }
+    void setGenZLepInfoToken(edm::EDGetTokenT<std::vector<GenZDecayProperties>> genZLepInfoToken) {
+        fGenZLepInfoName_token = genZLepInfoToken;
+    }
 
 
 private:
 
     edm::EDGetTokenT<GenEventInfoProduct> fGenInfoName_token;
     edm::EDGetTokenT<std::vector<GenZDecayProperties>> fGenZInfoName_token;
+    edm::EDGetTokenT<std::vector<GenZDecayProperties>> fGenZLepInfoName_token;
 
     // input
     

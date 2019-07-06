@@ -21,6 +21,7 @@
 ZCounting::ZCounting(const edm::ParameterSet& iConfig)
 {
     isData_ = iConfig.getUntrackedParameter<bool>("isData");
+    selectEvents_ = iConfig.getUntrackedParameter<bool>("selectEvents");
 
     zcount_trigger *triggerModule = new zcount_trigger();
     triggerModule->setTriggerResultsToken(consumes<edm::TriggerResults>(iConfig.getParameter<edm::InputTag>("TriggerResults")));
@@ -47,6 +48,7 @@ ZCounting::ZCounting(const edm::ParameterSet& iConfig)
         zcount_genInfo* genModule = new zcount_genInfo();
         genModule->setGenInfoToken(consumes<GenEventInfoProduct>(iConfig.getParameter<edm::InputTag>("genEventInfo")));
         genModule->setGenZInfoToken(consumes<std::vector<GenZDecayProperties>>(iConfig.getParameter<edm::InputTag>("genZCollection")));
+        genModule->setGenZLepInfoToken(consumes<std::vector<GenZDecayProperties>>(iConfig.getParameter<edm::InputTag>("genZLeptonCollection")));
 
         addModule(genModule);
     }
@@ -77,7 +79,15 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 
     for(auto& m:modules_){
         m->readSetup(iSetup);
-        if(!m->readEvent(iEvent)) return;
+
+        if(selectEvents_){
+            if(!m->readEvent(iEvent)){
+                return;
+            }
+        }
+        else{
+            m->readEvent(iEvent);
+        }
         m->fillBranches();
     }
 

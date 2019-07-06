@@ -3,7 +3,14 @@
  *    
  * Created on: 29 June 2019
  *   Author: David Walter
- *  
+ *
+ *  MuonProbeCategory {0,5}
+ *    0: the probe does not pass the lowest criteria - it should not be stored with this category
+ *    1: the probe passes the HLT trigger
+ *    2: the probe passes the selection, but not the HLT trigger
+ *    3: the probe passes is a global muon, but fails the selection
+ *    4: the probe is a standalone muon, this means the (possible) muon does not match to a tracker track
+ *    5: the probe is a tracker muon or a tracker track, this means that the (possible) muon does not match to a standalone muon
  */
 
 #ifndef ZCOUNTING_ZCOUNTANALYZER_INTERFACE_ZCOUNT_MUONS_H_
