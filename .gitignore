@@ -6,3 +6,5 @@
 *.root
 *.pyc
 *.log
+*.h5
+*.pdf
