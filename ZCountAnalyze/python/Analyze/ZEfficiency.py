@@ -9,8 +9,9 @@ from pandas import DataFrame
 import pdb
 import argparse
 import numpy as np
+import matplotlib
+matplotlib.use('pdf')
 import matplotlib.pyplot as plt
-
 
 parser = argparse.ArgumentParser(prog='./ZEfficiency')
 parser.add_argument(
@@ -38,16 +39,23 @@ selection='ZStableMass > 66 ' \
 branches=['MuonProbeCategory','nPV','eventWeight']
 
 from Utils import tree_to_df
+
+#dataframe with all Zs that are accepted in Gen
 ZAcc = tree_to_df(root2array(input, treeName[0], selection=selection, branches=branches),5)
 ZAcc['eventWeight'] = ZAcc['eventWeight']/abs(ZAcc['eventWeight'])
+nAcc = np.sum(ZAcc['eventWeight'])
 
-### alysis part ###
+print("number of accepted gen Events is = "+str(nAcc))
+
 
 #dataframe with all Zs that are reconstructed
-ZReco = ZAcc.query('MuonProbeCategory_0==1 | MuonProbeCategory_0==2')
-
+selection='nMuonTags >=1 & nMuonProbes >= 1'
+ZReco = tree_to_df(root2array(input, treeName[0], selection=selection, branches=branches),5)
+query = ' | '
+query = query.join(['MuonProbeCategory_{0}==1 | MuonProbeCategory_{0}==2'.format(i) for i in range(0,5)])
+ZReco = ZReco.query(query)
+ZReco['eventWeight'] = ZReco['eventWeight']/abs(ZReco['eventWeight'])
 nReco = np.sum(ZReco['eventWeight'])
-nAcc = np.sum(ZAcc['eventWeight'])
 
 print("inclusive Z Efficiency is: eff = "+str(nReco)+"/"+str(nAcc)+" = "+str(nReco/nAcc))
 

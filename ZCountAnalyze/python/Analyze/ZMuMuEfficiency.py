@@ -9,6 +9,8 @@ from pandas import DataFrame
 import pdb
 import argparse
 import numpy as np
+import matplotlib
+matplotlib.use('pdf')
 import matplotlib.pyplot as plt
 
 
@@ -52,6 +54,7 @@ nGlo = np.sum(ZAcc.query('MuonProbeCategory_0==3')['eventWeight'])
 nSta = np.sum(ZAcc.query('MuonProbeCategory_0==4')['eventWeight'])
 nTrk = np.sum(ZAcc.query('MuonProbeCategory_0==5')['eventWeight'])
 
+pdb.set_trace()
 
 def Eff(hlt,pp, fp):
     if 2*hlt+pp <= 0:
@@ -76,11 +79,11 @@ def EffMuMu_old(nHLT_,nSel_,nGlo_,nSta_,nTrk_):
     return eff_tot, err_tot
 
 
-def EffMuMu_new(nHLT_, nSel_, nSta_, nTrk_):
+def EffMuMu_new(nHLT_, nSel_, nGlo_, nSta_, nTrk_):
     eff_HLT, err_HLT = Eff(nHLT_, 0, nSel_)
-    eff_Sel, err_Sel = Eff(nHLT_, nSel_, nTrk_ + nSta_)
-    eff_Trk, err_Trk = Eff(nHLT_, nSel_ + nTrk_, nSta_)
-    eff_Sta, err_Sta = Eff(nHLT_, nSel_ + nSta_, nTrk_)
+    eff_Sel, err_Sel = Eff(nHLT_, nSel_, nGlo_)
+    eff_Trk, err_Trk = Eff(nHLT_, nSel_ + nGlo_ + nTrk_, nSta_)
+    eff_Sta, err_Sta = Eff(nHLT_, nSel_ + nGlo_ + nSta_, nTrk_)
 
     if eff_HLT <= 0 or eff_Sel <=0 or eff_Trk <= 0 or eff_Sta <= 0:
         return 0., 0.
@@ -94,7 +97,7 @@ def EffMuMu_new(nHLT_, nSel_, nSta_, nTrk_):
 print("inclusive Z->mumu old Efficiency is: eff = "+str(EffMuMu_old(nHLT,nSel,nGlo,nSta,nTrk)))
 
 #new Z->MuMu Efficiency with tracking
-print("inclusive Z->mumu new Efficiency is: eff = "+str(EffMuMu_new(nHLT,nSel,nSta,nTrk)))
+print("inclusive Z->mumu new Efficiency is: eff = "+str(EffMuMu_new(nHLT,nSel,nGlo,nSta,nTrk)))
 
 #Efficiency in dependence of PU
 minPU=0
@@ -113,7 +116,7 @@ for iPV in range(minPU,maxPU):
     nTrk = np.sum(ZAcc.query('MuonProbeCategory_0==5 & nPV=={0}'.format(iPV))['eventWeight'])
 
     ZEff_PU_old[iPV], ZEff_PU_old_err[iPV] = EffMuMu_old(nHLT,nSel,nGlo,nSta,nTrk)
-    ZEff_PU_new[iPV], ZEff_PU_new_err[iPV] = EffMuMu_new(nHLT,nSel,nSta,nTrk)
+    ZEff_PU_new[iPV], ZEff_PU_new_err[iPV] = EffMuMu_new(nHLT,nSel,nGlo,nSta,nTrk)
 
 
 dfOut = DataFrame()
