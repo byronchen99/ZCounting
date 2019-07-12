@@ -18,15 +18,28 @@ void zcount_genInfo::initBranches(TTree* tree){
     addBranch(tree,"ZPhi", &ZPhi_,"ZPhi_/f");
     addBranch(tree,"ZM", &ZM_,"ZM_/f");
     addBranch(tree,"ZStableMass", &ZStableMass_,"ZStableMass_/f");
-    addBranch(tree,"ZDecayMode", &ZDecayMode_,"ZDecayMode_/i");
+    addBranch(tree,"ZDecayMode",  &ZDecayMode_,"ZDecayMode_/i");
 
-    addBranch(tree,"ZLeptonPt", &ZLeptonPt_,"ZLeptonPt_/f");
+    addBranch(tree,"ZLeptonPt",  &ZLeptonPt_,"ZLeptonPt_/f");
     addBranch(tree,"ZLeptonEta", &ZLeptonEta_,"ZLeptonEta_/f");
     addBranch(tree,"ZLeptonPhi", &ZLeptonPhi_,"ZLeptonPhi_/f");
+    addBranch(tree,"ZLeptonRecoCat", &ZLeptonRecoCat_,"ZLeptonRecoCat_/i");
+    addBranch(tree,"ZLeptonRecoPt",  &ZLeptonRecoPt_,"ZLeptonRecoPt_/f");
+    addBranch(tree,"ZLeptonRecoEta", &ZLeptonRecoEta_,"ZLeptonRecoEta_/f");
+    addBranch(tree,"ZLeptonRecoPhi", &ZLeptonRecoPhi_,"ZLeptonRecoPhi_/f");
+    addBranch(tree,"ZLeptonRecoDelR", &ZLeptonRecoDelR_,"ZLeptonRecoDelR_/f");
 
-    addBranch(tree,"ZAntiLeptonPt", &ZAntiLeptonPt_,"ZAntiLeptonPt_/f");
+    addBranch(tree,"ZAntiLeptonPt",  &ZAntiLeptonPt_, "ZAntiLeptonPt_/f");
     addBranch(tree,"ZAntiLeptonEta", &ZAntiLeptonEta_,"ZAntiLeptonEta_/f");
     addBranch(tree,"ZAntiLeptonPhi", &ZAntiLeptonPhi_,"ZAntiLeptonPhi_/f");
+    addBranch(tree,"ZAntiLeptonRecoCat", &ZAntiLeptonRecoCat_,"ZAntiLeptonRecoCat_/i");
+    addBranch(tree,"ZAntiLeptonRecoPt",  &ZAntiLeptonRecoPt_, "ZAntiLeptonRecoPt_/f");
+    addBranch(tree,"ZAntiLeptonRecoEta", &ZAntiLeptonRecoEta_,"ZAntiLeptonRecoEta_/f");
+    addBranch(tree,"ZAntiLeptonRecoPhi", &ZAntiLeptonRecoPhi_,"ZAntiLeptonRecoPhi_/f");
+    addBranch(tree,"ZAntiLeptonRecoDelR", &ZAntiLeptonRecoDelR_,"ZAntiLeptonRecoDelR_/f");
+
+    addBranch(tree,"ZMassReco",  &ZMassReco_, "ZMassReco_/f");
+
 
 }
 
@@ -78,31 +91,18 @@ bool zcount_genInfo::readEvent(const edm::Event& iEvent){
 
     ZDecayMode_ = hGenZInfoProduct->at(0).decayMode();
 
-    if(hGenZInfoProduct->at(0).stableLepton()){
-        ZLeptonPt_        = hGenZInfoProduct->at(0).stableLepton()->pt();
-        ZLeptonEta_       = hGenZInfoProduct->at(0).stableLepton()->eta();
-        ZLeptonPhi_       = hGenZInfoProduct->at(0).stableLepton()->phi();
-    }
-    else{
-        edm::LogVerbatim("zcount_genInfo") << "zcount_genZInfo: no gen stable lepton found";
-        ZLeptonPt_  = 0;
-        ZLeptonEta_ = 0;
-        ZLeptonPhi_ = 0;
-    }
-    if(hGenZInfoProduct->at(0).stableAntiLepton()){
-        ZAntiLeptonPt_        = hGenZInfoProduct->at(0).stableAntiLepton()->pt();
-        ZAntiLeptonEta_       = hGenZInfoProduct->at(0).stableAntiLepton()->eta();
-        ZAntiLeptonPhi_       = hGenZInfoProduct->at(0).stableAntiLepton()->phi();
-    }
-    else{
-        edm::LogVerbatim("zcount_genInfo") << "zcount_genZInfo: no gen stable antilepton found";
-        ZAntiLeptonPt_  = 0;
-        ZAntiLeptonEta_ = 0;
-        ZAntiLeptonPhi_ = 0;
-    }
+    LV lep = nullP4_;
+    if(hGenZInfoProduct->at(0).stableLepton())
+        lep = hGenZInfoProduct->at(0).stableLepton()->polarP4();
+    ZLepton_ = TLorentzVector(lep.X(),lep.Y(),lep.Z(),lep.T());
+
+    lep = nullP4_;
+    if(hGenZInfoProduct->at(0).stableAntiLepton())
+        lep = hGenZInfoProduct->at(0).stableAntiLepton()->polarP4();
+    ZAntiLepton_ = TLorentzVector(lep.X(),lep.Y(),lep.Z(),lep.T());
 
     if(hGenZInfoProduct->at(0).stableLepton() && hGenZInfoProduct->at(0).stableAntiLepton()){
-        ZStableMass_ = (hGenZInfoProduct->at(0).stableLepton()->polarP4() + hGenZInfoProduct->at(0).stableAntiLepton()->polarP4()).mass();
+        ZStableMass_ = (ZAntiLepton_ + ZLepton_).M();
     }
     else{
         ZStableMass_ = 0;
@@ -116,7 +116,57 @@ bool zcount_genInfo::readEvent(const edm::Event& iEvent){
 
 
 void zcount_genInfo::fillBranches(){
+    edm::LogVerbatim("zcount_genInfo") << "zcount_genZInfo: fill Branches";
+
+    const std::vector<recoMuon> *recoMuons = muonModule->getRecoMuons();
+
+    ZLeptonRecoCat_ = 0;
+    TLorentzVector ZLeptonReco_;
+
+    ZAntiLeptonRecoCat_ = 0;
+    TLorentzVector ZAntiLeptonReco_;
+
+    double minDelRLep  = 0.4;
+    double minDelRALep = 0.4;
+
+    // delta R matching from reco particles to gen particles
+    for (auto const& itMu : *recoMuons) {
+        if(ZLepton_.Pt() && itMu.charge < 0. && itMu.lv.DeltaR(ZLepton_) < minDelRLep){
+            minDelRLep = itMu.lv.DeltaR(ZLepton_);
+            ZLeptonRecoCat_ = itMu.category;
+            ZLeptonReco_ = itMu.lv;
+
+        }
+        else if(ZAntiLepton_.Pt() && itMu.charge > 0. && itMu.lv.DeltaR(ZAntiLepton_) < minDelRALep){
+            minDelRALep = itMu.lv.DeltaR(ZAntiLepton_);
+            ZAntiLeptonRecoCat_ = itMu.category;
+            ZAntiLeptonReco_ = itMu.lv;
+        }
+    }
+
+    ZLeptonPt_ = ZLepton_.Pt();
+    ZLeptonEta_ = ZLepton_.Eta();
+    ZLeptonPhi_ = ZLepton_.Phi();
+
+    ZAntiLeptonPt_ = ZAntiLepton_.Pt();
+    ZAntiLeptonEta_ = ZAntiLepton_.Eta();
+    ZAntiLeptonPhi_ = ZAntiLepton_.Phi();
+
+    ZLeptonRecoPt_  = ZLeptonReco_.Pt();
+    ZLeptonRecoEta_ = ZLeptonReco_.Eta();
+    ZLeptonRecoPhi_ = ZLeptonReco_.Phi();
+    ZLeptonRecoDelR_ = minDelRLep;
+
+    ZAntiLeptonRecoPt_  = ZAntiLeptonReco_.Pt();
+    ZAntiLeptonRecoEta_ = ZAntiLeptonReco_.Eta();
+    ZAntiLeptonRecoPhi_ = ZAntiLeptonReco_.Phi();
+    ZAntiLeptonRecoDelR_ = minDelRALep;
+
+    ZMassReco_ = (ZLeptonReco_ + ZAntiLeptonReco_).M();
+
+    edm::LogVerbatim("zcount_genInfo") << "zcount_genZInfo: end fill Branches";
 
     return;
 }
+
 

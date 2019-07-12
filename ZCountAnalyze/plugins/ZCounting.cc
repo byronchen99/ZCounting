@@ -49,6 +49,7 @@ ZCounting::ZCounting(const edm::ParameterSet& iConfig)
         genModule->setGenInfoToken(consumes<GenEventInfoProduct>(iConfig.getParameter<edm::InputTag>("genEventInfo")));
         genModule->setGenZInfoToken(consumes<std::vector<GenZDecayProperties>>(iConfig.getParameter<edm::InputTag>("genZCollection")));
         genModule->setGenZLepInfoToken(consumes<std::vector<GenZDecayProperties>>(iConfig.getParameter<edm::InputTag>("genZLeptonCollection")));
+        genModule->setMuonModule(*muonModule);
 
         addModule(genModule);
     }

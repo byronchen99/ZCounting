@@ -10,10 +10,16 @@
 #define ZCOUNTING_ZCOUNTANALYZER_INTERFACE_ZCOUNT_GENINFO_H_
 
 #include "ZCounting/ZCountAnalyze/interface/zcount_module.h"
+#include "ZCounting/ZCountAnalyze/interface/zcount_muons.h"
 
 #include "DataFormats/HepMCCandidate/interface/GenParticle.h"
 #include "SimDataFormats/GeneratorProducts/interface/GenEventInfoProduct.h"
 #include "ZCounting/ZUtils/interface/GenZDecayProperties.h"
+
+#include <TLorentzVector.h>
+
+typedef ROOT::Math::LorentzVector<ROOT::Math::PtEtaPhiM4D<double> > LV;
+
 
 class zcount_genInfo: public zcount_module{
 public:
@@ -36,6 +42,10 @@ public:
         fGenZLepInfoName_token = genZLepInfoToken;
     }
 
+    void setMuonModule(zcount_muons &module){
+        muonModule = &module;
+    }
+
 
 private:
 
@@ -43,11 +53,17 @@ private:
     edm::EDGetTokenT<std::vector<GenZDecayProperties>> fGenZInfoName_token;
     edm::EDGetTokenT<std::vector<GenZDecayProperties>> fGenZLepInfoName_token;
 
+    zcount_muons *muonModule;
+
+    TLorentzVector ZLepton_;
+    TLorentzVector ZAntiLepton_;
+    const LV nullP4_{0,0,0,0};
     // input
     
     // output
     float eventWeight_;
 
+    // Gen particles
     float ZPt_;
     float ZEta_;
     float ZPhi_;
@@ -62,6 +78,22 @@ private:
     float ZAntiLeptonPt_;
     float ZAntiLeptonEta_;
     float ZAntiLeptonPhi_;
+
+    // Associated Reco particles
+    int ZLeptonRecoCat_;
+    float ZLeptonRecoPt_;
+    float ZLeptonRecoEta_;
+    float ZLeptonRecoPhi_;
+    float ZLeptonRecoDelR_;
+
+    int ZAntiLeptonRecoCat_;
+    float ZAntiLeptonRecoPt_;
+    float ZAntiLeptonRecoEta_;
+    float ZAntiLeptonRecoPhi_;
+    float ZAntiLeptonRecoDelR_;
+
+
+    float ZMassReco_;
 
 };
 

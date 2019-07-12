@@ -76,6 +76,7 @@ bool zcount_muons::readEvent(const edm::Event& iEvent){
 
     nTag_ = 0;
     nProbe_ = 0;
+    recoMuons.clear();
 
     if(!isMuonTrigger()){
         edm::LogVerbatim("zcount_muons") << "zcount muons: event did not pass any muon trigger";
@@ -104,11 +105,11 @@ bool zcount_muons::readEvent(const edm::Event& iEvent){
     edm::LogVerbatim("zcount_muons") << "zcount_muons: nTracks = "<<hTrackProduct->size();
 
 
-
     // Tag loop
     for (auto const& itMu1 : *hMuonProduct) {
         if((unsigned int)nTag_ >= max_num_tags || (unsigned int)nProbe_ >= max_num_probes)
             break;
+
         float pt1 = itMu1.muonBestTrack()->pt();
         float eta1 = itMu1.muonBestTrack()->eta();
         float phi1 = itMu1.muonBestTrack()->phi();
@@ -125,6 +126,8 @@ bool zcount_muons::readEvent(const edm::Event& iEvent){
             continue;
 
         vTag.SetPtEtaPhiM(pt1, eta1, phi1, MUON_MASS);
+        recoMuons.push_back({vTag,cHLT,q1});
+
         edm::LogVerbatim("zcount_muons") << "zcount_muons: good tag muon found";
 
         bool goodTPPair = false; // if at least one good probe is found to the corresponding tag
@@ -175,12 +178,15 @@ bool zcount_muons::readEvent(const edm::Event& iEvent){
                         continue;  // make sure we don't double count MuMu2HLT category
 
                     probeCat_[nProbe_] = cHLT;
+                    recoMuons.push_back({vProbe,cHLT,q2});
+
                     edm::LogVerbatim("zcount_muons") << "zcount_muons: HLT probe";
 
                 }
                 else {
                     // category Sel: probe passing selection but not trigger
                     probeCat_[nProbe_] = cSel;
+                    recoMuons.push_back({vProbe,cSel,q2});
                     edm::LogVerbatim("zcount_muons") << "zcount_muons: Sel probe";
 
                 }
@@ -189,12 +195,14 @@ bool zcount_muons::readEvent(const edm::Event& iEvent){
             else if (itMu2.isGlobalMuon()) {
                 // category Glo: probe is a Global muon but failing selection
                 probeCat_[nProbe_] = cGlo;
+                recoMuons.push_back({vProbe,cGlo,q2});
                 edm::LogVerbatim("zcount_muons") << "zcount_muons: Glo probe";
 
             }
             else if (itMu2.isStandAloneMuon()) {
                 // category Sta: probe is a Standalone muon
                 probeCat_[nProbe_] = cSta;
+                recoMuons.push_back({vProbe,cSta,q2});
                 edm::LogVerbatim("zcount_muons") << "zcount_muons: Sta probe";
 
             }
@@ -202,6 +210,7 @@ bool zcount_muons::readEvent(const edm::Event& iEvent){
                  itMu2.innerTrack()->hitPattern().numberOfValidPixelHits() >= 1) {
                 // cateogry Trk: probe is a tracker track
                 probeCat_[nProbe_] = cTrk;
+                recoMuons.push_back({vProbe,cTrk,q2});
                 edm::LogVerbatim("zcount_muons") << "zcount_muons: Trk probe";
             }
 
@@ -260,6 +269,7 @@ bool zcount_muons::readEvent(const edm::Event& iEvent){
             if (itTrk.hitPattern().trackerLayersWithMeasurement() >= 6 && itTrk.hitPattern().numberOfValidPixelHits() >= 1) {
                 probeCat_[nProbe_] = cTrk;
                 edm::LogVerbatim("zcount_muons") << "zcount_muons: Trk probe";
+                recoMuons.push_back({vTrack,cTrk,q2});
 
                 probePt_[nProbe_]   = pt2;
                 probeEta_[nProbe_]  = eta2;

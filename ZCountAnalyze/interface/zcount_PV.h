@@ -29,7 +29,7 @@ public:
         fPVName_token = pvToken;
     }
 
-    const reco::Vertex* getPV(){
+    const reco::Vertex* getPV()const{
         return pv;
     }
 

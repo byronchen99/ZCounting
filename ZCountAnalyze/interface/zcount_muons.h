@@ -26,6 +26,13 @@
 #include "DataFormats/VertexReco/interface/VertexFwd.h"
 #include "DataFormats/VertexReco/interface/Vertex.h"
 
+#include <TLorentzVector.h>
+
+struct recoMuon{
+    TLorentzVector lv;
+    int category;
+    float charge;
+};
 
 class zcount_muons: public zcount_module{
 public:
@@ -52,6 +59,11 @@ public:
         triggerModule = &module;
     }
 
+    const std::vector<recoMuon>* getRecoMuons() const{
+        return &recoMuons;
+    };
+
+
 private:
    
     edm::EDGetTokenT<reco::MuonCollection>  fMuonName_token;
@@ -63,6 +75,8 @@ private:
     zcount_PV      *pvModule;
     zcount_trigger *triggerModule;
 
+    std::vector<recoMuon> recoMuons;
+
     // definitions
     enum MuonIDTypes { NoneID, LooseID, MediumID, TightID };
     enum MuonIsoTypes { NoneIso, TrackerIso, PFIso };
@@ -73,7 +87,6 @@ private:
 
     // constants
     const double MUON_MASS = 0.105658369;
-
 
     // input
     double PtCutTag_;
