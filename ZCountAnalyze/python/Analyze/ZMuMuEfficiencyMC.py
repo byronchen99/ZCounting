@@ -6,7 +6,7 @@ from __future__ import division, print_function
 #
 # # #
 from root_numpy import root2array, list_trees
-from pandas import DataFrame
+import pandas as pd
 import pdb
 import argparse
 import numpy as np
@@ -14,17 +14,21 @@ import matplotlib
 matplotlib.use('pdf')
 import matplotlib.pyplot as plt
 
-
 parser = argparse.ArgumentParser(prog='./ZMuMUEfficiency')
 parser.add_argument(
-    '-i','--input', required=True,
+    '-i','--input', nargs='+',
     help='specify input root file'
 )
 args = parser.parse_args()
 
-input = args.input
+inputs = args.input
 
-treeName = list_trees(input)
+if isinstance(inputs, (list,)):
+    treeName = list_trees(inputs[0])
+else:
+    treeName = list_trees(inputs)
+    inputs = [inputs,]
+
 if(len(treeName) > 1):
     print("more then one tree in file ... specify, which tree to use")
     exit()
@@ -38,10 +42,11 @@ selection='ZMassReco > 66 ' \
           '& abs(ZLeptonRecoEta) < 2.4 ' \
           '& abs(ZAntiLeptonRecoEta) < 2.4 '
 #specify which branches to load
-branches=['ZLeptonRecoCat','ZAntiLeptonRecoCat','nPV','eventWeight']
+branches=['ZLeptonRecoCat','ZAntiLeptonRecoCat','nPV','eventWeight', 'ZLeptonRecoEta', 'ZAntiLeptonRecoEta']
 
 from Utils import tree_to_df
-ZAcc = tree_to_df(root2array(input, treeName[0], selection=selection, branches=branches),5)
+ZAcc = [tree_to_df(root2array(i, treeName[0], selection=selection, branches=branches),5) for i in inputs]
+ZAcc = pd.concat(ZAcc)
 ZAcc['eventWeight'] = ZAcc['eventWeight']/abs(ZAcc['eventWeight'])
 
 ### alysis part ###
@@ -104,71 +109,93 @@ print("inclusive Z->mumu old Efficiency is: eff = "+str(EffMuMu_old(nHLT,nSel,nG
 #new Z->MuMu Efficiency with tracking
 print("inclusive Z->mumu new Efficiency is: eff = "+str(EffMuMu_new(nHLT,nSel,nGlo,nSta,nTrk)))
 
+### Plot ###
+def plotEff(name,xlabel,ylabel,bins,eff,err, cuts):
+    plt.clf()
+    fig, ax = plt.subplots()
+
+    ax.errorbar(bins[:-1] + (bins[1:] - bins[:-1])/2 , eff, xerr=np.zeros(len(bins)-1), yerr=err, fmt='ro')
+    ax.set(xlim=(bins[0], bins[-1]), ylim=(0.7, 1.1))
+    ax.text(0.05, 0.9, cuts, transform=ax.transAxes)
+    ax.set_ylabel(ylabel)
+    ax.set_xlabel(xlabel)
+    plt.savefig(name+'.png')
+    plt.close()
+
+
 #Differential efficiencies
-minPU=0
-maxPU=60
 
-MuEff_PU_HLT_Sel = [np.zeros(maxPU-minPU), np.zeros(maxPU-minPU)]
-MuEff_PU_Sel_Glo = [np.zeros(maxPU-minPU), np.zeros(maxPU-minPU)]
-MuEff_PU_Glo_StaOrTrk = [np.zeros(maxPU-minPU), np.zeros(maxPU-minPU)]
-MuEff_PU_Trk_Sta = [np.zeros(maxPU-minPU), np.zeros(maxPU-minPU)]
-MuEff_PU_Sta_Trk = [np.zeros(maxPU-minPU), np.zeros(maxPU-minPU)]
-
-ZEff_PU_old = [np.zeros(maxPU-minPU), np.zeros(maxPU-minPU)]
-ZEff_PU_new = [np.zeros(maxPU-minPU), np.zeros(maxPU-minPU)]
+dfOut = pd.DataFrame()
 
 
-for iPV in range(minPU,maxPU):
-    nHLT = np.sum(ZAcc.query(qHLT+' & nPV=={0}'.format(iPV))['eventWeight'])
-    nSel = np.sum(ZAcc.query(qSel+' & nPV=={0}'.format(iPV))['eventWeight'])
-    nGlo = np.sum(ZAcc.query(qGlo+' & nPV=={0}'.format(iPV))['eventWeight'])
-    nSta = np.sum(ZAcc.query(qSta+' & nPV=={0}'.format(iPV))['eventWeight'])
-    nTrk = np.sum(ZAcc.query(qTrk+' & nPV=={0}'.format(iPV))['eventWeight'])
+def differentialEff(bins, obs, cuts, sel=''):
+    if sel != '':
+        sel = '&'+sel
+    
+    MuEff_HLT_Sel = [np.zeros(len(bins)-1), np.zeros(len(bins)-1)]
+    MuEff_Sel_Glo = [np.zeros(len(bins)-1), np.zeros(len(bins)-1)]
+    MuEff_Glo_StaOrTrk = [np.zeros(len(bins)-1), np.zeros(len(bins)-1)]
+    MuEff_Trk_Sta = [np.zeros(len(bins)-1), np.zeros(len(bins)-1)]
+    MuEff_Sta_Trk = [np.zeros(len(bins)-1), np.zeros(len(bins)-1)]
 
-    MuEff_PU_HLT_Sel[0][iPV], MuEff_PU_HLT_Sel[1][iPV] = Eff(nHLT, 0, nSel)
-    MuEff_PU_Sel_Glo[0][iPV], MuEff_PU_Sel_Glo[1][iPV] = Eff(nHLT, nSel, nGlo)
-    MuEff_PU_Glo_StaOrTrk[0][iPV], MuEff_PU_Glo_StaOrTrk[1][iPV] = Eff(nHLT, nSel + nGlo, nSta + nTrk)
-    MuEff_PU_Trk_Sta[0][iPV], MuEff_PU_Trk_Sta[1][iPV] = Eff(nHLT, nSel + nGlo + nTrk, nSta)
-    MuEff_PU_Sta_Trk[0][iPV], MuEff_PU_Sta_Trk[1][iPV] = Eff(nHLT, nSel + nGlo + nSta, nTrk)
+    ZEff_old = [np.zeros(len(bins)-1), np.zeros(len(bins)-1)]
+    ZEff_new = [np.zeros(len(bins)-1), np.zeros(len(bins)-1)]
 
-    ZEff_PU_old[0][iPV], ZEff_PU_old[1][iPV] = EffMuMu_old(nHLT,nSel,nGlo,nSta,nTrk)
-    ZEff_PU_new[0][iPV], ZEff_PU_new[1][iPV] = EffMuMu_new(nHLT,nSel,nGlo,nSta,nTrk)
+    for i in range(0,len(bins)-1):
+        bin_low = bins[i]
+        bin_high = bins[i+1]
+        nHLT = np.sum(ZAcc.query('('+qHLT+') & {0}>{1} & {0}<{2} {3}'.format(obs, bin_low, bin_high, sel))['eventWeight'])
+        nSel = np.sum(ZAcc.query('('+qSel+') & {0}>{1} & {0}<{2} {3}'.format(obs, bin_low, bin_high, sel))['eventWeight'])
+        nGlo = np.sum(ZAcc.query('('+qGlo+') & {0}>{1} & {0}<{2} {3}'.format(obs, bin_low, bin_high, sel))['eventWeight'])
+        nSta = np.sum(ZAcc.query('('+qSta+') & {0}>{1} & {0}<{2} {3}'.format(obs, bin_low, bin_high, sel))['eventWeight'])
+        nTrk = np.sum(ZAcc.query('('+qTrk+') & {0}>{1} & {0}<{2} {3}'.format(obs, bin_low, bin_high, sel))['eventWeight'])
+    
+        MuEff_HLT_Sel[0][i], MuEff_HLT_Sel[1][i] = Eff(nHLT, 0, nSel)
+        MuEff_Sel_Glo[0][i], MuEff_Sel_Glo[1][i] = Eff(nHLT, nSel, nGlo)
+        MuEff_Glo_StaOrTrk[0][i], MuEff_Glo_StaOrTrk[1][i] = Eff(nHLT, nSel + nGlo, nSta + nTrk)
+        MuEff_Trk_Sta[0][i], MuEff_Trk_Sta[1][i] = Eff(nHLT, nSel + nGlo + nTrk, nSta)
+        MuEff_Sta_Trk[0][i], MuEff_Sta_Trk[1][i] = Eff(nHLT, nSel + nGlo + nSta, nTrk)
+    
+        ZEff_old[0][i], ZEff_old[1][i] = EffMuMu_old(nHLT,nSel,nGlo,nSta,nTrk)
+        ZEff_new[0][i], ZEff_new[1][i] = EffMuMu_new(nHLT,nSel,nGlo,nSta,nTrk)
+
+    dfOut[obs+'_'+cuts+'_lowEdge'] = bins[:-1]
+    dfOut[obs+'_'+cuts+'_upEdge'] = bins[1:]
+
+    dfOut['ZMuMuEff_{0}_{1}_old'.format(obs, cuts)] = ZEff_old[0]
+    dfOut['ZMuMuErr_{0}_{1}_old'.format(obs, cuts)] = ZEff_old[1]
+    dfOut['ZMuMuEff_{0}_{1}_new'.format(obs, cuts)] = ZEff_new[0]
+    dfOut['ZMuMuErr_{0}_{1}_new'.format(obs, cuts)] = ZEff_new[1]
+
+    plotEff('MuEff_{0}_{1}_HLT_Sel'.format(obs, cuts), obs, 'Mu HLT Efficiency',bins, MuEff_HLT_Sel[0], MuEff_HLT_Sel[1], cuts)
+    plotEff('MuEff_{0}_{1}_Sel_Glo'.format(obs, cuts), obs, 'Mu Sel Efficiency',bins, MuEff_Sel_Glo[0], MuEff_Sel_Glo[1], cuts)
+    plotEff('MuEff_{0}_{1}_Glo_StaOrTrk'.format(obs, cuts), obs, 'Mu Glo Efficiency',bins, MuEff_Glo_StaOrTrk[0], MuEff_Glo_StaOrTrk[1], cuts)
+    plotEff('MuEff_{0}_{1}_Trk_Sta'.format(obs, cuts), obs, 'Mu Trk Efficiency',bins, MuEff_Trk_Sta[0], MuEff_Trk_Sta[1], cuts)
+    plotEff('MuEff_{0}_{1}_Sta_Trk'.format(obs, cuts), obs, 'Mu Sta Efficiency',bins, MuEff_Sta_Trk[0], MuEff_Sta_Trk[1], cuts)
+
+    plotEff('ZEff_{0}_{1}_old'.format(obs, cuts), obs, 'old Z efficiency',bins, ZEff_old[0], ZEff_old[1], cuts)
+    plotEff('ZEff_{0}_{1}_new'.format(obs, cuts), obs, 'new Z efficiency',bins, ZEff_new[0], ZEff_new[1], cuts)
+
+    plt.clf()
+    fig, ax = plt.subplots()
+    #fig.subplots_adjust(bottom=0.15, left=0.2)
+
+    ax.errorbar(bins[:-1] + (bins[1:] - bins[:-1])/2, ZEff_old[0], xerr=np.zeros(len(bins)-1), yerr=ZEff_old[1], fmt='ro', label='old')
+    ax.errorbar(bins[:-1] + (bins[1:] - bins[:-1])/2, ZEff_new[0], xerr=np.zeros(len(bins)-1), yerr=ZEff_new[1], fmt='go', label='new')
+    ax.set(xlim=(bins[0], bins[-1]), ylim=(0.7, 1.1))
+    ax.legend()
+    ax.text(0.05, 0.9, cuts, transform=ax.transAxes)
+    ax.set_ylabel('Z efficiency')
+    ax.set_xlabel(obs)
+    plt.savefig('ZMuMu_{0}_{1}_both.png'.format(obs,cuts))
+    plt.close()
 
 
-dfOut = DataFrame()
-dfOut['nPV'] = range(minPU,maxPU)
-dfOut['ZMuMuEff_old'] = ZEff_PU_old[0]
-dfOut['ZMuMuErr_old'] = ZEff_PU_old[1]
-dfOut['ZMuMuEff_new'] = ZEff_PU_new[0]
-dfOut['ZMuMuErr_new'] = ZEff_PU_new[1]
+differentialEff(np.linspace(0.5, 59.5, 60), 'nPV', 'inclusive')
+differentialEff(np.linspace(0.5, 59.5, 60), 'nPV', 'BB', sel='abs(ZLeptonRecoEta) < 0.9 & abs(ZAntiLeptonRecoEta) < 0.9')
+differentialEff(np.linspace(0.5, 59.5, 60), 'nPV', 'EB', sel='abs(ZLeptonRecoEta) > 0.9 & abs(ZAntiLeptonRecoEta) < 0.9')
+differentialEff(np.linspace(0.5, 59.5, 60), 'nPV', 'BE', sel='abs(ZLeptonRecoEta) < 0.9 & abs(ZAntiLeptonRecoEta) > 0.9')
+differentialEff(np.linspace(0.5, 59.5, 60), 'nPV', 'EE', sel='abs(ZLeptonRecoEta) > 0.9 & abs(ZAntiLeptonRecoEta) > 0.9')
+
 dfOut.to_hdf('ZMuMuEfficiencies.h5', 'ZMuMuEfficiencies', mode='w')
 
-
-### Plot ###
-def plotEff(name,xlabel,ylabel,xMin,xMax,eff,err=None):
-    plt.clf()
-    if not isinstance(err, (list,)):
-        err = np.zeros(xMax - xMin)
-
-    plt.errorbar(range(xMin, xMax), eff, xerr=np.zeros(xMax - xMin), yerr=err, fmt='ro')
-    plt.ylim((0.7, 1.1))
-    plt.ylabel(xlabel)
-    plt.xlabel(ylabel)
-    plt.savefig(name+'.pdf')
-
-plotEff('MuEff_PU_HLT_Sel','nPV', 'Mu HLT Efficiency',minPU, maxPU, MuEff_PU_HLT_Sel[0], MuEff_PU_HLT_Sel[1])
-plotEff('MuEff_PU_Sel_Glo','nPV', 'Mu Sel Efficiency',minPU, maxPU, MuEff_PU_Sel_Glo[0], MuEff_PU_Sel_Glo[1])
-plotEff('MuEff_PU_Glo_StaOrTrk','nPV', 'Mu Glo Efficiency',minPU, maxPU, MuEff_PU_Glo_StaOrTrk[0], MuEff_PU_Glo_StaOrTrk[1])
-plotEff('MuEff_PU_Trk_Sta','nPV', 'Mu Trk Efficiency',minPU, maxPU, MuEff_PU_Trk_Sta[0], MuEff_PU_Trk_Sta[1])
-plotEff('MuEff_PU_Sta_Trk','nPV', 'Mu Sta Efficiency',minPU, maxPU, MuEff_PU_Sta_Trk[0], MuEff_PU_Sta_Trk[1])
-
-plotEff('ZEff_PU_old','nPV', 'old Z efficiency',minPU, maxPU, ZEff_PU_old[0], ZEff_PU_old[1])
-plotEff('ZEff_PU_new','nPV', 'new Z efficiency',minPU, maxPU, ZEff_PU_new[0], ZEff_PU_new[1])
-
-plt.errorbar(range(minPU,maxPU), ZEff_PU_old[0], xerr=np.zeros(maxPU-minPU), yerr=ZEff_PU_old[1], fmt='ro', label='old' )
-plt.errorbar(range(minPU,maxPU), ZEff_PU_new[0], xerr=np.zeros(maxPU-minPU), yerr=ZEff_PU_new[1], fmt='go', label='new' )
-plt.ylim((0.7,1.1))
-plt.legend()
-plt.ylabel('Z efficiency')
-plt.xlabel('nPV')
-plt.savefig('ZMuMuEff_PU_both.pdf')

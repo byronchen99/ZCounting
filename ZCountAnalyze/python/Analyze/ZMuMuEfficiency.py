@@ -54,8 +54,6 @@ nGlo = np.sum(ZAcc.query('MuonProbeCategory_0==3')['eventWeight'])
 nSta = np.sum(ZAcc.query('MuonProbeCategory_0==4')['eventWeight'])
 nTrk = np.sum(ZAcc.query('MuonProbeCategory_0==5')['eventWeight'])
 
-pdb.set_trace()
-
 def Eff(hlt,pp, fp):
     if 2*hlt+pp <= 0:
         return 0., 0.
