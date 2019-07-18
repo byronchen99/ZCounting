@@ -51,6 +51,16 @@ public:
 protected:
     template <class T>
     void addBranch(TTree* t, const char* name, T*, const char* leaflist=0);
+
+    // definitions
+    enum MuonIDTypes { NoneID, LooseID, MediumID, TightID };
+    enum MuonIsoTypes { NoneIso, TrackerIso, PFIso };
+    enum MuonCategory { cNone, cTrk, cSta, cGlo, cSel, cHLT};
+
+    const double MUON_MASS = 0.105658369;
+    const double MUON_MAX_DELTAR_MATCH = 0.5;   // maximum delta R between gen and reco muon by matching
+    const double MUON_MAX_DRELPT_MATCH = 0.5;   // maximum relative pt difference between gen and reco muon by matching
+
 private:
     std::vector<TString> allbranches_;
     bool read_;

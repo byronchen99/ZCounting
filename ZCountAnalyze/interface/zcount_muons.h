@@ -5,12 +5,12 @@
  *   Author: David Walter
  *
  *  MuonProbeCategory {0,5}
- *    0: the probe does not pass the lowest criteria - it should not be stored with this category
- *    1: the probe passes the HLT trigger
- *    2: the probe passes the selection, but not the HLT trigger
+ *    5: the probe passes the HLT trigger
+ *    4: the probe passes the selection, but not the HLT trigger
  *    3: the probe passes is a global muon, but fails the selection
- *    4: the probe is a standalone muon, this means the (possible) muon does not match to a tracker track
- *    5: the probe is a tracker muon or a tracker track, this means that the (possible) muon does not match to a standalone muon
+ *    2: the probe is a standalone muon, this means the (possible) muon does not match to a tracker track
+ *    1: the probe is a tracker muon or a tracker track, this means that the (possible) muon does not match to a standalone muon
+ *    0: the probe does not pass the lowest criteria - it should not be stored with this category
  */
 
 #ifndef ZCOUNTING_ZCOUNTANALYZER_INTERFACE_ZCOUNT_MUONS_H_
@@ -28,11 +28,6 @@
 
 #include <TLorentzVector.h>
 
-struct recoMuon{
-    TLorentzVector lv;
-    int category;
-    float charge;
-};
 
 class zcount_muons: public zcount_module{
 public:
@@ -59,10 +54,16 @@ public:
         triggerModule = &module;
     }
 
-    const std::vector<recoMuon>* getRecoMuons() const{
-        return &recoMuons;
-    };
 
+    // functions
+    int getMuonCategory(const reco::Muon &muon, const reco::Vertex &vtx);
+    bool isValidTrack(const reco::Track &trk);
+
+    bool isMuonTrigger();
+    bool isMuonTriggerObj(const double eta, const double phi);
+
+    bool passMuonID(const reco::Muon& muon, const reco::Vertex& vtx);
+    bool passMuonIso(const reco::Muon& muon);
 
 private:
    
@@ -75,18 +76,8 @@ private:
     zcount_PV      *pvModule;
     zcount_trigger *triggerModule;
 
-    std::vector<recoMuon> recoMuons;
-
-    // definitions
-    enum MuonIDTypes { NoneID, LooseID, MediumID, TightID };
-    enum MuonIsoTypes { NoneIso, TrackerIso, PFIso };
-    enum ProbeCategory { cNone, cHLT, cSel, cGlo, cSta, cTrk};
-
     static constexpr std::size_t max_num_tags   = 5;
     static constexpr std::size_t max_num_probes = 20;
-
-    // constants
-    const double MUON_MASS = 0.105658369;
 
     // input
     double PtCutTag_;
@@ -119,13 +110,6 @@ private:
     float probePhi_[max_num_probes];
     float dilepMass_[max_num_probes];   // tag-and-probe mass
     int   tagIndex_[max_num_probes];    // index of the corresponding tag muon
-
-    // functions
-    bool isMuonTrigger();
-    bool isMuonTriggerObj(const double eta, const double phi);
-
-    bool passMuonID(const reco::Muon& muon, const reco::Vertex& vtx, const MuonIDTypes& idType);
-    bool passMuonIso(const reco::Muon& muon, const MuonIsoTypes& isoType, const float isoCut);
 
 };
 

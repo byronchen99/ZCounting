@@ -8,7 +8,7 @@ options.register('outputFile','output',VarParsing.VarParsing.multiplicity.single
 options.register('job', 0, VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.int, "job number")
 options.register('isData', False, VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.bool, "switch off generator Info")
 options.register('selectEvents', False, VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.bool, "switch off cuts ")
-options.register('max', -1, VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.int, "specify number of events")
+options.register('nEvents', -1, VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.int, "specify number of events")
 
 
 process = cms.Process("zcounting")
@@ -24,7 +24,7 @@ process.MessageLogger.cerr.INFO = cms.untracked.PSet(
 process.options   = cms.untracked.PSet( wantSummary = cms.untracked.bool(True) )
 
 
-process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(options.max))
+process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(options.nEvents))
 
 process.source = cms.Source("PoolSource",
     fileNames = cms.untracked.vstring(

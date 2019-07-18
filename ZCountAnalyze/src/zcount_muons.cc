@@ -76,7 +76,6 @@ bool zcount_muons::readEvent(const edm::Event& iEvent){
 
     nTag_ = 0;
     nProbe_ = 0;
-    recoMuons.clear();
 
     if(!isMuonTrigger()){
         edm::LogVerbatim("zcount_muons") << "zcount muons: event did not pass any muon trigger";
@@ -120,13 +119,12 @@ bool zcount_muons::readEvent(const edm::Event& iEvent){
             continue;
         if (fabs(eta1) > EtaCutTag_)
             continue;
-        if (!(passMuonID(itMu1, pv, IDType_) && passMuonIso(itMu1, IsoType_, IsoCut_)))
+        if (!(passMuonID(itMu1, pv) && passMuonIso(itMu1)))
             continue;
         if (!isMuonTriggerObj(eta1, phi1))
             continue;
 
         vTag.SetPtEtaPhiM(pt1, eta1, phi1, MUON_MASS);
-        recoMuons.push_back({vTag,cHLT,q1});
 
         edm::LogVerbatim("zcount_muons") << "zcount_muons: good tag muon found";
 
@@ -150,7 +148,6 @@ bool zcount_muons::readEvent(const edm::Event& iEvent){
             edm::LogVerbatim("zcount_muons") << "zcount_muons: probe eta = "<<eta2;
             edm::LogVerbatim("zcount_muons") << "zcount_muons: probe c1/c2 = "<<q1<<"/"<<q2;
 
-
             // Probe selection: kinematic cuts and opposite charge requirement
             if (pt2 < PtCutProbe_)
                 continue;
@@ -168,17 +165,13 @@ bool zcount_muons::readEvent(const edm::Event& iEvent){
             if ((dilepMass < MassMin_) || (dilepMass > MassMax_))
                 continue;
 
-
             // Determine event category for efficiency calculation
-            if (passMuonID(itMu2, pv, IDType_) && passMuonIso(itMu2, IsoType_, IsoCut_)) {
+            if (passMuonID(itMu2, pv) && passMuonIso(itMu2)) {
                 if (isMuonTriggerObj(eta2, phi2)) {
-
                     // category (2)HLT: both muons passing trigger requirements
                     if (&itMu1 > &itMu2)
                         continue;  // make sure we don't double count MuMu2HLT category
-
                     probeCat_[nProbe_] = cHLT;
-                    recoMuons.push_back({vProbe,cHLT,q2});
 
                     edm::LogVerbatim("zcount_muons") << "zcount_muons: HLT probe";
 
@@ -186,31 +179,25 @@ bool zcount_muons::readEvent(const edm::Event& iEvent){
                 else {
                     // category Sel: probe passing selection but not trigger
                     probeCat_[nProbe_] = cSel;
-                    recoMuons.push_back({vProbe,cSel,q2});
                     edm::LogVerbatim("zcount_muons") << "zcount_muons: Sel probe";
 
                 }
-
             }
             else if (itMu2.isGlobalMuon()) {
                 // category Glo: probe is a Global muon but failing selection
                 probeCat_[nProbe_] = cGlo;
-                recoMuons.push_back({vProbe,cGlo,q2});
                 edm::LogVerbatim("zcount_muons") << "zcount_muons: Glo probe";
 
             }
             else if (itMu2.isStandAloneMuon()) {
                 // category Sta: probe is a Standalone muon
                 probeCat_[nProbe_] = cSta;
-                recoMuons.push_back({vProbe,cSta,q2});
                 edm::LogVerbatim("zcount_muons") << "zcount_muons: Sta probe";
 
             }
-            else if (itMu2.innerTrack()->hitPattern().trackerLayersWithMeasurement() >= 6 &&
-                 itMu2.innerTrack()->hitPattern().numberOfValidPixelHits() >= 1) {
+            else if (isValidTrack(*(itMu2.innerTrack()))) {
                 // cateogry Trk: probe is a tracker track
                 probeCat_[nProbe_] = cTrk;
-                recoMuons.push_back({vProbe,cTrk,q2});
                 edm::LogVerbatim("zcount_muons") << "zcount_muons: Trk probe";
             }
 
@@ -266,10 +253,9 @@ bool zcount_muons::readEvent(const edm::Event& iEvent){
                 continue;
 
 
-            if (itTrk.hitPattern().trackerLayersWithMeasurement() >= 6 && itTrk.hitPattern().numberOfValidPixelHits() >= 1) {
+            if (isValidTrack(itTrk)) {
                 probeCat_[nProbe_] = cTrk;
                 edm::LogVerbatim("zcount_muons") << "zcount_muons: Trk probe";
-                recoMuons.push_back({vTrack,cTrk,q2});
 
                 probePt_[nProbe_]   = pt2;
                 probeEta_[nProbe_]  = eta2;
@@ -323,37 +309,56 @@ bool zcount_muons::isMuonTriggerObj(const double eta, const double phi) {
 // Muon ID selection, using internal function "DataFormats/MuonReco/src/MuonSelectors.cc
 bool zcount_muons::passMuonID(
     const reco::Muon& muon,
-    const reco::Vertex& vtx,
-    const MuonIDTypes& idType) {
+    const reco::Vertex& vtx) {
 
-    if (idType == LooseID && muon::isLooseMuon(muon))
+    if (IDType_ == LooseID && muon::isLooseMuon(muon))
         return true;
-    else if (idType == MediumID && muon::isMediumMuon(muon))
+    else if (IDType_ == MediumID && muon::isMediumMuon(muon))
         return true;
-    else if (idType == TightID && muon::isTightMuon(muon, vtx))
+    else if (IDType_ == TightID && muon::isTightMuon(muon, vtx))
         return true;
-    else if (idType == NoneID)
+    else if (IDType_ == NoneID)
         return true;
     else
         return false;
 }
 //--------------------------------------------------------------------------------------------------
 //Muon isolation selection, up-to-date with MUO POG recommendation (FIXME: CHECK PLS)
-bool zcount_muons::passMuonIso(const reco::Muon& muon,
-                            const MuonIsoTypes& isoType,
-                            const float isoCut) {
+bool zcount_muons::passMuonIso(const reco::Muon& muon) {
 
-    if (isoType == TrackerIso && muon.isolationR03().sumPt < isoCut)
+    if (IsoType_ == TrackerIso && muon.isolationR03().sumPt < IsoCut_)
         return true;
-    else if (isoType == PFIso &&
+    else if (IsoType_ == PFIso &&
            muon.pfIsolationR04().sumChargedHadronPt +
                    std::max(0.,
                             muon.pfIsolationR04().sumNeutralHadronEt + muon.pfIsolationR04().sumPhotonEt -
-                                0.5 * muon.pfIsolationR04().sumPUPt) < isoCut)
+                                0.5 * muon.pfIsolationR04().sumPUPt) < IsoCut_)
         return true;
-    else if (isoType == NoneIso)
+    else if (IsoType_ == NoneIso)
         return true;
     else
         return false;
 }
-
+//--------------------------------------------------------------------------------------------------
+int zcount_muons::getMuonCategory(const reco::Muon &muon, const reco::Vertex &vtx){
+    if (passMuonID(muon, vtx) && passMuonIso(muon)){
+        if (isMuonTriggerObj(muon.muonBestTrack()->eta(), muon.muonBestTrack()->phi())){
+            return cHLT;
+        }
+        return cSel;
+    }
+    else if(muon.isGlobalMuon())
+        return cGlo;
+    else if(muon.isStandAloneMuon())
+        return cSta;
+    else if(isValidTrack(*(muon.innerTrack())))
+        return cTrk;
+    else
+        return cNone;
+}
+//--------------------------------------------------------------------------------------------------
+bool zcount_muons::isValidTrack(const reco::Track &trk){
+    if(trk.hitPattern().trackerLayersWithMeasurement() >= 6 && trk.hitPattern().numberOfValidPixelHits() >= 1)
+        return true;
+    return false;
+}

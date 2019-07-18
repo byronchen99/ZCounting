@@ -33,6 +33,8 @@ public:
         return pv;
     }
 
+    bool isGoodPV(const reco::Vertex &vtx);
+
 private:
 
     const reco::Vertex* pv;
@@ -49,6 +51,11 @@ private:
     
     // output
     float nPV_;
+    float VtxX_;
+    float VtxY_;
+    float VtxZ_;
+    float VtxRho_;
+    float VtxNDoF_;
 };
 
 #endif

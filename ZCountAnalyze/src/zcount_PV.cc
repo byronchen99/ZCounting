@@ -17,6 +17,12 @@ void zcount_PV::getInput(const edm::ParameterSet& iConfig){
 
 void zcount_PV::initBranches(TTree* tree){
     addBranch(tree,"nPV", &nPV_,"nPV_/f");
+
+    addBranch(tree,"VtxX",     &VtxX_,    "VtxX_/f");
+    addBranch(tree,"VtxY",     &VtxY_,    "VtxY_/f");
+    addBranch(tree,"VtxZ",     &VtxZ_,    "VtxZ_/f");
+    addBranch(tree,"VtxRho",   &VtxRho_,  "VtxRho_/f");
+    addBranch(tree,"VtxNDoF",  &VtxNDoF_, "VtxNDoF_/f");
 }
 
 bool zcount_PV::readEvent(const edm::Event& iEvent){
@@ -32,19 +38,13 @@ bool zcount_PV::readEvent(const edm::Event& iEvent){
     pv = &(*pvCol->begin());
     nPV_ = 0;
     for (auto const& itVtx : *hVertexProduct) {
-        if (itVtx.isFake())
+
+        if(!isGoodPV(itVtx))
             continue;
-        if (itVtx.tracksSize() < VtxNTracksFitCut_)
-            continue;
-        if (itVtx.ndof() < VtxNdofCut_)
-            continue;
-        if (fabs(itVtx.z()) > VtxAbsZCut_)
-            continue;
-        if (itVtx.position().Rho() > VtxRhoCut_)
-            continue;
+
         if (nPV_ == 0)
             pv = &itVtx;
-        
+
         nPV_++;
     }
     if (nPV_ == 0)
@@ -57,6 +57,29 @@ bool zcount_PV::readEvent(const edm::Event& iEvent){
 
 
 void zcount_PV::fillBranches(){
+
+    VtxX_    = pv->x();
+    VtxY_    = pv->y();
+    VtxZ_    = pv->z();
+    VtxRho_  = pv->position().Rho();
+    VtxNDoF_ = pv->ndof();
+
     return;
+}
+
+//--------------------------------------------------------------------------------------------------
+bool zcount_PV::isGoodPV(const reco::Vertex &vtx){
+    if (vtx.isFake())
+        return false;
+    if (vtx.tracksSize() < VtxNTracksFitCut_)
+        return false;
+    if (vtx.ndof() < VtxNdofCut_)
+        return false;
+    if (fabs(vtx.z()) > VtxAbsZCut_)
+        return false;
+    if (vtx.position().Rho() > VtxRhoCut_)
+        return false;
+
+    return true;
 }
 
