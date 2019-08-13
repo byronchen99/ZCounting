@@ -5,6 +5,7 @@
 <use name="DataFormats/TrackReco"/>
 <use name="DataFormats/VertexReco"/>
 <use name="DataFormats/MuonReco"/>
+<use name="DataFormats/PatCandidates"/>
 <use name="FWCore/ServiceRegistry"/>
 <use name="CommonTools/UtilAlgos"/>
 <use name="TrackingTools/IPTools"/>

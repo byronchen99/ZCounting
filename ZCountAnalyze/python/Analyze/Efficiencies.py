@@ -55,7 +55,7 @@ def muTagAndProbeEff(hlt, pp, fp):
     return eff, eff_err
 
 
-def ztoMuMuEff_old(nHLT_,nSel_,nGlo_,nSta_,nTrk_):
+def eff_ztomumu_old(nHLT_,nSel_,nGlo_,nSta_,nTrk_):
     eff_HLT, err_HLT = muTagAndProbeEff(nHLT_, 0, nSel_)
     eff_Sel, err_Sel = muTagAndProbeEff(nHLT_, nSel_, nGlo_)
     eff_Glo, err_Glo = muTagAndProbeEff(nHLT_, nSel_ + nGlo_, nTrk_ + nSta_)
@@ -70,7 +70,7 @@ def ztoMuMuEff_old(nHLT_,nSel_,nGlo_,nSta_,nTrk_):
     return eff_tot, err_tot
 
 
-def ztoMuMuEff_new(nHLT_, nSel_, nGlo_, nSta_, nTrk_):
+def eff_ztomumu_new(nHLT_, nSel_, nGlo_, nSta_, nTrk_):
     eff_HLT, err_HLT = muTagAndProbeEff(nHLT_, 0, nSel_)
     eff_Sel, err_Sel = muTagAndProbeEff(nHLT_, nSel_, nGlo_)
     eff_Trk, err_Trk = muTagAndProbeEff(nHLT_, nSel_ + nGlo_ + nTrk_, nSta_)
@@ -83,6 +83,31 @@ def ztoMuMuEff_new(nHLT_, nSel_, nGlo_, nSta_, nTrk_):
     err_tot = 2 * eff_tot * np.sqrt(((1-eff_HLT)/(1-(1-eff_HLT)**2)*err_HLT)**2
                                     + (err_Sel/eff_Sel)**2 + (err_Trk/eff_Trk)**2 + (err_Sta/eff_Sta)**2
                                     )
+    return eff_tot, err_tot
+
+
+def eff_ztomumu_sel(nHLT_, nSel_, nGlo_, nSta_, nTrk_):
+    #  facctorised Z efficiency from tag and probe at selection level
+    eff_Sel, err_Sel = muTagAndProbeEff(nHLT_, nSel_, nGlo_)
+    eff_Glo, err_Glo = muTagAndProbeEff(nHLT_, nSel_ + nGlo_, nTrk_ + nSta_)
+
+    if eff_Sel <= 0 or eff_Glo <= 0:
+        return 0., 0.
+
+    eff_tot = eff_Sel ** 2 * eff_Glo ** 2
+    err_tot = 2 * eff_tot * np.sqrt((err_Sel / eff_Sel) ** 2 + (err_Glo / eff_Glo) ** 2)
+    return eff_tot, err_tot
+
+
+def eff_ztomumu_glo(nHLT_, nSel_, nGlo_, nSta_, nTrk_):
+    #  facctorised Z efficiency from tag and probe at global muon level
+    eff_Glo, err_Glo = muTagAndProbeEff(nHLT_, nSel_ + nGlo_, nTrk_ + nSta_)
+
+    if eff_Glo <= 0:
+        return 0., 0.
+
+    eff_tot = eff_Glo ** 2
+    err_tot = 2 * eff_Glo * err_Glo
     return eff_tot, err_tot
 
 
@@ -124,6 +149,8 @@ def zMCEff1D(ZReco, ZAcc, bins, obs, region='inclusive', sel=''):
         ZAcc = ZAcc.query(sel)
 
     ZEff = [np.zeros(len(bins)-1), np.zeros(len(bins)-1)]
+    ZEff_sel = [np.zeros(len(bins)-1), np.zeros(len(bins)-1)]
+    ZEff_glo = [np.zeros(len(bins)-1), np.zeros(len(bins)-1)]
 
     MuEff_HLT_Sel = [np.zeros(len(bins) - 1), np.zeros(len(bins) - 1)]
     MuEff_Sel_Glo = [np.zeros(len(bins) - 1), np.zeros(len(bins) - 1)]
@@ -132,6 +159,8 @@ def zMCEff1D(ZReco, ZAcc, bins, obs, region='inclusive', sel=''):
     MuEff_Sta_Trk = [np.zeros(len(bins) - 1), np.zeros(len(bins) - 1)]
 
     ZMuMuEff = [np.zeros(len(bins) - 1), np.zeros(len(bins) - 1)]
+    ZMuMuEff_sel = [np.zeros(len(bins) - 1), np.zeros(len(bins) - 1)]
+    ZMuMuEff_glo = [np.zeros(len(bins) - 1), np.zeros(len(bins) - 1)]
 
     for i in range(0, len(bins)-1):
         bin_low = bins[i]
@@ -140,17 +169,17 @@ def zMCEff1D(ZReco, ZAcc, bins, obs, region='inclusive', sel=''):
 
         ZReco_i = ZReco.query(sel)
 
-        qHLT = 'ZLeptonRecoCat_1==5 & ZAntiLeptonRecoCat_1==5'
-        qSel = '(ZLeptonRecoCat_1==5 & ZAntiLeptonRecoCat_1 == 4) | (ZLeptonRecoCat_1==4 & ZAntiLeptonRecoCat_1 == 5)'
-        qGlo = '(ZLeptonRecoCat_1==5 & ZAntiLeptonRecoCat_1 == 3) | (ZLeptonRecoCat_1==3 & ZAntiLeptonRecoCat_1 == 5)'
-        qSta = '(ZLeptonRecoCat_1==5 & ZAntiLeptonRecoCat_1 == 2) | (ZLeptonRecoCat_1==2 & ZAntiLeptonRecoCat_1 == 5)'
-        qTrk = '(ZLeptonRecoCat_1==5 & ZAntiLeptonRecoCat_1 == 1) | (ZLeptonRecoCat_1==1 & ZAntiLeptonRecoCat_1 == 5)'
+        qHLT = 'muon_Category==5 & antiMuon_Category==5'
+        qSel = '(muon_Category==5 & antiMuon_Category==4) | (muon_Category==4 & antiMuon_Category==5)'
+        qGlo = '(muon_Category==5 & antiMuon_Category==3) | (muon_Category==3 & antiMuon_Category==5)'
+        qSta = '(muon_Category==5 & antiMuon_Category==2) | (muon_Category==2 & antiMuon_Category==5)'
+        qTrk = '(muon_Category==5 & antiMuon_Category==1) | (muon_Category==1 & antiMuon_Category==5)'
 
-        nHLT = np.sum(ZReco_i.query(qHLT)['eventWeight'])
-        nSel = np.sum(ZReco_i.query(qSel)['eventWeight'])
-        nGlo = np.sum(ZReco_i.query(qGlo)['eventWeight'])
-        nSta = np.sum(ZReco_i.query(qSta)['eventWeight'])
-        nTrk = np.sum(ZReco_i.query(qTrk)['eventWeight'])
+        nHLT = len(ZReco_i.query(qHLT))
+        nSel = len(ZReco_i.query(qSel))
+        nGlo = len(ZReco_i.query(qGlo))
+        nSta = len(ZReco_i.query(qSta))
+        nTrk = len(ZReco_i.query(qTrk))
 
         MuEff_HLT_Sel[0][i], MuEff_HLT_Sel[1][i] = muTagAndProbeEff(nHLT, 0, nSel)
         MuEff_Sel_Glo[0][i], MuEff_Sel_Glo[1][i] = muTagAndProbeEff(nHLT, nSel, nGlo)
@@ -158,106 +187,118 @@ def zMCEff1D(ZReco, ZAcc, bins, obs, region='inclusive', sel=''):
         MuEff_Trk_Sta[0][i], MuEff_Trk_Sta[1][i] = muTagAndProbeEff(nHLT, nSel + nGlo + nTrk, nSta)
         MuEff_Sta_Trk[0][i], MuEff_Sta_Trk[1][i] = muTagAndProbeEff(nHLT, nSel + nGlo + nSta, nTrk)
 
-        ZMuMuEff[0][i], ZMuMuEff[1][i] = ztoMuMuEff_old(nHLT, nSel, nGlo, nSta, nTrk)
+        ZMuMuEff[0][i], ZMuMuEff[1][i] = eff_ztomumu_old(nHLT, nSel, nGlo, nSta, nTrk)
+        ZMuMuEff_sel[0][i], ZMuMuEff_sel[1][i] = eff_ztomumu_sel(nHLT, nSel, nGlo, nSta, nTrk)
+        ZMuMuEff_glo[0][i], ZMuMuEff_glo[1][i] = eff_ztomumu_glo(nHLT, nSel, nGlo, nSta, nTrk)
 
+        #  full true Z efficiency
         ZAcc_i = ZAcc.query(sel)
-        ZReco_i = ZReco_i.query('(ZAntiLeptonRecoCat_0>=4 & ZLeptonRecoCat_0==5) '
-                                '| (ZAntiLeptonRecoCat_0==5 & ZLeptonRecoCat_0>=4)')
+        ZReco_i = ZReco.query(sel + '& (muon_Category==5 | antiMuon_Category==5) & muon_Category>=4 & antiMuon_Category>=4')
 
-        nReco_i = np.sum(ZReco_i['eventWeight'])
-        nAcc_i = np.sum(ZAcc_i['eventWeight'])
+        nReco_i = len(ZReco_i)
+        nAcc_i = len(ZAcc_i)
         nBoth_i = len(np.intersect1d(ZReco_i['LepPt'], ZAcc_i['LepPt']))
 
         ZEff[0][i], ZEff[1][i] = zEff(nReco_i, nAcc_i, nBoth_i)
 
+        #  true Z efficiency at selection level (without requiring trigger)
+        ZAcc_i = ZAcc.query(sel)
+        ZReco_i = ZReco.query(sel + ' & muon_Category>=4 & antiMuon_Category>=4')
+
+        nReco_i = len(ZReco_i)
+        nAcc_i = len(ZAcc_i)
+        nBoth_i = len(np.intersect1d(ZReco_i['LepPt'], ZAcc_i['LepPt']))
+
+        ZEff_sel[0][i], ZEff_sel[1][i] = zEff(nReco_i, nAcc_i, nBoth_i)
+
+        #  true Z efficiency at gobal muon level (requiring two global muons)
+        ZAcc_i = ZAcc.query(sel)
+        ZReco_i = ZReco.query(sel + '& muon_Category>=3 & antiMuon_Category>=3 ')
+
+        nReco_i = len(ZReco_i)
+        nAcc_i = len(ZAcc_i)
+        nBoth_i = len(np.intersect1d(ZReco_i['LepPt'], ZAcc_i['LepPt']))
+
+        ZEff_glo[0][i], ZEff_glo[1][i] = zEff(nReco_i, nAcc_i, nBoth_i)
+
     x = bins[:-1] + (bins[1:] - bins[:-1])/2
 
-    plt.clf()
-    fig, ax = plt.subplots()
-    ax.errorbar(x, ZEff[0], xerr=np.zeros(len(x)), yerr=ZEff[1], fmt='bo', label='true')
-    ax.errorbar(x, ZMuMuEff[0], xerr=np.zeros(len(x)), yerr=ZMuMuEff[1], fmt='ro', label='factorized')
-    ax.set(xlim=(bins[0], bins[-1]), ylim=(0.8, 1.1))
-    ax.legend()
-    ax.text(0.05, 0.9, r'$66\ \mathrm{GeV} < \mathrm{M}_{\mu\mu} < 116\ \mathrm{GeV}$', transform=ax.transAxes)
-    ax.text(0.05, 0.85, r'$p_\mathrm{t}(\mu) > 27\ \mathrm{GeV} \qquad |\eta(\mu)| < 2.4$', transform=ax.transAxes)
-    ax.text(0.05, 0.8, region, transform=ax.transAxes)
-    ax.set_ylabel('Z efficiency')
-    ax.set_xlabel(obs)
-    plt.savefig(output+'/ZMuMu_{0}_{1}_all.png'.format(obs, region))
-    plt.close()
+    def plot_zeff(eff_true, eff_tnp, name):
+        plt.clf()
+        fig, ax = plt.subplots(2, 1, sharex=True, gridspec_kw={'height_ratios': [2, 1]})
+        fig.subplots_adjust(hspace=0)
 
-    pulls = ZMuMuEff[0] - ZEff[0]
-    pulls_sig = np.sqrt(ZMuMuEff[1]**2 + ZEff[1]**2)
+        ax[0].errorbar(x, eff_true[0], xerr=np.zeros(len(x)), yerr=eff_true[1], fmt='bo', label='true')
+        ax[0].errorbar(x, eff_tnp[0], xerr=np.zeros(len(x)), yerr=eff_tnp[1], fmt='ro', label='tnp')
+        ax[0].set(xlim=(bins[0], bins[-1]), ylim=(0.75, 1.1))
+        ax[0].legend()
+        ax[0].text(0.05, 0.9, r'$66\ \mathrm{GeV} < \mathrm{M}_{\mu\mu} < 116\ \mathrm{GeV}$', transform=ax[0].transAxes)
+        ax[0].text(0.05, 0.82, r'$p_\mathrm{t}(\mu) > 27\ \mathrm{GeV} \qquad |\eta(\mu)| < 2.4$', transform=ax[0].transAxes)
+        ax[0].text(0.05, 0.74, region, transform=ax[0].transAxes)
+        ax[0].set_ylabel(r'$\epsilon_\mathrm{Z}$')
+        ax[0].set_xlabel(obs)
+        ax[0].set_yticks([0.8, 0.85, 0.9, 0.95, 1.0, 1.05])
+        ax[0].set_title("Z efficiency at {0} muon level".format(name))
 
-    plt.clf()
-    fig, ax = plt.subplots()
-    ax.errorbar(x, pulls, xerr=np.zeros(len(x)), yerr=pulls_sig, fmt='ro', label='factorized - true')
-    ax.set(xlim=(bins[0], bins[-1]), ylim=(-0.025, 0.05))
-    ax.text(0.05, 0.9, r'$66\ \mathrm{GeV} < \mathrm{M}_{\mu\mu} < 116\ \mathrm{GeV}$', transform=ax.transAxes)
-    ax.text(0.05, 0.85, r'$p_\mathrm{t}(\mu) > 27\ \mathrm{GeV} \qquad |\eta(\mu)| < 2.4$', transform=ax.transAxes)
-    ax.text(0.05, 0.8, region, transform=ax.transAxes)
-    ax.legend(loc='upper right')
-    ax.set_ylabel('Z efficiency pulls')
-    ax.set_xlabel(obs)
-    plt.savefig(output+'/ZMuMu_{0}_{1}_pulls.png'.format(obs, region))
-    plt.close()
+        pulls = eff_tnp[0] - eff_true[0]
+        pulls_sig = np.sqrt(eff_tnp[1]**2 + eff_true[1]**2)
 
+        ax[1].errorbar(x, pulls, xerr=np.zeros(len(x)), yerr=pulls_sig, fmt='ko')#  , label='factorized - true')
+        ax[1].plot(x, np.zeros(len(x)), color='gray', linestyle='dashed')
+        ax[1].set_ylim(-0.02, 0.04)
+        ax[1].set_ylabel(r'$\epsilon^\mathrm{tnp}_\mathrm{Z} - \epsilon^\mathrm{true}_\mathrm{Z}$')
+        ax[1].set_xlabel(obs)
+        ax[1].set_yticks([-0.01, 0., 0.01, 0.02, 0.03])
+        plt.savefig(output+'/ZMuMu_{0}_{1}_{2}_level.png'.format(obs, region, name))
+        plt.close()
 
-#    dfOut = pd.DataFrame()
-#    dfOut[obs + '_' + region + '_lowEdge'] = bins[:-1]
-#    dfOut[obs + '_' + region + '_upEdge'] = bins[1:]
-#    dfOut['ZEff_{0}_{1}'.format(obs, region)] = ZEff[0]
-#    dfOut['ZErr_{0}_{1}'.format(obs, region)] = ZEff[1]
-#    dfOut['ZMuMuEff_{0}_{1}'.format(obs, region)] = ZMuMuEff[0]
-#    dfOut['ZMuMuErr_{0}_{1}'.format(obs, region)] = ZMuMuEff[1]
+    plot_zeff(ZEff, ZMuMuEff, "hlt")
+    plot_zeff(ZEff_sel, ZMuMuEff_sel, "selection")
+    plot_zeff(ZEff_glo, ZMuMuEff_glo, "global")
 
-#    return dfOut
 
 
 # acceptance selection
-selection_Reco = 'ZMassReco > 66 ' \
-                 '& ZMassReco < 116 ' \
-                 '& ZDecayMode == 13 ' \
-                 '& ZLeptonRecoPt > 27 ' \
-                 '& ZAntiLeptonRecoPt > 27 ' \
-                 '& abs(ZLeptonRecoEta) < 2.4 ' \
-                 '& abs(ZAntiLeptonRecoEta) < 2.4 '
+selection_Reco = 'z_recoMass > 66 ' \
+                 '& z_recoMass < 116 ' \
+                 '& muon_recoPt > 27 ' \
+                 '& antiMuon_recoPt > 27 ' \
+                 '& abs(muon_recoEta) < 2.4 ' \
+                 '& abs(antiMuon_recoEta) < 2.4 '
 
-selection_Gen = 'ZStableMass > 66 ' \
-                '& ZStableMass < 116 ' \
-                '& ZDecayMode == 13 ' \
-                '& ZLeptonPt > 27 ' \
-                '& ZAntiLeptonPt > 27 ' \
-                '& abs(ZLeptonEta) < 2.4 ' \
-                '& abs(ZAntiLeptonEta) < 2.4 '
+selection_Gen = 'z_genMass > 66 ' \
+                '& z_genMass < 116 ' \
+                '& muon_genPt > 27 ' \
+                '& antiMuon_genPt > 27 ' \
+                '& abs(muon_genEta) < 2.4 ' \
+                '& abs(antiMuon_genEta) < 2.4 '
 
 # specify which branches to load
-branches_Reco = ['ZLeptonRecoCat', 'ZAntiLeptonRecoCat', 'nPV', 'eventWeight',
-                 'ZLeptonRecoEta', 'ZAntiLeptonRecoEta',
-                 'ZLeptonRecoPhi', 'ZAntiLeptonRecoPhi',
-                 'ZLeptonRecoPt', 'ZAntiLeptonRecoPt'
+branches_Reco = ['nPV',
+                 'muon_Category', 'antiMuon_Category',
+                 'muon_recoEta', 'antiMuon_recoEta',
+                 'muon_recoPhi', 'antiMuon_recoPhi',
+                 'muon_recoPt', 'antiMuon_recoPt'
                  ]
 
-branches_Gen = ['nPV', 'eventWeight',
-                'ZLeptonEta', 'ZAntiLeptonEta',
-                'ZLeptonPhi', 'ZAntiLeptonPhi',
-                'ZLeptonPt', 'ZAntiLeptonPt'
+branches_Gen = ['nPV',
+                'muon_genEta', 'antiMuon_genEta',
+                'muon_genPhi', 'antiMuon_genPhi',
+                'muon_genPt', 'antiMuon_genPt'
                 ]
 
 print(">>> Load Events in reco acceptance")
 dfReco = [tree_to_df(root2array(i, treeName[0], selection=selection_Reco, branches=branches_Reco), 5) for i in inputs]
 dfReco = pd.concat(dfReco)
-dfReco['eventWeight'] = dfReco['eventWeight']/dfReco['eventWeight']
-dfReco = dfReco.rename(columns={"ZLeptonRecoEta": "LepEta", "ZLeptonRecoPhi": "LepPhi", "ZLeptonRecoPt": "LepPt",
-                                "ZAntiLeptonRecoEta": "AntiLepEta", "ZAntiLeptonRecoPhi": "AntiLepPhi", "ZAntiLeptonRecoPt": "AntiLepPt"
+dfReco = dfReco.rename(columns={"muon_recoEta": "LepEta", "muon_recoPhi": "LepPhi", "muon_recoPt": "LepPt",
+                                "antiMuon_recoEta": "AntiLepEta", "antiMuon_recoPhi": "AntiLepPhi", "antiMuon_recoPt": "AntiLepPt"
                                 })
 
 print(">>> Load Events in gen acceptance")
 dfGen = [tree_to_df(root2array(i, treeName[0], selection=selection_Gen, branches=branches_Gen), 5) for i in inputs]
 dfGen = pd.concat(dfGen)
-dfGen['eventWeight'] = dfGen['eventWeight']/dfGen['eventWeight']
-dfGen = dfGen.rename(columns={"ZLeptonEta": "LepEta", "ZLeptonPhi": "LepPhi", "ZLeptonPt": "LepPt",
-                              "ZAntiLeptonEta": "AntiLepEta", "ZAntiLeptonPhi": "AntiLepPhi", "ZAntiLeptonPt": "AntiLepPt"
+dfGen = dfGen.rename(columns={"muon_genEta": "LepEta", "muon_genPhi": "LepPhi", "muon_genPt": "LepPt",
+                              "antiMuon_genEta": "AntiLepEta", "antiMuon_genPhi": "AntiLepPhi", "antiMuon_genPt": "AntiLepPt"
                               })
 
 print(">>> add new columns")
