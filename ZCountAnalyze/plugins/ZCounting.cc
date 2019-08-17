@@ -6,8 +6,17 @@
 /**\class ZCounting ZCounting.cc ZCounting/ZCountAnalyze/plugins/ZCounting.cc
 
  Description:
-     Filter needed information to derive MC corrections for Z counting via tag and probe
-     Run over miniAOD
+     Purpose is to derive MC corrections of Z counting efficiency in respect of true (MC) Z efficiency
+
+     Select events which have:
+        - a decay of Z to mu mu
+        - available generator level information of both muons
+        - at least one good primary vertex
+     Store:
+        - information of the gen muons
+        - information of the corresponding reco muons (if given)
+
+
 
  Implementation:
 
@@ -41,6 +50,7 @@
 #include "DataFormats/PatCandidates/interface/Muon.h"
 #include "DataFormats/HepMCCandidate/interface/GenParticle.h"
 #include "DataFormats/VertexReco/interface/Vertex.h"
+#include "SimDataFormats/PileupSummaryInfo/interface/PileupSummaryInfo.h"
 
 #include "ZCounting/ZUtils/interface/GenZDecayProperties.h"
 
@@ -94,6 +104,7 @@ private:
     edm::EDGetTokenT<pat::MuonCollection> muonCollection_;
     edm::EDGetTokenT<std::vector<reco::Vertex> > pvCollection_;
     edm::EDGetTokenT<std::vector<GenZDecayProperties> > genZCollection_;
+    edm::EDGetTokenT<std::vector<PileupSummaryInfo> > pileupInfoCollection_;
 
     std::vector<std::string> muonTriggerPatterns_;
 
@@ -104,8 +115,10 @@ private:
     double VtxRhoCut_;
 
     // --- output
+    int nPU_;
     int nPV_;
 
+    int muon_recoMatches_;
     bool muon_hasRecoObj_;
     int muon_Category_;
     float muon_recoPt_;
@@ -115,6 +128,7 @@ private:
     float muon_genEta_;
     float muon_genPhi_;
 
+    int antiMuon_recoMatches_;
     bool antiMuon_hasRecoObj_;
     int antiMuon_Category_;
     float antiMuon_recoPt_;
@@ -136,7 +150,8 @@ ZCounting::ZCounting(const edm::ParameterSet& iConfig):
     triggerObjects_  (consumes<std::vector<pat::TriggerObjectStandAlone> >(iConfig.getParameter<edm::InputTag>("trigger_objects"))),
     muonCollection_  (consumes<pat::MuonCollection> (iConfig.getParameter<edm::InputTag>("pat_muons"))),
     pvCollection_    (consumes<std::vector<reco::Vertex> > (iConfig.getParameter<edm::InputTag>("edmPVName"))),
-    genZCollection_  (consumes<std::vector<GenZDecayProperties> > (iConfig.getParameter<edm::InputTag>("genZLeptonCollection")))
+    genZCollection_  (consumes<std::vector<GenZDecayProperties> > (iConfig.getParameter<edm::InputTag>("genZLeptonCollection"))),
+    pileupInfoCollection_  (consumes<std::vector<PileupSummaryInfo> >(iConfig.getParameter<edm::InputTag>("pileupSummaryInfoCollection")))
 {
     edm::LogInfo("ZCounting")<<"ZCounting(...)";
 
@@ -172,12 +187,14 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     edm::Handle<pat::MuonCollection> muonCollection;
     edm::Handle<std::vector<reco::Vertex> > pvCollection;
     edm::Handle<std::vector<GenZDecayProperties> > genZCollection;
+    edm::Handle<std::vector<PileupSummaryInfo> > pileupInfoCollection;
 
     iEvent.getByToken(triggerBits_, triggerBits);
     iEvent.getByToken(triggerObjects_, triggerObjects);
     iEvent.getByToken(muonCollection_, muonCollection);
     iEvent.getByToken(pvCollection_, pvCollection);
     iEvent.getByToken(genZCollection_, genZCollection);
+    iEvent.getByToken(pileupInfoCollection_, pileupInfoCollection);
 
     // only keep Z -> mu mu
     if(!genZCollection->size() || genZCollection->at(0).decayMode() != 13) return;
@@ -224,10 +241,9 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     LorentzVector muon_reco;
     LorentzVector antiMuon_reco;
     for (pat::Muon mu : *muonCollection){
-        const reco::GenParticle *genMuon = mu.genLepton();
-        if(!genMuon) continue;
 
-        if(genMuon->pt() == ZLepton->pt() && genMuon->eta() == ZLepton->eta() && genMuon->phi() == ZLepton->phi()){
+        if(reco::deltaR(mu.eta(), mu.phi(), ZLepton->eta(), ZLepton->phi()) < 0.03 && mu.pdgId() == 13){
+            muon_recoMatches_++;
             muon_reco = mu.p4();
             muon_hasRecoObj_ = true;
             muon_recoPt_ = mu.pt();
@@ -235,7 +251,8 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
             muon_recoPhi_ = mu.phi();
             muon_Category_ = getMuonCategory(mu, pv, muonTriggerObjects);
         }
-        if(genMuon->pt() == ZAntiLepton->pt() && genMuon->eta() == ZAntiLepton->eta() && genMuon->phi() == ZAntiLepton->phi()){
+        if(reco::deltaR(mu.eta(), mu.phi(), ZAntiLepton->eta(), ZAntiLepton->phi()) < 0.03 && mu.pdgId() == -13){
+            antiMuon_recoMatches_++;
             antiMuon_reco = mu.p4();
             antiMuon_hasRecoObj_ = true;
             antiMuon_recoPt_ = mu.pt();
@@ -247,6 +264,11 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 
     if(muon_hasRecoObj_ && antiMuon_hasRecoObj_)
         z_recoMass_ = (muon_reco + antiMuon_reco).M();
+
+    for(std::vector<PileupSummaryInfo>::const_iterator puI = pileupInfoCollection->begin(); puI != pileupInfoCollection->end(); ++puI)
+    {
+        if(puI->getBunchCrossing() == 0) nPU_ = puI->getTrueNumInteractions();
+    }
 
     tree_->Fill();
 }
@@ -266,7 +288,9 @@ ZCounting::beginJob()
     tree_=(fs->make<TTree>("tree" ,"tree" ));
 
     tree_->Branch("nPV", &nPV_,"nPV_/i");
+    tree_->Branch("nPU", &nPU_,"nPU_/i");
 
+    tree_->Branch("muon_recoMatches", &muon_recoMatches_,"muon_recoMatches_/i");
     tree_->Branch("muon_hasRecoObj", &muon_hasRecoObj_,"muon_hasRecoObj_/b");
     tree_->Branch("muon_Category", &muon_Category_,"muon_Category_/i");
     tree_->Branch("muon_recoPt", &muon_recoPt_,"muon_recoPt_/f");
@@ -276,6 +300,7 @@ ZCounting::beginJob()
     tree_->Branch("muon_genEta", &muon_genEta_,"muon_genEta_/f");
     tree_->Branch("muon_genPhi", &muon_genPhi_,"muon_genPhi_/f");
 
+    tree_->Branch("antiMuon_recoMatches", &antiMuon_recoMatches_,"antiMuon_recoMatches_/i");
     tree_->Branch("antiMuon_hasRecoObj", &antiMuon_hasRecoObj_,"antiMuon_hasRecoObj_/b");
     tree_->Branch("antiMuon_Category", &antiMuon_Category_,"antiMuon_Category_/i");
     tree_->Branch("antiMuon_recoPt", &antiMuon_recoPt_,"antiMuon_recoPt_/f");
@@ -310,8 +335,10 @@ ZCounting::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
 void ZCounting::clearVariables(){
     edm::LogInfo("ZCounting")<<"clearVariables()";
 
-    nPV_= 0;
+    nPV_ = 0;
+    nPU_ = 0;
 
+    muon_recoMatches_ = 0;
     muon_hasRecoObj_ = false;
     muon_Category_ = 0;
     muon_recoPt_ = 0.;
@@ -321,6 +348,7 @@ void ZCounting::clearVariables(){
     muon_genEta_ = 0.;
     muon_genPhi_ = 0.;
 
+    antiMuon_recoMatches_ = 0;
     antiMuon_hasRecoObj_ = false;
     antiMuon_Category_ = 0;
     antiMuon_recoPt_ = 0.;

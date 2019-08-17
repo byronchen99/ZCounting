@@ -1,6 +1,8 @@
 import FWCore.ParameterSet.Config as cms
 
 zcounting = cms.EDAnalyzer('ZCounting',
+    pileupSummaryInfoCollection=cms.InputTag("slimmedAddPileupInfo"),
+
     # Primary vertex - source
     edmPVName = cms.InputTag("offlineSlimmedPrimaryVertices"),
     # Primary vertex - settings
