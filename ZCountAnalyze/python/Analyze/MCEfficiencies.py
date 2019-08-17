@@ -38,7 +38,7 @@ if (len(treeName) > 1):
     exit()
 
 
-def eff(nReco, nAcc, nBoth):
+def eff(nReco, nAcc):
     """
     MC Z Effciciency
     :param nReco:
@@ -49,11 +49,10 @@ def eff(nReco, nAcc, nBoth):
     if nAcc < 10 or nReco < 5:
         return 0., 0.
     eff = nReco / nAcc
-    x = nReco - nBoth
-    y = nAcc - nBoth
-    err = np.sqrt(1 / (y + nBoth) ** 2 * x
-                  + ((x + nBoth) ** 2 * y) / (y + nBoth) ** 4
-                  + ((x - y) ** 2 * nBoth) / (y + nBoth) ** 4
+    x = nReco
+    b = nAcc - nReco
+    err = np.sqrt((b / (x + b) ** 2) ** 2 * x
+                  + (x / (x + b) ** 2) ** 2 * b
                   )
     return eff, err
 
@@ -93,24 +92,16 @@ def zMCEff1D(df, bins, obs, region='inclusive', sel=''):
         ZReco_i = df.query(sel)
 
         # total glo muon efficiency
-        denomGlo = ZReco_i.query('muon_Category>=3 & muon_recoMatches == 1')
-        nomGlo = ZReco_i.query('muon_Category>=3 & muon_recoMatches == 1'
-                               '& antiMuon_Category>=3 & antiMuon_recoMatches ==1')
-        denomGlo_i = len(denomGlo)
-        nomGlo_i = len(nomGlo)
-        nBoth_i = len(np.intersect1d(denomGlo['z_genMass'], nomGlo['z_genMass']))
-
-        MuEff_Glo[0][i], MuEff_Glo[1][i] = eff(nomGlo_i, denomGlo_i, nBoth_i)
+        denomGlo = len(ZReco_i.query('muon_Category>=3 & muon_recoMatches == 1'))
+        nomGlo = len(ZReco_i.query('muon_Category>=3 & muon_recoMatches == 1'
+                                   '& antiMuon_Category>=3 & antiMuon_recoMatches ==1'))
+        MuEff_Glo[0][i], MuEff_Glo[1][i] = eff(nomGlo, denomGlo)
 
         # total sel efficiency
-        denomSel = ZReco_i.query('muon_Category>=4 & muon_recoMatches == 1')
-        nomSel = ZReco_i.query('muon_Category>=4 & muon_recoMatches == 1'
-                               '& antiMuon_Category>=4 & antiMuon_recoMatches ==1')
-        denomSel_i = len(denomSel)
-        nomSel_i = len(nomSel)
-        nBoth_i = len(np.intersect1d(denomSel['z_genMass'], nomSel['z_genMass']))
-
-        MuEff_Sel[0][i], MuEff_Sel[1][i] = eff(nomSel_i, denomSel_i, nBoth_i)
+        denomSel = len(ZReco_i.query('muon_Category>=4 & muon_recoMatches == 1'))
+        nomSel = len(ZReco_i.query('muon_Category>=4 & muon_recoMatches == 1'
+                                   '& antiMuon_Category>=4 & antiMuon_recoMatches ==1'))
+        MuEff_Sel[0][i], MuEff_Sel[1][i] = eff(nomSel, denomSel)
 
         ZMuMuEff_glo[0][i] = MuEff_Glo[0][i] ** 2
         ZMuMuEff_glo[1][i] = 2 * MuEff_Glo[0][i] * MuEff_Glo[1][i]
@@ -118,53 +109,33 @@ def zMCEff1D(df, bins, obs, region='inclusive', sel=''):
         ZMuMuEff_sel[1][i] = 2 * MuEff_Sel[0][i] * MuEff_Sel[1][i]
 
         # hlt efficiency in respect of Sel muons
-        denomHLT = ZReco_i.query('muon_Category>=5 & muon_recoMatches == 1'
-                                 '& antiMuon_Category>=4 & antiMuon_recoMatches ==1')
-        nomHLT = ZReco_i.query('muon_Category>=5 & muon_recoMatches == 1'
-                               '& antiMuon_Category>=5 & antiMuon_recoMatches ==1')
-
-        denomHLT_i = len(denomHLT)
-        nomHLT_i = len(nomHLT)
-        nBoth_i = len(np.intersect1d(denomHLT['z_genMass'], nomHLT['z_genMass']))
-
-        MuEff_HLT[0][i], MuEff_HLT[1][i] = eff(nomHLT_i, denomHLT_i, nBoth_i)
+        denomHLT = len(ZReco_i.query('muon_Category>=5 & muon_recoMatches == 1'
+                                     '& antiMuon_Category>=4 & antiMuon_recoMatches == 1'))
+        nomHLT = len(ZReco_i.query('muon_Category>=5 & muon_recoMatches == 1'
+                                   '& antiMuon_Category>=5 & antiMuon_recoMatches == 1'))
+        MuEff_HLT[0][i], MuEff_HLT[1][i] = eff(nomHLT, denomHLT)
 
         ZMuMuEff[0][i] = (1 - (1 - MuEff_HLT[0][i]) ** 2) * MuEff_Sel[0][i] ** 2
-        ZMuMuEff[1][i] = np.sqrt((2 * (1 - MuEff_HLT[0][i]) * MuEff_Sel[0][i] ** 2 * MuEff_HLT[1][i])**2 \
-                                 + ((1 - (1 - MuEff_HLT[0][i]) ** 2) * 2 * MuEff_Sel[0][i] * MuEff_Sel[1][i])**2)
+        ZMuMuEff[1][i] = np.sqrt((2 * (1 - MuEff_HLT[0][i]) * MuEff_Sel[0][i] ** 2 * MuEff_HLT[1][i]) ** 2 \
+                                 + ((1 - (1 - MuEff_HLT[0][i]) ** 2) * 2 * MuEff_Sel[0][i] * MuEff_Sel[1][i]) ** 2)
 
         #  full true Z efficiency
-        ZAcc_i = df.query(sel)
-        ZReco_i = df.query(sel + '& muon_recoMatches == 1 & antiMuon_recoMatches ==1'
-                                    '& (muon_Category==5 | antiMuon_Category==5) & muon_Category>=4 & antiMuon_Category>=4')
-
-        nReco_i = len(ZReco_i)
-        nAcc_i = len(ZAcc_i)
-        nBoth_i = len(np.intersect1d(ZReco_i['z_genMass'], ZAcc_i['z_genMass']))
-
-        ZEff[0][i], ZEff[1][i] = eff(nReco_i, nAcc_i, nBoth_i)
+        nZAcc_i = len(df.query(sel))
+        nZReco_i = len(df.query(sel + '& muon_recoMatches == 1 & antiMuon_recoMatches ==1'
+                                      '& (muon_Category==5 | antiMuon_Category==5) & muon_Category>=4 & antiMuon_Category>=4'))
+        ZEff[0][i], ZEff[1][i] = eff(nZReco_i, nZAcc_i)
 
         #  true Z efficiency at selection level (without requiring trigger)
-        ZAcc_i = df.query(sel)
-        ZReco_i = df.query(sel + '& muon_recoMatches == 1 & antiMuon_recoMatches ==1 '
-                                    '& muon_Category>=4 & antiMuon_Category>=4')
-
-        nReco_i = len(ZReco_i)
-        nAcc_i = len(ZAcc_i)
-        nBoth_i = len(np.intersect1d(ZReco_i['z_genMass'], ZAcc_i['z_genMass']))
-
-        ZEff_sel[0][i], ZEff_sel[1][i] = eff(nReco_i, nAcc_i, nBoth_i)
+        nZAcc_i = len(df.query(sel))
+        nZReco_i = len(df.query(sel + '& muon_recoMatches == 1 & antiMuon_recoMatches ==1 '
+                                      '& muon_Category>=4 & antiMuon_Category>=4'))
+        ZEff_sel[0][i], ZEff_sel[1][i] = eff(nZReco_i, nZAcc_i)
 
         #  true Z efficiency at gobal muon level (requiring two global muons)
-        ZAcc_i = df.query(sel)
-        ZReco_i = df.query(sel + '& muon_recoMatches == 1 & antiMuon_recoMatches ==1 '
-                                    '& muon_Category>=3 & antiMuon_Category>=3')
-
-        nReco_i = len(ZReco_i)
-        nAcc_i = len(ZAcc_i)
-        nBoth_i = len(np.intersect1d(ZReco_i['z_genMass'], ZAcc_i['z_genMass']))
-
-        ZEff_glo[0][i], ZEff_glo[1][i] = eff(nReco_i, nAcc_i, nBoth_i)
+        nZAcc_i = len(df.query(sel))
+        nZReco_i = len(df.query(sel + '& muon_recoMatches == 1 & antiMuon_recoMatches ==1 '
+                                      '& muon_Category>=3 & antiMuon_Category>=3'))
+        ZEff_glo[0][i], ZEff_glo[1][i] = eff(nZReco_i, nZAcc_i)
 
     x = bins[:-1] + (bins[1:] - bins[:-1]) / 2
 
@@ -199,8 +170,8 @@ def zMCEff1D(df, bins, obs, region='inclusive', sel=''):
         plt.savefig(output + '/ZMuMu_{0}_{1}_{2}_level.png'.format(obs, region, name))
         plt.close()
 
-    plot_zeff(ZEff, ZMuMuEff, "hlt")
-    plot_zeff(ZEff_sel, ZMuMuEff_sel, "selection")
+    plot_zeff(ZEff, ZMuMuEff, "mediumSelHLT")
+    plot_zeff(ZEff_sel, ZMuMuEff_sel, "mediumSel")
     plot_zeff(ZEff_glo, ZMuMuEff_glo, "global")
 
 
@@ -213,28 +184,32 @@ selection = 'z_genMass > 66 ' \
             '& abs(antiMuon_genEta) < 2.4 '
 
 # specify which branches to load
-branches = ['nPV', 'z_recoMass', 'z_genMass',
+branches = ['nPV', 'nPU', 'z_recoMass', 'z_genMass',
             'muon_genEta', 'antiMuon_genEta',
             'muon_genPhi', 'antiMuon_genPhi',
             'muon_genPt', 'antiMuon_genPt',
             'muon_recoMatches', 'antiMuon_recoMatches',
-            'muon_Category', 'antiMuon_Category'
+            'muon_CategoryMedium', 'antiMuon_CategoryMedium',
+            'muon_CategoryTight', 'antiMuon_CategoryTight'
             ]
 
 print(">>> Load Events in gen acceptance")
 dfGen = [tree_to_df(root2array(i, treeName[0], selection=selection, branches=branches), 5) for i in inputs]
 dfGen = pd.concat(dfGen)
 
+dfGen = dfGen.rename(columns={"muon_CategoryMedium": "muon_Category", "antiMuon_CategoryMedium": "antiMuon_Category"})
+#dfGen = dfGen.rename(columns={"muon_CategoryTight": "muon_Category", "antiMuon_CategoryTight": "antiMuon_Category"})
+
 print(">>> add new columns")
-for df in (dfGen,):
-    df['delPhiLL'] = abs(
-        abs(df['muon_genPhi'] - df['antiMuon_genPhi']).apply(lambda x: x - 2 * math.pi if x > math.pi else x))
-    df['delEtaLL'] = abs(df['muon_genEta'] - df['antiMuon_genEta'])
-    df['delRLL'] = np.sqrt(
-        (df['muon_genEta'] - df['antiMuon_genEta']) ** 2 + (df['muon_genPhi'] - df['antiMuon_genPhi']) ** 2)
-    df['delPtLL'] = abs(df['muon_genPt'] - df['antiMuon_genPt'])
-    df['relPtLL'] = abs(df['muon_genPt'] - df['antiMuon_genPt']) / abs(df['muon_genPt'] + df['antiMuon_genPt'])
-    df['sumPtLL'] = df['muon_genPt'] + df['antiMuon_genPt']
+dfGen['delPhiLL'] = abs(
+    abs(dfGen['muon_genPhi'] - dfGen['antiMuon_genPhi']).apply(lambda x: x - 2 * math.pi if x > math.pi else x))
+dfGen['delEtaLL'] = abs(dfGen['muon_genEta'] - dfGen['antiMuon_genEta'])
+dfGen['delRLL'] = np.sqrt(
+    (dfGen['muon_genEta'] - dfGen['antiMuon_genEta']) ** 2 + (dfGen['muon_genPhi'] - dfGen['antiMuon_genPhi']) ** 2)
+dfGen['delPtLL'] = abs(dfGen['muon_genPt'] - dfGen['antiMuon_genPt'])
+dfGen['relPtLL'] = abs(dfGen['muon_genPt'] - dfGen['antiMuon_genPt']) / abs(
+    dfGen['muon_genPt'] + dfGen['antiMuon_genPt'])
+dfGen['sumPtLL'] = dfGen['muon_genPt'] + dfGen['antiMuon_genPt']
 
 # --- differential efficiencies
 dfList = []
@@ -242,9 +217,7 @@ zMCEff1D(dfGen, np.linspace(0., 5., 20), 'delRLL')
 zMCEff1D(dfGen, np.linspace(0., 5., 20), 'delRLL', 'BB',
          sel='abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) < 0.9')
 zMCEff1D(dfGen, np.linspace(0., 5., 20), 'delRLL', 'BE',
-         sel='abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) > 0.9')
-zMCEff1D(dfGen, np.linspace(0., 5., 20), 'delRLL', 'EB',
-         sel='abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) < 0.9')
+         sel='(abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) > 0.9) | (abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) < 0.9)')
 zMCEff1D(dfGen, np.linspace(0., 5., 20), 'delRLL', 'EE',
          sel='abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) > 0.9')
 
@@ -252,9 +225,7 @@ zMCEff1D(dfGen, np.linspace(0., 2.5, 20), 'delEtaLL')
 zMCEff1D(dfGen, np.linspace(0., 2.5, 20), 'delEtaLL', 'BB',
          sel='abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) < 0.9')
 zMCEff1D(dfGen, np.linspace(0., 2.5, 20), 'delEtaLL', 'BE',
-         sel='abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) > 0.9')
-zMCEff1D(dfGen, np.linspace(0., 2.5, 20), 'delEtaLL', 'EB',
-         sel='abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) < 0.9')
+         sel='(abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) > 0.9) | (abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) < 0.9)')
 zMCEff1D(dfGen, np.linspace(0., 2.5, 20), 'delEtaLL', 'EE',
          sel='abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) > 0.9')
 
@@ -262,9 +233,7 @@ zMCEff1D(dfGen, np.linspace(0., math.pi, 20), 'delPhiLL')
 zMCEff1D(dfGen, np.linspace(0., math.pi, 20), 'delPhiLL', 'BB',
          sel='abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) < 0.9')
 zMCEff1D(dfGen, np.linspace(0., math.pi, 20), 'delPhiLL', 'BE',
-         sel='abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) > 0.9')
-zMCEff1D(dfGen, np.linspace(0., math.pi, 20), 'delPhiLL', 'EB',
-         sel='abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) < 0.9')
+         sel='(abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) > 0.9) | (abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) < 0.9)')
 zMCEff1D(dfGen, np.linspace(0., math.pi, 20), 'delPhiLL', 'EE',
          sel='abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) > 0.9')
 
@@ -272,9 +241,7 @@ zMCEff1D(dfGen, np.linspace(0., 100, 20), 'delPtLL')
 zMCEff1D(dfGen, np.linspace(0., 100, 20), 'delPtLL', 'BB',
          sel='abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) < 0.9')
 zMCEff1D(dfGen, np.linspace(0., 100, 20), 'delPtLL', 'BE',
-         sel='abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) > 0.9')
-zMCEff1D(dfGen, np.linspace(0., 100, 20), 'delPtLL', 'EB',
-         sel='abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) < 0.9')
+         sel='(abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) > 0.9) | (abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) < 0.9)')
 zMCEff1D(dfGen, np.linspace(0., 100, 20), 'delPtLL', 'EE',
          sel='abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) > 0.9')
 
@@ -282,9 +249,7 @@ zMCEff1D(dfGen, np.linspace(0., 1., 20), 'relPtLL')
 zMCEff1D(dfGen, np.linspace(0., 1., 20), 'relPtLL', 'BB',
          sel='abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) < 0.9')
 zMCEff1D(dfGen, np.linspace(0., 1., 20), 'relPtLL', 'BE',
-         sel='abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) > 0.9')
-zMCEff1D(dfGen, np.linspace(0., 1., 20), 'relPtLL', 'EB',
-         sel='abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) < 0.9')
+         sel='(abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) > 0.9) | (abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) < 0.9)')
 zMCEff1D(dfGen, np.linspace(0., 1., 20), 'relPtLL', 'EE',
          sel='abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) > 0.9')
 
@@ -292,9 +257,7 @@ zMCEff1D(dfGen, np.linspace(50., 250, 20), 'sumPtLL')
 zMCEff1D(dfGen, np.linspace(50., 250, 20), 'sumPtLL', 'BB',
          sel='abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) < 0.9')
 zMCEff1D(dfGen, np.linspace(50., 250, 20), 'sumPtLL', 'BE',
-         sel='abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) > 0.9')
-zMCEff1D(dfGen, np.linspace(50., 250, 20), 'sumPtLL', 'EB',
-         sel='abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) < 0.9')
+         sel='(abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) > 0.9) | (abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) < 0.9)')
 zMCEff1D(dfGen, np.linspace(50., 250, 20), 'sumPtLL', 'EE',
          sel='abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) > 0.9')
 
@@ -302,10 +265,16 @@ zMCEff1D(dfGen, np.linspace(0.5, 59.5, 60), 'nPV', 'inclusive')
 zMCEff1D(dfGen, np.linspace(0.5, 59.5, 60), 'nPV', 'BB',
          sel='abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) < 0.9')
 zMCEff1D(dfGen, np.linspace(0.5, 59.5, 60), 'nPV', 'BE',
-         sel='abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) > 0.9')
-zMCEff1D(dfGen, np.linspace(0.5, 59.5, 60), 'nPV', 'EB',
-         sel='abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) < 0.9')
+         sel='(abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) > 0.9) | (abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) < 0.9)')
 zMCEff1D(dfGen, np.linspace(0.5, 59.5, 60), 'nPV', 'EE',
+         sel='abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) > 0.9')
+
+zMCEff1D(dfGen, np.linspace(0.5, 59.5, 60), 'nPU', 'inclusive')
+zMCEff1D(dfGen, np.linspace(0.5, 59.5, 60), 'nPU', 'BB',
+         sel='abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) < 0.9')
+zMCEff1D(dfGen, np.linspace(0.5, 59.5, 60), 'nPU', 'BE',
+         sel='(abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) > 0.9) | (abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) < 0.9)')
+zMCEff1D(dfGen, np.linspace(0.5, 59.5, 60), 'nPU', 'EE',
          sel='abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) > 0.9')
 
 zMCEff1D(dfGen, np.linspace(0.5, 59.5, 60), 'nPV', 'delRLL0to25', sel='delRLL < 2.5')
