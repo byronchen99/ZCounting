@@ -88,8 +88,10 @@ private:
     bool isTriggerObject(const std::vector<pat::TriggerObjectStandAlone>&, const pat::Muon&);
     bool isGoodPV(const reco::Vertex&);
     bool isValidTrack(const reco::Track&);
+    bool customIsTightMuon(const pat::Muon&);
     int getMuonCategoryMedium(const pat::Muon&, const std::vector<pat::TriggerObjectStandAlone>&);
     int getMuonCategoryTight(const pat::Muon&, const reco::Vertex&, const std::vector<pat::TriggerObjectStandAlone>&);
+    int getMuonCategoryCustomTight(const pat::Muon&, const std::vector<pat::TriggerObjectStandAlone>&);
 
     // ----------member data ---------------------------
 
@@ -123,6 +125,7 @@ private:
     bool muon_hasRecoObj_;
     int muon_CategoryMedium_;
     int muon_CategoryTight_;
+    int muon_CategoryCustomTight_;
     float muon_recoPt_;
     float muon_recoEta_;
     float muon_recoPhi_;
@@ -134,6 +137,7 @@ private:
     bool antiMuon_hasRecoObj_;
     int antiMuon_CategoryMedium_;
     int antiMuon_CategoryTight_;
+    int antiMuon_CategoryCustomTight_;
     float antiMuon_recoPt_;
     float antiMuon_recoEta_;
     float antiMuon_recoPhi_;
@@ -215,7 +219,6 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 
         nPV_++;
     }
-    if(nPV_ == 0) return;
 
     edm::LogVerbatim("ZCounting") << "get trigger objects";
 
@@ -254,6 +257,7 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
             muon_recoPhi_ = mu.phi();
             muon_CategoryMedium_ = getMuonCategoryMedium(mu, muonTriggerObjects);
             muon_CategoryTight_ = getMuonCategoryTight(mu, pv, muonTriggerObjects);
+            muon_CategoryCustomTight_ = getMuonCategoryCustomTight(mu, muonTriggerObjects);
         }
         if(reco::deltaR(mu.eta(), mu.phi(), ZAntiLepton->eta(), ZAntiLepton->phi()) < 0.03 && mu.pdgId() == -13){
             antiMuon_recoMatches_++;
@@ -264,6 +268,7 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
             antiMuon_recoPhi_ = mu.phi();
             antiMuon_CategoryMedium_ = getMuonCategoryMedium(mu, muonTriggerObjects);
             antiMuon_CategoryTight_ = getMuonCategoryTight(mu, pv, muonTriggerObjects);
+            antiMuon_CategoryCustomTight_ = getMuonCategoryCustomTight(mu, muonTriggerObjects);
         }
     }
 
@@ -299,6 +304,7 @@ ZCounting::beginJob()
     tree_->Branch("muon_hasRecoObj", &muon_hasRecoObj_,"muon_hasRecoObj_/b");
     tree_->Branch("muon_CategoryMedium", &muon_CategoryMedium_,"muon_CategoryMedium_/i");
     tree_->Branch("muon_CategoryTight", &muon_CategoryTight_,"muon_CategoryTight_/i");
+    tree_->Branch("muon_CategoryCustomTight", &muon_CategoryCustomTight_,"muon_CategoryCustomTight_/i");
     tree_->Branch("muon_recoPt", &muon_recoPt_,"muon_recoPt_/f");
     tree_->Branch("muon_recoEta", &muon_recoEta_,"muon_recoEta_/f");
     tree_->Branch("muon_recoPhi", &muon_recoPhi_,"muon_recoPhi_/f");
@@ -310,6 +316,7 @@ ZCounting::beginJob()
     tree_->Branch("antiMuon_hasRecoObj", &antiMuon_hasRecoObj_,"antiMuon_hasRecoObj_/b");
     tree_->Branch("antiMuon_CategoryMedium", &antiMuon_CategoryMedium_,"antiMuon_CategoryMedium_/i");
     tree_->Branch("antiMuon_CategoryTight", &antiMuon_CategoryTight_,"antiMuon_CategoryTight_/i");
+    tree_->Branch("antiMuon_CategoryCustomTight", &antiMuon_CategoryCustomTight_,"antiMuon_CategoryCustomTight_/i");
     tree_->Branch("antiMuon_recoPt", &antiMuon_recoPt_,"antiMuon_recoPt_/f");
     tree_->Branch("antiMuon_recoEta", &antiMuon_recoEta_,"antiMuon_recoEta_/f");
     tree_->Branch("antiMuon_recoPhi", &antiMuon_recoPhi_,"antiMuon_recoPhi_/f");
@@ -349,6 +356,7 @@ void ZCounting::clearVariables(){
     muon_hasRecoObj_ = false;
     muon_CategoryMedium_ = 0;
     muon_CategoryTight_ = 0;
+    muon_CategoryCustomTight_ = 0;
     muon_recoPt_ = 0.;
     muon_recoEta_ = 0.;
     muon_recoPhi_ = 0.;
@@ -360,6 +368,7 @@ void ZCounting::clearVariables(){
     antiMuon_hasRecoObj_ = false;
     antiMuon_CategoryMedium_ = 0;
     antiMuon_CategoryTight_ = 0;
+    antiMuon_CategoryCustomTight_ = 0;
     antiMuon_recoPt_ = 0.;
     antiMuon_recoEta_ = 0.;
     antiMuon_recoPhi_ = 0.;
@@ -452,6 +461,18 @@ bool ZCounting::isValidTrack(const reco::Track &trk){
 }
 
 //--------------------------------------------------------------------------------------------------
+bool ZCounting::customIsTightMuon(const pat::Muon &mu){
+    // From https://twiki.cern.ch/twiki/bin/view/CMSPublic/SWGuideMuonId#Tight_Muon releasing the PV criterias
+    return (mu.isGlobalMuon()
+        && mu.isPFMuon()
+        && (mu.globalTrack()->normalizedChi2() < 10.)
+        && (mu.globalTrack()->hitPattern().numberOfValidMuonHits() > 0)
+        && (mu.numberOfMatchedStations() > 1)
+        && (mu.innerTrack()->hitPattern().numberOfValidPixelHits() > 0)
+        && (mu.innerTrack()->hitPattern().trackerLayersWithMeasurement() > 5));
+}
+
+//--------------------------------------------------------------------------------------------------
 int ZCounting::getMuonCategoryMedium(const pat::Muon &mu, const std::vector<pat::TriggerObjectStandAlone> &tObjCol){
     if(mu.isMediumMuon() && isTriggerObject(tObjCol, mu)) return cHLT;
     if(mu.isMediumMuon()) return cSel;
@@ -465,6 +486,16 @@ int ZCounting::getMuonCategoryMedium(const pat::Muon &mu, const std::vector<pat:
 int ZCounting::getMuonCategoryTight(const pat::Muon &mu, const reco::Vertex &vtx, const std::vector<pat::TriggerObjectStandAlone> &tObjCol){
     if(mu.isTightMuon(vtx) && isTriggerObject(tObjCol, mu)) return cHLT;
     if(mu.isTightMuon(vtx)) return cSel;
+    if(mu.isGlobalMuon()) return cGlo;
+    if(mu.isStandAloneMuon()) return cSta;
+    if(isValidTrack(*(mu.innerTrack()))) return cTrk;
+    return cNone;
+}
+
+//--------------------------------------------------------------------------------------------------
+int ZCounting::getMuonCategoryCustomTight(const pat::Muon &mu, const std::vector<pat::TriggerObjectStandAlone> &tObjCol){
+    if(customIsTightMuon(mu) && isTriggerObject(tObjCol, mu)) return cHLT;
+    if(customIsTightMuon(mu)) return cSel;
     if(mu.isGlobalMuon()) return cGlo;
     if(mu.isStandAloneMuon()) return cSta;
     if(isValidTrack(*(mu.innerTrack()))) return cTrk;
