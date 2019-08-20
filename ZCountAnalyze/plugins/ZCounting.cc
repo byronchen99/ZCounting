@@ -153,9 +153,6 @@ private:
 
     float z_genMass_;
     float z_recoMass_;
-    float muonAntiMuon_recoClDistXY_;
-    float muonAntiMuon_recoClDistZ_;
-
 };
 
 //
@@ -250,13 +247,13 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 
     // --- find reco muons corresponding to the gen muons from Z
     edm::LogVerbatim("ZCounting") << "find reco muons";
-    pat::Muon muon_reco;
-    pat::Muon antiMuon_reco;
+    LorentzVector muon_reco;
+    LorentzVector antiMuon_reco;
     for (pat::Muon mu : *muonCollection){
 
         if(reco::deltaR(mu.eta(), mu.phi(), ZLepton->eta(), ZLepton->phi()) < 0.03 && mu.pdgId() == 13){
             muon_recoMatches_++;
-            muon_reco = mu;
+            muon_reco = mu.p4();
             muon_hasRecoObj_ = true;
             muon_recoPt_ = mu.pt();
             muon_recoEta_ = mu.eta();
@@ -269,7 +266,7 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
         }
         if(reco::deltaR(mu.eta(), mu.phi(), ZAntiLepton->eta(), ZAntiLepton->phi()) < 0.03 && mu.pdgId() == -13){
             antiMuon_recoMatches_++;
-            antiMuon_reco = mu;
+            antiMuon_reco = mu.p4();
             antiMuon_hasRecoObj_ = true;
             antiMuon_recoPt_ = mu.pt();
             antiMuon_recoEta_ = mu.eta();
@@ -282,12 +279,8 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
         }
     }
 
-    if(muon_hasRecoObj_ && antiMuon_hasRecoObj_){
-        z_recoMass_ = (muon_reco.p4() + antiMuon_reco.p4()).M();
-        muonAntiMuon_recoClDistXY_ = std::sqrt(std::pow(muon_reco.vertex().x() - antiMuon_reco.vertex().x(),2)
-                                               + std::pow(muon_reco.vertex().y() - antiMuon_reco.vertex().y(),2));
-        muonAntiMuon_recoClDistZ_ = std::abs(muon_reco.vertex().z() - antiMuon_reco.vertex().z());
-    }
+    if(muon_hasRecoObj_ && antiMuon_hasRecoObj_)
+        z_recoMass_ = (muon_reco + antiMuon_reco).M();
 
     for(std::vector<PileupSummaryInfo>::const_iterator puI = pileupInfoCollection->begin(); puI != pileupInfoCollection->end(); ++puI)
     {
@@ -344,8 +337,6 @@ ZCounting::beginJob()
 
     tree_->Branch("z_genMass", &z_genMass_,"z_genMass_/f");
     tree_->Branch("z_recoMass", &z_recoMass_,"z_recoMass_/f");
-    tree_->Branch("muonAntiMuon_recoClDistXY", &muonAntiMuon_recoClDistXY_, "muonAntiMuon_recoClDistXY_/f");
-    tree_->Branch("muonAntiMuon_recoClDistZ", &muonAntiMuon_recoClDistZ_, "muonAntiMuon_recoClDistZ_/f");
 
 }
 
@@ -402,8 +393,6 @@ void ZCounting::clearVariables(){
 
     z_genMass_ = 0.;
     z_recoMass_ = 0.;
-    muonAntiMuon_recoClDistXY_ = 0.;
-    muonAntiMuon_recoClDistZ_ = 0.;
 }
 
 //--------------------------------------------------------------------------------------------------
