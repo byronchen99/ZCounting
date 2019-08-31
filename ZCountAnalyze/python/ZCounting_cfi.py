@@ -19,12 +19,11 @@ zcounting = cms.EDAnalyzer('ZCounting',
     pat_muons = cms.InputTag("slimmedMuons","","PAT"),
 
     # Muon - triggers
-    muon_trigger_patterns=cms.vstring("HLT_L1SingleMu18_v*",
-                                      "HLT_IsoMu24_v*",
-                                      "HLT_IsoTkMu24_v*",
-                                      "HLT_Mu50_v*",
-                                      "HLT_TkMu50_v*",
-                                      ),
+    muon_trigger_patterns=cms.vstring("HLT_L1_SingleMu22_v*",
+                                      "HLT_L1_SingleMu25_v*"
+                                      "HLT_IsoMu24_v",
+                                      "HLT_IsoMu27_v",
+                                      "HLT_IsoMu30_v"),
 
     # For MC only
     genEventInfo         = cms.InputTag('generator'),
