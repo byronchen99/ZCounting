@@ -93,8 +93,8 @@ private:
     bool isGoodPV(const reco::Vertex&);
     bool isValidTrack(const reco::Track&);
     bool customIsTightMuon(const pat::Muon&);
-    int pfIso(const pat::Muon&);
-    int tkIso(const pat::Muon&);
+    double pfIso(const pat::Muon&);
+    double tkIso(const pat::Muon&);
     int getMuonID(const pat::Muon&, const reco::Vertex&);
 
     // ----------member data ---------------------------
@@ -126,8 +126,8 @@ private:
 
     int muon_recoMatches_;
     bool muon_hasRecoObj_;
-    int muon_tkIso_;
-    int muon_pfIso_;
+    float muon_tkIso_;
+    float muon_pfIso_;
     int muon_ID_;
     int muon_triggerBits_;
     float muon_recoPt_;
@@ -139,8 +139,8 @@ private:
 
     int antiMuon_recoMatches_;
     bool antiMuon_hasRecoObj_;
-    int antiMuon_tkIso_;
-    int antiMuon_pfIso_;
+    float antiMuon_tkIso_;
+    float antiMuon_pfIso_;
     int antiMuon_ID_;
     int antiMuon_triggerBits_;
     float antiMuon_recoPt_;
@@ -315,8 +315,8 @@ ZCounting::beginJob()
     tree_->Branch("muon_recoMatches", &muon_recoMatches_,"muon_recoMatches_/i");
     tree_->Branch("muon_hasRecoObj", &muon_hasRecoObj_,"muon_hasRecoObj_/b");
     tree_->Branch("muon_ID", &muon_ID_,"muon_ID_/i");
-    tree_->Branch("muon_tkIso", &muon_tkIso_,"muon_tkIso_/i");
-    tree_->Branch("muon_pfIso", &muon_pfIso_,"muon_pfIso_/i");
+    tree_->Branch("muon_tkIso", &muon_tkIso_,"muon_tkIso_/f");
+    tree_->Branch("muon_pfIso", &muon_pfIso_,"muon_pfIso_/f");
     tree_->Branch("muon_triggerBits", &muon_triggerBits_,"muon_triggerBits_/i");
     tree_->Branch("muon_recoPt", &muon_recoPt_,"muon_recoPt_/f");
     tree_->Branch("muon_recoEta", &muon_recoEta_,"muon_recoEta_/f");
@@ -328,8 +328,8 @@ ZCounting::beginJob()
     tree_->Branch("antiMuon_recoMatches", &antiMuon_recoMatches_,"antiMuon_recoMatches_/i");
     tree_->Branch("antiMuon_hasRecoObj", &antiMuon_hasRecoObj_,"antiMuon_hasRecoObj_/b");
     tree_->Branch("antiMuon_ID", &antiMuon_ID_,"antiMuon_ID_/i");
-    tree_->Branch("antiMuon_tkIso", &antiMuon_tkIso_,"antiMuon_tkIso_/i");
-    tree_->Branch("antiMuon_pfIso", &antiMuon_pfIso_,"antiMuon_pfIso_/i");
+    tree_->Branch("antiMuon_tkIso", &antiMuon_tkIso_,"antiMuon_tkIso_/f");
+    tree_->Branch("antiMuon_pfIso", &antiMuon_pfIso_,"antiMuon_pfIso_/f");
     tree_->Branch("antiMuon_triggerBits", &antiMuon_triggerBits_,"antiMuon_triggerBits_/i");
     tree_->Branch("antiMuon_recoPt", &antiMuon_recoPt_,"antiMuon_recoPt_/f");
     tree_->Branch("antiMuon_recoEta", &antiMuon_recoEta_,"antiMuon_recoEta_/f");
@@ -369,8 +369,8 @@ void ZCounting::clearVariables(){
     muon_recoMatches_ = 0;
     muon_hasRecoObj_ = false;
     muon_ID_ = 0;
-    muon_tkIso_ = 0;
-    muon_pfIso_ = 0;
+    muon_tkIso_ = 0.;
+    muon_pfIso_ = 0.;
     muon_triggerBits_ = 0;
     muon_recoPt_ = 0.;
     muon_recoEta_ = 0.;
@@ -382,8 +382,8 @@ void ZCounting::clearVariables(){
     antiMuon_recoMatches_ = 0;
     antiMuon_hasRecoObj_ = false;
     antiMuon_ID_ = 0;
-    antiMuon_tkIso_ = 0;
-    antiMuon_pfIso_ = 0;
+    antiMuon_tkIso_ = 0.;
+    antiMuon_pfIso_ = 0.;
     antiMuon_triggerBits_ = 0;
     antiMuon_recoPt_ = 0.;
     antiMuon_recoEta_ = 0.;
@@ -525,22 +525,16 @@ int ZCounting::getMuonID(const pat::Muon &mu, const reco::Vertex &vtx){
 
 
 //--------------------------------------------------------------------------------------------------
-int ZCounting::tkIso(const pat::Muon &mu){
-    double tkIso = mu.isolationR03().sumPt / mu.pt();
-    if(tkIso < 0.05) return 2;  // tight
-    if(tkIso < 0.1) return 1;   // loose
-    else return 0;
+double ZCounting::tkIso(const pat::Muon &mu){
+    return mu.isolationR03().sumPt / mu.pt();
 }
 
 //--------------------------------------------------------------------------------------------------
-int ZCounting::pfIso(const pat::Muon &mu){
-    double pfIso = (mu.pfIsolationR04().sumChargedHadronPt + std::max(0., mu.pfIsolationR04().sumNeutralHadronEt
+double ZCounting::pfIso(const pat::Muon &mu){
+    return (mu.pfIsolationR04().sumChargedHadronPt + std::max(0., mu.pfIsolationR04().sumNeutralHadronEt
                                                                          + mu.pfIsolationR04().sumPhotonEt
                                                                          - 0.5 * mu.pfIsolationR04().sumPUPt)
                    ) / mu.pt();
-    if(pfIso < 0.25) return 2;  // tight
-    if(pfIso < 0.15) return 1;  // loose
-    else return 0;
 }
 
 
