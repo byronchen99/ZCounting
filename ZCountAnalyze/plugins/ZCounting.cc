@@ -96,6 +96,8 @@ private:
     double pfIso(const pat::Muon&);
     double tkIso(const pat::Muon&);
     int getMuonID(const pat::Muon&, const reco::Vertex&);
+    double dxy(const pat::Muon&, const reco::Vertex&);
+    double dz(const pat::Muon&, const reco::Vertex&);
 
     // ----------member data ---------------------------
 
@@ -130,6 +132,8 @@ private:
     float muon_pfIso_;
     int muon_ID_;
     int muon_triggerBits_;
+    float muon_dxy_;
+    float muon_dz_;
     float muon_recoPt_;
     float muon_recoEta_;
     float muon_recoPhi_;
@@ -143,6 +147,8 @@ private:
     float antiMuon_pfIso_;
     int antiMuon_ID_;
     int antiMuon_triggerBits_;
+    float antiMuon_dxy_;
+    float antiMuon_dz_;
     float antiMuon_recoPt_;
     float antiMuon_recoEta_;
     float antiMuon_recoPhi_;
@@ -259,6 +265,8 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
             muon_ID_ = getMuonID(mu, pv);
             muon_tkIso_ = tkIso(mu);
             muon_pfIso_ = pfIso(mu);
+            muon_dxy_ = dxy(mu, pv);
+            muon_dz_ = dz(mu, pv);
 
             for(unsigned j = 0, m = muonTriggerPatterns_.size(); j < m; ++j){
                 std::vector<pat::TriggerObjectStandAlone> tObjCol = get_muonTriggerObjects(*triggerObjects, triggerNames, muonTriggerPatterns_.at(j));
@@ -276,6 +284,8 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
             antiMuon_ID_ = getMuonID(mu, pv);
             antiMuon_tkIso_ = tkIso(mu);
             antiMuon_pfIso_ = pfIso(mu);
+            antiMuon_dxy_ = dxy(mu, pv);
+            antiMuon_dz_ = dz(mu, pv);
 
             for(unsigned j = 0, m = muonTriggerPatterns_.size(); j < m; ++j){
                 std::vector<pat::TriggerObjectStandAlone> tObjCol = get_muonTriggerObjects(*triggerObjects, triggerNames, muonTriggerPatterns_.at(j));
@@ -318,6 +328,8 @@ ZCounting::beginJob()
     tree_->Branch("muon_tkIso", &muon_tkIso_,"muon_tkIso_/f");
     tree_->Branch("muon_pfIso", &muon_pfIso_,"muon_pfIso_/f");
     tree_->Branch("muon_triggerBits", &muon_triggerBits_,"muon_triggerBits_/i");
+    tree_->Branch("muon_dxy", &muon_dxy_,"muon_dxy_/f");
+    tree_->Branch("muon_dz", &muon_dz_,"muon_dz_/f");
     tree_->Branch("muon_recoPt", &muon_recoPt_,"muon_recoPt_/f");
     tree_->Branch("muon_recoEta", &muon_recoEta_,"muon_recoEta_/f");
     tree_->Branch("muon_recoPhi", &muon_recoPhi_,"muon_recoPhi_/f");
@@ -331,6 +343,8 @@ ZCounting::beginJob()
     tree_->Branch("antiMuon_tkIso", &antiMuon_tkIso_,"antiMuon_tkIso_/f");
     tree_->Branch("antiMuon_pfIso", &antiMuon_pfIso_,"antiMuon_pfIso_/f");
     tree_->Branch("antiMuon_triggerBits", &antiMuon_triggerBits_,"antiMuon_triggerBits_/i");
+    tree_->Branch("antiMuon_dxy", &antiMuon_dxy_,"antiMuon_dxy_/f");
+    tree_->Branch("antiMuon_dz", &antiMuon_dz_,"antiMuon_dz_/f");
     tree_->Branch("antiMuon_recoPt", &antiMuon_recoPt_,"antiMuon_recoPt_/f");
     tree_->Branch("antiMuon_recoEta", &antiMuon_recoEta_,"antiMuon_recoEta_/f");
     tree_->Branch("antiMuon_recoPhi", &antiMuon_recoPhi_,"antiMuon_recoPhi_/f");
@@ -372,6 +386,8 @@ void ZCounting::clearVariables(){
     muon_tkIso_ = 0.;
     muon_pfIso_ = 0.;
     muon_triggerBits_ = 0;
+    muon_dxy_ = 0.;
+    muon_dz_ = 0.;
     muon_recoPt_ = 0.;
     muon_recoEta_ = 0.;
     muon_recoPhi_ = 0.;
@@ -385,6 +401,8 @@ void ZCounting::clearVariables(){
     antiMuon_tkIso_ = 0.;
     antiMuon_pfIso_ = 0.;
     antiMuon_triggerBits_ = 0;
+    antiMuon_dxy_ = 0.;
+    antiMuon_dz_ = 0.;
     antiMuon_recoPt_ = 0.;
     antiMuon_recoEta_ = 0.;
     antiMuon_recoPhi_ = 0.;
@@ -512,7 +530,6 @@ bool ZCounting::customIsTightMuon(const pat::Muon &mu){
         && (mu.innerTrack()->hitPattern().trackerLayersWithMeasurement() > 5));
 }
 
-
 //--------------------------------------------------------------------------------------------------
 int ZCounting::getMuonID(const pat::Muon &mu, const reco::Vertex &vtx){
     if(mu.isTightMuon(vtx)) return 5;
@@ -522,7 +539,6 @@ int ZCounting::getMuonID(const pat::Muon &mu, const reco::Vertex &vtx){
     if(isValidTrack(*(mu.innerTrack()))) return 1;
     return 0;
 }
-
 
 //--------------------------------------------------------------------------------------------------
 double ZCounting::tkIso(const pat::Muon &mu){
@@ -537,7 +553,15 @@ double ZCounting::pfIso(const pat::Muon &mu){
                    ) / mu.pt();
 }
 
+//--------------------------------------------------------------------------------------------------
+double ZCounting::dxy(const pat::Muon &mu, const reco::Vertex &vtx){
+    return fabs(mu.muonBestTrack()->dxy(vtx.position()));
+}
 
+//--------------------------------------------------------------------------------------------------
+double ZCounting::dz(const pat::Muon &mu, const reco::Vertex &vtx){
+    return fabs(mu.muonBestTrack()->dz(vtx.position()));
+}
 
 //define this as a plug-in
 DEFINE_FWK_MODULE(ZCounting);
