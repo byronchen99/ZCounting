@@ -57,7 +57,8 @@ def eff(nReco, nAcc):
     return eff, err
 
 
-def zMCEff1D(df, bins, obs, region='inclusive', sel=''):
+def zMCEff1D(df, bins, obs, region='inclusive', sel='',
+             cutsPtEta='p_\mathrm{t}(\mu) > 27\ \mathrm{GeV} \qquad |\eta(\mu)| < 2.4'):
     """
     compute Z efficiency from MC and Z->mumu efficiency from tag and probe
     :param df: dataframe with events satisfying the gen accepance
@@ -81,7 +82,7 @@ def zMCEff1D(df, bins, obs, region='inclusive', sel=''):
 
         Efficiency.Calculate(df.query(sel), i)
 
-    Efficiency.Plot()
+    Efficiency.Plot(cutsPtEta)
 
 
 class Efficiency:
@@ -98,9 +99,9 @@ class Efficiency:
             eff.calculate(df, ibin)
 
     @classmethod
-    def Plot(cls):
+    def Plot(cls, cutsPtEta):
         for eff in cls.collection:
-            eff.plot()
+            eff.plot(cutsPtEta)
 
     def __init__(self, name, reqID, reqPFIso, reqTkIso, reqHLT=None, triggerName=''):
         self.name = name
@@ -169,7 +170,7 @@ class Efficiency:
 
         self.eff_true[0][ibin], self.eff_true[1][ibin] = eff(nZReco, nZAcc)
 
-    def plot(self):
+    def plot(self, cutsPtEta):
         plt.clf()
         fig, ax = plt.subplots(2, 1, sharex=True, gridspec_kw={'height_ratios': [2, 1]})
         fig.subplots_adjust(hspace=0)
@@ -184,9 +185,9 @@ class Efficiency:
         ax[0].legend()
         ax[0].text(0.05, 0.9, r'$66\ \mathrm{GeV} < \mathrm{M}_{\mu\mu} < 116\ \mathrm{GeV}$',
                    transform=ax[0].transAxes)
-        ax[0].text(0.05, 0.82, r'$p_\mathrm{t}(\mu) > 27\ \mathrm{GeV} \qquad |\eta(\mu)| < 2.4$',
+        ax[0].text(0.05, 0.82, r'${0}$'.format(cutsPtEta),
                    transform=ax[0].transAxes)
-        ax[0].text(0.05, 0.74, "${}$".format(self.region), transform=ax[0].transAxes)
+        ax[0].text(0.05, 0.74, "${0}$".format(self.region), transform=ax[0].transAxes)
         if self.HLT:
             ax[0].text(0.05, 0.04,
                        r'{0}'.format(self.triggerName),
@@ -261,7 +262,6 @@ for iBit in range(0, 5):
 # --- define Efficiencies
 Efficiency("ZNoID", 0, 0, 0)
 Efficiency("ZTrk", 1, 0, 0)
-Efficiency("ZTrkOrSta", 2, 0, 0)
 Efficiency("ZGlobal", 3, 0, 0)
 Efficiency("ZcTight", 4, 0, 0)
 Efficiency("ZTight", 5, 0, 0)
@@ -272,12 +272,14 @@ Efficiency("ZcTightIsoMu27", 4, 0, 0, 4, '$\mathrm{HLT\_IsoMu27\_v^{*}}$')
 Efficiency("ZcTightIsoMu30", 4, 0, 0, 5, '$\mathrm{HLT\_IsoMu30\_v^{*}}$')
 
 zMCEff1D(dfGen, np.linspace(0.5, 74.5, 25), 'nPU', 'inclusive')
-zMCEff1D(dfGen, np.linspace(0.5, 74.5, 25), 'nPU', 'BB',
-         sel='abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) < 0.9')
+zMCEff1D(dfGen, np.linspace(0.5, 74.5, 15), 'nPU', 'BB',
+         sel='abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) < 0.9',
+         cutsPtEta='p_\mathrm{t}(\mu) > 27\ \mathrm{GeV} \qquad |\eta(\mu)| < 0.9')
 # zMCEff1D(dfGen, np.linspace(0.5, 59.5, 60), 'nPU', 'BE',
 #       sel='(abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) > 0.9) | (abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) < 0.9)')
-zMCEff1D(dfGen, np.linspace(0.5, 74.5, 25), 'nPU', 'EE',
-         sel='abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) > 0.9')
+zMCEff1D(dfGen, np.linspace(0.5, 74.5, 15), 'nPU', 'EE',
+         sel='abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) > 0.9',
+         cutsPtEta='p_\mathrm{t}(\mu) > 27\ \mathrm{GeV} \qquad 0.9 < |\eta(\mu)| < 2.4')
 
 # --- differential efficiencies
 # zMCEff1D(dfGen, np.linspace(0., 5., 20), 'delRLL')
