@@ -5,7 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 from root_numpy import root2array, list_trees
-from Utils import tree_to_df
+from Utils import tree_to_df, plot_scatter
 from scipy.stats import pearsonr
 import pdb
 
@@ -55,7 +55,9 @@ branches = ['nPU',
             'muon_genEta', 'antiMuon_genEta',
             'muon_genPhi', 'antiMuon_genPhi',
             'muon_dxy', 'antiMuon_dxy',
-            'muon_dz', 'antiMuon_dz'
+            'muon_dz', 'antiMuon_dz',
+            'muon_tkIso', 'antiMuon_tkIso',
+            'muon_pfIso', 'antiMuon_pfIso'
             ]
 
 print(">>> Load Events in gen acceptance")
@@ -69,37 +71,21 @@ df['delRLL'] = np.sqrt(
 
 df = df.query('delRLL > 0.4')
 
+plot_scatter(df['muon_tkIso'], df['antiMuon_tkIso'], '$\mu^{-}\ Tracker\ Isolation$', '$\mu^{+}\ Tracker\ Isolation$',
+             range=(0, 1.), title='CMS Simulation',
+             saveas='MuMu_inclusive_tkIso.png')
+plot_scatter(df['muon_pfIso'], df['antiMuon_pfIso'], '$\mu^{-}\ PF\ Isolation$', '$\mu^{+}\ PF\ Isolation$',
+             range=(0, 1.), title='CMS Simulation',
+             saveas='MuMu_inclusive_pfIso.png')
 
-def plot_scatter(x, y, xlabel, ylabel, range,
-                 cutsPtEta='p_\mathrm{t}(\mu) > 27\ \mathrm{GeV} \qquad |\eta(\mu)| < 2.4',
-                 cutsAdditional=None,
-                 saveas='scat.png'):
-    plt.clf()
-    plt.scatter(x, y, marker='.', color='k')
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    xtext= (range[1] - range[0])*0.1 + range[0]
-    ytext = (range[1] - range[0])
-    plt.text(xtext, range[0] + 0.9*ytext, r'$66\ \mathrm{GeV} < \mathrm{M}_{\mu\mu} < 116\ \mathrm{GeV}$')
-    plt.text(xtext, range[0] + 0.84*ytext, r'${0}$'.format(cutsPtEta))
-    plt.text(xtext, range[0] + 0.78*ytext, "$\Delta R(\mu,\mu) > 0.4$")
-    corr, _ = pearsonr(x, y)
-    plt.text(xtext, range[0] + 0.72*ytext, r'$\rho_{pearson} = $'+'${0}$'.format(round(corr,3)))
-    if cutsAdditional:
-        plt.text(xtext, range[0] + 0.66*ytext, "${0}$".format(cutsAdditional))
-    if range:
-        plt.xlim(range)
-        plt.ylim(range)
-    plt.savefig(output + '/'+saveas)
-    plt.close()
-
-
-
+exit()
 
 plot_scatter(df['muon_dxy'], df['antiMuon_dxy'], '$\mu^{-} d_{xy}$', '$\mu^{+} d_{xy}$',
-             range=(0, 0.5), saveas='MuMu_inclusive_dxy.png')
+             range=(0, 0.5), title='CMS Simulation',
+             saveas='MuMu_inclusive_dxy.png')
 plot_scatter(df['muon_dz'], df['antiMuon_dz'], '$\mu^{-} d_{z}$', '$\mu^{+} d_{z}$',
-             range=(0, 1.), saveas='MuMu_inclusive_dz.png')
+             range=(0, 1.), title='CMS Simulation',
+             saveas='MuMu_inclusive_dz.png')
 
 dfLPU = df.query('nPU < 30')
 
@@ -119,7 +105,6 @@ plot_scatter(dfHPU['muon_dz'], dfHPU['antiMuon_dz'], '$\mu^{-} d_{z}$', '$\mu^{+
              range=(0, 1.), cutsAdditional='nPU > 30',
              saveas='MuMu_HighPU_dz.png')
 
-exit()
 dfBB = df.query('muon_genEta < 0.9 & antiMuon_genEta < 0.9')
 dfEE = df.query('muon_genEta > 0.9 & antiMuon_genEta > 0.9')
 
