@@ -20,6 +20,8 @@ TnPPairTreeProducer::TnPPairTreeProducer(const edm::ParameterSet& iConfig)
     fMuonHLTObjectNames = iConfig.getParameter<std::vector<std::string>>("MuonTriggerObjectNames");
     fPVName = iConfig.getUntrackedParameter<std::string>("edmPVName", "offlinePrimaryVertices");
 
+    selectSameCharge_ = iConfig.getUntrackedParameter<bool>("SelectSameCharge");
+
     VtxNTracksFitCut_ = iConfig.getUntrackedParameter<double>("VtxNTracksFitMin");
     VtxNdofCut_ = iConfig.getUntrackedParameter<double>("VtxNdofMin");
     VtxAbsZCut_ = iConfig.getUntrackedParameter<double>("VtxAbsZMax");
@@ -197,7 +199,7 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
             phi2_ = itMu2.muonBestTrack()->phi();
             q2_ = itMu2.muonBestTrack()->charge();
 
-            if(q1_ == q2_)
+            if( (selectSameCharge_ && q1_ != q2_) || (!selectSameCharge_ && q1_ == q2_) )
                 continue;
             if (pt2_ < PtCutL2_)
                 continue;
@@ -262,7 +264,7 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
                 continue;
             if (fabs(eta2_) > EtaCutL2_)
                 continue;
-            if (q1_ == q2_)
+            if( (selectSameCharge_ && q1_ != q2_) || (!selectSameCharge_ && q1_ == q2_) )
                 continue;
 
             vProbe.SetPtEtaPhiM(pt2_, eta2_, phi2_, MUON_MASS);

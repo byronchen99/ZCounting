@@ -69,6 +69,8 @@ private:
 
     // --- input
 
+    bool selectSameCharge_;
+
     double MassMin_;
     double MassMax_;
 
