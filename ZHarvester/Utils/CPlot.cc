@@ -324,7 +324,7 @@ void CPlot::AddProfile(TFile *f, TString prName, TString label, TString drawopt,
 
 //--------------------------------------------------------------------------------------------------
 void CPlot::AddTextBox(TString text, double x1, double y1, double x2, double y2,
-                       int bordersize, int textcolor, int fillcolor)
+                       int bordersize, int textcolor, int fillcolor, int align)
 {
   TPaveText *tb = new TPaveText(x1,y1,x2,y2,"NDC");
   tb->SetTextColor(textcolor);
@@ -334,6 +334,7 @@ void CPlot::AddTextBox(TString text, double x1, double y1, double x2, double y2,
     tb->SetFillColor(fillcolor);
   tb->SetBorderSize(bordersize);
   tb->AddText(text);
+  tb->SetTextAlign(align);
   fTextBoxes.push_back(tb);
 }
 

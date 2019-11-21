@@ -93,7 +93,7 @@ public:
   
   // Adding a text box to the plot
   void AddTextBox(TString text, double x1, double y1, double x2, double y2,
-                  int bordersize=1, int textcolor=kBlack, int fillcolor=kWhite);
+                  int bordersize=1, int textcolor=kBlack, int fillcolor=kWhite, int algin=22);
   void AddTextBox(double x1, double y1, double x2, double y2, 
                   int bordersize, int textcolor, int fillcolor, int nlines, ...);		  
   
@@ -172,7 +172,7 @@ protected:
   vector<TLegendEntry*> fStackEntries;  // pointer to legend entry objects for histograms in a stack
   
   RooPlot *fRooPlot;
-  
+
   static int sCount;                    // number of CPlot instances
 };
 
