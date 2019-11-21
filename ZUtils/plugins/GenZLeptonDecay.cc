@@ -106,7 +106,7 @@ GenZLeptonDecay::produce(edm::Event& iEvent, const edm::EventSetup& iSetup)
     for(reco::GenParticleCollection::const_iterator i_particle = v_particle->begin(); i_particle != v_particle->end(); ++i_particle){
         if(i_particle->status() != 1) continue;
         const int absPdgId = std::abs(i_particle->pdgId());
-        if(absPdgId<11 || absPdgId>16) continue;
+        if(absPdgId<11 || absPdgId>16 || absPdgId%2 == 0) continue;
         if(!i_particle->isPromptFinalState() && !i_particle->isDirectPromptTauDecayProductFinalState()) continue;
         v_stableLepton.push_back(&(*i_particle));
     }
