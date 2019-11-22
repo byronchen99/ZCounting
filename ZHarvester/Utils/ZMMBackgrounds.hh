@@ -58,6 +58,29 @@ public:
   ~CDasPlusExp();
 };
 
+class CQCD: public CBackgroundModel
+{
+public:
+  CQCD(RooRealVar &m, TH1D* hist, const Bool_t pass, const int ibin, int intOrder=1);
+  TH1D        *inHist;
+  RooDataHist *dataHist;
+  RooHistPdf  *histPdf;
+  ~CQCD();
+};
+
+class CQCDPlusTT: public CBackgroundModel
+{
+public:
+  CQCDPlusTT(RooRealVar &m, TH1D* histQCD, TH1D* histTT, const Bool_t pass, const int ibin, int intOrder=1);
+  RooRealVar  *frac;
+  TH1D        *inHistQCD;
+  TH1D        *inHistTT;
+  RooDataHist *dataHistQCD;
+  RooHistPdf  *histPdfQCD;
+  RooDataHist *dataHistTT;
+  RooHistPdf  *histPdfTT;
+  ~CQCDPlusTT();
+};
 
 //--------------------------------------------------------------------------------------------------
 CExponential::CExponential(RooRealVar &m, const Bool_t pass, const int ibin)
@@ -141,9 +164,9 @@ CQuadPlusExp::CQuadPlusExp(RooRealVar &m, const Bool_t pass, const int ibin, con
     a2 = new RooRealVar("bkg_a2","bkg_a2",0.,0.,10.);
   }
 
-  quad = new RooGenericPdf("bkg_quad","bkg_quad","@1 + @2*@0 + @3*@0*@0",RooArgList(m,*a0,*a1,*a2));  
+  quad = new RooGenericPdf("bkg1","bkg_quad","@1 + @2*@0 + @3*@0*@0",RooArgList(m,*a0,*a1,*a2));
   t1   = new RooRealVar("bkg_t1","bkg_t1",-0.1,-1.,0.);
-  exp  = new RooExponential("bkg_exp","bkg_exp",m,*t1);
+  exp  = new RooExponential("bkg2","bkg_exp",m,*t1);
 
   char name[10];
   if(pass) sprintf(name,"%s_%d","Pass",ibin);
@@ -195,16 +218,17 @@ CDasPlusExp::CDasPlusExp(RooRealVar &m, const Bool_t pass, const int ibin)
   if(pass) sprintf(name,"%s_%d","Pass",ibin);
   else     sprintf(name,"%s_%d","Fail",ibin);
   char vname[50];
-  sprintf(vname,"background%s",name);
 
-  mean   = new RooRealVar("bkg_mean" , "bkg_mean" ,   90,    30,200);
-  sigma  = new RooRealVar("bkg_sigma", "bkg_sigma",   12,    10, 60);
-  kLo    = new RooRealVar("bkg_kLo"  , "bkg_kLo"  ,  1.5,   .02, 10);
-  kHi    = new RooRealVar("bkg_kHi"  , "bkg_kHi"  ,  1.5,   .02, 10);
-  dd     = new RooGaussDoubleSidedExp("bkgDas","bkgDas",m,*mean,*sigma,*kLo,*kHi);
-  t1     = new RooRealVar("bkg_t1"  ,"bkg_t1"  ,-0.20,-.4,.4);
-  frac   = new RooRealVar("bkg_frac","bkg_frac", .95, 0.,1.);
-  exp1   = new RooExponential("bkg_exp1","bkg_exp1",m,*t1);
+  sprintf(vname,"bkg_mean%s",name);     mean   = new RooRealVar("bkg_mean" , "bkg_mean" ,   90,    30,200);
+  sprintf(vname,"bkg_sigma%s",name);    sigma  = new RooRealVar("bkg_sigma", "bkg_sigma",   12,    10, 60);
+  sprintf(vname,"bkg_kLo%s",name);      kLo    = new RooRealVar("bkg_kLo"  , "bkg_kLo"  ,  1.5,   .02, 10);
+  sprintf(vname,"bkg_kHi%s",name);      kHi    = new RooRealVar("bkg_kHi"  , "bkg_kHi"  ,  1.5,   .02, 10);
+  sprintf(vname,"bkgPDF1%s",name);       dd     = new RooGaussDoubleSidedExp("bkgDas","bkgDas",m,*mean,*sigma,*kLo,*kHi);
+  sprintf(vname,"bkg_t1%s",name);       t1     = new RooRealVar("bkg_t1"  ,"bkg_t1"  ,-0.20,-.4,.4);
+  sprintf(vname,"bkg_frac%s",name);     frac   = new RooRealVar("bkg_frac","bkg_frac", .95, 0.,1.);
+  sprintf(vname,"bkgPDF2%s",name);     exp1   = new RooExponential("bkg_exp1","bkg_exp1",m,*t1);
+
+  sprintf(vname,"background%s",name);
   model  = new RooAddPdf(vname,vname,RooArgList(*dd,*exp1),RooArgList(*frac));
 }
 
@@ -218,4 +242,66 @@ CDasPlusExp::~CDasPlusExp()
   delete frac;
   delete exp1;
   delete dd;
+}
+
+//--------------------------------------------------------------------------------------------------
+CQCD::CQCD(RooRealVar &m, TH1D* hist, const Bool_t pass, const int ibin, int intOrder)
+{
+  char name[10];
+  if(pass) sprintf(name,"%s_%i","Pass",ibin);
+  else     sprintf(name,"%s_%i","Fail",ibin);
+
+  char vname[50];
+
+  sprintf(vname,"inHist_%s",hist->GetName());
+  inHist = (TH1D*)hist->Clone(vname);
+
+  sprintf(vname,"background%s",name);
+
+  dataHist = new RooDataHist("bkg_dataHist","bkg_dataHist",RooArgSet(m),inHist);
+  histPdf  = new RooHistPdf("bkg_histPdf","bkg_histPdf",m,*dataHist,intOrder);
+  model    = new RooHistPdf(vname,vname,m,*dataHist,intOrder);
+}
+
+CQCD::~CQCD()
+{
+  delete inHist;
+  delete dataHist;
+  delete histPdf;
+}
+
+//--------------------------------------------------------------------------------------------------
+CQCDPlusTT::CQCDPlusTT(RooRealVar &m, TH1D* histQCD, TH1D* histTT, const Bool_t pass, const int ibin, int intOrder)
+{
+  char name[10];
+  if(pass) sprintf(name,"%s_%d","Pass",ibin);
+  else     sprintf(name,"%s_%d","Fail",ibin);
+  char vname[50];
+  sprintf(vname,"bkg_frac%s",name);
+
+  frac   = new RooRealVar(vname,"bkg_frac", .5, 0.,1.);
+
+
+  sprintf(vname,"inHistQCD_%s",histQCD->GetName()); inHistQCD = (TH1D*)histQCD->Clone(vname);
+  sprintf(vname,"inHistTT_%s",histTT->GetName());   inHistTT = (TH1D*)histTT->Clone(vname);
+
+  sprintf(vname,"bkgHistQCD%s",name);       dataHistQCD = new RooDataHist(vname,"bkg_dataHist",RooArgSet(m),inHistQCD);
+  sprintf(vname,"bkgPDF1%s",name);       histPdfQCD  = new RooHistPdf(vname,"bkg_histPdf",m,*dataHistQCD,intOrder);
+
+  sprintf(vname,"bkgHistTT%s",name);        dataHistTT = new RooDataHist(vname,"bkg_dataHist",RooArgSet(m),inHistTT);
+  sprintf(vname,"bkgPDF2%s",name);         histPdfTT  = new RooHistPdf(vname,"bkg_histPdf",m,*dataHistTT,intOrder);
+
+  sprintf(vname,"background%s",name);   model = new RooAddPdf(vname,vname,RooArgList(*histPdfQCD,*histPdfTT),RooArgList(*frac));
+
+}
+
+CQCDPlusTT::~CQCDPlusTT()
+{
+  delete inHistQCD;
+  delete dataHistQCD;
+  delete histPdfQCD;
+  delete inHistTT;
+  delete dataHistTT;
+  delete histPdfTT;
+  delete frac;
 }
