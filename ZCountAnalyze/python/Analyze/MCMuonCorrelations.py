@@ -19,13 +19,13 @@ parser.add_argument(
     help='specify input root file'
 )
 parser.add_argument(
-    '-o', '--output', nargs=1, default='./',
+    '-o', '--output', default='./',
     help='specify output dir'
 )
 args = parser.parse_args()
 
 inputs = args.input
-output = args.output[0]
+output = args.output
 
 if not os.path.isdir(output):
     os.mkdir(output)
@@ -57,7 +57,8 @@ branches = ['nPU',
             'muon_dxy', 'antiMuon_dxy',
             'muon_dz', 'antiMuon_dz',
             'muon_tkIso', 'antiMuon_tkIso',
-            'muon_pfIso', 'antiMuon_pfIso'
+            'muon_pfIso', 'antiMuon_pfIso',
+            'muon_isFromPV', 'antiMuon_isFromPV'
             ]
 
 print(">>> Load Events in gen acceptance")
@@ -71,6 +72,26 @@ df['delRLL'] = np.sqrt(
 
 df = df.query('delRLL > 0.4')
 
+dfFromPV = df.query('muon_isFromPV == 1 & antiMuon_isFromPV == 1')
+dfNotFromPV = df.query('muon_isFromPV == 0 & antiMuon_isFromPV == 0')
+
+plot_scatter(dfFromPV['muon_dxy'], dfFromPV['antiMuon_dxy'], '$\mu^{-} d_{xy}$', '$\mu^{+} d_{xy}$',
+             range=(0, 0.5), title='Events with Z from PV',
+             saveas=output+'/MuMu_FromPV_dxy.png')
+plot_scatter(dfFromPV['muon_dz'], dfFromPV['antiMuon_dz'], '$\mu^{-} d_{z}$', '$\mu^{+} d_{z}$',
+             range=(0, .5), title='Events with Z from PV',
+             saveas=output+'/MuMu_FromPV_dz.png')
+
+plot_scatter(dfNotFromPV['muon_dxy'], dfNotFromPV['antiMuon_dxy'], '$\mu^{-} d_{xy}$', '$\mu^{+} d_{xy}$',
+             range=(0, 0.5), title='Events with Z not from PV',
+             saveas=output+'/MuMu_NotFromPV_dxy.png')
+plot_scatter(dfNotFromPV['muon_dz'], dfNotFromPV['antiMuon_dz'], '$\mu^{-} d_{z}$', '$\mu^{+} d_{z}$',
+             range=(0, .5), title='Events with Z not from PV',
+             saveas=output+'/MuMu_NotFromPV_dz.png')
+
+exit()
+
+
 plot_scatter(df['muon_tkIso'], df['antiMuon_tkIso'], '$\mu^{-}\ Tracker\ Isolation$', '$\mu^{+}\ Tracker\ Isolation$',
              range=(0, 1.), title='CMS Simulation',
              saveas='MuMu_inclusive_tkIso.png')
@@ -78,7 +99,6 @@ plot_scatter(df['muon_pfIso'], df['antiMuon_pfIso'], '$\mu^{-}\ PF\ Isolation$',
              range=(0, 1.), title='CMS Simulation',
              saveas='MuMu_inclusive_pfIso.png')
 
-exit()
 
 plot_scatter(df['muon_dxy'], df['antiMuon_dxy'], '$\mu^{-} d_{xy}$', '$\mu^{+} d_{xy}$',
              range=(0, 0.5), title='CMS Simulation',

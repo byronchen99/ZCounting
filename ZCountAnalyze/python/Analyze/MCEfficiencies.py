@@ -3,10 +3,12 @@ from __future__ import division, print_function
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
 import os
 from root_numpy import root2array, list_trees
 from Utils import tree_to_df
 import math
+import json
 
 import argparse
 
@@ -58,7 +60,7 @@ def eff(nReco, nAcc):
 
 
 def zMCEff1D(df, bins, obs, region='inclusive', sel='',
-             cutsPtEta='p_\mathrm{t}(\mu) > 27\ \mathrm{GeV} \qquad |\eta(\mu)| < 2.4'):
+             cutsPtEta='p_\mathrm{t}(\mu) > 30\ \mathrm{GeV} \qquad |\eta(\mu)| < 2.4'):
     """
     compute Z efficiency from MC and Z->mumu efficiency from tag and probe
     :param df: dataframe with events satisfying the gen accepance
@@ -116,6 +118,8 @@ class Efficiency:
         self.obs = None
         self.region = None
         self.x = []
+
+        self.fitResults = dict()
         Efficiency.collection.append(self)
 
     def set(self, bins, obs, region):
@@ -200,9 +204,25 @@ class Efficiency:
         pulls = self.eff_tnp[0] - self.eff_true[0]
         pulls_sig = np.sqrt(self.eff_tnp[1] ** 2 + self.eff_true[1] ** 2)
 
+        # do fit
+        def linear(x, a, b):
+            return a * x + b
+
+        popt, pcov = curve_fit(linear, self.x, pulls, sigma=pulls_sig)
+        perr = np.sqrt(np.diag(pcov))
+        self.fitResults[self.region + "_a"] = popt[0]
+        self.fitResults[self.region + "_b"] = popt[1]
+        self.fitResults[self.region + "_a-err"] = perr[0]
+        self.fitResults[self.region + "_b-err"] = perr[1]
+
+        ax[1].plot(self.x, np.zeros(len(self.x)), color='gray', linestyle='dashed')
+
+        ax[1].plot(self.x, linear(self.x, *popt), 'm-')
+        ax[1].fill_between(self.x, linear(self.x, *(popt-perr)), linear(self.x, *(popt+perr)), color='magenta', alpha=0.5)
+        ax[1].text(0.05, 0.1, r'fit: $(%5.1e\ \pm\ %5.1e) \cdot x + %5.1e\ \pm\ %5.1e $' % (popt[0],perr[0], popt[1],perr[1]), color='magenta', transform=ax[1].transAxes)
+
         ax[1].errorbar(self.x, pulls, xerr=np.zeros(len(self.x)), yerr=pulls_sig,
                        fmt='ko')  # , label='factorized - true')
-        ax[1].plot(self.x, np.zeros(len(self.x)), color='gray', linestyle='dashed')
         ax[1].set_ylim(-0.01, 0.03)
         ax[1].set_ylabel(r'$\epsilon^\mathrm{tnp}_\mathrm{Z} - \epsilon^\mathrm{true}_\mathrm{Z}$')
         ax[1].set_xlabel(self.obs)
@@ -214,8 +234,8 @@ class Efficiency:
 # acceptance selection
 selection = 'z_genMass > 66 ' \
             '& z_genMass < 116 ' \
-            '& muon_genPt > 27 ' \
-            '& antiMuon_genPt > 27 ' \
+            '& muon_genPt > 30 ' \
+            '& antiMuon_genPt > 30 ' \
             '& abs(muon_genEta) < 2.4 ' \
             '& abs(antiMuon_genEta) < 2.4 ' \
             '& muon_recoMatches <= 1' \
@@ -248,7 +268,7 @@ dfGen['relPtLL'] = abs(dfGen['muon_genPt'] - dfGen['antiMuon_genPt']) / abs(
     dfGen['muon_genPt'] + dfGen['antiMuon_genPt'])
 dfGen['sumPtLL'] = dfGen['muon_genPt'] + dfGen['antiMuon_genPt']
 
-dfGen = dfGen.query('delRLL > 0.4')
+#dfGen = dfGen.query('delRLL > 0.4')
 
 print(">>> convert bit code into bit map")
 for iBit in range(0, 5):
@@ -260,26 +280,32 @@ for iBit in range(0, 5):
         lambda x: 1 if x % (nBit * 2) >= nBit else 0)
 
 # --- define Efficiencies
-Efficiency("ZNoID", 0, 0, 0)
-Efficiency("ZTrk", 1, 0, 0)
-Efficiency("ZGlobal", 3, 0, 0)
-Efficiency("ZcTight", 4, 0, 0)
-Efficiency("ZTight", 5, 0, 0)
-Efficiency("ZcTightL1SMu18", 4, 0, 0, 1, '$\mathrm{HLT\_L1SingleMu18\_v^{*}}$')
-Efficiency("ZcTightL1SMu25", 4, 0, 0, 2, '$\mathrm{HLT\_L1SingleMu25\_v^{*}}$')
-Efficiency("ZcTightIsoMu24", 4, 0, 0, 3, '$\mathrm{HLT\_IsoMu24\_v^{*}}$')
-Efficiency("ZcTightIsoMu27", 4, 0, 0, 4, '$\mathrm{HLT\_IsoMu27\_v^{*}}$')
-Efficiency("ZcTightIsoMu30", 4, 0, 0, 5, '$\mathrm{HLT\_IsoMu30\_v^{*}}$')
+# Efficiency("ZNoID", 0, 0, 0)
+# Efficiency("ZTrk", 1, 0, 0)
+# Efficiency("ZGlobal", 3, 0, 0)
+# Efficiency("ZcTight", 4, 0, 0)
+# Efficiency("ZTight", 5, 0, 0)
+#Efficiency("ZTightIsoMu27", 5, 0, 0, 4, '$\mathrm{HLT\_IsoMu27\_v^{*}}$')
+# Efficiency("ZcTightL1SMu18", 4, 0, 0, 1, '$\mathrm{HLT\_L1SingleMu18\_v^{*}}$')
+# Efficiency("ZcTightL1SMu25", 4, 0, 0, 2, '$\mathrm{HLT\_L1SingleMu25\_v^{*}}$')
+#eff_ZcTIsoMu24 = Efficiency("ZcTightIsoMu24", 4, 0, 0, 3, '$\mathrm{HLT\_IsoMu24\_v^{*}}$')
+eff_ZcTIsoMu27 = Efficiency("ZcTightIsoMu27", 4, 0, 0, 4, '$\mathrm{HLT\_IsoMu27\_v^{*}}$')
+# Efficiency("ZcTightIsoMu30", 4, 0, 0, 5, '$\mathrm{HLT\_IsoMu30\_v^{*}}$')
 
-zMCEff1D(dfGen, np.linspace(0.5, 74.5, 25), 'nPU', 'inclusive')
-zMCEff1D(dfGen, np.linspace(0.5, 74.5, 15), 'nPU', 'BB',
+zMCEff1D(dfGen, np.linspace(0.5, 74.5, 25), 'nPV', 'inclusive')
+zMCEff1D(dfGen, np.linspace(0.5, 74.5, 15), 'nPV', 'BB',
          sel='abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) < 0.9',
-         cutsPtEta='p_\mathrm{t}(\mu) > 27\ \mathrm{GeV} \qquad |\eta(\mu)| < 0.9')
-# zMCEff1D(dfGen, np.linspace(0.5, 59.5, 60), 'nPU', 'BE',
-#       sel='(abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) > 0.9) | (abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) < 0.9)')
-zMCEff1D(dfGen, np.linspace(0.5, 74.5, 15), 'nPU', 'EE',
+         cutsPtEta='p_\mathrm{t}(\mu) > 30\ \mathrm{GeV} \qquad |\eta(\mu)| < 0.9')
+
+zMCEff1D(dfGen, np.linspace(0.5, 74.5, 15), 'nPV', 'BE',
+       sel='(abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) > 0.9) | (abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) < 0.9)')
+
+zMCEff1D(dfGen, np.linspace(0.5, 74.5, 15), 'nPV', 'EE',
          sel='abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) > 0.9',
-         cutsPtEta='p_\mathrm{t}(\mu) > 27\ \mathrm{GeV} \qquad 0.9 < |\eta(\mu)| < 2.4')
+         cutsPtEta='p_\mathrm{t}(\mu) > 30\ \mathrm{GeV} \qquad 0.9 < |\eta(\mu)| < 2.4')
+
+with open(output+'/MCCorrections_'+ eff_ZcTIsoMu27.name + '.json', 'w') as file:
+    file.write(json.dumps(eff_ZcTIsoMu27.fitResults, sort_keys=True, indent=4))
 
 # --- differential efficiencies
 # zMCEff1D(dfGen, np.linspace(0., 5., 20), 'delRLL')
