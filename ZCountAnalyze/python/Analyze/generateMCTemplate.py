@@ -35,6 +35,16 @@ if (len(treeName) > 1):
     exit()
 
 
+dfPV = [tree_to_df(root2array(i, treeName[0], branches=['nPV']), 5) for i in inputs]
+dfPV = pd.concat(dfPV)
+
+hPV = ROOT.TH1D("hPV", "th1d number of primary vertices shape", 75, -0.5, 74.5)
+
+for nPV in dfPV['nPV']:
+    hPV.Fill(nPV)
+
+hPV.Scale(1. / hPV.Integral())
+
 # acceptance selection
 selection = 'z_recoMass > 66 ' \
             '& z_recoMass < 116 ' \
@@ -115,6 +125,8 @@ tfile = ROOT.TFile.Open(output+"/template_HLT.root", "RECREATE")
 
 ttree = array2tree(dfOut.to_records(index=False))
 ttree.Write()
+hPV.Write()
+
 ttree.Delete()
 
 tfile.Close()
@@ -142,6 +154,7 @@ tfile = ROOT.TFile.Open(output+"/template_Sel.root", "RECREATE")
 
 ttree = array2tree(dfOut.to_records(index=False))
 ttree.Write()
+hPV.Write()
 ttree.Delete()
 
 tfile.Close()
@@ -169,5 +182,8 @@ tfile = ROOT.TFile.Open(output+"/template_Glo.root", "RECREATE")
 ttree = array2tree(dfOut.to_records(index=False))
 ttree.Write()
 ttree.Delete()
+hPV.Write()
 
 tfile.Close()
+
+hPV.Delete()
