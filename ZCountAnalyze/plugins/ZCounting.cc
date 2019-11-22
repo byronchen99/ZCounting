@@ -11,7 +11,6 @@
      Select events which have:
         - a decay of Z to mu mu
         - available generator level information of both muons
-        - at least one good primary vertex
      Store:
         - information of the gen muons
         - information of the corresponding reco muons (if given)
@@ -98,6 +97,8 @@ private:
     int getMuonID(const pat::Muon&, const reco::Vertex&);
     double dxy(const pat::Muon&, const reco::Vertex&);
     double dz(const pat::Muon&, const reco::Vertex&);
+    double pointsDistance(const reco::Candidate::Point&, const reco::Candidate::Point&);
+    bool isPVClosestVertex(const std::vector<reco::Vertex>&, const pat::Muon&);
 
     // ----------member data ---------------------------
 
@@ -125,6 +126,7 @@ private:
     // --- output
     int nPU_;
     int nPV_;
+    int decayMode_;
 
     int muon_recoMatches_;
     bool muon_hasRecoObj_;
@@ -140,6 +142,8 @@ private:
     float muon_genPt_;
     float muon_genEta_;
     float muon_genPhi_;
+    bool muon_isFromPV_;
+    float muon_genVtxToPV_;
 
     int antiMuon_recoMatches_;
     bool antiMuon_hasRecoObj_;
@@ -155,6 +159,8 @@ private:
     float antiMuon_genPt_;
     float antiMuon_genEta_;
     float antiMuon_genPhi_;
+    bool antiMuon_isFromPV_;
+    float antiMuon_genVtxToPV_;
 
     float z_genMass_;
     float z_recoMass_;
@@ -214,20 +220,9 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     iEvent.getByToken(genZCollection_, genZCollection);
     iEvent.getByToken(pileupInfoCollection_, pileupInfoCollection);
 
-    // only keep Z -> mu mu
-    if(!genZCollection->size() || genZCollection->at(0).decayMode() != 13) return;
+    decayMode_ = (genZCollection->size() != 0 ? genZCollection->at(0).decayMode() : 0);
 
-    // PV selection
-    const std::vector<reco::Vertex> *pvCol = pvCollection.product();
-    reco::Vertex pv = *pvCol->begin();
-    nPV_ = 0;
-    for (auto const& itVtx : *pvCollection) {
-        if(!isGoodPV(itVtx))
-            continue;
-        if (nPV_ == 0)
-            pv = itVtx;
-        nPV_++;
-    }
+    //ZBoson->vertex().Coordinates().x();
 
     edm::LogVerbatim("ZCounting") << "get trigger objects";
     const edm::TriggerNames &triggerNames = iEvent.triggerNames(*triggerBits);
@@ -238,6 +233,23 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     const reco::GenParticle *ZAntiLepton = genZCollection->at(0).stableAntiLepton();
 
     if(!ZLepton || ! ZAntiLepton) return;
+
+    // PV selection
+    const std::vector<reco::Vertex> *pvCol = pvCollection.product();
+    reco::Vertex pv = *pvCol->begin();
+    nPV_ = 0;
+    for (auto const& itVtx : *pvCol) {
+        if(!isGoodPV(itVtx))
+            continue;
+        if (nPV_ == 0)
+            pv = itVtx;
+        nPV_++;
+    }
+
+    if(nPV_){
+        muon_genVtxToPV_ = pointsDistance(pv.position(), ZLepton->vertex());
+        antiMuon_genVtxToPV_ = pointsDistance(pv.position(), ZAntiLepton->vertex());
+    }
 
     muon_genPt_ = ZLepton->pt();
     muon_genEta_ = ZLepton->eta();
@@ -268,6 +280,8 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
             muon_dxy_ = dxy(mu, pv);
             muon_dz_ = dz(mu, pv);
 
+            muon_isFromPV_ = isPVClosestVertex(*pvCol, mu);
+
             for(unsigned j = 0, m = muonTriggerPatterns_.size(); j < m; ++j){
                 std::vector<pat::TriggerObjectStandAlone> tObjCol = get_muonTriggerObjects(*triggerObjects, triggerNames, muonTriggerPatterns_.at(j));
                 muon_triggerBits_ += std::pow(2,j) * isTriggerObject(tObjCol, mu);
@@ -286,6 +300,8 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
             antiMuon_pfIso_ = pfIso(mu);
             antiMuon_dxy_ = dxy(mu, pv);
             antiMuon_dz_ = dz(mu, pv);
+
+            antiMuon_isFromPV_ = isPVClosestVertex(*pvCol, mu);
 
             for(unsigned j = 0, m = muonTriggerPatterns_.size(); j < m; ++j){
                 std::vector<pat::TriggerObjectStandAlone> tObjCol = get_muonTriggerObjects(*triggerObjects, triggerNames, muonTriggerPatterns_.at(j));
@@ -321,6 +337,7 @@ ZCounting::beginJob()
 
     tree_->Branch("nPV", &nPV_,"nPV_/i");
     tree_->Branch("nPU", &nPU_,"nPU_/i");
+    tree_->Branch("decayMode", &decayMode_, "decayMode_/i");
 
     tree_->Branch("muon_recoMatches", &muon_recoMatches_,"muon_recoMatches_/i");
     tree_->Branch("muon_hasRecoObj", &muon_hasRecoObj_,"muon_hasRecoObj_/b");
@@ -336,6 +353,8 @@ ZCounting::beginJob()
     tree_->Branch("muon_genPt", &muon_genPt_,"muon_genPt_/f");
     tree_->Branch("muon_genEta", &muon_genEta_,"muon_genEta_/f");
     tree_->Branch("muon_genPhi", &muon_genPhi_,"muon_genPhi_/f");
+    tree_->Branch("muon_isFromPV", &muon_isFromPV_,"muon_isFromPV_/b");
+    tree_->Branch("muon_genVtxToPV", &muon_genVtxToPV_,"muon_genVtxToPV_/f");
 
     tree_->Branch("antiMuon_recoMatches", &antiMuon_recoMatches_,"antiMuon_recoMatches_/i");
     tree_->Branch("antiMuon_hasRecoObj", &antiMuon_hasRecoObj_,"antiMuon_hasRecoObj_/b");
@@ -351,6 +370,8 @@ ZCounting::beginJob()
     tree_->Branch("antiMuon_genPt", &antiMuon_genPt_,"antiMuon_genPt_/f");
     tree_->Branch("antiMuon_genEta", &antiMuon_genEta_,"antiMuon_genEta_/f");
     tree_->Branch("antiMuon_genPhi", &antiMuon_genPhi_,"antiMuon_genPhi_/f");
+    tree_->Branch("antiMuon_isFromPV", &antiMuon_isFromPV_,"antiMuon_isFromPV_/b");
+    tree_->Branch("antiMuon_genVtxToPV", &antiMuon_genVtxToPV_,"antiMuon_genVtxToPV_/f");
 
     tree_->Branch("z_genMass", &z_genMass_,"z_genMass_/f");
     tree_->Branch("z_recoMass", &z_recoMass_,"z_recoMass_/f");
@@ -379,6 +400,7 @@ void ZCounting::clearVariables(){
 
     nPV_ = 0;
     nPU_ = 0;
+    decayMode_ = 0;
 
     muon_recoMatches_ = 0;
     muon_hasRecoObj_ = false;
@@ -394,6 +416,9 @@ void ZCounting::clearVariables(){
     muon_genPt_ = 0.;
     muon_genEta_ = 0.;
     muon_genPhi_ = 0.;
+    muon_isFromPV_ = 0;
+    muon_genVtxToPV_ = -1;
+
 
     antiMuon_recoMatches_ = 0;
     antiMuon_hasRecoObj_ = false;
@@ -409,6 +434,8 @@ void ZCounting::clearVariables(){
     antiMuon_genPt_ = 0.;
     antiMuon_genEta_ = 0.;
     antiMuon_genPhi_ = 0.;
+    antiMuon_isFromPV_ = 0;
+    antiMuon_genVtxToPV_ = -1;
 
     z_genMass_ = 0.;
     z_recoMass_ = 0.;
@@ -561,6 +588,32 @@ double ZCounting::dxy(const pat::Muon &mu, const reco::Vertex &vtx){
 //--------------------------------------------------------------------------------------------------
 double ZCounting::dz(const pat::Muon &mu, const reco::Vertex &vtx){
     return fabs(mu.muonBestTrack()->dz(vtx.position()));
+}
+
+//--------------------------------------------------------------------------------------------------
+double ZCounting::pointsDistance(const reco::Candidate::Point &p1, const reco::Candidate::Point &p2){
+    // computes the euclidean distance of two points
+    return std::sqrt(std::pow(p1.x() - p2.x(),2) + std::pow(p1.y() - p2.y(),2) + std::pow(p1.z() - p2.z(),2));
+}
+
+//--------------------------------------------------------------------------------------------------
+bool ZCounting::isPVClosestVertex(const std::vector<reco::Vertex> &vtxCol, const pat::Muon &mu){
+    reco::Vertex vtx = *vtxCol.begin();
+    double minDist = 999.;
+    int nPV = 0;
+    for (auto const& itVtx : vtxCol) {
+        if(!isGoodPV(itVtx))
+            continue;
+        const float dist = pointsDistance(itVtx.position(), mu.vertex());
+        if (dist < minDist){
+            vtx = itVtx;
+            minDist = dist;
+            if(nPV > 0)
+                return false;
+        }
+        nPV++;
+    }
+    return true;
 }
 
 //define this as a plug-in
