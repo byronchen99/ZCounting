@@ -1,0 +1,183 @@
+#!/usr/bin/env python
+
+def zmonitoring(dirDQM, dirOut, byLsCSV, mcCorrections, sigTemplates, ptCut, runlist = None):
+    import os
+    import pandas as pd
+    import glob
+    import subprocess
+    import json
+
+    if runlist == None:
+        print("create runlist from byLsCSV file")
+        with open(byLsCSV) as file:
+            byLS_lines = file.readlines()
+        byLS_data = pd.read_csv(byLsCSV, sep=',', low_memory=False,
+                           skiprows=lambda x: byLS_lines[x].startswith('#') and not byLS_lines[x].startswith('#run'))
+        runlist = byLS_data['#run:fill'].str.split(':', expand=True)[0].drop_duplicates().tolist()
+
+    cmsswbase = os.environ['CMSSW_BASE']
+    if not cmsswbase:
+        print("please set cmsenv")
+        exit()
+
+    cs_file = open("cs_tmp.sub", "w")
+
+    cs_file.write("executable  = runZCountingOnBatch.sh \n")
+    cs_file.write("output      = condor/$(ClusterId).$(ProcId).out \n")
+    cs_file.write("error       = condor/$(ClusterId).$(ProcId).err \n")
+    cs_file.write("log         = condor/$(ClusterId).$(ProcId).log \n")
+    cs_file.write("+JobFlavour =\"workday\" \n")
+
+    runs = []
+    for run in runlist:
+        if len(glob.glob(dirDQM+"/000*/*{0}*.root".format(run))) == 0:
+            continue
+        runs.append(run)
+        cs_file.write("arguments  = {0} {1} {2} {3} {4} {5} {6} {7}\n".format(
+            run,
+            cmsswbase,
+            dirDQM,
+            byLsCSV,
+            dirOut,
+            mcCorrections,
+            sigTemplates,
+            ptCut
+    	))
+
+        cs_file.write("queue\n")
+    cs_file.close()
+
+    out = os.popen("condor_submit cs_tmp.sub").read()
+    print(out)
+    os.system("rm cs_tmp.sub")
+
+    out = out.split("\n")[-2].split(" ")
+    njobs = int(out[0])
+    clusterId = int(out[-1][:-1])
+
+    # create jobinformation
+    ji = {
+        'process' : 'zmonitoring',
+        'dirDQM': dirDQM,
+        'dirOut': dirOut,
+        'byLsCSV': byLsCSV,
+        'mcCorrections': mcCorrections,
+        'sigTemplates': sigTemplates,
+        'ptCut': ptCut,
+        'runs': runs,
+        'njobs': njobs,
+        'clusterId': clusterId
+    }
+    # write jobinformation
+    if not os.path.isdir(dirOut):
+        os.mkdir(dirOut)
+    with open(dirOut+'/jobinfo.json'.format(clusterId), 'w') as f:
+        json.dump(ji, f, indent=4, separators=(',', ': '))
+
+def check(projectdir, resubmit=False):
+    import os
+    import json
+
+    with open(projectdir+'/jobinfo.json', 'r') as f:
+        ji = json.load(f)
+
+    if resubmit:
+        from subprocess import call
+    else:
+        def call(name, **opts):
+            print(name)
+
+    unfinished_jobs = []
+    for ijob in range(ji['njobs']):
+        outfilename = "condor/{0}.{1}.err".format(ji['clusterId'], ijob)
+        if not os.path.isfile(outfilename):
+            unfinished_jobs.append(ijob)
+            continue
+        with open(outfilename, "r") as f:
+            lastline = f.readlines()[-1]
+        if lastline != "INFO: ===Done\n":
+            unfinished_jobs.append(ijob)
+    if len(unfinished_jobs) == 0:
+        print("all jobs done!")
+    else:
+        print("unfinished jobs: {0}".format(unfinished_jobs))
+        if resubmit:
+            print("resubmit unfinished jobs")
+            if not os.path.isdir(projectdir+'/failed'):
+                os.mkdir(projectdir+'/failed')
+                os.mkdir(projectdir+'/failed/csvFiles')
+            os.system("mv {0}/jobinfo.json {0}/jobinfo{1}.json".format(projectdir, ji['clusterId']))
+
+            if ji['process'] == 'zmonitoring':
+                for ijob in unfinished_jobs:
+                    
+                    runDir = "{0}/Run{1}".format(projectdir, ji['runs'][ijob])
+                    if os.path.isdir(runDir):
+                        os.system("mv {0} {1}/failed/".format(runDir, projectdir))
+
+                    csvFile = "{0}/csvFiles/csvfile{1}.csv".format(projectdir, ji['runs'][ijob])
+                    if os.path.isfile(csvFile):
+                        os.system("mv {0} {1}/failed/csvFiles/".format(csvFile, projectdir))
+
+                zmonitoring(ji['dirDQM'], ji['dirOut'], ji['byLsCSV'], ji['mcCorrections'], ji['sigTemplates'], ji['ptCut'],
+                            runlist=[ji['runs'][i] for i in unfinished_jobs])
+
+
+# ------------------------------------------------------------------------------
+# parse command line arguments
+if __name__ == '__main__':
+    # setup argument parser
+    import argparse
+    parser = argparse.ArgumentParser(prog='./submit')
+    subparsers = parser.add_subparsers(dest='subparser')
+
+    # command line arguments: zmonitoring
+    parserA = subparsers.add_parser(
+        'zmonitoring',
+        help='submit ZMonitoring jobs to HTCondor'
+    )
+    parserA.add_argument(
+        '-i', '--inputDQM', type=str, required=True,
+        help='specify directory to input histogram .root files'
+    )
+    parserA.add_argument(
+        '--mcCorrections', default='./Resources/MCCorrections.json', type=str,
+        help='specify .json file with MC corrections for muon correlations'
+    )
+    parserA.add_argument(
+        '--sigTemplates', default='./Resources/MCTemplates', type=str,
+        help='specify directory with MC template root tree files for signal shapes'
+    )
+    parserA.add_argument(
+        '--byLS', default=None, type=str,
+        help='specify byLS.json to select specific lumi sections'
+    )
+    parserA.add_argument(
+        '--ptCut', type=float,
+        help='specify lower pt cut on tag and probe muons'
+    )
+    parserA.add_argument(
+        '-o', '--output', default='./',
+        help='specify output dir'
+    )
+
+    # command line arguments: check
+    parserC = subparsers.add_parser(
+        'check',
+        help='submit ZMonitoring jobs to HTCondor'
+    )
+    parserC.add_argument(
+        '-i', '--project', type=str, required=True,
+        help='specify directory to jobinfo.json file'
+    )
+    parserC.add_argument(
+        '--resubmit', default=False, action="store_true",
+        help='to resubmit failed jobs'
+    )
+
+    # parse arguments and call subparser
+    args = parser.parse_args()
+    if args.subparser == 'zmonitoring':
+        zmonitoring(args.inputDQM, args.output, args.byLS, args.mcCorrections, args.sigTemplates, args.ptCut)
+    if args.subparser == 'check':
+        check(args.project, args.resubmit)

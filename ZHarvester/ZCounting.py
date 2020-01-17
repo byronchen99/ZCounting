@@ -524,3 +524,5 @@ if args.writeSummaryCSV:
 
     with open(outCSVDir + 'Mergedcsvfile.csv', 'w') as file:
         df_merged.to_csv(file, index=False)
+
+log.info("===Done")

@@ -241,10 +241,12 @@ std::vector<float> calculateDataEfficiency(
 ){
 
   CPlot::sOutDir = outputDir;
+  gSystem->cd(outputDir);
 
   // Generate histogram templates from MC if necessary
-  if(sigModPass==2 || sigModFail==2) generateTemplate(mcfilename, ptCutTag, ptCutProbe, hPV);
-
+  if(sigModPass==2 || sigModFail==2) {
+    generateTemplate(mcfilename, ptCutTag, ptCutProbe, hPV);
+  }
   // Calculate efficiency and save results to plots and histograms
   TCanvas *cpass = MakeCanvas("cpass","cpass",720,540);
   cpass->SetWindowPosition(cpass->GetWindowTopX()+cpass->GetBorderSize()+800,0);
@@ -340,7 +342,7 @@ void generateTemplate(
     }
   }
 
-  TFile outfile("histTemplates.root", "RECREATE");
+  TFile outfile = TFile("histTemplates.root", "RECREATE");
   h_mass_pass_central->Write();
   h_mass_fail_central->Write();
   h_mass_pass_forward->Write();
