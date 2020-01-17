@@ -164,7 +164,7 @@ class Efficiency:
 
         nZAcc = len(df)
 
-        query = 'muon_recoMatches == 1 & antiMuon_recoMatches ==1 ' \
+        query = 'muon_recoMatches == 1 & antiMuon_recoMatches == 1 ' \
                 '& muon_ID>={0} & antiMuon_ID>={0} ' \
                 '& muon_pfIso >= {1} & antiMuon_pfIso >= {1} ' \
                 '& muon_tkIso >= {2} & antiMuon_tkIso >= {2}'.format(self.ID, self.pfIso, self.tkIso)
@@ -239,7 +239,8 @@ selection = 'z_genMass > 66 ' \
             '& abs(muon_genEta) < 2.4 ' \
             '& abs(antiMuon_genEta) < 2.4 ' \
             '& muon_recoMatches <= 1' \
-            '& antiMuon_recoMatches <= 1'
+            '& antiMuon_recoMatches <= 1' \
+            '& (decayMode == 13 | decayMode == 151313)'
 
 # specify which branches to load
 branches = ['nPV', 'nPU', 'z_recoMass', 'z_genMass',
@@ -258,17 +259,18 @@ dfGen = [tree_to_df(root2array(i, treeName[0], selection=selection, branches=bra
 dfGen = pd.concat(dfGen)
 
 print(">>> add new columns")
-dfGen['delPhiLL'] = abs(
-    abs(dfGen['muon_genPhi'] - dfGen['antiMuon_genPhi']).apply(lambda x: x - 2 * math.pi if x > math.pi else x))
-dfGen['delEtaLL'] = abs(dfGen['muon_genEta'] - dfGen['antiMuon_genEta'])
-dfGen['delRLL'] = np.sqrt(
-    (dfGen['muon_genEta'] - dfGen['antiMuon_genEta']) ** 2 + (dfGen['muon_genPhi'] - dfGen['antiMuon_genPhi']) ** 2)
-dfGen['delPtLL'] = abs(dfGen['muon_genPt'] - dfGen['antiMuon_genPt'])
-dfGen['relPtLL'] = abs(dfGen['muon_genPt'] - dfGen['antiMuon_genPt']) / abs(
-    dfGen['muon_genPt'] + dfGen['antiMuon_genPt'])
-dfGen['sumPtLL'] = dfGen['muon_genPt'] + dfGen['antiMuon_genPt']
+#dfGen['delPhiLL'] = abs(
+#    abs(dfGen['muon_genPhi'] - dfGen['antiMuon_genPhi']).apply(lambda x: x - 2 * math.pi if x > math.pi else x))
+#dfGen['delEtaLL'] = abs(dfGen['muon_genEta'] - dfGen['antiMuon_genEta'])
+#dfGen['delRLL'] = np.sqrt(
+#    (dfGen['muon_genEta'] - dfGen['antiMuon_genEta']) ** 2 + (dfGen['muon_genPhi'] - dfGen['antiMuon_genPhi']) ** 2)
+#dfGen['delPtLL'] = abs(dfGen['muon_genPt'] - dfGen['antiMuon_genPt'])
+#dfGen['relPtLL'] = abs(dfGen['muon_genPt'] - dfGen['antiMuon_genPt']) / abs(
+#    dfGen['muon_genPt'] + dfGen['antiMuon_genPt'])
+#dfGen['sumPtLL'] = dfGen['muon_genPt'] + dfGen['antiMuon_genPt']
 
 #dfGen = dfGen.query('delRLL > 0.4')
+
 
 print(">>> convert bit code into bit map")
 for iBit in range(0, 5):
@@ -281,31 +283,32 @@ for iBit in range(0, 5):
 
 # --- define Efficiencies
 # Efficiency("ZNoID", 0, 0, 0)
-# Efficiency("ZTrk", 1, 0, 0)
-# Efficiency("ZGlobal", 3, 0, 0)
-# Efficiency("ZcTight", 4, 0, 0)
-# Efficiency("ZTight", 5, 0, 0)
+#Efficiency("ZTrk", 1, 0, 0)
+#Efficiency("ZGlobal", 3, 0, 0)
+#Efficiency("ZcTight", 4, 0, 0)
+#Efficiency("ZTight", 5, 0, 0)
 #Efficiency("ZTightIsoMu27", 5, 0, 0, 4, '$\mathrm{HLT\_IsoMu27\_v^{*}}$')
 # Efficiency("ZcTightL1SMu18", 4, 0, 0, 1, '$\mathrm{HLT\_L1SingleMu18\_v^{*}}$')
 # Efficiency("ZcTightL1SMu25", 4, 0, 0, 2, '$\mathrm{HLT\_L1SingleMu25\_v^{*}}$')
 #eff_ZcTIsoMu24 = Efficiency("ZcTightIsoMu24", 4, 0, 0, 3, '$\mathrm{HLT\_IsoMu24\_v^{*}}$')
-eff_ZcTIsoMu27 = Efficiency("ZcTightIsoMu27", 4, 0, 0, 4, '$\mathrm{HLT\_IsoMu27\_v^{*}}$')
+#eff_ZcTIsoMu27 = Efficiency("ZcTightIsoMu27", 4, 0, 0, 4, '$\mathrm{HLT\_IsoMu27\_v^{*}}$')
 # Efficiency("ZcTightIsoMu30", 4, 0, 0, 5, '$\mathrm{HLT\_IsoMu30\_v^{*}}$')
+eff_ZTightIDIsoMu27 = Efficiency("ZTightID_IsoMu27", 5, 0, 0, 4, '$\mathrm{HLT\_IsoMu27\_v^{*}}$')
 
-zMCEff1D(dfGen, np.linspace(0.5, 74.5, 25), 'nPV', 'inclusive')
-zMCEff1D(dfGen, np.linspace(0.5, 74.5, 15), 'nPV', 'BB',
+zMCEff1D(dfGen, np.linspace(0.5, 74.5, 25), 'nPU', 'inclusive')
+zMCEff1D(dfGen, np.linspace(0.5, 74.5, 15), 'nPU', 'BB',
          sel='abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) < 0.9',
          cutsPtEta='p_\mathrm{t}(\mu) > 30\ \mathrm{GeV} \qquad |\eta(\mu)| < 0.9')
 
-zMCEff1D(dfGen, np.linspace(0.5, 74.5, 15), 'nPV', 'BE',
+zMCEff1D(dfGen, np.linspace(0.5, 74.5, 15), 'nPU', 'BE',
        sel='(abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) > 0.9) | (abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) < 0.9)')
 
-zMCEff1D(dfGen, np.linspace(0.5, 74.5, 15), 'nPV', 'EE',
+zMCEff1D(dfGen, np.linspace(0.5, 74.5, 15), 'nPU', 'EE',
          sel='abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) > 0.9',
          cutsPtEta='p_\mathrm{t}(\mu) > 30\ \mathrm{GeV} \qquad 0.9 < |\eta(\mu)| < 2.4')
 
-with open(output+'/MCCorrections_'+ eff_ZcTIsoMu27.name + '.json', 'w') as file:
-    file.write(json.dumps(eff_ZcTIsoMu27.fitResults, sort_keys=True, indent=4))
+with open(output+'/MCCorrections_nPU_'+ eff_ZTightIDIsoMu27.name + '.json', 'w') as file:
+    file.write(json.dumps(eff_ZTightIDIsoMu27.fitResults, sort_keys=True, indent=4))
 
 # --- differential efficiencies
 # zMCEff1D(dfGen, np.linspace(0., 5., 20), 'delRLL')

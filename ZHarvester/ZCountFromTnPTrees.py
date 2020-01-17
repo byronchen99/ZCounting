@@ -17,20 +17,28 @@ parser.add_argument(
     help='specify input tnp root files'
 )
 parser.add_argument(
-    '--mcCorrections', default='./Resources/MCCorrections_ZcTightIsoMu24.json', type=str,
-    help='specify mc dir'
+    '--mcCorrections', default='./Resources/MCCorrections.json', type=str,
+    help='specify .json file with MC corrections for muon correlations'
+)
+parser.add_argument(
+    '--sigTemplates', default='./Resources/MCTemplates', type=str,
+    help='specify directory with MC template root tree files for signal shapes'
+)
+parser.add_argument(
+    '--byLS', default=None, type=str,
+    help='specify byLS.json to select specific lumi sections'
 )
 parser.add_argument(
     '--ptCut', type=float,
     help='specify lower pt cut on tag and probe muons'
 )
 parser.add_argument(
-    '--lumi', nargs=2, default=[1, 1], type=float,
-    help='specify luminosity and its relative uncertainty'
+    '--tkIso', default=999., type=float,
+    help='specify tracker isolation cut for the HLT criteria'
 )
 parser.add_argument(
-    '--frac', default=1., type=float,
-    help='specify random fraction to take for fit'
+    '--lumi', nargs=3, default=[1, 1, 1], type=float,
+    help='specify delivered, recorded luminosity in pb^-1 and its relative uncertainty'
 )
 parser.add_argument(
     '-o', '--output', default='./',
@@ -41,14 +49,16 @@ args = parser.parse_args()
 inputs = args.input
 output = args.output
 mcCorr = args.mcCorrections
-dataFraction = args.frac
+sigTemplates = args.sigTemplates
+byLS_file = args.byLS
 
 ptCut = args.ptCut
-Lumi, Lumi_Erel = args.lumi
+tkIsoCut = args.tkIso
+lumiDel, lumiRec, lumi_Erel = args.lumi
 
-sigTemplate = '/nfs/dust/cms/user/dwalter/CMSSW_10_2_13/src/ZCounting/ZHarvester/Resources/sigTemplates_mergedCP1CP5/'
-bkgTemplateQCD = '/nfs/dust/cms/user/dwalter/CMSSW_10_2_13/src/ZCounting/ZHarvester/Resources/bkgTemplate_SameSignData_Pt30.root'
-bkgTemplateTT = '/nfs/dust/cms/user/dwalter/CMSSW_10_2_13/src/ZCounting/ZHarvester/Resources/bkgTemplate_TTbar_Pt30.root'
+bkgTemplateQCD = ""
+bkgTemplateTT = ""
+
 
 ROOT.gROOT.LoadMacro(os.path.dirname(os.path.realpath(__file__)) + "/calculateDataEfficiency.C")
 ROOT.gROOT.SetBatch(True)
@@ -77,14 +87,15 @@ ZBERate = 0.117200
 ZEERate = 0.105541
 
 # acceptance selection
-selection = 'pt1 > {0} & pt2 > {0} & tkIso1/pt1<0.05'.format(ptCut)  # 'dilepMass > 66 ' \
-# '& dilepMass < 116 ' \
+selection = 'dilepMass > 66 & dilepMass < 116 & pt1 > {0} & pt2 > {0} & tkIso1/pt1 < {1}'.format(ptCut, tkIsoCut)  # ' ' \
+# '  ' \
 
 # specify which branches to load
 branches = ['nPV', 'dilepMass',  # 'eventNumber', 'run', 'ls',
             'is2HLT', 'isSel', 'isGlo', 'isSta', 'isTrk',
             'pt2', 'tkIso2',
             'eta1', 'eta2',
+            'run','ls'
             ]
 
 print(">>> Load Events")
@@ -92,10 +103,15 @@ df = [tree_to_df(root2array(i, treeName[0], selection=selection, branches=branch
 print(">>> Concatenate")
 df = pd.concat(df)
 
-df = df.sample(frac=dataFraction)
+if byLS_file is not None:
+    with open(byLS_file) as json_file:
+        byLS = json.load(json_file)
+    print(">>> select good ls from byLS.json")
+    df = df.query('|'.join(['(run == {0} & ls >= {1} & ls <= {2})'.format(run,ls_start,ls_end) for run, ls_bounds in byLS.items() for ls_start, ls_end in ls_bounds]))
 
-df['is2HLT'] = df['is2HLT'] * (df['tkIso2'] / df['pt2'] < 0.05)
-df['isSel'] = df['isSel'] + df['is2HLT'] * (df['tkIso2'] / df['pt2'] > 0.05)
+
+df['is2HLT'] = df['is2HLT'] * (df['tkIso2'] / df['pt2'] < tkIsoCut)
+df['isSel'] = df['isSel'] + df['is2HLT'] * (df['tkIso2'] / df['pt2'] > tkIsoCut)
 
 hZReco = TH1D("hZReco", "th1d Z reco", MassBin, MassMin, MassMax)
 hPV = TH1D("hPV_data", "th1d number of primary vertices shape", 75, -0.5, 74.5)
@@ -147,7 +163,6 @@ for p in df.query("(isSta==1 | isTrk==1) & abs(eta2) < 0.9")['dilepMass']:
     hFailGloB.Fill(p)
 
 # --- endcap
-
 for t in df.query("is2HLT==1 & abs(eta1) > 0.9")['dilepMass']:
     hPassHLTE.Fill(t)
     hPassSelE.Fill(t)
@@ -183,30 +198,33 @@ result = []
 
 
 def calculateEfficiencies(sigShapes, bkgShapes, outp):
+    if not os.path.isdir(outp):
+        os.mkdir(outp)
+
     effGloB = ROOT.calculateDataEfficiency(hPassGloB, hFailGloB, outp, 0, "Glo", 0,
                                            sigShapes[0], bkgShapes[0], sigShapes[1], bkgShapes[1], ptCut, ptCut, 0,
                                            # hPV,
-                                           Lumi, sigTemplate + "template_Glo.root", bkgTemplateQCD, bkgTemplateTT)
+                                           lumiRec, sigTemplates + "template_Glo.root", bkgTemplateQCD, bkgTemplateTT)
     effGloE = ROOT.calculateDataEfficiency(hPassGloE, hFailGloE, outp, 0, "Glo", 1,
                                            sigShapes[0], bkgShapes[0], sigShapes[1], bkgShapes[1], ptCut, ptCut, 0,
                                            # hPV,
-                                           Lumi, sigTemplate + "template_Glo.root", bkgTemplateQCD, bkgTemplateTT)
+                                           lumiRec, sigTemplates + "template_Glo.root", bkgTemplateQCD, bkgTemplateTT)
     effSelB = ROOT.calculateDataEfficiency(hPassSelB, hFailSelB, outp, 0, "Sel", 0,
                                            sigShapes[2], bkgShapes[2], sigShapes[3], bkgShapes[3], ptCut, ptCut, 0,
                                            # hPV,
-                                           Lumi, sigTemplate + "template_Sel.root", bkgTemplateQCD, bkgTemplateTT)
+                                           lumiRec, sigTemplates + "template_Sel.root", bkgTemplateQCD, bkgTemplateTT)
     effSelE = ROOT.calculateDataEfficiency(hPassSelE, hFailSelE, outp, 0, "Sel", 1,
                                            sigShapes[2], bkgShapes[2], sigShapes[3], bkgShapes[3], ptCut, ptCut, 0,
                                            # hPV,
-                                           Lumi, sigTemplate + "template_Sel.root", bkgTemplateQCD, bkgTemplateTT)
+                                           lumiRec, sigTemplates + "template_Sel.root", bkgTemplateQCD, bkgTemplateTT)
     effHLTB = ROOT.calculateDataEfficiency(hPassHLTB, hFailHLTB, outp, 0, "HLT", 0,
                                            sigShapes[4], bkgShapes[4], sigShapes[5], bkgShapes[5], ptCut, ptCut, 0,
                                            # hPV,
-                                           Lumi, sigTemplate + "template_HLT.root", bkgTemplateQCD, bkgTemplateTT)
+                                           lumiRec, sigTemplates + "template_HLT.root", bkgTemplateQCD, bkgTemplateTT)
     effHLTE = ROOT.calculateDataEfficiency(hPassHLTE, hFailHLTE, outp, 0, "HLT", 1,
                                            sigShapes[4], bkgShapes[4], sigShapes[5], bkgShapes[5], ptCut, ptCut, 0,
                                            # hPV,
-                                           Lumi, sigTemplate + "template_HLT.root", bkgTemplateQCD, bkgTemplateTT)
+                                           lumiRec, sigTemplates + "template_HLT.root", bkgTemplateQCD, bkgTemplateTT)
 
     ZBBEff = (effGloB[0] * effGloB[0] * effSelB[0] * effSelB[0] * (1 - (1 - effHLTB[0]) * (1 - effHLTB[0])))
     ZBEEff = (effGloB[0] * effGloE[0] * effSelB[0] * effSelE[0] * (1 - (1 - effHLTB[0]) * (1 - effHLTE[0])))
@@ -253,16 +271,18 @@ def calculateEfficiencies(sigShapes, bkgShapes, outp):
     NZReco = hZReco.GetEntries() * 0.99  # assume 1% fake
     NZReco_EStat = np.sqrt(hZReco.GetEntries()) * 0.99
 
-    NZDeliv = NZReco / ZEff
-    NZDelivMC = NZReco / ZEffMC
+    deadtime = lumiRec / lumiDel
+
+    NZDeliv = NZReco / (ZEff * deadtime)
+    NZDelivMC = NZReco / (ZEffMC * deadtime)
     NZDelivMC_EStat = [0., 0.]
     for i in (0, 1):
         NZDelivMC_EStat[i] = NZDeliv * np.sqrt((NZReco_EStat / NZReco) ** 2 + (ZEff_EStat[i] / ZEffMC) ** 2)
 
-    ZFid = NZDeliv / Lumi
-    ZFidMC = NZDelivMC / Lumi
-    ZFidMC_EStat = NZDelivMC_EStat[1] / Lumi
-    ZFidMC_ELumi = ZFidMC * Lumi_Erel
+    ZFid = NZDeliv / lumiDel
+    ZFidMC = NZDelivMC / lumiDel
+    ZFidMC_EStat = NZDelivMC_EStat[1] / lumiDel
+    ZFidMC_ELumi = ZFidMC * lumi_Erel
 
     result.append([sigShapes, bkgShapes,
                    effGloB[0], effGloB[1], effGloE[0], effGloE[1],
@@ -271,7 +291,7 @@ def calculateEfficiencies(sigShapes, bkgShapes, outp):
                    effGloB[3], effGloB[4], effGloE[3], effGloE[4],
                    effSelB[3], effSelB[4], effSelE[3], effSelE[4],
                    effHLTB[3], effHLTB[4], effHLTE[3], effHLTE[4],
-                   ZBBEff, ZBBEff_EStat, ZBEEff, ZBEEff_EStat, ZBEEff, ZBEEff_EStat, ZEEEff, ZEEEff_EStat,
+                   ZBBEff, ZBBEff_EStat, ZBEEff, ZBEEff_EStat, ZEEEff, ZEEEff_EStat,
                    ZEff, ZEff_EStat, ZEffMC,
                    NZReco, NZReco_EStat,
                    NZDeliv, NZDelivMC, NZDelivMC_EStat[1],
@@ -279,10 +299,10 @@ def calculateEfficiencies(sigShapes, bkgShapes, outp):
                    ])
 
 
-calculateEfficiencies([2, 2, 2, 2, 2, 2], [7, 7, 7, 7, 7, 7], output + "/effNominal")
-calculateEfficiencies([2, 2, 2, 2, 2, 2], [5, 2, 5, 2, 5, 5], output + "/effVarBkg")
-calculateEfficiencies([1, 1, 1, 1, 1, 1], [7, 7, 7, 7, 7, 7], output + "/effVarSig")
-calculateEfficiencies([1, 1, 1, 1, 1, 1], [5, 2, 5, 2, 5, 5], output + "/effVarSigVarBkg")
+#calculateEfficiencies([2, 2, 2, 2, 2, 2], [5, 2, 5, 5, 5, 5], output + "/effNominal")
+calculateEfficiencies([2, 2, 2, 2, 2, 2], [2, 2, 1, 1, 5, 5], output + "/effNominal")
+#calculateEfficiencies([1, 1, 1, 1, 1, 1], [7, 7, 7, 7, 7, 7], output + "/effVarSig")
+#calculateEfficiencies([1, 1, 1, 1, 1, 1], [5, 2, 5, 5, 5, 5], output + "/effVarSig")
 
 results = pd.DataFrame(result,
                        columns=['sigShapes', 'bkgShapes',
@@ -292,8 +312,7 @@ results = pd.DataFrame(result,
                                 'effGloB_chi2Pass', 'effGloB_chi2Fail', 'effGloE_chi2Pass', 'effGloE_chi2Fail',
                                 'effSelB_chi2Pass', 'effSelB_chi2Fail', 'effSelE_chi2Pass', 'effSelE_chi2Fail',
                                 'effHLTB_chi2Pass', 'effHLTB_chi2Fail', 'effHLTE_chi2Pass', 'effHLTE_chi2Fail',
-                                'ZBBEff', 'ZBBEff_EStat', 'ZBEEff', 'ZBEEff_EStat', 'ZBEEff', 'ZBEEff_EStat', 'ZEEEff',
-                                'ZEEEff_EStat',
+                                'ZBBEff', 'ZBBEff_EStat', 'ZBEEff', 'ZBEEff_EStat', 'ZEEEff', 'ZEEEff_EStat',
                                 'ZEff', 'ZEff_EStat', 'ZEffMC',
                                 'NZReco', 'NZReco_EStat',
                                 'NZDeliv', 'NZDelivMC', 'NZDelivMC_EStat',
@@ -302,4 +321,3 @@ results = pd.DataFrame(result,
 
 with open(output + '/result.csv', 'w') as file:
     results.to_csv(file)
-    # file.write(json.dumps(result, sort_keys=True, indent=4))

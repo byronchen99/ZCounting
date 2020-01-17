@@ -14,6 +14,7 @@
 #include <fstream>                  // functions for file I/O
 #include <string>                   // C++ string class
 #include <sstream>                  // class for parsing strings
+#include <TPad.h>
 
 #include "Utils/CPlot.hh"             // helper class for plots
 #include "Utils/MitStyleRemix.hh"         // style settings for drawing
@@ -41,7 +42,7 @@
 
 using namespace std;
 
-// Set up fiducial region 
+// Set up fiducial region
 const Float_t massLo  = 66.;
 const Float_t massHi  = 116.;
 const UInt_t  massBin = 50;
@@ -73,53 +74,44 @@ std::vector<double> preFit(TH1D *failHist);
 
 //--------------------------------------------------------------------------------------------------
 std::vector<float> getZyield(
-                const TString inputFile,
+                TH1D *h_yield,
                 const TString outputDir,    // output directory
-                const TString hName,        // Name of the histogram to take the Z yield from
-                const TString runNum,
                 const Int_t   iBin,         // Label of measurement in currect run
-                const Int_t   startLS,
-                const Int_t   endLS,
+                const Int_t   sigMod,
+                const Int_t   bkgMod,
                 const Float_t ptCutTag,
                 const Float_t ptCutProbe,
-                const Int_t   sigMod=0,
-                const Int_t   bkgMod=0,
                 const Float_t lumi=10.,     // luminosity for plot label
                 const TString format="png"  // plot format
 ){
 
-  gSystem->mkdir(outputDir,kTRUE);
-  CPlot::sOutDir = outputDir + TString("/Run") + runNum + TString("/plots");
+  CPlot::sOutDir = outputDir;
 
   TCanvas *cyield = MakeCanvas("cyield","cyield",720,540);
   cyield->SetWindowPosition(cyield->GetWindowTopX()+cyield->GetBorderSize()+800,0);
 
-  TFile *infile = new TFile(inputFile);
 
-  TH2F *h_mass_yield = (TH2F*)infile->Get("DQMData/Run "+runNum+"/ZCounting/Run summary/Histograms/"+hName);
-  TH1D *h_yield = h_mass_yield->ProjectionY("h_yield", startLS, endLS, "e");
-
-  Double_t NsigMax = h_yield->GetEntries();  
-  if(sigMod == 0){      // perform count - not supported
+  Double_t NsigMax = h_yield->GetEntries();
+  if(sigMod == 0){      // perform count - expect 1% faces
     std::vector<float> resultEff = {};
-    resultEff.push_back(NsigMax);
-    resultEff.push_back(std::sqrt(NsigMax));
-    resultEff.push_back(std::sqrt(NsigMax));
+    resultEff.push_back(NsigMax*0.99);
+    resultEff.push_back(std::sqrt(NsigMax)*0.99);
+    resultEff.push_back(std::sqrt(NsigMax)*0.99);
     resultEff.push_back(0.);
-    resultEff.push_back(0.);
+    resultEff.push_back(0.01);
     return resultEff;
-  } 
+  }
 
   RooRealVar m("m","mass",massLo,massHi);
   m.setBins(10000);
 
   CSignalModel     *sigModel = 0;
-  CBackgroundModel *bkgModel = 0;                        
+  CBackgroundModel *bkgModel = 0;
 
   Int_t nfl=0;
 
   if(sigMod == 1){     // perform fit
-    sigModel = new CBreitWignerConvCrystalBall(m,kTRUE);
+    sigModel = new CBreitWignerConvCrystalBall(m, kTRUE, 0);
     nfl += 4;
     if(bkgMod == 1){
       bkgModel = new CExponential(m, kTRUE, 0);
@@ -189,7 +181,7 @@ std::vector<float> getZyield(
   sprintf(yield,"%u Events",(Int_t)NsigMax);
   sprintf(nsigstr,"N_{sig} = %.1f #pm %.1f",a,aErr);
   resChi2 = mframe->chiSquare(nfl);
-  sprintf(chi2str,"#chi^{2}/DOF = %.3f",resChi2);  
+  sprintf(chi2str,"#chi^{2}/DOF = %.3f",resChi2);
 
   if(bkgMod>0)
     sprintf(nbkgstr,"N_{bkg} = %.1f #pm %.1f",b,bErr);
@@ -225,81 +217,6 @@ std::vector<float> getZyield(
 
   return resultEff;
 }
-/*
-//--------------------------------------------------------------------------------------------------
-std::vector<float> calculateDataEfficiency(
-		const TString inputFile,    // DQMIO file 
-		const TString outputDir,    // output directory
-		const TString runNum,       // Runnum
-		const Int_t   iBin,         // Label of measurement in currect run
-		const Int_t   startLS,      // starting LS for currect measurement
-		const Int_t    endLS,        // ending LS for currect measurement
-		const TString effType,      // "HLT" or "SIT" or "Glo" or "Sta" or "Trk"
-		const Bool_t  etaRegion,    // 0 for barrel, 1 for forward 
-		const Int_t   sigModPass,   // signal extraction method for PASS sample
-		const Int_t   bkgModPass,   // background model for PASS sample
-		const Int_t   sigModFail,   // signal extraction method for FAIL sample      
-		const Int_t   bkgModFail,   // background model for FAIL sample
-		const Float_t ptCutTag,     // for generating template and printing cuts on plots
-		const Float_t ptCutProbe,   //
-		const Float_t lumi=10.,     // luminosity for plot label
-        const TString mcfilename="",// ROOT file containing MC events to generate templates from
-        const TString purwDir="",
-		const TString format="png"  // plot format
-){
-
-  gSystem->mkdir(outputDir,kTRUE);
-  CPlot::sOutDir = outputDir + TString("/Run") + runNum + TString("/plots");
-
-  // Generate histogram templates from MC if necessary
-  if(sigModPass==2 || sigModFail==2) generateTemplate(mcfilename, ptCutTag, ptCutProbe);
-
-  // Load the DQMIO file and corresponding histograms
-  TFile *infile = new TFile(inputFile);
-
-  TString region = etaRegion ? "forward" : "central";
-  TH2F *h_mass_lumi_pass = (TH2F*)infile->Get("DQMData/Run "+runNum+"/ZCounting/Run summary/Histograms/h_mass_"+effType+"_pass_"+region);
-  TH2F *h_mass_lumi_fail = (TH2F*)infile->Get("DQMData/Run "+runNum+"/ZCounting/Run summary/Histograms/h_mass_"+effType+"_fail_"+region);
-
-  TH1D *h_mass_pass = h_mass_lumi_pass->ProjectionY("h_mass_pass", startLS, endLS, "e"); 
-  TH1D *h_mass_fail = h_mass_lumi_fail->ProjectionY("h_mass_fail", startLS, endLS, "e");
-
-  // Calculate efficiency and save results to plots and histograms
-  TCanvas *cpass = MakeCanvas("cpass","cpass",720,540);
-  cpass->SetWindowPosition(cpass->GetWindowTopX()+cpass->GetBorderSize()+800,0);
-  TCanvas *cfail = MakeCanvas("cfail","cfail",720,540);
-  cfail->SetWindowPosition(cfail->GetWindowTopX()+cfail->GetBorderSize()+800,cpass->GetWindowTopX()+cfail->GetBorderSize()+540);
-
-  Double_t eff  = 0.;
-  Double_t errl = 0.;
-  Double_t errh = 0.;
-  Double_t chi2pass = 999.;
-  Double_t chi2fail = 999.;
-
-  if(sigModPass == 0){
-    performCount(eff, errl, errh, h_mass_pass, h_mass_fail, ptCutTag, ptCutProbe,
-      cpass, cfail, effType, etaRegion, iBin, lumi, format);
-    //cout << effType.Data() << ": " << eff << " + " << errh << " - " << errl << endl;
-  }else{
-    performFit(eff, errl, errh, chi2pass, chi2fail, h_mass_pass, h_mass_fail,
-      sigModPass, bkgModPass, sigModFail, bkgModFail, ptCutTag, ptCutProbe,
-      cpass, cfail, effType, etaRegion, iBin, lumi, format);
-    //cout << effType.Data() << ": " << eff << " + " << errh << " - " << errl << endl;
-  }
-  delete cpass;
-  delete cfail;
-
-  std::vector<float> resultEff = {};
-
-  resultEff.push_back(eff);
-  resultEff.push_back(errl);
-  resultEff.push_back(errh);
-  resultEff.push_back(chi2pass);
-  resultEff.push_back(chi2fail);
-
-  return resultEff;
-
-}*/
 
 //--------------------------------------------------------------------------------------------------
 std::vector<float> calculateDataEfficiency(
@@ -318,13 +235,12 @@ std::vector<float> calculateDataEfficiency(
         TH1D          *hPV=0,
 		const Float_t lumi=10.,             // luminosity for plot label
         const TString mcfilename="",        // ROOT file containing MC events to generate templates from
-        const TString bkgQCDFilename="",    //ROOT file containing bkg template
+        const TString bkgQCDFilename="",    // ROOT file containing bkg template
         const TString bkgTTFilename="",
 		const TString format="png"          // plot format
 ){
 
-  gSystem->mkdir(outputDir,kTRUE);
-  CPlot::sOutDir = outputDir + TString("/efficiencies");
+  CPlot::sOutDir = outputDir;
 
   // Generate histogram templates from MC if necessary
   if(sigModPass==2 || sigModFail==2) generateTemplate(mcfilename, ptCutTag, ptCutProbe, hPV);
@@ -365,6 +281,7 @@ std::vector<float> calculateDataEfficiency(
 
   return resultEff;
 }
+
 
 //--------------------------------------------------------------------------------------------------
 void generateTemplate(
@@ -452,7 +369,7 @@ void performCount(
   resErrl = resEff - TEfficiency::ClopperPearson((UInt_t)ntotal, (UInt_t)npass, 0.68269, kFALSE);
   resErrh = TEfficiency::ClopperPearson((UInt_t)ntotal, (UInt_t)npass, 0.68269, kTRUE) - resEff;
 
-  // Plot tag and passing- and failing- probe mass distribution 
+  // Plot tag and passing- and failing- probe mass distribution
   char binlabelx[100];
   char binlabely[100];
   char effstr[100];
@@ -497,15 +414,14 @@ void performCount(
 
 //--------------------------------------------------------------------------------------------------
 void performFit(
-	Double_t &resEff, Double_t &resErrl, Double_t &resErrh, Double_t &resChi2Pass, Double_t &resChi2Fail, TH1D *passHist, TH1D *failHist, 
+	Double_t &resEff, Double_t &resErrl, Double_t &resErrh, Double_t &resChi2Pass, Double_t &resChi2Fail, TH1D *passHist, TH1D *failHist,
 	const Int_t sigpass, const Int_t bkgpass, const Int_t sigfail, const Int_t bkgfail,
 	const Float_t ptCutTag, const Float_t ptCutProbe, const TString bkgQCDTemplate, const TString bkgTTTemplate,
 	TCanvas *cpass, TCanvas *cfail, const TString effType, const Bool_t etaRegion, const Int_t iBin, const Float_t lumi, const TString format
 ){
 
   RooRealVar m("m","mass",massLo,massHi);
-  //m.setBins(10000);
-  m.setBins(massBin);
+  m.setBins(10000);
 
   RooCategory sample("sample","");
   sample.defineType("Pass",1);
@@ -522,18 +438,18 @@ void performFit(
                                    RooFit::Import("Pass",*((RooDataHist*)dataPass)),
                                    RooFit::Import("Fail",*((RooDataHist*)dataFail)));
 
-// Inital Pdfs for models 
-// Signal Model: 
-// 	1: Breit-Wigner convolved with Crystal Ball function
-// 	2: MC template convolved with Gaussian
+// Inital Pdfs for models
+// Signal Model:
+// 	    1: Breit-Wigner convolved with Crystal Ball function
+// 	    2: MC template convolved with Gaussian
 // Background Model:
-//  	1: exponential model
-//  	2: quadratic model
-//  	3: exponential + quadratic model
-//  	4: Das (wide gaussian with exponential tails) model
-//  	5: Das + decaying exponential model
+//      1: exponential model
+//      2: quadratic model
+//      3: exponential + quadratic model
+//      4: Das (wide gaussian with exponential tails) model
+//      5: Das + decaying exponential model
 //      6: bkg QCD template
-//      6: bkg QCD + ttbar template
+//      7: bkg QCD + ttbar template
 
 
   TFile *histfile = 0;
@@ -545,6 +461,7 @@ void performFit(
   if(bkgfail== 2 or bkgfail==3){
     vBkgPars = preFit(failHist);
   }
+
   TFile *histbkgQCDfile = 0;
   TFile *histbkgTTfile = 0;
   if(bkgfail== 6 or bkgpass==6 or bkgfail== 7 or bkgpass==7){
@@ -555,7 +472,6 @@ void performFit(
       assert(histbkgTTfile);
     }
   }
-
   TH1D *hbkgQCDPass = 0;
   TH1D *hbkgQCDFail = 0;
   TH1D *hbkgTTPass = 0;
@@ -593,7 +509,7 @@ void performFit(
   switch(sigpass) {
     case 1:
       sprintf(fsigpass, "BW x CB");
-      sigPass = new CBreitWignerConvCrystalBall(m,kTRUE);
+      sigPass = new CBreitWignerConvCrystalBall(m, kTRUE, etaRegion);
       nflpass += 4; break;
     case 2:
       sprintf(fsigpass, "MC x Gaus");
@@ -637,7 +553,7 @@ void performFit(
   switch(sigfail) {
     case 1:
       sprintf(fsigfail, "BW x CB");
-      sigFail = new CBreitWignerConvCrystalBall(m,kFALSE);
+      sigFail = new CBreitWignerConvCrystalBall(m, kFALSE, etaRegion);
       nflfail += 4; break;
     case 2:
       sprintf(fsigfail, "MC x Gaus");
@@ -703,7 +619,7 @@ void performFit(
 
   RooFitResult *fitResult=0;
   Int_t strategy = 2;
-  if(effType == "SIT" or effType == "HLT") {
+  if(effType == "Sel" or effType == "HLT") {
     Nsig.setRange(0,2.0*NsigMax);
     strategy=1;
   }
@@ -742,9 +658,11 @@ void performFit(
   resErrl = fabs(eff.getErrorLo());
   resErrh = eff.getErrorHi();
 
-  // Plot tag and passing- and failing- probe mass distribution 
+  // Plot tag and passing- and failing- probe mass distribution
   char bkgpassname[50];
   char bkgfailname[50];
+  char sigpassname[50];
+  char sigfailname[50];
   char binlabelx[100];
   char binlabely[100];
   char effstr[100];
@@ -755,10 +673,7 @@ void performFit(
   char nsigstr[100];
   char nbkgstr[100];
   char chi2str[100];
-
-  sprintf(bkgpassname, "backgroundPass_%d",etaRegion);
-
-  sprintf(bkgfailname, "backgroundFail_%d",etaRegion);
+  char expstr[50];
 
   if(!etaRegion) sprintf(binlabelx, "0.0 < |#eta| < 0.9");
   else           sprintf(binlabelx, "0.9 < |#eta| < 2.4");
@@ -766,114 +681,122 @@ void performFit(
   sprintf(binlabely, "%i GeV/c < p_{T} < 13000 GeV/c",(Int_t)ptCutProbe);
   sprintf(effstr,"#varepsilon = %.4f_{ -%.4f}^{ +%.4f}",resEff,resErrl,resErrh);
   sprintf(lumitext,"%.1f pb^{-1}  at  #sqrt{s} = 13 TeV",lumi);
-//  sprintf(lumitext,"  %.0f lumi-sections at  #sqrt{s} = 13 TeV",lumi);
   sprintf(ylabel,"Events / 1 GeV/c^{2}");
 
   RooPlot *mframePass = m.frame(Bins(massBin));
   dataPass->plotOn(mframePass,MarkerStyle(kFullCircle),MarkerSize(0.8),DrawOption("ZP"));
-  if(bkgpass>0)
-    modelPass->plotOn(mframePass,Components(bkgpassname),LineColor(kRed));
-    if(bkgfail == 3 or bkgfail == 5 or bkgpass == 7){
-      sprintf(bkgpassname, "bkgPDF1Pass_%d",etaRegion);
-      modelPass->plotOn(mframePass,Components(bkgpassname),LineStyle(kDashed),LineColor(kMagenta));
-      sprintf(bkgpassname, "bkgPDF2Pass_%d",etaRegion);
-      modelPass->plotOn(mframePass,Components(bkgpassname),LineStyle(kDashed),LineColor(kOrange));
-
-      //std::cout<<" === "<<bkgPass->frac->getValV()<<std::endl;
+  if(bkgpass>0){
+    sprintf(bkgpassname, "backgroundPass_%d",etaRegion);
+    modelPass->plotOn(mframePass,Components(bkgpassname),LineColor(8));
+    if(bkgpass == 3 or bkgpass == 5 or bkgpass == 7){
+      sprintf(bkgpassname, "bkg_pdf1Pass_%d",etaRegion);
+      modelPass->plotOn(mframePass,Components(bkgpassname),LineStyle(kDashed),LineColor(8));
+      sprintf(bkgpassname, "bkg_pdf2Pass_%d",etaRegion);
+      modelPass->plotOn(mframePass,Components(bkgpassname),LineStyle(kDashed),LineColor(8));
     }
-
-  modelPass->plotOn(mframePass);
-
-  RooPlot *mframeFail = m.frame(Bins(massBin));
-  dataFail->plotOn(mframeFail,MarkerStyle(kFullCircle),MarkerSize(0.8),DrawOption("ZP"));
-  modelFail->plotOn(mframeFail,Components(bkgfailname),LineColor(kRed));
-  if(bkgfail == 3 or bkgfail == 5 or bkgfail == 7){
-    sprintf(bkgfailname, "bkgPDF1Fail_%d",etaRegion);
-    modelFail->plotOn(mframeFail,Components(bkgfailname),LineStyle(kDashed),LineColor(kMagenta));
-    sprintf(bkgfailname, "bkgPDF2Fail_%d",etaRegion);
-    modelFail->plotOn(mframeFail,Components(bkgfailname),LineStyle(kDashed),LineColor(kOrange));
   }
-  modelFail->plotOn(mframeFail);
+  if(sigpass>0){
+    sprintf(sigpassname, "signalPass_%d",etaRegion);
+    modelPass->plotOn(mframePass,Components(sigpassname),LineColor(9));
+  }
+  modelPass->plotOn(mframePass, LineColor(2));
 
   double a = NsigPass.getVal(), b = NbkgPass.getVal();
-  sprintf(pname,"%s_%s_pass_%d", effType.Data(), etaRegion ? "forward" : "central", iBin);
   sprintf(yield,"%u Events",(Int_t)passHist->GetEntries());
   sprintf(nsigstr,"N_{sig} = %.1f #pm %.1f",NsigPass.getVal(),NsigPass.getPropagatedError(*fitResult));
   sprintf(chi2str,"#chi^{2}/DOF = %.3f",mframePass->chiSquare(nflpass));resChi2Pass = mframePass->chiSquare(nflpass);
   if(bkgpass>0)
     sprintf(nbkgstr,"N_{bkg} = %.1f #pm %.1f",NbkgPass.getVal(),NbkgPass.getPropagatedError(*fitResult));
-  CPlot plotPass(pname,mframePass,"Passing probes","tag-probe mass [GeV/c^{2}]",ylabel);
-  plotPass.AddTextBox(binlabelx,0.21,0.78,0.51,0.83,0,kBlack,-1);
-  plotPass.AddTextBox(binlabely,0.21,0.73,0.51,0.78,0,kBlack,-1);
-  plotPass.AddTextBox(yield,0.21,0.69,0.51,0.73,0,kBlack,-1);
-  plotPass.AddTextBox(fsigpass, 0.21, 0.63, 0.41, 0.67, 0, kBlue, -1, 12);
-  /*if(bkgpass == 3){
-    sprintf(fbkgpass, "quad");   plotPass.AddTextBox(fbkgpass, 0.21, 0.59, 0.41, 0.63, 0, kMagenta, -1, 12);
-    sprintf(fbkgpass, "exp");    plotPass.AddTextBox(fbkgpass, 0.29, 0.59, 0.41, 0.63, 0, kOrange, -1, 12);
-  }
-  else if(bkgpass == 5){
-    sprintf(fbkgpass, "das");   plotPass.AddTextBox(fbkgpass, 0.21, 0.59, 0.41, 0.63, 0, kMagenta, -1, 12);
-    sprintf(fbkgpass, "exp");    plotPass.AddTextBox(fbkgpass, 0.29, 0.59, 0.41, 0.63, 0, kOrange, -1, 12);
-  }*/
-  if(bkgpass == 7){
-    sprintf(fbkgpass, "QCD");   plotPass.AddTextBox(fbkgpass, 0.21, 0.59, 0.41, 0.63, 0, kMagenta, -1, 12);
-    sprintf(fbkgpass, "TT");    plotPass.AddTextBox(fbkgpass, 0.29, 0.59, 0.41, 0.63, 0, kOrange, -1, 12);
-  }
-  else{
-    plotPass.AddTextBox(fbkgpass, 0.21, 0.59, 0.41, 0.63, 0, kRed, -1, 12);
+
+  for(int i=0; i <=1; i++){
+    // do two plots, one with linear scale and one with log scale
+    if(i==1) sprintf(expstr, "_exp");
+    else     sprintf(expstr, "");
+
+    sprintf(pname,"%s_%s_pass_%d%s", effType.Data(), etaRegion ? "forward" : "central", iBin, expstr);
+    CPlot plotPass(pname,mframePass,"Passing probes","tag-probe mass [GeV/c^{2}]",ylabel);
+
+    plotPass.AddTextBox(binlabelx,0.21,0.78,0.51,0.83,0,kBlack,-1);
+    plotPass.AddTextBox(binlabely,0.21,0.73,0.51,0.78,0,kBlack,-1);
+    plotPass.AddTextBox(yield,0.21,0.69,0.51,0.73,0,kBlack,-1);
+    plotPass.AddTextBox(fsigpass, 0.21, 0.63, 0.41, 0.67, 0, 9, -1, 12);
+    plotPass.AddTextBox(fbkgpass, 0.21, 0.59, 0.41, 0.63, 0, 8, -1, 12);
+    plotPass.AddTextBox(effstr,0.70,0.85,0.94,0.90, 0,kBlack,-1);
+    if(bkgpass>0) {
+      plotPass.AddTextBox(0.70,0.68,0.94,0.83,0,kBlack,-1,2,nsigstr,nbkgstr);
+      plotPass.AddTextBox(chi2str,0.70,0.62,0.94,0.67,0,kBlack,0);
+    } else {
+      plotPass.AddTextBox(0.70,0.73,0.94,0.83,0,kBlack,-1,1,nsigstr);
+      plotPass.AddTextBox(chi2str,0.70,0.62,0.94,0.67,0,kBlack,0);
+    }
+    plotPass.AddTextBox("CMS Preliminary",0.19,0.83,0.54,0.89,0);
+    plotPass.AddTextBox(lumitext,0.62,0.92,0.94,0.99,0,kBlack,-1);
+
+    if(i==1){
+      double ymin = passHist->GetMinimum();
+      if(ymin <= 0.) ymin = 1.;
+
+      plotPass.SetYRange(0.1 * ymin, passHist->GetMaximum()*10);
+      plotPass.SetLogy();
+    }
+
+    plotPass.Draw(cpass,kTRUE,format);
   }
 
-  plotPass.AddTextBox(effstr,0.70,0.85,0.94,0.90, 0,kBlack,-1);
-  if(bkgpass>0) {
-    plotPass.AddTextBox(0.70,0.68,0.94,0.83,0,kBlack,-1,2,nsigstr,nbkgstr);
-    plotPass.AddTextBox(chi2str,0.70,0.62,0.94,0.67,0,kBlack,0);
-  } else {
-    plotPass.AddTextBox(0.70,0.73,0.94,0.83,0,kBlack,-1,1,nsigstr);
-    plotPass.AddTextBox(chi2str,0.70,0.62,0.94,0.67,0,kBlack,0);
+  RooPlot *mframeFail = m.frame(Bins(massBin));
+  dataFail->plotOn(mframeFail,MarkerStyle(kFullCircle),MarkerSize(0.8),DrawOption("ZP"));
+  if(bkgfail>0){
+    sprintf(bkgfailname, "backgroundFail_%d",etaRegion);
+    modelFail->plotOn(mframeFail,Components(bkgfailname),LineColor(8));
+    if(bkgfail == 3 or bkgfail == 5 or bkgfail == 7){
+      sprintf(bkgfailname, "bkg_pdf1Fail_%d",etaRegion);
+      modelFail->plotOn(mframeFail,Components(bkgfailname),LineStyle(kDashed),LineColor(8));
+      sprintf(bkgfailname, "bkg_pdf2Fail_%d",etaRegion);
+      modelFail->plotOn(mframeFail,Components(bkgfailname),LineStyle(kDashed),LineColor(8));
+    }
   }
-  plotPass.AddTextBox("CMS Preliminary",0.19,0.83,0.54,0.89,0);
-  plotPass.AddTextBox(lumitext,0.62,0.92,0.94,0.99,0,kBlack,-1);
-  //if(effType == "HLT") {
-  //  plotPass.SetYRange(0.00001*passHist->GetMaximum(),passHist->GetMaximum()*10);
-  //}
-  //else{
-  plotPass.SetYRange(0.0001*passHist->GetMaximum(),passHist->GetMaximum()*10);
-  //}
-  plotPass.SetLogy();
-  plotPass.Draw(cpass,kTRUE,format);
+  if(sigfail>0){
+    sprintf(sigfailname, "signalFail_%d",etaRegion);
+    modelFail->plotOn(mframeFail,Components(sigfailname),LineColor(9));
+  }
+  modelFail->plotOn(mframeFail,LineColor(2));
 
   double f = NsigFail.getVal(), d = NbkgFail.getVal();
-  sprintf(pname,"%s_%s_fail_%d", effType.Data(), etaRegion ? "forward" : "central", iBin);
   sprintf(yield,"%u Events",(Int_t)failHist->GetEntries());
   sprintf(nsigstr,"N_{sig} = %.1f #pm %.1f",NsigFail.getVal(),NsigFail.getPropagatedError(*fitResult));
   sprintf(nbkgstr,"N_{bkg} = %.1f #pm %.1f",NbkgFail.getVal(),NbkgFail.getPropagatedError(*fitResult));
   sprintf(chi2str,"#chi^{2}/DOF = %.3f",mframeFail->chiSquare(nflfail));resChi2Fail = mframeFail->chiSquare(nflfail);
-  CPlot plotFail(pname,mframeFail,"Failing probes","tag-probe mass [GeV/c^{2}]",ylabel);
-  plotFail.AddTextBox(binlabelx,0.21,0.78,0.51,0.83,0,kBlack,-1);
-  plotFail.AddTextBox(binlabely,0.21,0.73,0.51,0.78,0,kBlack,-1);
-  plotFail.AddTextBox(yield,0.21,0.69,0.51,0.73,0,kBlack,-1);
-  plotFail.AddTextBox(effstr,0.70,0.85,0.94,0.90,0,kBlack,-1);
-  plotFail.AddTextBox(0.70,0.68,0.94,0.83,0,kBlack,-1,2,nsigstr,nbkgstr);
-  plotFail.AddTextBox(chi2str,0.70,0.62,0.94,0.67,0,kBlack,-1);
-  plotFail.AddTextBox("CMS Preliminary",0.19,0.83,0.54,0.89,0);
-  plotFail.AddTextBox(lumitext,0.62,0.92,0.94,0.99,0,kBlack,-1);
-  plotFail.AddTextBox(fsigfail, 0.21, 0.63, 0.41, 0.67, 0, kBlue, -1, 12);
-  /*if(bkgfail == 3){
-    sprintf(fbkgfail, "quad");   plotFail.AddTextBox(fbkgfail, 0.21, 0.59, 0.41, 0.63, 0, kMagenta, -1, 12);
-    sprintf(fbkgfail, "exp");    plotFail.AddTextBox(fbkgfail, 0.29, 0.59, 0.41, 0.63, 0, kOrange, -1, 12);
+
+  for(int i=0; i <=1; i++){
+    // do two plots, one with linear scale and one with log scale
+    if(i==1) sprintf(expstr, "_exp");
+    else     sprintf(expstr, "");
+
+    sprintf(pname,"%s_%s_fail_%d%s", effType.Data(), etaRegion ? "forward" : "central", iBin, expstr);
+    CPlot plotFail(pname,mframeFail,"Failing probes","tag-probe mass [GeV/c^{2}]",ylabel);
+
+    plotFail.AddTextBox(binlabelx,0.21,0.78,0.51,0.83,0,kBlack,-1);
+    plotFail.AddTextBox(binlabely,0.21,0.73,0.51,0.78,0,kBlack,-1);
+    plotFail.AddTextBox(yield,0.21,0.69,0.51,0.73,0,kBlack,-1);
+    plotFail.AddTextBox(effstr,0.70,0.85,0.94,0.90,0,kBlack,-1);
+    plotFail.AddTextBox(0.70,0.68,0.94,0.83,0,kBlack,-1,2,nsigstr,nbkgstr);
+    plotFail.AddTextBox(chi2str,0.70,0.62,0.94,0.67,0,kBlack,-1);
+    plotFail.AddTextBox("CMS Preliminary",0.19,0.83,0.54,0.89,0);
+    plotFail.AddTextBox(lumitext,0.62,0.92,0.94,0.99,0,kBlack,-1);
+    plotFail.AddTextBox(fsigfail, 0.21, 0.63, 0.41, 0.67, 0, 9, -1, 12);
+    plotFail.AddTextBox(fbkgfail, 0.21, 0.59, 0.41, 0.63, 0, 8, -1, 12);
+
+    if(i==1){
+      double ymin = failHist->GetMinimum();
+      if(ymin <= 0.) ymin = 1.;
+
+      plotFail.SetYRange(0.5 * ymin,failHist->GetMaximum()*2);
+      plotFail.SetLogy();
+    }
+
+    plotFail.Draw(cfail,kTRUE,format);
+
   }
-  else if(bkgfail == 5){
-    sprintf(fbkgfail, "das");   plotFail.AddTextBox(fbkgfail, 0.21, 0.59, 0.41, 0.63, 0, kMagenta, -1, 12);
-    sprintf(fbkgfail, "exp");    plotFail.AddTextBox(fbkgfail, 0.29, 0.59, 0.41, 0.63, 0, kOrange, -1, 12);
-  }*/
-  if(bkgfail == 7){
-    sprintf(fbkgfail, "QCD");   plotFail.AddTextBox(fbkgfail, 0.21, 0.59, 0.41, 0.63, 0, kMagenta, -1, 12);
-    sprintf(fbkgfail, "TT");    plotFail.AddTextBox(fbkgfail, 0.29, 0.59, 0.41, 0.63, 0, kOrange, -1, 12);
-  }
-  else{
-    plotFail.AddTextBox(fbkgfail, 0.21, 0.59, 0.41, 0.63, 0, kRed, -1, 12);
-  }
-  plotFail.Draw(cfail,kTRUE,format);
 
   delete modelPass;
   delete modelFail;
@@ -921,4 +844,3 @@ std::vector<double> preFit(TH1D* failHist){
 
   return v;
 }
-
