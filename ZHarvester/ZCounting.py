@@ -222,7 +222,7 @@ for run in byLS_data.drop_duplicates('run')['run'].values:
     log.info("===Looping over measurements...")
 
     with open(outSubDir + 'byLS.csv', 'wb') as file:
-        file.write("#run:fill,ls,time,delivered(Hz/pb),recorded(Hz/pb),source\n")
+        file.write("#run:fill,ls,time,delivered(hz/ub),recorded(hz/ub),source\n")
 
     while len(LSlist) > 0:  # begin next measurement "m"
         log.debug("Openning DQMIO.root file: %s", eosFile)
@@ -351,6 +351,9 @@ for run in byLS_data.drop_duplicates('run')['run'].values:
         ZRateUncorrected = Zyield_m / (ZEff * timeWindow_m * deadtime_m)
         ZRate = Zyield_m / (ZMCEff * timeWindow_m * deadtime_m)
 
+        ZinstLumiRec_m = Zyield_m / (ZMCEff * sigma_fid * timeWindow_m)
+        ZinstLumiDel_m = Zyield_m / (ZMCEff * sigma_fid * deadtime_m * timeWindow_m)
+
         ZRate_EStat = [0., 0.]
         for i in (0, 1):
             ZRate_EStat[i] = ZRate * (Zyieldres_m[i+1] / Zyield_m + ZEff_EStat[i] / ZMCEff)
@@ -383,8 +386,8 @@ for run in byLS_data.drop_duplicates('run')['run'].values:
         ZyieldRec.append(Zyield_m / ZMCEff)
         ZLumiRec.append(Zyield_m / (ZMCEff * sigma_fid))
         ZLumiDel.append(Zyield_m / (ZMCEff * sigma_fid * deadtime_m))
-        ZinstLumiRec.append(Zyield_m / (ZMCEff * sigma_fid * timeWindow_m))
-        ZinstLumiDel.append(Zyield_m / (ZMCEff * sigma_fid * deadtime_m * timeWindow_m))
+        ZinstLumiRec.append(ZinstLumiRec_m)
+        ZinstLumiDel.append(ZinstLumiDel_m)
 
         XSecFid.append(ZMCXSec)
         XSecFidUncorrected.append(ZXSec)
@@ -440,16 +443,13 @@ for run in byLS_data.drop_duplicates('run')['run'].values:
         log.info("===Writing per LS CSV file")
         with open(outSubDir + 'byLS.csv', 'ab') as file:
 
-            avgZLumiRec = Zyield_m / (ZMCEff * sigma_fid * len(goodLSlist) * secPerLS)
-            avgZLumiDel = Zyield_m / (ZMCEff * sigma_fid * len(goodLSlist) * secPerLS * deadtime_m)
-
             for ls in goodLSlist:
                 time = data_run.loc[data_run['ls'] == ls]['time'].values[0].split(" ")
                 ttime = ROOT.TDatime(currentYear, int(time[0].split("/")[0]),
                                                  int(time[0].split("/")[1]), int(time[1].split(":")[0]),
                                                  int(time[1].split(":")[1]), int(time[1].split(":")[2])).Convert()
 
-                file.write("{0}:{1},{2}:{2},{3},{4},{5},ZMonitoring\n".format(run, fill, ls, ttime, avgZLumiDel, avgZLumiRec))
+                file.write("{0}:{1},{2}:{2},{3},{4},{5},ZMonitoring\n".format(run, fill, ls, ttime, ZinstLumiDel_m * 1000000, ZinstLumiRec_m * 1000000))
 
         nMeasurements = nMeasurements + 1
 

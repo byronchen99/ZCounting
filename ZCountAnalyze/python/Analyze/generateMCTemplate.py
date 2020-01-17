@@ -13,13 +13,18 @@ parser.add_argument(
     help='specify input root file'
 )
 parser.add_argument(
-    '-o', '--output', nargs=1, default='./',
+    '--ptCut', type=float,
+    help='specify lower pt cut on tag and probe muons'
+)
+parser.add_argument(
+    '-o', '--output', type=float, default='./',
     help='specify output dir'
 )
 args = parser.parse_args()
 
 inputs = args.input
-output = args.output[0]
+output = args.output
+ptCut = args.ptCut
 
 if not os.path.isdir(output):
     os.mkdir(output)
@@ -48,12 +53,12 @@ hPV.Scale(1. / hPV.Integral())
 # acceptance selection
 selection = 'z_recoMass > 66 ' \
             '& z_recoMass < 116 ' \
-            '& muon_recoPt > 27 ' \
-            '& antiMuon_recoPt > 27 ' \
+            '& muon_recoPt > {0} ' \
+            '& antiMuon_recoPt > {0} ' \
             '& abs(muon_recoEta) < 2.4 ' \
             '& abs(antiMuon_recoEta) < 2.4 ' \
             '& muon_recoMatches == 1 ' \
-            '& antiMuon_recoMatches == 1'
+            '& antiMuon_recoMatches == 1'.format(ptCut)
 
 # specify which branches to load
 branches = ['nPV', 'nPU', 'z_recoMass',
@@ -85,9 +90,9 @@ for iBit in range(0, 5):
 
 print(">>> select events with a tag")
 
-df = df.query('(muon_hlt_1 == 1 & muon_ID > 4) | (antiMuon_hlt_1 == 1 & antiMuon_ID > 4)')
-df['passHLT'] = ((df['muon_ID'] >= 4) & (df['antiMuon_ID'] >= 4) & (df['muon_hlt_1'] == 1) & (df['antiMuon_hlt_1'] == 1))
-df['passSel'] = ((df['muon_ID'] >= 4) & (df['antiMuon_ID'] >= 4))
+df = df.query('(muon_hlt_1 == 4 & muon_ID > 4) | (antiMuon_hlt_4 == 1 & antiMuon_ID > 4)')
+df['passHLT'] = ((df['muon_ID'] >= 5) & (df['antiMuon_ID'] >= 5) & (df['muon_hlt_1'] == 1) & (df['antiMuon_hlt_1'] == 1))
+df['passSel'] = ((df['muon_ID'] >= 5) & (df['antiMuon_ID'] >= 5))
 df['passGlo'] = ((df['muon_ID'] >= 3) & (df['antiMuon_ID'] >= 3))
 df['passTrk'] = ((df['muon_ID'] >= 1) & (df['antiMuon_ID'] >= 1))
 
