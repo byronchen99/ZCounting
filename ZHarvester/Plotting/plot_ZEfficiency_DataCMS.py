@@ -14,15 +14,13 @@ ROOT.gStyle.SetTitleX(.3)
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("-c", "--cms", default="nothing", type=str, help="give the CMS csv as input")
+parser.add_argument("-c", "--cms", type=str, help="give the CMS csv as input", required=True)
 parser.add_argument("-s", "--saveDir", default='./', type=str, help="give output dir")
 args = parser.parse_args()
 
-if args.cms=="nothing":
-	print "please provide cms input files"
-	sys.exit()
-
 outDir = args.saveDir
+if not os.path.isdir(outDir):
+    os.mkdir(outDir)
 
 ########## Data Acquisition ##########
 
@@ -30,8 +28,8 @@ data = pandas.read_csv(str(args.cms), sep=',',low_memory=False)#, skiprows=[1,2,
 data = data.sort_values(['fill','tdate_begin','tdate_end'])
 
 # remove rows with invalid Z rates and low statistics
-data = data[np.isfinite(data['ZRate'])]
-data = data[data['delZCount'] > 1000.]
+#data = data[np.isfinite(data['ZRate'])]
+data = data[data['z_relstat'] < 0.05]
 
 data['tdate'] = data['tdate_begin'] + (data['tdate_end'] - data['tdate_begin'])/2
 
@@ -43,10 +41,11 @@ fills = data.drop_duplicates('fill')['fill'].values
 ##### loop over Fills and produce fill specific plots
 for fill in fills:
     dFill = data.loc[data['fill'] == fill]
-        
-    shutil.rmtree(args.saveDir+"PlotsFill_"+str(fill), ignore_errors=True)
-    os.makedirs(args.saveDir+"PlotsFill_"+str(fill))
-	
+
+    subDir = outDir+"/PlotsFill_"+str(fill)
+    if not os.path.isdir(subDir):
+        os.mkdir(subDir)
+
     ### Efficiency ###
 
     for eff, name, ymin, ymax in (('ZMCeff'  ,'corrected Z-Reconstruction efficitency', 0.75, 1.0),
@@ -59,15 +58,15 @@ for fill in fills:
                   ('ZEEeff'  ,'Z-EE-Reconstruction efficitency', 0.75, 1.0),
                   ('HLTeffB' ,'Muon HLT-B efficiency',0.8, 1.0 ),
                   ('HLTeffE' ,'Muon HLT-E efficiency',0.8, 1.0),
-                  ('SITeffB' ,'Muon SIT-B efficiency',0.9, 1.0),
-                  ('SITeffE' ,'Muon SIT-E efficiency',0.9, 1.0),
+                  ('SeleffB' ,'Muon Sel-B efficiency',0.9, 1.0),
+                  ('SeleffE' ,'Muon Sel-E efficiency',0.9, 1.0),
                   ('GloeffB' ,'Muon Glo-B efficiency',0.9, 1.0),
                   ('GloeffE' ,'Muon Glo-E efficiency',0.9, 1.0),
-                  ('StaeffB' ,'Muon Sta-B efficiency',0.9, 1.0),
-                  ('StaeffE' ,'Muon Sta-E efficiency',0.9, 1.0),
-                  ('TrkeffB' ,'Muon Trk-B efficiency',0.95,1.01),
-                  ('TrkeffE' ,'Muon Trk-E efficiency',0.95,1.01),
-                  ('Zfpr'    ,'Z fake rate',0.0,0.1),
+                  #('StaeffB' ,'Muon Sta-B efficiency',0.9, 1.0),
+                  #('StaeffE' ,'Muon Sta-E efficiency',0.9, 1.0),
+                  #('TrkeffB' ,'Muon Trk-B efficiency',0.95,1.01),
+                  #('TrkeffE' ,'Muon Trk-E efficiency',0.95,1.01),
+                  #('ZYieldFpr'    ,'Z fake rate',0.0,0.1),
                  ):
         graph_Zeff = ROOT.TGraph(len(dFill),dFill['tdate'].values,dFill[eff].values )
         graph_Zeff.SetName("graph_Zeff")
@@ -97,7 +96,7 @@ for fill in fills:
         #text1=ROOT.TText(0.3,0.83,"CMS Automatic, produced: "+datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         #text1.SetNDC()
         #text1.Draw()
-        c1.SaveAs(outDir+"PlotsFill_"+str(fill)+"/"+str(eff)+"_"+str(fill)+".png")
+        c1.SaveAs(subDir+"/"+str(eff)+"_"+str(fill)+".png")
         c1.Close()
         if eff in meta.keys():
             meta[eff].append(np.mean(dFill[eff].values))
@@ -116,15 +115,15 @@ for eff, name, ymin, ymax in (('ZMCeff'  ,'corrected Z-Reconstruction efficitenc
                   ('ZEEeff'  ,'Z-EE-Reconstruction efficitency', 0.75, 1.0),
                   ('HLTeffB' ,'Muon HLT-B efficiency',0.8, 1.0 ),
                   ('HLTeffE' ,'Muon HLT-E efficiency',0.8, 1.0),
-                  ('SITeffB' ,'Muon SIT-B efficiency',0.9, 1.0),
-                  ('SITeffE' ,'Muon SIT-E efficiency',0.9, 1.0),
+                  ('SeleffB' ,'Muon Sel-B efficiency',0.9, 1.0),
+                  ('SeleffE' ,'Muon Sel-E efficiency',0.9, 1.0),
                   ('GloeffB' ,'Muon Glo-B efficiency',0.9, 1.0),
                   ('GloeffE' ,'Muon Glo-E efficiency',0.9, 1.0),
-                  ('StaeffB' ,'Muon Sta-B efficiency',0.9, 1.0),
-                  ('StaeffE' ,'Muon Sta-E efficiency',0.9, 1.0),
-                  ('TrkeffB' ,'Muon Trk-B efficiency',0.95,1.01),
-                  ('TrkeffE' ,'Muon Trk-E efficiency',0.95,1.01),
-                  ('Zfpr'    ,'Z fake rate',0.0,0.1),
+                  #('StaeffB' ,'Muon Sta-B efficiency',0.9, 1.0),
+                  #('StaeffE' ,'Muon Sta-E efficiency',0.9, 1.0),
+                  #('TrkeffB' ,'Muon Trk-B efficiency',0.95,1.01),
+                  #('TrkeffE' ,'Muon Trk-E efficiency',0.95,1.01),
+                 # ('ZYieldFpr'    ,'Z fake rate',0.0,0.1),
                  ):
     graph_meta = ROOT.TGraph(len(fills),fills.astype(float),np.array(meta[eff]))
     graph_meta.SetName("graph_meta")
@@ -155,4 +154,3 @@ for eff, name, ymin, ymax in (('ZMCeff'  ,'corrected Z-Reconstruction efficitenc
     #text1.Draw()
     c1.SaveAs(outDir+"/allSummary_"+str(eff)+".png")
     c1.Close()
-

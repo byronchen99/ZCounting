@@ -49,7 +49,7 @@ def zmonitoring(dirDQM, dirOut, byLsCSV, mcCorrections, sigTemplates, ptCut, run
 
     out = os.popen("condor_submit cs_tmp.sub").read()
     print(out)
-    os.system("rm cs_tmp.sub")
+    #os.system("rm cs_tmp.sub")
 
     out = out.split("\n")[-2].split(" ")
     njobs = int(out[0])
@@ -103,21 +103,22 @@ def check(projectdir, resubmit=False):
         print("unfinished jobs: {0}".format(unfinished_jobs))
         if resubmit:
             print("resubmit unfinished jobs")
-            if not os.path.isdir(projectdir+'/failed'):
-                os.mkdir(projectdir+'/failed')
-                os.mkdir(projectdir+'/failed/csvFiles')
+            faildir = projectdir+'/failed'+str(ji['clusterId'])
+            if not os.path.isdir(faildir):
+                os.mkdir(faildir)
+                os.mkdir(faildir+'/csvFiles')
             os.system("mv {0}/jobinfo.json {0}/jobinfo{1}.json".format(projectdir, ji['clusterId']))
 
             if ji['process'] == 'zmonitoring':
                 for ijob in unfinished_jobs:
-                    
+
                     runDir = "{0}/Run{1}".format(projectdir, ji['runs'][ijob])
                     if os.path.isdir(runDir):
-                        os.system("mv {0} {1}/failed/".format(runDir, projectdir))
+                        os.system("mv {0} {1}/".format(runDir, faildir))
 
                     csvFile = "{0}/csvFiles/csvfile{1}.csv".format(projectdir, ji['runs'][ijob])
                     if os.path.isfile(csvFile):
-                        os.system("mv {0} {1}/failed/csvFiles/".format(csvFile, projectdir))
+                        os.system("mv {0} {1}/csvFiles/".format(csvFile, faildir))
 
                 zmonitoring(ji['dirDQM'], ji['dirOut'], ji['byLsCSV'], ji['mcCorrections'], ji['sigTemplates'], ji['ptCut'],
                             runlist=[ji['runs'][i] for i in unfinished_jobs])
@@ -149,8 +150,8 @@ if __name__ == '__main__':
         help='specify directory with MC template root tree files for signal shapes'
     )
     parserA.add_argument(
-        '--byLS', default=None, type=str,
-        help='specify byLS.json to select specific lumi sections'
+        '--byLsCSV', default=None, type=str,
+        help='specify byLsCSV to select specific lumi sections'
     )
     parserA.add_argument(
         '--ptCut', type=float,
@@ -178,6 +179,6 @@ if __name__ == '__main__':
     # parse arguments and call subparser
     args = parser.parse_args()
     if args.subparser == 'zmonitoring':
-        zmonitoring(args.inputDQM, args.output, args.byLS, args.mcCorrections, args.sigTemplates, args.ptCut)
+        zmonitoring(args.inputDQM, args.output, args.byLsCSV, args.mcCorrections, args.sigTemplates, args.ptCut)
     if args.subparser == 'check':
         check(args.project, args.resubmit)

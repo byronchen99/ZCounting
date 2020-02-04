@@ -57,7 +57,7 @@ const Int_t maxPU = 60;
 
 void generateTemplate(
         const TString mcfilename,
-        const Float_t ptCutTag, const Float_t ptCutProbe, TH1D *hPV=0);
+        const Float_t ptCutTag, const Float_t ptCutProbe, TH1D *hPV=0, const TString outputDir="");
 
 void performCount(
         Double_t &resEff, Double_t &resErrl, Double_t &resErrh, TH1D *passHist, TH1D *failHist,
@@ -67,7 +67,7 @@ void performCount(
 void performFit(
         Double_t &resEff, Double_t &resErrl, Double_t &resErrh, Double_t &resChi2Pass, Double_t &resChi2Fail, TH1D *passHist, TH1D *failHist,
         const Int_t sigpass, const Int_t bkgpass, const Int_t sigfail, const Int_t bkgfail,
-        const Float_t ptCutTag, const Float_t ptCutProbe, const TString bkgQCDTemplate, const TString bkgTTTemplate,
+        const Float_t ptCutTag, const Float_t ptCutProbe, const TString outputDir, const TString bkgQCDTemplate, const TString bkgTTTemplate,
         TCanvas *cpass, TCanvas *cfail, const TString effType, const Bool_t etaRegion, const Int_t iBin, const Float_t lumi, const TString format);
 
 std::vector<double> preFit(TH1D *failHist);
@@ -241,11 +241,10 @@ std::vector<float> calculateDataEfficiency(
 ){
 
   CPlot::sOutDir = outputDir;
-  gSystem->cd(outputDir);
 
   // Generate histogram templates from MC if necessary
   if(sigModPass==2 || sigModFail==2) {
-    generateTemplate(mcfilename, ptCutTag, ptCutProbe, hPV);
+    generateTemplate(mcfilename, ptCutTag, ptCutProbe, hPV, outputDir);
   }
   // Calculate efficiency and save results to plots and histograms
   TCanvas *cpass = MakeCanvas("cpass","cpass",720,540);
@@ -266,7 +265,7 @@ std::vector<float> calculateDataEfficiency(
   }else{
     performFit(eff, errl, errh, chi2pass, chi2fail, h_mass_pass, h_mass_fail,
       sigModPass, bkgModPass, sigModFail, bkgModFail,
-      ptCutTag, ptCutProbe, bkgQCDFilename, bkgTTFilename,
+      ptCutTag, ptCutProbe, outputDir, bkgQCDFilename, bkgTTFilename,
       cpass, cfail, effType, etaRegion, iBin, lumi, format);
     //cout << effType.Data() << ": " << eff << " + " << errh << " - " << errl << endl;
   }
@@ -290,7 +289,8 @@ void generateTemplate(
 	const TString mcfilename,
 	const Float_t ptCutTag,
 	const Float_t ptCutProbe,
-	TH1D          *hPV
+	TH1D          *hPV,
+    const TString outputDir
 ){
   cout << "Creating histogram templates... "; cout.flush();
 
@@ -342,7 +342,7 @@ void generateTemplate(
     }
   }
 
-  TFile outfile = TFile("histTemplates.root", "RECREATE");
+  TFile outfile = TFile(outputDir+"/histTemplates.root", "RECREATE");
   h_mass_pass_central->Write();
   h_mass_fail_central->Write();
   h_mass_pass_forward->Write();
@@ -418,7 +418,7 @@ void performCount(
 void performFit(
 	Double_t &resEff, Double_t &resErrl, Double_t &resErrh, Double_t &resChi2Pass, Double_t &resChi2Fail, TH1D *passHist, TH1D *failHist,
 	const Int_t sigpass, const Int_t bkgpass, const Int_t sigfail, const Int_t bkgfail,
-	const Float_t ptCutTag, const Float_t ptCutProbe, const TString bkgQCDTemplate, const TString bkgTTTemplate,
+	const Float_t ptCutTag, const Float_t ptCutProbe, const TString outputDir, const TString bkgQCDTemplate, const TString bkgTTTemplate,
 	TCanvas *cpass, TCanvas *cfail, const TString effType, const Bool_t etaRegion, const Int_t iBin, const Float_t lumi, const TString format
 ){
 
@@ -456,7 +456,7 @@ void performFit(
 
   TFile *histfile = 0;
   if(sigpass==2 || sigfail==2) {
-    histfile = new TFile("histTemplates.root");
+    histfile = new TFile(outputDir+"/histTemplates.root");
     assert(histfile);
   }
   std::vector<double> vBkgPars;

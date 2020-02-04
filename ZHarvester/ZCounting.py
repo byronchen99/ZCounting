@@ -9,6 +9,10 @@ import logging as log
 import argparse
 import pdb
 
+from Utils.Utils import to_RootTime
+# disable panda warnings when assigning a new column in the dataframe
+pd.options.mode.chained_assignment = None
+
 cmsswbase = os.environ['CMSSW_BASE']
 
 parser = argparse.ArgumentParser()
@@ -55,6 +59,12 @@ outDir = args.dirOut if args.dirOut.endswith("/") else args.dirOut+"/"
 if not os.path.isdir(outDir):
     os.mkdir(outDir)
 
+outCSVDir = outDir+"csvFiles/"
+if not os.path.isdir(outCSVDir):
+    try:
+        os.mkdir(outCSVDir)
+    except OSError:
+        print("directory already exists ...")
 
 ########################################
 
@@ -72,11 +82,24 @@ maximumLS = 2500
 LSperMeasurement = 100  # required number of lumi sections per measurement
 LumiPerMeasurement = 20  # minimum recorded lumi for one measurement in pb-1
 
-ZBBRate = 0.077904  # Fraction of Z events where both muons are in barrel region
-ZBERate = 0.117200  # barrel and endcap
-ZEERate = 0.105541  # both endcap
+fakerate = 0.01
+
+ZBBAcc = 0.077904  # Fraction of Z events where both muons are in barrel region
+ZBEAcc = 0.117200  # barrel and endcap
+ZEEAcc = 0.105541  # both endcap
+
+fullAcc = (ZBBAcc + ZBEAcc + ZEEAcc)
+
+ZBBAcc = ZBBAcc / fullAcc
+ZBEAcc = ZBEAcc / fullAcc
+ZEEAcc = ZEEAcc / fullAcc
 
 ########################################
+def full_efficiency(effBB, effBE, effEE):
+    return effBB * ZBBAcc + effBE * ZBEAcc + effEE * ZEEAcc
+
+def full_uncertainty(effBB_stat, effBE_stat, effEE_stat):
+    return [np.sqrt((ZBBAcc * effBB_stat[i]) ** 2 + (ZBEAcc * effBE_stat[i]) ** 2 + (ZEEAcc * effEE_stat[i]) ** 2) for i in range(0,1)]
 
 
 # log.info("Loading C marco...")	#I think we don't need this
@@ -115,18 +138,17 @@ byLS_data = byLS_data.drop_duplicates(['fill', 'run', 'ls'])
 log.info("Looping over runs...")
 for run in byLS_data.drop_duplicates('run')['run'].values:
 
-    data_run = byLS_data.loc[byLS_data['run'] == run]
-
-    fill = data_run.drop_duplicates('fill')['fill'].values[0]
-    LSlist = data_run['ls'].values.tolist()
-
     if run < int(args.beginRun) or run >= int(args.endRun):
         continue
+
+    data_run = byLS_data.loc[byLS_data['run'] == run]
+    fill = data_run.drop_duplicates('fill')['fill'].values[0]
+    LSlist = data_run.query('ls <= {0}'.format(maximumLS))['ls'].values.tolist()
 
     # check if run was processed already
     outSubDir = outDir + "Run{0}/".format(run)
     if os.path.isdir(outSubDir):
-        print("Run " + str(run) + " was already processed, skipping and going to next run")
+        log.info("Run %i was already processed, skipping and going to next run", run)
         continue
     os.mkdir(outSubDir)
 
@@ -138,31 +160,22 @@ for run in byLS_data.drop_duplicates('run')['run'].values:
     runarray = array('i')
     tdate_begin = array('i')
     tdate_end = array('i')
-    Zrate = array('d')
-    Zrate_EStatUp = array('d')
-    Zrate_EStatDown = array('d')
-    ZrateUncorrected = array('d')
-    lumiRec = array('d')
-    lumiDel = array('d')
-    instDel = array('d')
-    instRec = array('d')
-    pileUp = array('d')
-    ZyieldRec = array('d')
-    ZyieldDel = array('d')
+    zDel = array('d')
+    zDel_mc = array('d')
+    z_relstat = array('d')
+    zRate = array('d')
+    zRate_mc = array('d')
+    zLumi = array('d')
+    zLumi_mc = array('d')
+    zXSec = array('d')
+    zXSec_mc = array('d')
     windowarray = array('d')
     deadTime = array('d')
     beginLS = array('i')
     endLS = array('i')
-
-    XSecFid = array('d')
-    XSecFidUncorrected = array('d')
-    Zyield_reco = array('d')
-    Zyield_chi2 = array('d')
-    Zyield_fpr = array('d')  # Z fals positive rate: fraction of bkg events in reconstructed Zs: bkg/(sig+bkg)
-    ZLumiRec = array('d')
-    ZLumiDel = array('d')
-    ZinstLumiRec = array('d')
-    ZinstLumiDel = array('d')
+    pileUp = array('d')
+    lumiDel = array('d')
+    lumiRec = array('d')
 
     # Efficiency related
     HLTeffB = array('d')
@@ -221,28 +234,19 @@ for run in byLS_data.drop_duplicates('run')['run'].values:
     print("The file exists: " + str(eosFile) + " for run  " + str(run))
     log.info("===Looping over measurements...")
 
-    with open(outSubDir + 'byLS.csv', 'wb') as file:
-        file.write("#run:fill,ls,time,delivered(hz/ub),recorded(hz/ub),source\n")
 
     while len(LSlist) > 0:  # begin next measurement "m"
         log.debug("Openning DQMIO.root file: %s", eosFile)
 
         mergeMeasurements = False
         # merge data to one measuement if remaining luminosity is too less for two measuements
-        if (sum(data_run.loc[data_run['ls'].isin(LSlist)]['recorded(/pb)'].values) < 2 * LumiPerMeasurement):
+        if (sum(data_run.loc[data_run['ls'].isin(LSlist)]['recorded(/pb)'].values) < 1.5 * LumiPerMeasurement):
             mergeMeasurements = True
 
         # produce goodLSlist with ls that are used for one measurement
         goodLSlist = []
         recLumi_m = 0
-        while (recLumi_m < LumiPerMeasurement or len(goodLSlist) < LSperMeasurement or mergeMeasurements) and len(
-                LSlist) > 0:
-            if len(LSlist) < 1:
-                print("No more lumi sections in current run")
-                break
-            if LSlist[0] > maximumLS:
-                log.error("===Lumi Section not stored in root file")
-                break
+        while (recLumi_m < LumiPerMeasurement or len(goodLSlist) < LSperMeasurement or mergeMeasurements) and len(LSlist) > 0:
 
             goodLSlist.append(LSlist[0])
             recLumi_m += (data_run[data_run['ls'] == LSlist[0]]['recorded(/pb)'].values)[0]
@@ -258,8 +262,8 @@ for run in byLS_data.drop_duplicates('run')['run'].values:
                 h_X.Add(h_X_ls.ProjectionY("h_mass_{0}_{1}_{2}".format(name_, run, ls), ls, ls, "e"))
             return h_X
 
-        ### compute Z yield
-        Zyieldres_m = ROOT.getZyield(load_histo("h_mass_yield_Z"), outSubDir, nMeasurements, 0, 0, ptCutTag, ptCutProbe, recLumi_m);
+        ### compute Z yield #TODO
+        #Zyieldres_m = ROOT.getZyield(load_histo("h_mass_yield_Z"), outSubDir, nMeasurements, 0, 0, ptCutTag, ptCutProbe, recLumi_m);
 
         ### compute muon efficiencies
         HLTeffresB_m = ROOT.calculateDataEfficiency(load_histo("h_mass_HLT_pass_central"), load_histo("h_mass_HLT_fail_central"),
@@ -283,15 +287,12 @@ for run in byLS_data.drop_duplicates('run')['run'].values:
                                                     outSubDir, nMeasurements, "Glo", 1, 2, 2, 2, 2,
                                                     ptCutTag, ptCutProbe, 0, recLumi_m, mcShapeDir + "template_Glo.root")
 
-        Zyield_m = Zyieldres_m[0]
         HLTeffB_m = HLTeffresB_m[0]
         HLTeffE_m = HLTeffresE_m[0]
         SeleffB_m = SeleffresB_m[0]
         SeleffE_m = SeleffresE_m[0]
         GloeffB_m = GloeffresB_m[0]
         GloeffE_m = GloeffresE_m[0]
-
-        log.debug("======ZRawYield: %f", Zyield_m)
 
         # ZtoMuMu efficiency purely from data
         ZBBEff = (GloeffB_m * GloeffB_m * SeleffB_m * SeleffB_m * (1 - (1 - HLTeffB_m) * (1 - HLTeffB_m)))
@@ -322,92 +323,85 @@ for run in byLS_data.drop_duplicates('run')['run'].values:
                 ((1 - HLTeffB_m) / (1 - (1 - HLTeffB_m) * (1 - HLTeffE_m)) * HLTeffresE_m[i]) ** 2
             )
 
-        # ZtoMuMu efficiency correction as a parametrized function of pile-up
-        avgpu_m = np.average(data_run.loc[data_run['ls'].isin(goodLSlist)]['avgpu'].values)
+        ZEff = full_efficiency(ZBBEff, ZBEEff, ZEEEff)
+        ZEff_stat = full_uncertainty(ZBBEff_EStat, ZBEEff_EStat, ZEEEff_EStat)
 
-        ZMCEffBB = ZBBEff - (corr['BB_a'] * avgpu_m + corr['BB_b'])
-        ZMCEffBE = ZBEEff - (corr['BE_a'] * avgpu_m + corr['BE_b'])
-        ZMCEffEE = ZEEEff - (corr['EE_a'] * avgpu_m + corr['EE_b'])
+        # --- per ls dataframe, one per measurement
+        data_m = data_run.loc[data_run['ls'].isin(goodLSlist)]
+        data_m['effBB_mc'] = ZBBEff - (data_m['avgpu'] * corr['BB_a'] + corr['BB_b'])
+        data_m['effBE_mc'] = ZBEEff - (data_m['avgpu'] * corr['BE_a'] + corr['BE_b'])
+        data_m['effEE_mc'] = ZEEEff - (data_m['avgpu'] * corr['EE_a'] + corr['EE_b'])
 
+        data_m['eff_mc'] = full_efficiency(data_m['effBB_mc'], data_m['effBE_mc'], data_m['effEE_mc'])
 
-        # Multiply average frequency of each category with its efficiency
-        ZMCEff = (ZMCEffBB * ZBBRate + ZMCEffBE * ZBERate + ZMCEffEE * ZEERate) / (ZBBRate + ZBERate + ZEERate)
-        ZEff = (ZBBEff * ZBBRate + ZBEEff * ZBERate + ZEEEff * ZEERate) / (ZBBRate + ZBERate + ZEERate)
-        ZEff_EStat = [0., 0.]
-        for i in (0, 1):
-            ZEff_EStat[i] = 1. / (ZBBRate + ZBERate + ZEERate) * np.sqrt(
-                (ZBBRate * ZBBEff_EStat[i]) ** 2 + (ZBERate * ZBEEff_EStat[i]) ** 2 + (ZEERate * ZEEEff_EStat[i]) ** 2
-            )
+        hist_Zyield = dqmfile.Get("DQMData/Run {0}/ZCounting/Run summary/Histograms/h_mass_yield_Z".format(run))
+        hist_ZyieldBB = dqmfile.Get("DQMData/Run {0}/ZCounting/Run summary/Histograms/h_yieldBB_Z".format(run))
+        hist_ZyieldEE = dqmfile.Get("DQMData/Run {0}/ZCounting/Run summary/Histograms/h_yieldEE_Z".format(run))
 
-        log.debug("======ZToMuMuEff: %f", ZMCEff)
-        log.debug("======ZToMuMuEff: %f, %f ,%f, %f, %f, %f", ZMCEffBB, ZMCEffBE, ZMCEffEE, ZBBEff, ZBEEff, ZEEEff)
+        data_m['zYield'] = data_m['ls'].apply(lambda ls: hist_Zyield.ProjectionY("", ls, ls, "e").GetEntries() * (1.-fakerate))
+        data_m['zYieldBB'] = data_m['ls'].apply(lambda ls: hist_ZyieldBB.GetBinContent(ls) * (1.-fakerate))
+        data_m['zYieldEE'] = data_m['ls'].apply(lambda ls: hist_ZyieldEE.GetBinContent(ls) * (1.-fakerate))
 
-        timeWindow_m = len(goodLSlist) * secPerLS
-        delLumi_m = sum(data_run.loc[data_run['ls'].isin(goodLSlist)]['delivered(/pb)'].values)
+        data_m['zDel'] = data_m['zYield'] / ZEff
+        data_m['zDelBB'] = data_m['zYieldBB'] / ZBBEff
+        data_m['zDelEE'] = data_m['zYieldEE'] / ZEEEff
+
+        data_m['zDel_mc'] = data_m['zYield'] / data_m['eff_mc']
+        data_m['zDelBB_mc'] = data_m['zYieldBB'] / (data_m['effBB_mc'])
+        data_m['zDelEE_mc'] = data_m['zYieldEE'] / (data_m['effEE_mc'])
+
+        data_m['z_relstat'] = (1./np.sqrt(data_m['zYield']) + max(ZEff_stat)/ZEff).replace(np.inf, 1.)
+
+        data_m['time'] = data_m['time'].apply(lambda x: to_RootTime(x,currentYear))
+        data_m['run'] = np.ones(len(data_m),dtype='int') * run
+        data_m['fill'] = np.ones(len(data_m),dtype='int') * fill
+
+        with open(outCSVDir + 'csvfile{0}_{1}.csv'.format(run, nMeasurements), 'w') as file:
+            data_m.to_csv(file, index=False)
+
+        # --- per measurement dataframe
+        delLumi_m = data_m['delivered(/pb)'].sum()
+        recLumi_m = data_m['recorded(/pb)'].sum()
         deadtime_m = recLumi_m / delLumi_m
+        timeWindow_m = len(goodLSlist) * secPerLS
 
-        ZXSec = Zyield_m / (ZEff * recLumi_m)
-        ZMCXSec = Zyield_m / (ZMCEff * recLumi_m)
-        ZRateUncorrected = Zyield_m / (ZEff * timeWindow_m * deadtime_m)
-        ZRate = Zyield_m / (ZMCEff * timeWindow_m * deadtime_m)
+        zDel_m = data_m['zDel'].sum()
+        zDel_mc_m = data_m['zDel_mc'].sum()
+        z_relstat_m = 1./max(np.sqrt(data_m['zYield'].sum()),1.) + max(ZEff_stat)/ZEff
+        zRate_m = zDel_m / (timeWindow_m * deadtime_m)
+        zRate_mc_m = zDel_mc_m / (timeWindow_m * deadtime_m)
+        zLumi_m = zDel_m / sigma_fid
+        zLumi_mc_m = zDel_mc_m / sigma_fid
+        zXSec_m = zDel_m / recLumi_m
+        zXSec_mc_m = zDel_mc_m / recLumi_m
 
-        ZinstLumiRec_m = Zyield_m / (ZMCEff * sigma_fid * timeWindow_m)
-        ZinstLumiDel_m = Zyield_m / (ZMCEff * sigma_fid * deadtime_m * timeWindow_m)
-
-        ZRate_EStat = [0., 0.]
-        for i in (0, 1):
-            ZRate_EStat[i] = ZRate * (Zyieldres_m[i+1] / Zyield_m + ZEff_EStat[i] / ZMCEff)
-
-        log.debug("======ZMCXSec: %f", ZMCXSec)
-        log.debug("======ZRate: %f", ZRate)
-
-        datestampLow_m = data_run.loc[data_run['ls'] == goodLSlist[0]]['time'].values[0].split(" ")
-        datestampUp_m = data_run.loc[data_run['ls'] == goodLSlist[-1]]['time'].values[0].split(" ")
-
-        dateLow_m = ROOT.TDatime(currentYear, int(datestampLow_m[0].split("/")[0]),
-                                 int(datestampLow_m[0].split("/")[1]), int(datestampLow_m[1].split(":")[0]),
-                                 int(datestampLow_m[1].split(":")[1]), int(datestampLow_m[1].split(":")[2]))
-        dateUp_m = ROOT.TDatime(currentYear, int(datestampUp_m[0].split("/")[0]), int(datestampUp_m[0].split("/")[1]),
-                                int(datestampUp_m[1].split(":")[0]), int(datestampUp_m[1].split(":")[1]),
-                                int(datestampUp_m[1].split(":")[2]))
-
-        log.debug("======beginTime: %s", dateLow_m.Convert())
-        log.debug("======endTime: %s", dateUp_m.Convert())
+        dateLow_m = to_RootTime(data_run.loc[data_run['ls'] == goodLSlist[0]]['time'].values[0])
+        dateUp_m = to_RootTime(data_run.loc[data_run['ls'] == goodLSlist[-1]]['time'].values[0])
 
         # Variables to write in csv file
         fillarray.append(fill)
         runarray.append(run)
 
-        ZrateUncorrected.append(ZRateUncorrected)
-        Zrate.append(ZRate)
-        Zrate_EStatDown.append(ZRate_EStat[0])
-        Zrate_EStatUp.append(ZRate_EStat[1])
-        ZyieldDel.append(Zyield_m / (ZMCEff * deadtime_m))
-        ZyieldRec.append(Zyield_m / ZMCEff)
-        ZLumiRec.append(Zyield_m / (ZMCEff * sigma_fid))
-        ZLumiDel.append(Zyield_m / (ZMCEff * sigma_fid * deadtime_m))
-        ZinstLumiRec.append(ZinstLumiRec_m)
-        ZinstLumiDel.append(ZinstLumiDel_m)
-
-        XSecFid.append(ZMCXSec)
-        XSecFidUncorrected.append(ZXSec)
+        zDel.append(zDel_m)
+        zDel_mc.append(zDel_mc_m)
+        z_relstat.append(z_relstat_m)
+        zRate.append(zRate_m)
+        zRate_mc.append(zRate_mc_m)
+        zLumi.append(zLumi_m)
+        zLumi_mc.append(zLumi_mc_m)
+        zXSec.append(zXSec_m)
+        zXSec_mc.append(zXSec_mc_m)
 
         lumiDel.append(delLumi_m)
         lumiRec.append(recLumi_m)
-        instDel.append(delLumi_m / timeWindow_m)
-        instRec.append(recLumi_m / timeWindow_m)
 
-        pileUp.append(avgpu_m)
-        tdate_begin.append(dateLow_m.Convert())
-        tdate_end.append(dateUp_m.Convert())
+        pileUp.append(data_m['avgpu'].mean())
+        tdate_begin.append(dateLow_m)
+        tdate_end.append(dateUp_m)
         windowarray.append(timeWindow_m)
         deadTime.append(deadtime_m)
         beginLS.append(goodLSlist[0])
         endLS.append(goodLSlist[-1])
-
-        Zyield_reco.append(Zyieldres_m[0])
-        Zyield_chi2.append(Zyieldres_m[3])
-        Zyield_fpr.append(Zyieldres_m[4])
 
         # Efficiency related
         HLTeffB.append(HLTeffB_m)
@@ -430,34 +424,20 @@ for run in byLS_data.drop_duplicates('run')['run'].values:
         GloeffE_chi2pass.append(GloeffresE_m[3])
         GloeffE_chi2fail.append(GloeffresE_m[4])
 
-        ZMCeff.append(ZMCEff)
-        ZMCeffBB.append(ZMCEffBB)
-        ZMCeffBE.append(ZMCEffBE)
-        ZMCeffEE.append(ZMCEffEE)
+        ZMCeff.append(data_m['eff_mc'].mean())
+        ZMCeffBB.append(data_m['effBB_mc'].mean())
+        ZMCeffBE.append(data_m['effBE_mc'].mean())
+        ZMCeffEE.append(data_m['effEE_mc'].mean())
 
         Zeff.append(ZEff)
         ZBBeff.append(ZBBEff)
         ZBEeff.append(ZBEEff)
         ZEEeff.append(ZEEEff)
 
-        log.info("===Writing per LS CSV file")
-        with open(outSubDir + 'byLS.csv', 'ab') as file:
-
-            for ls in goodLSlist:
-                time = data_run.loc[data_run['ls'] == ls]['time'].values[0].split(" ")
-                ttime = ROOT.TDatime(currentYear, int(time[0].split("/")[0]),
-                                                 int(time[0].split("/")[1]), int(time[1].split(":")[0]),
-                                                 int(time[1].split(":")[1]), int(time[1].split(":")[2])).Convert()
-
-                file.write("{0}:{1},{2}:{2},{3},{4},{5},ZMonitoring\n".format(run, fill, ls, ttime, ZinstLumiDel_m * 1000000, ZinstLumiRec_m * 1000000))
-
         nMeasurements = nMeasurements + 1
 
-    outCSVDir = outDir + "/csvFiles/"
-    if not  os.path.isdir(outCSVDir):
-        os.mkdir(outCSVDir)
 
-    ## Write Per Run CSV Files
+    ## Write per measurement csv file - one per run
     log.info("===Writing per Run CSV file")
 
     result = pd.DataFrame()
@@ -465,24 +445,17 @@ for run in byLS_data.drop_duplicates('run')['run'].values:
     result["run"] = runarray
     result["tdate_begin"] = tdate_begin
     result["tdate_end"] = tdate_end
-    result["ZRate"] = Zrate
-    result["ZRate_EStatDown"] = Zrate_EStatDown
-    result["ZRate_EStatUp"] = Zrate_EStatUp
-    result["ZRateUncorrected"] = ZRateUncorrected
-    result["ZYieldDelivered"] = ZyieldDel
-    result["ZYieldRecorded"] = ZyieldRec
-    result["ZYieldReconstructed"] = Zyield_reco
-    result["ZYieldFpr"] = Zyield_fpr
-    result["ZLumiDel"] = ZLumiDel
-    result["ZLumiRec"] = ZLumiRec
-    result["ZLumiDelInst"] = ZinstLumiDel
-    result["ZLumiRecInst"] = ZinstLumiRec
-    result["XSecFid"] = XSecFid
-    result["XSecFidUncorrected"] = XSecFidUncorrected
-    result["LumiDel"] = lumiDel
-    result["LumiRec"] = lumiRec
-    result["LumiDelInst"] = instDel
-    result["LumiRecInst"] = instRec
+    result["zDel"] = zDel
+    result["zDel_mc"] = zDel_mc
+    result["z_relstat"] = z_relstat
+    result["zRate"] = zRate
+    result["zRate_mc"] = zRate_mc
+    result["zLumi"] = zLumi
+    result["zLumi_mc"] = zLumi_mc
+    result["zXSec"] = zXSec
+    result["zXSec_mc"] = zXSec_mc
+    result["lumiDel"] = lumiDel
+    result["lumiRec"] = lumiRec
     result["timewindow"] = windowarray
     result["deadtime"] = deadTime
     result["pileUp"] = pileUp
@@ -516,13 +489,19 @@ for run in byLS_data.drop_duplicates('run')['run'].values:
     with open(outCSVDir + '/csvfile{0}.csv'.format(run), 'w') as file:
         result.to_csv(file, index=False)
 
-## Write Big CSV File
+## Write big per measurement csv file
 log.info("===Writing overall CSV file")
 if args.writeSummaryCSV:
-    rateFileList = sorted(glob.glob(outCSVDir + '/csvfile*.csv'))
+    rateFileList = sorted(glob.glob(outCSVDir + '/csvfile??????.csv'))
     df_merged = pd.concat([pd.read_csv(m) for m in rateFileList], ignore_index=True)
 
-    with open(outCSVDir + 'Mergedcsvfile.csv', 'w') as file:
+    with open(outCSVDir + 'Mergedcsvfile_perMeasurement.csv', 'w') as file:
+        df_merged.to_csv(file, index=False)
+
+    rateFileList = sorted(glob.glob(outCSVDir + '/csvfile*_*.csv'))
+    df_merged = pd.concat([pd.read_csv(m) for m in rateFileList], ignore_index=True)
+
+    with open(outCSVDir + 'Mergedcsvfile_perLS.csv', 'w') as file:
         df_merged.to_csv(file, index=False)
 
 log.info("===Done")
