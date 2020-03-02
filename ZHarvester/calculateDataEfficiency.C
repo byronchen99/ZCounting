@@ -895,7 +895,8 @@ std::vector<double> preFit(TH1D* failHist){
 //--------------------------------------------------------------------------------------------------
 std::vector<float> calculateZYield(
         TH1D           *hYieldOS,             // histogram with reconstructed z candidates
-        TH1D           *hYieldSS,        // histogram with reconstructed z candidates in same charge control region
+        TH1D           *hYieldSS,             // histogram with reconstructed z candidates in same charge control region
+        TH1D           *hYieldSSHighPU,       // histogram with reconstructed z candidates in same charge control region
         Int_t          sigOS=1,
         Int_t          bkgSS=2,
         Int_t          fitStrategy=1,
@@ -915,14 +916,16 @@ std::vector<float> calculateZYield(
     RooCategory sample("sample","");
     sample.defineType("OS",1);
     sample.defineType("SS",2);
+    sample.defineType("SSHighPU",3);
 
-    RooAbsData *dataOS     = new RooDataHist("dataOS","dataOS",RooArgSet(m),hYieldOS);
-    RooAbsData *dataSS     = new RooDataHist("dataFail","dataFail",RooArgSet(m),hYieldSS);
+    RooAbsData *dataOS       = new RooDataHist("dataOS","dataOS",RooArgSet(m),hYieldOS);
+    RooAbsData *dataSS       = new RooDataHist("dataSS","dataSS",RooArgSet(m),hYieldSS);
+    RooAbsData *dataSSHighPU = new RooDataHist("dataSSHighPU","dataSSHighPU",RooArgSet(m),hYieldSSHighPU);
     RooAbsData *dataCombined = new RooDataHist("dataCombined","dataCombined",RooArgList(m),
         RooFit::Index(sample),
         RooFit::Import("OS",*((RooDataHist*)dataOS)),
-        RooFit::Import("SS",*((RooDataHist*)dataSS)));
-
+        RooFit::Import("SS",*((RooDataHist*)dataSS)),
+        RooFit::Import("SSHighPU",*((RooDataHist*)dataSSHighPU)));
 
     TFile *histfile = 0;
     if(sigOS==2) {
@@ -966,17 +969,19 @@ std::vector<float> calculateZYield(
 
     Double_t NsigMax = hYieldOS->Integral();
     Double_t NbkgMax = hYieldSS->Integral();
+    Double_t NbkgHighPUMax = hYieldSSHighPU->Integral();
 
     RooRealVar nsigOS("nsigOS","signalfraction in OS", 0.99*NsigMax, 0., 1.5*NsigMax);
     RooRealVar nbkgOS("nbkgOS","backgroundfraction in OS", NbkgMax, 0., NsigMax);
     RooRealVar nbkgSS("nbkgSS","backgroundfraction in SS", NbkgMax, 0., 1.5*NbkgMax);
+    RooRealVar nbkgSSHighPU("nbkgSSHighPU","backgroundfraction in SS high PU", NbkgHighPUMax, 0., 1.5*NbkgHighPUMax);
 
     RooFormulaVar fr("fr","@0/(@0 + @1)",RooArgList(nbkgOS,nsigOS));
     RooFormulaVar tf("tf","@0/@1",RooArgList(nbkgOS,nbkgSS));
 
     RooAddPdf *modelOS = new RooAddPdf("modelOS","Model for OS sample", RooArgList(*(modelSigOS->model),*(modelBkgSS->model)), RooArgList(nsigOS, nbkgOS));
     RooAddPdf *modelSS = new RooAddPdf("modelSS","Model for SS sample", RooArgList(*(modelBkgSS->model)), RooArgList(nbkgSS));
-
+    RooAddPdf *modelSSHighPU = new RooAddPdf("modelSSHighPU","Model for SS high PU sample", RooArgList(*(modelBkgSS->model)), RooArgList(nbkgSSHighPU));
 
     Int_t strategy = 1;
     RooFitResult *fitResult=0;
@@ -1001,6 +1006,27 @@ std::vector<float> calculateZYield(
             //RooFit::Minos(RooArgSet(eff)),
             RooFit::Save());
     }
+    else if(fitStrategy == 4){
+        // --- fit on SS region
+        fitResult = modelSSHighPU->fitTo(*dataSSHighPU,
+            RooFit::PrintEvalErrors(-1),
+            RooFit::PrintLevel(-1),
+            RooFit::Warnings(0),
+            RooFit::Extended(),
+            RooFit::Strategy(1),
+            //RooFit::Minos(RooArgSet(eff)),
+            RooFit::Save());
+
+        fitResult = modelSSHighPU->fitTo(*dataSSHighPU,
+            RooFit::PrintEvalErrors(-1),
+            RooFit::PrintLevel(-1),
+            RooFit::Warnings(0),
+            RooFit::Extended(),
+            RooFit::Strategy(2),
+            //RooFit::Minos(RooArgSet(eff)),
+            RooFit::Save());
+    }
+
 
     RooArgSet* params = modelBkgSS->model->getVariables();
     params->Print("v");
@@ -1031,8 +1057,8 @@ std::vector<float> calculateZYield(
     totalPdf.addPdf(*modelOS,"OS");
     totalPdf.addPdf(*modelSS,"SS");
 
-    if(fitStrategy==2 || fitStrategy==3){
-        if(fitStrategy==2){
+    if(fitStrategy==2 || fitStrategy==3 || fitStrategy==4){
+        if(fitStrategy==2 || fitStrategy==4){
             modelBkgSS->freeze_all_parameters();
         }
 
@@ -1083,7 +1109,6 @@ std::vector<float> calculateZYield(
     TCanvas *cOS = MakeCanvas("cOS","cOS",720,540);
     cOS->SetWindowPosition(cOS->GetWindowTopX()+cOS->GetBorderSize()+800,0);
 
-    sprintf(ylabel,"Events / 1 GeV/c^{2}");
 
     RooPlot *mframeOS = m.frame(Bins(massBin));
     dataOS->plotOn(mframeOS,MarkerStyle(kFullCircle),MarkerSize(0.8),DrawOption("ZP"));
@@ -1095,13 +1120,12 @@ std::vector<float> calculateZYield(
     sprintf(yield,"%u Events",(Int_t)hYieldOS->GetEntries());
     sprintf(nsigstr,"N_{sig} = %.1f #pm %.1f",nsigOS.getVal(),nsigOS.getPropagatedError(*fitResult));
     sprintf(nbkgstr,"N_{bkg} = %.1f #pm %.1f",nbkgOS.getVal(),nbkgOS.getPropagatedError(*fitResult));
-    sprintf(chi2str,"#chi^{2}/DOF = %.3f",mframeOS->chiSquare(nflOS));
+    sprintf(chi2str,"#chi^{2}/DOF = %.3f",mframeOS->chiSquare(nflOS+1));
     sprintf(frstr,"fr = %.3f #pm %.3f",resfr, errfr);
     sprintf(tfstr,"tf = %.3f #pm %.3f",restf, errtf);
 
 
-    CPlot plotOS("plot_OS_"+std::to_string(100*fitStrategy+10*bkgSS+sigOS),mframeOS,"Opposite sign","tag-probe mass [GeV/c^{2}]",ylabel);
-
+    CPlot plotOS("plot_OS_"+std::to_string(100*fitStrategy+10*bkgSS+sigOS),mframeOS,"Opposite Sign - Low PU","tag-probe mass [GeV/c^{2}]","Events / 1 GeV/c^{2}");
 
     plotOS.AddTextBox("CMS Preliminary",0.19,0.83,0.54,0.89,0);
     plotOS.AddTextBox("|#eta| < 2.4",0.21,0.78,0.51,0.83,0,kBlack,-1);
@@ -1112,6 +1136,30 @@ std::vector<float> calculateZYield(
     plotOS.AddTextBox(0.70,0.62,0.94,0.90,0,kBlack,-1,5,chi2str, nbkgstr, nsigstr, frstr, tfstr);
 
     plotOS.Draw(cOS,kTRUE,"png");
+
+    plotOS.SetName("plot_OS_logscale_"+std::to_string(100*fitStrategy+10*bkgSS+sigOS));
+
+    double ymin = hYieldOS->GetMinimum();
+    if(ymin <= 0.) ymin = 1.;
+
+    plotOS.SetYRange(0.5 * ymin, hYieldOS->GetMaximum()*2);
+    plotOS.SetLogy();
+    plotOS.Draw(cOS,kTRUE,"png");
+
+
+    // --- plot pulls in OS region
+    TCanvas *cPullsOS = MakeCanvas("cResiOS","cResiOS",720,540);
+    cPullsOS->SetWindowPosition(cPullsOS->GetWindowTopX()+cPullsOS->GetBorderSize()+800,0);
+
+    RooHist* pullsHist = mframeOS->pullHist();
+    pullsHist->SetPointError(0.,0.,0.,0.);
+
+    RooPlot *mframePullsOS = m.frame(Bins(massBin));
+    mframePullsOS->addPlotable(pullsHist, "P");
+    CPlot plotPullsOS("plot_ResidOS_"+std::to_string(100*fitStrategy+10*bkgSS+sigOS),mframePullsOS,"Opposite Sign - Low PU","tag-probe mass [GeV/c^{2}]","pulls");
+
+    plotPullsOS.Draw(cOS,kTRUE,"png");
+
 
     // --- plot same sign region
     TCanvas *cSS = MakeCanvas("cSS","cSS",720,540);
@@ -1125,7 +1173,7 @@ std::vector<float> calculateZYield(
     sprintf(nbkgstr,"N_{bkg} = %.1f #pm %.1f",nbkgSS.getVal(),nbkgSS.getPropagatedError(*fitResult));
     sprintf(chi2str,"#chi^{2}/DOF = %.3f",mframeSS->chiSquare(nflSS));
 
-    CPlot plotSS("plot_SS_"+std::to_string(100*fitStrategy+10*bkgSS+sigOS),mframeSS,"Same sign","tag-probe mass [GeV/c^{2}]",ylabel);
+    CPlot plotSS("plot_SS_"+std::to_string(100*fitStrategy+10*bkgSS+sigOS),mframeSS,"Same Sign - Low PU","tag-probe mass [GeV/c^{2}]","Events / 1 GeV/c^{2}");
 
     plotSS.AddTextBox("CMS Preliminary",0.19,0.83,0.54,0.89,0);
     plotSS.AddTextBox("|#eta| < 2.4",0.21,0.78,0.51,0.83,0,kBlack,-1);
@@ -1136,6 +1184,33 @@ std::vector<float> calculateZYield(
 
     plotSS.Draw(cSS,kTRUE,"png");
 
+    // --- plot same sign high pileup region
+    TCanvas *cSSHighPU = MakeCanvas("cSSHighPU","cSSHighPU",720,540);
+    cSSHighPU->SetWindowPosition(cSSHighPU->GetWindowTopX()+cSSHighPU->GetBorderSize()+800,0);
+
+    RooPlot *mframeSSHighPU = m.frame(Bins(massBin));
+    dataSSHighPU->plotOn(mframeSSHighPU,MarkerStyle(kFullCircle),MarkerSize(0.8),DrawOption("ZP"));
+    modelSSHighPU->plotOn(mframeSSHighPU, Components(*(modelBkgSS->model)), LineColor(8));
+
+    sprintf(yield,"%u Events",(Int_t)hYieldSSHighPU->GetEntries());
+    sprintf(nbkgstr,"N_{bkg} = %.1f #pm %.1f",nbkgSSHighPU.getVal(),nbkgSSHighPU.getPropagatedError(*fitResult));
+    sprintf(chi2str,"#chi^{2}/DOF = %.3f",mframeSSHighPU->chiSquare(nflSS));
+
+    CPlot plotSSHighPU("plot_SSHighPU_"+std::to_string(100*fitStrategy+10*bkgSS+sigOS),mframeSSHighPU,"Same Sign - High PU","tag-probe mass [GeV/c^{2}]","Events / 1 GeV/c^{2}");
+
+    plotSSHighPU.AddTextBox("CMS Preliminary",0.19,0.83,0.54,0.89,0);
+    plotSSHighPU.AddTextBox("|#eta| < 2.4",0.21,0.78,0.51,0.83,0,kBlack,-1);
+    plotSSHighPU.AddTextBox(std::to_string(ptCut)+" GeV/c < p_{T} < 13000 GeV/c",0.21,0.73,0.51,0.78,0,kBlack,-1);
+    plotSSHighPU.AddTextBox(yield,0.21,0.69,0.51,0.73,0,kBlack,-1);
+    plotSSHighPU.AddTextBox(modelBkgSS->model->GetTitle(), 0.21, 0.59, 0.41, 0.63, 0, 8, -1, 12);
+    plotSSHighPU.AddTextBox(0.70,0.79,0.94,0.90,0,kBlack,-1,2,chi2str, nbkgstr);
+
+    const Double_t yMax = hYieldSSHighPU->GetMaximum() + hYieldSSHighPU->GetBinError(hYieldSSHighPU->GetMaximumBin());
+    const Double_t yMin = std::max(0., hYieldSSHighPU->GetMinimum() - hYieldSSHighPU->GetBinError(hYieldSSHighPU->GetMinimumBin()));
+    plotSSHighPU.SetYRange(yMin, yMax + 0.4*(yMax-yMin));
+    plotSSHighPU.Draw(cSSHighPU,kTRUE,"png");
+
+    // prepare return stuff
     std::vector<float> result = {};
 
     result.push_back(restf);
@@ -1145,4 +1220,5 @@ std::vector<float> calculateZYield(
     result.push_back(mframeSS->chiSquare(3));
 
     return result;
+
 }

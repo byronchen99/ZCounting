@@ -54,6 +54,14 @@ if inputs is None:
 #inputs of same sign selection
 inputs_ss = glob.glob("/pnfs/desy.de/cms/tier2/store/user/dwalter/TnPPairTrees_2017H_LowPUSameCharge_V02/SingleMuon/TnPPairTrees_2017H_LowPUSameCharge_V02/191020_141054/0000/output_0_*")
 
+inputs_ss_highPu2017B = glob.glob("/pnfs/desy.de/cms/tier2/store/user/dwalter/TnPPairTrees_2017B_SameCharge_V02_1/SingleMuon/TnPPairTrees_2017B_SameCharge_V02_1/191109_164559/0000/output_0_*")
+inputs_ss_highPu2017C = glob.glob("/pnfs/desy.de/cms/tier2/store/user/dwalter/TnPPairTrees_2017C_SameCharge_V02/SingleMuon/TnPPairTrees_2017C_SameCharge_V02/191102_165018/0000/output_0_*")
+inputs_ss_highPu2017D = glob.glob("/pnfs/desy.de/cms/tier2/store/user/dwalter/TnPPairTrees_2017D_SameCharge_V02/SingleMuon/TnPPairTrees_2017D_SameCharge_V02/191109_164614/0000/output_0_*")
+inputs_ss_highPu2017E = glob.glob("/pnfs/desy.de/cms/tier2/store/user/dwalter/TnPPairTrees_2017E_SameCharge_V02/SingleMuon/TnPPairTrees_2017E_SameCharge_V02/191109_164627/0000/output_0_*")
+inputs_ss_highPu2017F = glob.glob("/pnfs/desy.de/cms/tier2/store/user/dwalter/TnPPairTrees_2017F_SameCharge_V02/SingleMuon/TnPPairTrees_2017F_SameCharge_V02/191109_164641/0000/output_0_*")
+
+inputs_ss_highPu = inputs_ss_highPu2017B + inputs_ss_highPu2017C + inputs_ss_highPu2017D + inputs_ss_highPu2017E + inputs_ss_highPu2017F
+
 output = args.output
 
 mcCorr = args.mcCorrections
@@ -123,6 +131,11 @@ df_ss = [tree_to_df(root2array(i, treeName[0], selection=selection, branches=bra
 print(">>> Concatenate")
 df_ss = pd.concat(df_ss)
 
+print(">>> Load same sign events")
+df_ss_highPu = [tree_to_df(root2array(i, treeName[0], selection=selection, branches=branches), 5) for i in inputs_ss_highPu]
+print(">>> Concatenate")
+df_ss_highPu = pd.concat(df_ss_highPu)
+
 if byLS_file is not None:
     with open(byLS_file) as json_file:
         byLS = json.load(json_file)
@@ -134,12 +147,16 @@ if byLS_file is not None:
 df['is2HLT'] = df['is2HLT'] * (df['tkIso2'] / df['pt2'] < tkIsoCut)
 df['isSel'] = df['isSel'] + df['is2HLT'] * (df['tkIso2'] / df['pt2'] > tkIsoCut)
 
-
 df_ss['is2HLT'] = df_ss['is2HLT'] * (df_ss['tkIso2'] / df_ss['pt2'] < tkIsoCut)
 df_ss['isSel'] = df_ss['isSel'] + df_ss['is2HLT'] * (df_ss['tkIso2'] / df_ss['pt2'] > tkIsoCut)
 
+df_ss_highPu['is2HLT'] = df_ss_highPu['is2HLT'] * (df_ss_highPu['tkIso2'] / df_ss_highPu['pt2'] < tkIsoCut)
+df_ss_highPu['isSel'] = df_ss_highPu['isSel'] + df_ss_highPu['is2HLT'] * (df_ss_highPu['tkIso2'] / df_ss_highPu['pt2'] > tkIsoCut)
+
 hZReco = TH1D("hZReco", "th1d Z reco", MassBin, MassMin, MassMax)
 hZReco_ss = TH1D("hZReco_ss", "th1d Z reco same sign", MassBin, MassMin, MassMax)
+hZReco_ss_highPu = TH1D("hZReco_ss_highPu", "th1d Z reco same sign high pileup", MassBin, MassMin, MassMax)
+
 hPV = TH1D("hPV_data", "th1d number of primary vertices shape", 75, -0.5, 74.5)
 
 hPassHLTB = TH1D("hPassHLTB", "th1d pass barrel HLT", MassBin, MassMin, MassMax)
@@ -163,6 +180,7 @@ for nPV in df['nPV']:
 
 hPV.Scale(1. / hPV.Integral())
 
+# fill tag and probe histograms
 # --- barrel
 for t in df.query("is2HLT==1 & abs(eta1) < 0.9")['dilepMass']:
     hPassHLTB.Fill(t)
@@ -173,13 +191,11 @@ for p in df.query("is2HLT==1 & abs(eta2) < 0.9")['dilepMass']:
     hPassHLTB.Fill(p)
     hPassSelB.Fill(p)
     hPassGloB.Fill(p)
-    hZReco.Fill(p)
 
 for p in df.query("isSel==1 & abs(eta2) < 0.9")['dilepMass']:
     hFailHLTB.Fill(p)
     hPassSelB.Fill(p)
     hPassGloB.Fill(p)
-    hZReco.Fill(p)
 
 for p in df.query("isGlo==1 & abs(eta2) < 0.9")['dilepMass']:
     hFailSelB.Fill(p)
@@ -198,13 +214,11 @@ for p in df.query("is2HLT==1 & abs(eta2) > 0.9")['dilepMass']:
     hPassHLTE.Fill(p)
     hPassSelE.Fill(p)
     hPassGloE.Fill(p)
-    hZReco.Fill(p)
 
 for p in df.query("isSel==1 & abs(eta2) > 0.9")['dilepMass']:
     hFailHLTE.Fill(p)
     hPassSelE.Fill(p)
     hPassGloE.Fill(p)
-    hZReco.Fill(p)
 
 for p in df.query("isGlo==1 & abs(eta2) > 0.9")['dilepMass']:
     hFailSelE.Fill(p)
@@ -213,40 +227,44 @@ for p in df.query("isGlo==1 & abs(eta2) > 0.9")['dilepMass']:
 for p in df.query("(isSta==1 | isTrk==1) & abs(eta2) > 0.9")['dilepMass']:
     hFailGloE.Fill(p)
 
-# fill same sign histogram
+# fill z yield same histograms
 # --- barrel
-for p in df_ss.query("is2HLT==1 & abs(eta2) < 0.9")['dilepMass']:
+for p in df.query("is2HLT==1 | isSel==1")['dilepMass']:
+    hZReco.Fill(p)
+
+for p in df_ss.query("is2HLT==1 | isSel==1")['dilepMass']:
     hZReco_ss.Fill(p)
 
-for p in df_ss.query("isSel==1 & abs(eta2) < 0.9")['dilepMass']:
-    hZReco_ss.Fill(p)
-
-# --- endcap
-for p in df_ss.query("is2HLT==1 & abs(eta2) > 0.9")['dilepMass']:
-    hZReco_ss.Fill(p)
-
-for p in df_ss.query("isSel==1 & abs(eta2) > 0.9")['dilepMass']:
-    hZReco_ss.Fill(p)
+for p in df_ss_highPu.query("is2HLT==1 | isSel==1")['dilepMass']:
+    hZReco_ss_highPu.Fill(p)
 
 
 
-xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 1, 1, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
-xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 2, 1, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
-xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 3, 1, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
-xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 4, 1, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
-xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 5, 1, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
 
-xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 1, 2, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
-xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 2, 2, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
-xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 3, 2, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
-xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 4, 2, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
-xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 5, 2, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
 
-xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 1, 3, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
-xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 2, 3, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
-xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 3, 3, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
-xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 4, 3, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
-xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 5, 3, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, hZReco_ss_highPu, 2, 1, 1, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, hZReco_ss_highPu, 2, 2, 1, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, hZReco_ss_highPu, 2, 3, 1, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, hZReco_ss_highPu, 2, 4, 1, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, hZReco_ss_highPu, 2, 5, 1, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, hZReco_ss_highPu, 2, 1, 2, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, hZReco_ss_highPu, 2, 2, 2, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, hZReco_ss_highPu, 2, 3, 2, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, hZReco_ss_highPu, 2, 4, 2, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, hZReco_ss_highPu, 2, 5, 2, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, hZReco_ss_highPu, 2, 1, 3, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, hZReco_ss_highPu, 2, 2, 3, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, hZReco_ss_highPu, 2, 3, 3, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, hZReco_ss_highPu, 2, 4, 3, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, hZReco_ss_highPu, 2, 5, 3, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, hZReco_ss_highPu, 2, 1, 4, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, hZReco_ss_highPu, 2, 2, 4, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, hZReco_ss_highPu, 2, 3, 4, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, hZReco_ss_highPu, 2, 4, 4, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, hZReco_ss_highPu, 2, 5, 4, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
 
 exit()
 
