@@ -8,78 +8,89 @@
 class CBackgroundModel
 {
 public:
-  CBackgroundModel():model(0){}
-  virtual ~CBackgroundModel() { delete model; }
-  RooAbsPdf *model;
+    CBackgroundModel():model(0){}
+    virtual ~CBackgroundModel() { delete model; }
+    RooAbsPdf *model;
+    virtual void freeze_all_parameters() = 0;
 };
 
 class CExponential : public CBackgroundModel
 {
 public:
-  CExponential(RooRealVar &m, const Bool_t pass, const int ibin);
-  ~CExponential();
-  RooRealVar *t1;
+    CExponential(RooRealVar &m, const Bool_t pass, const int ibin);
+    ~CExponential();
+    RooRealVar *t1;
+    void freeze_all_parameters();
 };
 
 class CQuadratic : public CBackgroundModel
 {
 public:
-  CQuadratic(RooRealVar &m, const Bool_t pass, const int ibin, const float p0, const float e0, const float p1, const float e1, const float p2, const float e2);
+  CQuadratic(RooRealVar &m, const Bool_t pass, const int ibin,
+      const float p0=0, const float e0=0, const float p1=0, const float e1=0, const float p2=0, const float e2=0);
   ~CQuadratic();
   RooRealVar *a0;
   RooRealVar *a1;
   RooRealVar *a2;
+  void freeze_all_parameters();
+
 };
 
 class CQuadPlusExp : public CBackgroundModel
 {
 public:
-  CQuadPlusExp(RooRealVar &m, const Bool_t pass, const int ibin, const float p0, const float e0, const float p1, const float e1, const float p2, const float e2);
-  RooRealVar *a0, *a1, *a2, *t1;
-  RooAbsPdf *exp, *quad;
-  ~CQuadPlusExp();
+    CQuadPlusExp(RooRealVar &m, const Bool_t pass, const int ibin,
+      const float p0=0, const float e0=0, const float p1=0, const float e1=0, const float p2=0, const float e2=0);
+    RooRealVar *a0, *a1, *a2, *t1, *frac;
+    RooAbsPdf *exp, *quad;
+    ~CQuadPlusExp();
+    void freeze_all_parameters();
 };
 
 class CDas: public CBackgroundModel
 {
 public:
-  CDas(RooRealVar &m, const Bool_t pass, const int ibin);
-  RooRealVar *mean,*sigma,*kLo,*kHi;
-  ~CDas();
+    CDas(RooRealVar &m, const Bool_t pass, const int ibin);
+    RooRealVar *mean,*sigma,*kLo,*kHi;
+    ~CDas();
+    void freeze_all_parameters();
 };
 
 class CDasPlusExp: public CBackgroundModel
 {
 public:
-  CDasPlusExp(RooRealVar &m, const Bool_t pass, const int ibin);
-  RooRealVar *mean,*sigma,*kLo,*kHi,*t1, *frac;
-  RooGaussDoubleSidedExp *dd;
-  RooExponential *exp1;
-  ~CDasPlusExp();
+    CDasPlusExp(RooRealVar &m, const Bool_t pass, const int ibin);
+    RooRealVar *mean,*sigma,*kLo,*kHi,*t1, *frac;
+    RooGaussDoubleSidedExp *dd;
+    RooExponential *exp1;
+    ~CDasPlusExp();
+     void freeze_all_parameters();
 };
 
 class CQCD: public CBackgroundModel
 {
 public:
-  CQCD(RooRealVar &m, TH1D* hist, const Bool_t pass, const int ibin, int intOrder=1);
-  TH1D        *inHist;
-  RooDataHist *dataHist;
-  RooHistPdf  *histPdf;
-  ~CQCD();
+    CQCD(RooRealVar &m, TH1D* hist, const Bool_t pass, const int ibin, int intOrder=1);
+    TH1D        *inHist;
+    RooDataHist *dataHist;
+    RooHistPdf  *histPdf;
+    ~CQCD();
+    void freeze_all_parameters(){};
 };
 
 class CQCDPlusTT: public CBackgroundModel
 {
 public:
-  CQCDPlusTT(RooRealVar &m, TH1D* histQCD, TH1D* histTT, const Bool_t pass, const int ibin, int intOrder=1);
-  RooRealVar  *frac;
-  TH1D        *inHistQCD;
-  TH1D        *inHistTT;
-  RooDataHist *dataHistQCD;
-  RooHistPdf  *histPdfQCD;
-  RooDataHist *dataHistTT;
-  RooHistPdf  *histPdfTT;
-  ~CQCDPlusTT();
+    CQCDPlusTT(RooRealVar &m, TH1D* histQCD, TH1D* histTT, const Bool_t pass, const int ibin, int intOrder=1);
+    RooRealVar  *frac;
+    TH1D        *inHistQCD;
+    TH1D        *inHistTT;
+    RooDataHist *dataHistQCD;
+    RooHistPdf  *histPdfQCD;
+    RooDataHist *dataHistTT;
+    RooHistPdf  *histPdfTT;
+    ~CQCDPlusTT();
+    void freeze_all_parameters();
 };
 
 //--------------------------------------------------------------------------------------------------
@@ -93,7 +104,12 @@ CExponential::CExponential(RooRealVar &m, const Bool_t pass, const int ibin)
   sprintf(vname,"bkg_t1%s",name);    t1 = new RooRealVar(vname,"bkg_t1",-0.1,-1.,0.);
 
   sprintf(vname,"background%s",name);
-  model = new RooExponential(vname,vname,m,*t1);
+  model = new RooExponential(vname,"exp",m,*t1);
+}
+void CExponential::freeze_all_parameters(){
+    std::cout<<"freeze all parameters"<<std::endl;
+    t1->setConstant(kTRUE);
+
 }
 
 CExponential::~CExponential()
@@ -116,13 +132,19 @@ CQuadratic::CQuadratic(RooRealVar &m, const Bool_t pass, const int ibin, const f
     std::cout<<p2<<", "<<p2-e2<<", "<<upper<<std::endl;
     sprintf(vname,"bkg_a2%s",name);  a2 = new RooRealVar(vname,"bkg_a2",p2,p2-e2,upper);
   }else{
-    sprintf(vname,"bkg_a0%s",name);  a0 = new RooRealVar(vname,"bkg_a0",0.,-10.,10.);
-    sprintf(vname,"bkg_a1%s",name);  a1 = new RooRealVar(vname,"bkg_a1",0.,-10.,10.);
-    sprintf(vname,"bkg_a2%s",name);  a2 = new RooRealVar(vname,"bkg_a2",0.,0.,10.);
+    sprintf(vname,"bkg_a0%s",name);  a0 = new RooRealVar(vname,"bkg_a0",0.,-100000.,100000.);
+    sprintf(vname,"bkg_a1%s",name);  a1 = new RooRealVar(vname,"bkg_a1",0.,-1000.,1000.);
+    sprintf(vname,"bkg_a2%s",name);  a2 = new RooRealVar(vname,"bkg_a2",0.,-10.,10.);
   }
 
   sprintf(vname,"background%s",name);
-  model = new RooGenericPdf(vname,vname,"@1 + @2*@0 + @3*@0*@0",RooArgList(m,*a0,*a1,*a2));
+  model = new RooGenericPdf(vname,"quad","@1 + @2*@0 + @3*@0*@0",RooArgList(m,*a0,*a1,*a2));
+}
+void CQuadratic::freeze_all_parameters(){
+    std::cout<<"freeze all parameters"<<std::endl;
+    a0->setConstant(kTRUE);
+    a1->setConstant(kTRUE);
+    a2->setConstant(kTRUE);
 }
 
 CQuadratic::~CQuadratic()
@@ -133,30 +155,41 @@ CQuadratic::~CQuadratic()
 }
 
 //--------------------------------------------------------------------------------------------------
-CQuadPlusExp::CQuadPlusExp(RooRealVar &m, const Bool_t pass, const int ibin, const float p0, const float e0, const float p1, const float e1, const float p2, const float e2)
+CQuadPlusExp::CQuadPlusExp(RooRealVar &m, const Bool_t pass, const int ibin,
+    const float p0, const float e0, const float p1, const float e1, const float p2, const float e2)
 {
-  char name[10];
-  if(pass) sprintf(name,"%s_%d","Pass",ibin);
-  else     sprintf(name,"%s_%d","Fail",ibin);
-  char vname[50];
+    char name[10];
+    if(pass) sprintf(name,"%s_%d","Pass",ibin);
+    else     sprintf(name,"%s_%d","Fail",ibin);
+    char vname[50];
 
-  if((p0!=0.)||(p1!=0.)||(p2!=0.)){
-    sprintf(vname,"bkg_a0%s",name);  a0 = new RooRealVar(vname, "bkg_a0",p0,p0-e0,p0+e0);
-    sprintf(vname,"bkg_a1%s",name);  a1 = new RooRealVar(vname, "bkg_a1",p1,p1-e1,p1+e1);
-    float upper = p2+e2 > 0. ? 0. : p2+e2;
-    sprintf(vname,"bkg_a2%s",name);  a2 = new RooRealVar(vname, "bkg_a2",p2,p2-e2,upper);
-  }else{
-    sprintf(vname,"bkg_a0%s",name);  a0 = new RooRealVar(vname, "bkg_a0",0.,-10.,10.);
-    sprintf(vname,"bkg_a1%s",name);  a1 = new RooRealVar(vname, "bkg_a1",0.,-10.,10.);
-    sprintf(vname,"bkg_a2%s",name);  a2 = new RooRealVar(vname, "bkg_a2",0.,0.,10.);
-  }
+    if((p0!=0.)||(p1!=0.)||(p2!=0.)){
+        sprintf(vname,"bkg_a0%s",name);  a0 = new RooRealVar(vname, "bkg_a0",p0,p0-e0,p0+e0);
+        sprintf(vname,"bkg_a1%s",name);  a1 = new RooRealVar(vname, "bkg_a1",p1,p1-e1,p1+e1);
+        float upper = p2+e2 > 0. ? 0. : p2+e2;
+        sprintf(vname,"bkg_a2%s",name);  a2 = new RooRealVar(vname, "bkg_a2",p2,p2-e2,upper);
+    }else{
+        sprintf(vname,"bkg_a0%s",name);  a0 = new RooRealVar(vname, "bkg_a0",0.,-100000.,100000.);
+        sprintf(vname,"bkg_a1%s",name);  a1 = new RooRealVar(vname, "bkg_a1",0.,-1000.,1000.);
+        sprintf(vname,"bkg_a2%s",name);  a2 = new RooRealVar(vname, "bkg_a2",0.,-10.,10.);
+    }
 
-  sprintf(vname,"bkg_pdf1%s",name);      quad = new RooGenericPdf(vname, "bkg_quad","@1 + @2*@0 + @3*@0*@0",RooArgList(m,*a0,*a1,*a2));
-  sprintf(vname,"bkg_t1%s",name);        t1   = new RooRealVar(vname, "bkg_t1",-0.1,-1.,0.);
-  sprintf(vname,"bkg_pdf2%s",name);      exp  = new RooExponential(vname, "bkg_exp",m,*t1);
+    sprintf(vname,"bkg_pdf1%s",name);      quad = new RooGenericPdf(vname, "bkg_quad","@1 + @2*@0 + @3*@0*@0",RooArgList(m,*a0,*a1,*a2));
+    sprintf(vname,"bkg_t1%s",name);        t1   = new RooRealVar(vname, "bkg_t1",-0.1,-1.,0.);
+    sprintf(vname,"bkg_pdf2%s",name);      exp  = new RooExponential(vname, "bkg_exp",m,*t1);
+    sprintf(vname,"bkg_frac%s",name);      frac   = new RooRealVar(vname, "bkg_frac", .95, 0.,1.);
 
-  sprintf(vname,"background%s",name);
-  model = new RooGenericPdf(vname,vname,"@0+@1",RooArgList(*quad,*exp));
+    sprintf(vname,"background%s",name);
+    model = new RooAddPdf(vname, "quad + exp", RooArgList(*quad,*exp), RooArgList(*frac));
+}
+
+void CQuadPlusExp::freeze_all_parameters(){
+    std::cout<<"freeze all parameters"<<std::endl;
+    a0->setConstant(kTRUE);
+    a1->setConstant(kTRUE);
+    a2->setConstant(kTRUE);
+    t1->setConstant(kTRUE);
+    frac->setConstant(kTRUE);
 }
 
 CQuadPlusExp::~CQuadPlusExp()
@@ -167,6 +200,7 @@ CQuadPlusExp::~CQuadPlusExp()
   delete t1;
   delete quad;
   delete exp;
+  delete frac;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -183,7 +217,15 @@ CDas::CDas(RooRealVar &m, const Bool_t pass, const int ibin)
   sprintf(vname,"bkg_kHi%s",name);     kHi    = new RooRealVar(vname, "bkg_kHi", 1.5, .02, 10);
 
   sprintf(vname,"background%s",name);
-  model  = new RooGaussDoubleSidedExp(vname,vname,m,*mean,*sigma,*kLo,*kHi);
+  model  = new RooGaussDoubleSidedExp(vname,"das",m,*mean,*sigma,*kLo,*kHi);
+}
+
+void CDas::freeze_all_parameters(){
+    std::cout<<"freeze all parameters"<<std::endl;
+    mean->setConstant(kTRUE);
+    sigma->setConstant(kTRUE);
+    kLo->setConstant(kTRUE);
+    kHi->setConstant(kTRUE);
 }
 
 CDas::~CDas()
@@ -212,7 +254,17 @@ CDasPlusExp::CDasPlusExp(RooRealVar &m, const Bool_t pass, const int ibin)
   sprintf(vname,"bkg_pdf2%s",name);     exp1   = new RooExponential(vname, "bkg_exp1",m,*t1);
 
   sprintf(vname,"background%s",name);
-  model = new RooAddPdf(vname, vname, RooArgList(*dd,*exp1), RooArgList(*frac));
+  model = new RooAddPdf(vname, "das + exp", RooArgList(*dd,*exp1), RooArgList(*frac));
+}
+
+void CDasPlusExp::freeze_all_parameters(){
+    std::cout<<"freeze all parameters"<<std::endl;
+    mean->setConstant(kTRUE);
+    sigma->setConstant(kTRUE);
+    kLo->setConstant(kTRUE);
+    kHi->setConstant(kTRUE);
+    t1->setConstant(kTRUE);
+    frac->setConstant(kTRUE);
 }
 
 CDasPlusExp::~CDasPlusExp()
@@ -243,7 +295,7 @@ CQCD::CQCD(RooRealVar &m, TH1D* hist, const Bool_t pass, const int ibin, int int
   sprintf(vname,"bkg_pdf%s",name);   histPdf  = new RooHistPdf(vname, "bkg_histPdf",m,*dataHist,intOrder);
 
   sprintf(vname,"background%s",name);
-  model = new RooHistPdf(vname,vname,m,*dataHist,intOrder);
+  model = new RooHistPdf(vname,"qcd MC",m,*dataHist,intOrder);
 }
 
 CQCD::~CQCD()
@@ -271,8 +323,13 @@ CQCDPlusTT::CQCDPlusTT(RooRealVar &m, TH1D* histQCD, TH1D* histTT, const Bool_t 
   sprintf(vname,"bkg_frac%s",name);       frac = new RooRealVar(vname,"bkg_frac", .5, 0.,1.);
 
   sprintf(vname,"background%s",name);
-  model = new RooAddPdf(vname,vname,RooArgList(*histPdfQCD,*histPdfTT),RooArgList(*frac));
+  model = new RooAddPdf(vname,"qcd + ttbar MC",RooArgList(*histPdfQCD,*histPdfTT),RooArgList(*frac));
 
+}
+
+void CQCDPlusTT::freeze_all_parameters(){
+    std::cout<<"freeze all parameters"<<std::endl;
+    frac->setConstant(kTRUE);
 }
 
 CQCDPlusTT::~CQCDPlusTT()

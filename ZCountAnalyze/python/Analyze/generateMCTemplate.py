@@ -17,7 +17,7 @@ parser.add_argument(
     help='specify lower pt cut on tag and probe muons'
 )
 parser.add_argument(
-    '-o', '--output', type=float, default='./',
+    '-o', '--output', type=str, default='./',
     help='specify output dir'
 )
 args = parser.parse_args()
@@ -90,7 +90,7 @@ for iBit in range(0, 5):
 
 print(">>> select events with a tag")
 
-df = df.query('(muon_hlt_1 == 4 & muon_ID > 4) | (antiMuon_hlt_4 == 1 & antiMuon_ID > 4)')
+df = df.query('(muon_hlt_2 == 1 & muon_ID > 4) | (antiMuon_hlt_2 == 1 & antiMuon_ID > 4)')
 df['passHLT'] = ((df['muon_ID'] >= 5) & (df['antiMuon_ID'] >= 5) & (df['muon_hlt_1'] == 1) & (df['antiMuon_hlt_1'] == 1))
 df['passSel'] = ((df['muon_ID'] >= 5) & (df['antiMuon_ID'] >= 5))
 df['passGlo'] = ((df['muon_ID'] >= 3) & (df['antiMuon_ID'] >= 3))
@@ -127,6 +127,21 @@ dfOut = dfOut.rename(columns={'z_recoMass': 'mass', 'passHLT': 'pass'})
 dfOut = dfOut[['nPV', 'nPU', 'ptTag', 'ptProbe', 'etaTag', 'etaProbe', 'mass', 'pass']]
 
 tfile = ROOT.TFile.Open(output+"/template_HLT.root", "RECREATE")
+
+ttree = array2tree(dfOut.to_records(index=False))
+ttree.Write()
+hPV.Write()
+
+ttree.Delete()
+
+tfile.Close()
+
+
+dfOut = pd.concat([dfPassHLT1, dfFailHLT1, dfFailHLT2], sort=True)
+dfOut = dfOut.rename(columns={'z_recoMass': 'mass', 'passSel': 'pass'})
+dfOut = dfOut[['nPV', 'nPU', 'ptTag', 'ptProbe', 'etaTag', 'etaProbe', 'mass', 'pass']]
+
+tfile = ROOT.TFile.Open(output+"/template_ZYield.root", "RECREATE")
 
 ttree = array2tree(dfOut.to_records(index=False))
 ttree.Write()

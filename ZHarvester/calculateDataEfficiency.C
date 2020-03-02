@@ -355,6 +355,69 @@ void generateTemplate(
 
   cout << "Done!" << endl;
 }
+
+//--------------------------------------------------------------------------------------------------
+void generateTemplate_ZYield(
+	const TString mcfilename,
+	const Float_t ptCutTag,
+	const Float_t ptCutProbe,
+	TH1D          *hPV,
+    const TString outputDir
+){
+  cout << "Creating histogram templates... "; cout.flush();
+
+  TFile *infile    = new TFile(mcfilename);
+  TTree *eventTree = (TTree*)infile->Get("tree");
+  TH1D *hPVtemplate = (TH1D*)infile->Get("hPV");
+
+  if(hPV)
+    hPV->Divide(hPVtemplate);
+
+  Float_t mass, ptTag, etaTag, ptProbe, etaProbe;
+  Double_t wgt;
+  UInt_t npv;
+  Bool_t pass;
+
+  eventTree->SetBranchAddress("mass",       &mass);
+  eventTree->SetBranchAddress("ptTag",      &ptTag);
+  eventTree->SetBranchAddress("ptProbe",    &ptProbe);
+  eventTree->SetBranchAddress("etaTag",     &etaTag);
+  eventTree->SetBranchAddress("etaProbe",   &etaProbe);
+  eventTree->SetBranchAddress("nPV",        &npv);
+  eventTree->SetBranchAddress("pass",       &pass);
+
+  TH1D *h_mass_zyield = new TH1D("h_mass_zyield", "", massBin, massLo, massHi);
+
+
+  for(UInt_t ientry=0; ientry<eventTree->GetEntries(); ientry++) {
+    eventTree->GetEntry(ientry);
+
+    if(mass < massLo)  continue;
+    if(mass > massHi)  continue;
+    if(ptTag   < ptCutTag)   continue;
+    if(ptProbe   < ptCutProbe)   continue;
+    if(fabs(etaTag) > etaCutTag) continue;
+    if(fabs(etaProbe) > etaCutProbe) continue;
+
+    wgt = 1.0;
+    if(hPV)
+      wgt *= hPV->GetBinContent(hPV->FindBin(npv));
+
+    h_mass_zyield->Fill(mass, wgt);
+
+  }
+
+  TFile outfile = TFile(outputDir+"/histTemplates.root", "RECREATE");
+  h_mass_zyield->Write();
+  outfile.Write();
+  outfile.Close();
+
+  infile->Close();
+  delete infile;
+
+  cout << "Done!" << endl;
+}
+
 //--------------------------------------------------------------------------------------------------
 void performCount(
 	Double_t &resEff, Double_t &resErrl, Double_t &resErrh, TH1D *passHist, TH1D *failHist,
@@ -510,11 +573,9 @@ void performFit(
 
   switch(sigpass) {
     case 1:
-      sprintf(fsigpass, "BW x CB");
       sigPass = new CBreitWignerConvCrystalBall(m, kTRUE, etaRegion);
       nflpass += 4; break;
     case 2:
-      sprintf(fsigpass, "MC x Gaus");
       TH1D *h = (TH1D*)histfile->Get(Form("h_mass_pass_%s", etaRegion ? "forward" : "central"));
       assert(h);
       sigPass = new CMCTemplateConvGaussian(m,h,kTRUE,etaRegion);
@@ -523,42 +584,33 @@ void performFit(
 
   switch(bkgpass) {
     case 1:
-      sprintf(fbkgpass, "exp");
       bkgPass = new CExponential(m, kTRUE, etaRegion);
       nflpass += 1; break;
     case 2:
-      sprintf(fbkgpass, "quad");
       bkgPass = new CQuadratic(m, kTRUE, etaRegion, 0.,0.,0.,0.,0.,0.);
       nflpass += 3; break;
     case 3:
-      sprintf(fbkgpass, "exp + quad");
       bkgPass = new CQuadPlusExp(m, kTRUE, etaRegion, 0.,0.,0.,0.,0.,0.);
       nflpass += 4; break;
     case 4:
-      sprintf(fbkgpass, "das");
       bkgPass = new CDas(m, kTRUE, etaRegion);
       nflpass += 4; break;
     case 5:
-      sprintf(fbkgpass, "das + exp");
       bkgPass = new CDasPlusExp(m, kTRUE, etaRegion);
       nflpass += 6; break;
     case 6:
-      sprintf(fbkgpass, "QCD");
       bkgPass = new CQCD(m, hbkgQCDPass, kTRUE, etaRegion);
       nflpass += 1; break;
     case 7:
-      sprintf(fbkgpass, "QCD + TT");
       bkgPass = new CQCDPlusTT(m, hbkgQCDPass, hbkgTTPass, kTRUE, etaRegion);
       nflpass += 2; break;
   }
 
   switch(sigfail) {
     case 1:
-      sprintf(fsigfail, "BW x CB");
       sigFail = new CBreitWignerConvCrystalBall(m, kFALSE, etaRegion);
       nflfail += 4; break;
     case 2:
-      sprintf(fsigfail, "MC x Gaus");
       TH1D *h = (TH1D*)histfile->Get(Form("h_mass_fail_%s", etaRegion ? "forward" : "central"));
       assert(h);
       sigFail = new CMCTemplateConvGaussian(m,h,kFALSE,etaRegion);
@@ -567,31 +619,24 @@ void performFit(
 
   switch(bkgfail) {
     case 1:
-      sprintf(fbkgfail, "exp");
       bkgFail = new CExponential(m, kFALSE, etaRegion);
       nflfail += 1; break;
     case 2:
-      sprintf(fbkgfail, "quad");
       bkgFail = new CQuadratic(m, kFALSE, etaRegion, vBkgPars[0], vBkgPars[1], vBkgPars[2], vBkgPars[3], vBkgPars[4], vBkgPars[5]);
       nflfail += 3; break;
     case 3:
-      sprintf(fbkgfail, "quad + exp");
       bkgFail = new CQuadPlusExp(m, kFALSE, etaRegion, vBkgPars[0], vBkgPars[1], vBkgPars[2], vBkgPars[3], vBkgPars[4], vBkgPars[5]);
       nflfail += 4; break;
     case 4:
-      sprintf(fbkgfail, "das");
       bkgFail = new CDas(m, kFALSE, etaRegion);
       nflfail += 4; break;
     case 5:
-      sprintf(fbkgfail, "das + exp");
       bkgFail = new CDasPlusExp(m, kFALSE, etaRegion);
       nflfail += 6; break;
     case 6:
-      sprintf(fbkgfail, "QCD");
       bkgFail = new CQCD(m, hbkgQCDFail, kFALSE, etaRegion);
       nflfail += 1; break;
     case 7:
-      sprintf(fbkgfail, "QCD + TT");
       bkgFail = new CQCDPlusTT(m, hbkgQCDFail, hbkgTTFail, kFALSE, etaRegion);
       nflfail += 2; break;
   }
@@ -721,8 +766,8 @@ void performFit(
     plotPass.AddTextBox(binlabelx,0.21,0.78,0.51,0.83,0,kBlack,-1);
     plotPass.AddTextBox(binlabely,0.21,0.73,0.51,0.78,0,kBlack,-1);
     plotPass.AddTextBox(yield,0.21,0.69,0.51,0.73,0,kBlack,-1);
-    plotPass.AddTextBox(fsigpass, 0.21, 0.63, 0.41, 0.67, 0, 9, -1, 12);
-    plotPass.AddTextBox(fbkgpass, 0.21, 0.59, 0.41, 0.63, 0, 8, -1, 12);
+    plotPass.AddTextBox(sigPass->model->GetTitle(), 0.21, 0.63, 0.41, 0.67, 0, 9, -1, 12);
+    plotPass.AddTextBox(bkgPass->model->GetTitle(), 0.21, 0.59, 0.41, 0.63, 0, 8, -1, 12);
     plotPass.AddTextBox(effstr,0.70,0.85,0.94,0.90, 0,kBlack,-1);
     if(bkgpass>0) {
       plotPass.AddTextBox(0.70,0.68,0.94,0.83,0,kBlack,-1,2,nsigstr,nbkgstr);
@@ -785,8 +830,8 @@ void performFit(
     plotFail.AddTextBox(chi2str,0.70,0.62,0.94,0.67,0,kBlack,-1);
     plotFail.AddTextBox("CMS Preliminary",0.19,0.83,0.54,0.89,0);
     plotFail.AddTextBox(lumitext,0.62,0.92,0.94,0.99,0,kBlack,-1);
-    plotFail.AddTextBox(fsigfail, 0.21, 0.63, 0.41, 0.67, 0, 9, -1, 12);
-    plotFail.AddTextBox(fbkgfail, 0.21, 0.59, 0.41, 0.63, 0, 8, -1, 12);
+    plotFail.AddTextBox(sigFail->model->GetTitle(), 0.21, 0.63, 0.41, 0.67, 0, 9, -1, 12);
+    plotFail.AddTextBox(bkgFail->model->GetTitle(), 0.21, 0.59, 0.41, 0.63, 0, 8, -1, 12);
 
     if(i==1){
       double ymin = failHist->GetMinimum();
@@ -845,4 +890,259 @@ std::vector<double> preFit(TH1D* failHist){
   }
 
   return v;
+}
+
+//--------------------------------------------------------------------------------------------------
+std::vector<float> calculateZYield(
+        TH1D           *hYieldOS,             // histogram with reconstructed z candidates
+        TH1D           *hYieldSS,        // histogram with reconstructed z candidates in same charge control region
+        Int_t          sigOS=1,
+        Int_t          bkgSS=2,
+        Int_t          fitStrategy=1,
+        Double_t       ptCutTag=27.,
+        Double_t       ptCutProbe=27.,
+        TH1D           *hPV=0,
+        const TString  mcfilename="",
+        const TString  outputDir="./"
+){
+    CPlot::sOutDir = outputDir;
+
+    Int_t ptCut = 30;
+
+    RooRealVar m("m","mass",massLo,massHi);
+    m.setBins(10000);
+
+    RooCategory sample("sample","");
+    sample.defineType("OS",1);
+    sample.defineType("SS",2);
+
+    RooAbsData *dataOS     = new RooDataHist("dataOS","dataOS",RooArgSet(m),hYieldOS);
+    RooAbsData *dataSS     = new RooDataHist("dataFail","dataFail",RooArgSet(m),hYieldSS);
+    RooAbsData *dataCombined = new RooDataHist("dataCombined","dataCombined",RooArgList(m),
+        RooFit::Index(sample),
+        RooFit::Import("OS",*((RooDataHist*)dataOS)),
+        RooFit::Import("SS",*((RooDataHist*)dataSS)));
+
+
+    TFile *histfile = 0;
+    if(sigOS==2) {
+        generateTemplate_ZYield(mcfilename, ptCutTag, ptCutProbe, hPV, outputDir);
+        histfile = new TFile(outputDir+"/histTemplates.root");
+        assert(histfile);
+    }
+
+    CSignalModel     *modelSigOS = 0;
+    CBackgroundModel *modelBkgSS = 0;
+
+    Int_t nflOS=0, nflSS=0;
+
+    switch(sigOS) {
+      case 1:
+        modelSigOS = new CBreitWignerConvCrystalBall(m, kFALSE, 0);
+        nflOS += 4; break;
+      case 2:
+        TH1D *h = (TH1D*)histfile->Get("h_mass_zyield");
+        assert(h);
+        modelSigOS = new CMCTemplateConvGaussian(m,h,kFALSE,0);
+        nflOS += 2; break;
+    }
+    switch(bkgSS) {
+      case 1:
+        modelBkgSS = new CExponential(m, kFALSE, 0);
+        nflSS += 1; break;
+      case 2:
+        modelBkgSS = new CQuadratic(m, kFALSE, 0);
+        nflSS += 3; break;
+      case 3:
+        modelBkgSS = new CQuadPlusExp(m, kFALSE, 0);
+        nflSS += 4; break;
+      case 4:
+        modelBkgSS = new CDas(m, kFALSE, 0);
+        nflSS += 4; break;
+      case 5:
+        modelBkgSS = new CDasPlusExp(m, kFALSE, 0);
+        nflSS += 6; break;
+    }
+
+    Double_t NsigMax = hYieldOS->Integral();
+    Double_t NbkgMax = hYieldSS->Integral();
+
+    RooRealVar nsigOS("nsigOS","signalfraction in OS", 0.99*NsigMax, 0., 1.5*NsigMax);
+    RooRealVar nbkgOS("nbkgOS","backgroundfraction in OS", NbkgMax, 0., NsigMax);
+    RooRealVar nbkgSS("nbkgSS","backgroundfraction in SS", NbkgMax, 0., 1.5*NbkgMax);
+
+    RooFormulaVar fr("fr","@0/(@0 + @1)",RooArgList(nbkgOS,nsigOS));
+    RooFormulaVar tf("tf","@0/@1",RooArgList(nbkgOS,nbkgSS));
+
+    RooAddPdf *modelOS = new RooAddPdf("modelOS","Model for OS sample", RooArgList(*(modelSigOS->model),*(modelBkgSS->model)), RooArgList(nsigOS, nbkgOS));
+    RooAddPdf *modelSS = new RooAddPdf("modelSS","Model for SS sample", RooArgList(*(modelBkgSS->model)), RooArgList(nbkgSS));
+
+
+    Int_t strategy = 1;
+    RooFitResult *fitResult=0;
+
+    if(fitStrategy == 2){
+        // --- fit on SS region
+        fitResult = modelSS->fitTo(*dataSS,
+            RooFit::PrintEvalErrors(-1),
+            RooFit::PrintLevel(-1),
+            RooFit::Warnings(0),
+            RooFit::Extended(),
+            RooFit::Strategy(1),
+            //RooFit::Minos(RooArgSet(eff)),
+            RooFit::Save());
+
+        fitResult = modelSS->fitTo(*dataSS,
+            RooFit::PrintEvalErrors(-1),
+            RooFit::PrintLevel(-1),
+            RooFit::Warnings(0),
+            RooFit::Extended(),
+            RooFit::Strategy(2),
+            //RooFit::Minos(RooArgSet(eff)),
+            RooFit::Save());
+    }
+
+    RooArgSet* params = modelBkgSS->model->getVariables();
+    params->Print("v");
+
+    if(fitStrategy == 1){
+        // --- fit on OS region
+        fitResult = modelOS->fitTo(*dataOS,
+            RooFit::PrintEvalErrors(-1),
+            RooFit::PrintLevel(-1),
+            RooFit::Warnings(0),
+            RooFit::Extended(),
+            RooFit::Strategy(1),
+            //RooFit::Minos(RooArgSet(eff)),
+            RooFit::Save());
+
+        fitResult = modelOS->fitTo(*dataOS,
+            RooFit::PrintEvalErrors(-1),
+            RooFit::PrintLevel(-1),
+            RooFit::Warnings(0),
+            RooFit::Extended(),
+            RooFit::Strategy(2),
+            //RooFit::Minos(RooArgSet(eff)),
+            RooFit::Save());
+    }
+
+
+    RooSimultaneous totalPdf("totalPdf","totalPdf",sample);
+    totalPdf.addPdf(*modelOS,"OS");
+    totalPdf.addPdf(*modelSS,"SS");
+
+    if(fitStrategy==2 || fitStrategy==3){
+        if(fitStrategy==2){
+            modelBkgSS->freeze_all_parameters();
+        }
+
+        // --- fit on SS + OS together
+        fitResult = totalPdf.fitTo(*dataCombined,
+            RooFit::PrintEvalErrors(-1),
+            RooFit::PrintLevel(-1),
+            RooFit::Warnings(0),
+            //RooFit::Extended(),
+            RooFit::Strategy(strategy), // MINOS STRATEGY
+            //RooFit::Minos(RooArgSet(eff)),
+            RooFit::Save());
+
+        fitResult = totalPdf.fitTo(*dataCombined,
+            RooFit::PrintEvalErrors(-1),
+            RooFit::PrintLevel(-1),
+            RooFit::Warnings(0),
+            //RooFit::Extended(),
+            RooFit::Strategy(strategy), // MINOS STRATEGY
+            //RooFit::Minos(RooArgSet(eff)),
+            RooFit::Save());
+    }
+
+
+    params = modelBkgSS->model->getVariables();
+    params->Print("v");
+
+    Double_t resfr = fr.getVal();
+    Double_t errfr = fr.getPropagatedError(*fitResult);
+    Double_t restf = tf.getVal();
+    Double_t errtf = tf.getPropagatedError(*fitResult);
+
+
+
+    // Plotting
+
+    char ylabel[50];
+    char yield[50];
+    char nsigstr[50];
+    char nbkgstr[50];
+    char chi2str[50];
+    char frstr[50];
+    char tfstr[50];
+    char sigstr[50];
+
+
+    // --- plot opposite sign region
+    TCanvas *cOS = MakeCanvas("cOS","cOS",720,540);
+    cOS->SetWindowPosition(cOS->GetWindowTopX()+cOS->GetBorderSize()+800,0);
+
+    sprintf(ylabel,"Events / 1 GeV/c^{2}");
+
+    RooPlot *mframeOS = m.frame(Bins(massBin));
+    dataOS->plotOn(mframeOS,MarkerStyle(kFullCircle),MarkerSize(0.8),DrawOption("ZP"));
+    modelOS->plotOn(mframeOS, Components(*(modelSigOS->model)), LineColor(9));
+    modelOS->plotOn(mframeOS, Components(*(modelBkgSS->model)), LineColor(8));
+
+    modelOS->plotOn(mframeOS, LineColor(kRed));
+
+    sprintf(yield,"%u Events",(Int_t)hYieldOS->GetEntries());
+    sprintf(nsigstr,"N_{sig} = %.1f #pm %.1f",nsigOS.getVal(),nsigOS.getPropagatedError(*fitResult));
+    sprintf(nbkgstr,"N_{bkg} = %.1f #pm %.1f",nbkgOS.getVal(),nbkgOS.getPropagatedError(*fitResult));
+    sprintf(chi2str,"#chi^{2}/DOF = %.3f",mframeOS->chiSquare(nflOS));
+    sprintf(frstr,"fr = %.3f #pm %.3f",resfr, errfr);
+    sprintf(tfstr,"tf = %.3f #pm %.3f",restf, errtf);
+
+
+    CPlot plotOS("plot_OS_"+std::to_string(100*fitStrategy+10*bkgSS+sigOS),mframeOS,"Opposite sign","tag-probe mass [GeV/c^{2}]",ylabel);
+
+
+    plotOS.AddTextBox("CMS Preliminary",0.19,0.83,0.54,0.89,0);
+    plotOS.AddTextBox("|#eta| < 2.4",0.21,0.78,0.51,0.83,0,kBlack,-1);
+    plotOS.AddTextBox(std::to_string(ptCut)+" GeV/c < p_{T} < 13000 GeV/c",0.21,0.73,0.51,0.78,0,kBlack,-1);
+    plotOS.AddTextBox(yield,0.21,0.69,0.51,0.73,0,kBlack,-1);
+    plotOS.AddTextBox(modelSigOS->model->GetTitle(), 0.21, 0.63, 0.41, 0.67, 0, 9, -1, 12);
+    plotOS.AddTextBox(modelBkgSS->model->GetTitle(), 0.21, 0.59, 0.41, 0.63, 0, 8, -1, 12);
+    plotOS.AddTextBox(0.70,0.62,0.94,0.90,0,kBlack,-1,5,chi2str, nbkgstr, nsigstr, frstr, tfstr);
+
+    plotOS.Draw(cOS,kTRUE,"png");
+
+    // --- plot same sign region
+    TCanvas *cSS = MakeCanvas("cSS","cSS",720,540);
+    cSS->SetWindowPosition(cSS->GetWindowTopX()+cSS->GetBorderSize()+800,0);
+
+    RooPlot *mframeSS = m.frame(Bins(massBin));
+    dataSS->plotOn(mframeSS,MarkerStyle(kFullCircle),MarkerSize(0.8),DrawOption("ZP"));
+    modelSS->plotOn(mframeSS, Components(*(modelBkgSS->model)), LineColor(8));
+
+    sprintf(yield,"%u Events",(Int_t)hYieldSS->GetEntries());
+    sprintf(nbkgstr,"N_{bkg} = %.1f #pm %.1f",nbkgSS.getVal(),nbkgSS.getPropagatedError(*fitResult));
+    sprintf(chi2str,"#chi^{2}/DOF = %.3f",mframeSS->chiSquare(nflSS));
+
+    CPlot plotSS("plot_SS_"+std::to_string(100*fitStrategy+10*bkgSS+sigOS),mframeSS,"Same sign","tag-probe mass [GeV/c^{2}]",ylabel);
+
+    plotSS.AddTextBox("CMS Preliminary",0.19,0.83,0.54,0.89,0);
+    plotSS.AddTextBox("|#eta| < 2.4",0.21,0.78,0.51,0.83,0,kBlack,-1);
+    plotSS.AddTextBox(std::to_string(ptCut)+" GeV/c < p_{T} < 13000 GeV/c",0.21,0.73,0.51,0.78,0,kBlack,-1);
+    plotSS.AddTextBox(yield,0.21,0.69,0.51,0.73,0,kBlack,-1);
+    plotSS.AddTextBox(modelBkgSS->model->GetTitle(), 0.21, 0.59, 0.41, 0.63, 0, 8, -1, 12);
+    plotSS.AddTextBox(0.70,0.79,0.94,0.90,0,kBlack,-1,2,chi2str, nbkgstr);
+
+    plotSS.Draw(cSS,kTRUE,"png");
+
+    std::vector<float> result = {};
+
+    result.push_back(restf);
+    result.push_back(errtf);
+    result.push_back(errtf);
+    result.push_back(mframeOS->chiSquare(4));
+    result.push_back(mframeSS->chiSquare(3));
+
+    return result;
 }

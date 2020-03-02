@@ -9,11 +9,12 @@ from Utils.Utils import tree_to_df
 from ROOT import TH1D
 import ROOT
 import json
+import glob
 
 import argparse
 parser = argparse.ArgumentParser(prog='./Efficiencies')
 parser.add_argument(
-    '-i', '--input', nargs='+',
+    '-i', '--input', nargs='+', default=None,
     help='specify input tnp root files'
 )
 parser.add_argument(
@@ -29,7 +30,7 @@ parser.add_argument(
     help='specify byLS.json to select specific lumi sections'
 )
 parser.add_argument(
-    '--ptCut', type=float,
+    '--ptCut', type=float, default=27.,
     help='specify lower pt cut on tag and probe muons'
 )
 parser.add_argument(
@@ -47,20 +48,34 @@ parser.add_argument(
 args = parser.parse_args()
 
 inputs = args.input
+if inputs is None:
+    inputs = glob.glob("/pnfs/desy.de/cms/tier2/store/user/dwalter/TnPPairTrees_2017H_LowPU_V02/SingleMuon/TnPPairTrees_2017H_LowPU_V02/191014_135140/0000/output_0_*")
+
+#inputs of same sign selection
+inputs_ss = glob.glob("/pnfs/desy.de/cms/tier2/store/user/dwalter/TnPPairTrees_2017H_LowPUSameCharge_V02/SingleMuon/TnPPairTrees_2017H_LowPUSameCharge_V02/191020_141054/0000/output_0_*")
+
 output = args.output
+
 mcCorr = args.mcCorrections
 sigTemplates = args.sigTemplates
 byLS_file = args.byLS
-
 ptCut = args.ptCut
 tkIsoCut = args.tkIso
 lumiDel, lumiRec, lumi_Erel = args.lumi
+
+lumiDel, lumiRec, lumi_Erel = 200, 199, 0.017
+ptCut = 30
+byLS_file = "/nfs/dust/cms/user/dwalter/data/Lumi/ZMonitoring2017/Cert_306896-307082_13TeV_PromptReco_Collisions17_JSON_LowPU_lowPU.txt"
+sigTemplates = "/nfs/dust/cms/user/dwalter/data/Lumi/ZMonitoring2017/MCTemplates_DY50TuneCP1andCP5FlatPU0to75_Pt30HLT_L1SingleMu25/"
+mcCorr = "/nfs/dust/cms/user/dwalter/data/Lumi/ZMonitoring2017/MCTemplates_DY50TuneCP1andCP5FlatPU0to75/MCCorrections_nPU_TuneCP5FlatPU0to75_TightIDIsoMu27Pt30/MCCorrections_nPU_ZTightID_IsoMu27.json"
+
 
 bkgTemplateQCD = ""
 bkgTemplateTT = ""
 
 
 ROOT.gROOT.LoadMacro(os.path.dirname(os.path.realpath(__file__)) + "/calculateDataEfficiency.C")
+#ROOT.gROOT.LoadMacro(os.path.dirname(os.path.realpath(__file__)) + "/calculateFakeRate.C")
 ROOT.gROOT.SetBatch(True)
 
 if os.path.isdir(output):
@@ -98,22 +113,33 @@ branches = ['nPV', 'dilepMass',  # 'eventNumber', 'run', 'ls',
             'run','ls'
             ]
 
-print(">>> Load Events")
+print(">>> Load events")
 df = [tree_to_df(root2array(i, treeName[0], selection=selection, branches=branches), 5) for i in inputs]
 print(">>> Concatenate")
 df = pd.concat(df)
+
+print(">>> Load same sign events")
+df_ss = [tree_to_df(root2array(i, treeName[0], selection=selection, branches=branches), 5) for i in inputs_ss]
+print(">>> Concatenate")
+df_ss = pd.concat(df_ss)
 
 if byLS_file is not None:
     with open(byLS_file) as json_file:
         byLS = json.load(json_file)
     print(">>> select good ls from byLS.json")
     df = df.query('|'.join(['(run == {0} & ls >= {1} & ls <= {2})'.format(run,ls_start,ls_end) for run, ls_bounds in byLS.items() for ls_start, ls_end in ls_bounds]))
+    df_ss = df_ss.query('|'.join(['(run == {0} & ls >= {1} & ls <= {2})'.format(run,ls_start,ls_end) for run, ls_bounds in byLS.items() for ls_start, ls_end in ls_bounds]))
 
 
 df['is2HLT'] = df['is2HLT'] * (df['tkIso2'] / df['pt2'] < tkIsoCut)
 df['isSel'] = df['isSel'] + df['is2HLT'] * (df['tkIso2'] / df['pt2'] > tkIsoCut)
 
+
+df_ss['is2HLT'] = df_ss['is2HLT'] * (df_ss['tkIso2'] / df_ss['pt2'] < tkIsoCut)
+df_ss['isSel'] = df_ss['isSel'] + df_ss['is2HLT'] * (df_ss['tkIso2'] / df_ss['pt2'] > tkIsoCut)
+
 hZReco = TH1D("hZReco", "th1d Z reco", MassBin, MassMin, MassMax)
+hZReco_ss = TH1D("hZReco_ss", "th1d Z reco same sign", MassBin, MassMin, MassMax)
 hPV = TH1D("hPV_data", "th1d number of primary vertices shape", 75, -0.5, 74.5)
 
 hPassHLTB = TH1D("hPassHLTB", "th1d pass barrel HLT", MassBin, MassMin, MassMax)
@@ -186,6 +212,43 @@ for p in df.query("isGlo==1 & abs(eta2) > 0.9")['dilepMass']:
 
 for p in df.query("(isSta==1 | isTrk==1) & abs(eta2) > 0.9")['dilepMass']:
     hFailGloE.Fill(p)
+
+# fill same sign histogram
+# --- barrel
+for p in df_ss.query("is2HLT==1 & abs(eta2) < 0.9")['dilepMass']:
+    hZReco_ss.Fill(p)
+
+for p in df_ss.query("isSel==1 & abs(eta2) < 0.9")['dilepMass']:
+    hZReco_ss.Fill(p)
+
+# --- endcap
+for p in df_ss.query("is2HLT==1 & abs(eta2) > 0.9")['dilepMass']:
+    hZReco_ss.Fill(p)
+
+for p in df_ss.query("isSel==1 & abs(eta2) > 0.9")['dilepMass']:
+    hZReco_ss.Fill(p)
+
+
+
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 1, 1, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 2, 1, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 3, 1, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 4, 1, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 5, 1, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 1, 2, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 2, 2, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 3, 2, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 4, 2, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 5, 2, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 1, 3, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 2, 3, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 3, 3, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 4, 3, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+xxx = ROOT.calculateZYield(hZReco, hZReco_ss, 2, 5, 3, ptCut, ptCut, 0, sigTemplates + "template_ZYield.root", output)
+
+exit()
 
 print(">>> extract efficiencies")
 # --- efficiency extraction

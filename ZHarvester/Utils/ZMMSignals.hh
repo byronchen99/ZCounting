@@ -81,7 +81,7 @@ CBreitWignerConvCrystalBall::CBreitWignerConvCrystalBall(RooRealVar &m, const Bo
   cb = new RooCBShape(vname,vname,m,*mean,*sigma,*alpha,*n);
 
   sprintf(vname,"signal%s",name);
-  model = new RooFFTConvPdf(vname,vname,m,*bw,*cb);
+  model = new RooFFTConvPdf(vname,"BW x CB",m,*bw,*cb);
 }
 
 CBreitWignerConvCrystalBall::~CBreitWignerConvCrystalBall()
@@ -115,7 +115,7 @@ CMCTemplateConvGaussian::CMCTemplateConvGaussian(RooRealVar &m, TH1D* hist, cons
   sprintf(vname,"sig_histPdf%s",name);  histPdf  = new RooHistPdf(vname,vname,m,*dataHist,intOrder);
 
   sprintf(vname,"signal%s",name);
-  model = new RooFFTConvPdf(vname,vname,m,*histPdf,*gaus);
+  model = new RooFFTConvPdf(vname,"MC x Gaus",m,*histPdf,*gaus);
 }
 
 CMCTemplateConvGaussian::~CMCTemplateConvGaussian()
