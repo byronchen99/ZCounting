@@ -6,5 +6,6 @@
 <use name="CommonTools/UtilAlgos"/>
 <use name="ZCounting/ZCountAnalyze"/>
 <use name="ZCounting/ZUtils"/>
+<use name="AnalysisDataFormats/TopObjects"/>
 <use name="SimDataFormats/PileupSummaryInfo"/>
 <flags EDM_PLUGIN="1"/>

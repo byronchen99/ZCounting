@@ -53,6 +53,8 @@
 
 #include "ZCounting/ZUtils/interface/GenZDecayProperties.h"
 
+#include "AnalysisDataFormats/TopObjects/interface/TtGenEvent.h"
+
 // ROOT includes
 #include "TTree.h"
 #include "Math/Vector4D.h"
@@ -100,6 +102,10 @@ private:
     double pointsDistance(const reco::Candidate::Point&, const reco::Candidate::Point&);
     bool isPVClosestVertex(const std::vector<reco::Vertex>&, const pat::Muon&);
 
+    bool isTau(const reco::GenParticle* lepton)const;
+    const reco::GenParticle* tauDaughter(const reco::GenParticle* tau)const;
+
+
     // ----------member data ---------------------------
 
     edm::Service<TFileService> fs;
@@ -113,9 +119,14 @@ private:
     edm::EDGetTokenT<pat::MuonCollection> muonCollection_;
     edm::EDGetTokenT<std::vector<reco::Vertex> > pvCollection_;
     edm::EDGetTokenT<std::vector<GenZDecayProperties> > genZCollection_;
+    edm::EDGetTokenT<TtGenEvent> genTtEvent_;
     edm::EDGetTokenT<std::vector<PileupSummaryInfo> > pileupInfoCollection_;
 
     std::vector<std::string> muonTriggerPatterns_;
+
+    // flags
+    bool hasGenZ_;
+    bool hasGenTt_;
 
     // primary vertex cuts
     double VtxNTracksFitCut_;
@@ -175,9 +186,13 @@ ZCounting::ZCounting(const edm::ParameterSet& iConfig):
     muonCollection_  (consumes<pat::MuonCollection> (iConfig.getParameter<edm::InputTag>("pat_muons"))),
     pvCollection_    (consumes<std::vector<reco::Vertex> > (iConfig.getParameter<edm::InputTag>("edmPVName"))),
     genZCollection_  (consumes<std::vector<GenZDecayProperties> > (iConfig.getParameter<edm::InputTag>("genZLeptonCollection"))),
+    genTtEvent_  (consumes<TtGenEvent> (iConfig.getParameter<edm::InputTag>("genTtCollection"))),
     pileupInfoCollection_  (consumes<std::vector<PileupSummaryInfo> >(iConfig.getParameter<edm::InputTag>("pileupSummaryInfoCollection")))
 {
-    edm::LogInfo("ZCounting")<<"ZCounting(...)";
+    LogDebug("ZCounting")<<"ZCounting(...)";
+
+    hasGenZ_ = iConfig.getUntrackedParameter<bool>("hasGenZ");
+    hasGenTt_ = iConfig.getUntrackedParameter<bool>("hasGenTt");
 
     muonTriggerPatterns_ = iConfig.getParameter<std::vector<std::string>>("muon_trigger_patterns");
 
@@ -202,7 +217,7 @@ ZCounting::~ZCounting()
 void
 ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 {
-    edm::LogInfo("ZCounting")<<"analyze(...)";
+    LogDebug("ZCounting::analyze");
 
     this->clearVariables();
 
@@ -210,29 +225,66 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     edm::Handle<std::vector<pat::TriggerObjectStandAlone> > triggerObjects;
     edm::Handle<pat::MuonCollection> muonCollection;
     edm::Handle<std::vector<reco::Vertex> > pvCollection;
-    edm::Handle<std::vector<GenZDecayProperties> > genZCollection;
     edm::Handle<std::vector<PileupSummaryInfo> > pileupInfoCollection;
 
     iEvent.getByToken(triggerBits_, triggerBits);
     iEvent.getByToken(triggerObjects_, triggerObjects);
     iEvent.getByToken(muonCollection_, muonCollection);
     iEvent.getByToken(pvCollection_, pvCollection);
-    iEvent.getByToken(genZCollection_, genZCollection);
     iEvent.getByToken(pileupInfoCollection_, pileupInfoCollection);
 
-    decayMode_ = (genZCollection->size() != 0 ? genZCollection->at(0).decayMode() : 0);
+
+    const reco::GenParticle* genLepton = 0;
+    const reco::GenParticle* genAntiLepton = 0;
+    if(hasGenZ_){
+        edm::Handle<std::vector<GenZDecayProperties> > genZCollection;
+        iEvent.getByToken(genZCollection_, genZCollection);
+        decayMode_ = (genZCollection->size() != 0 ? genZCollection->at(0).decayMode() : 0);
+        genLepton = genZCollection->at(0).stableLepton();
+        genAntiLepton = genZCollection->at(0).stableAntiLepton();
+
+    }
+    if(hasGenTt_){
+        LogDebug("ZCounting::analyze")<<"hasGenZ";
+
+        edm::Handle<TtGenEvent> genTtEvent;
+        iEvent.getByToken(genTtEvent_, genTtEvent);
+        if(genTtEvent->lepton()){
+            LogDebug("ZCounting::analyze")<<"hasLepton";
+            genLepton = genTtEvent->lepton();
+            if(this->isTau(genLepton)){
+                decayMode_ += 150000;
+                genLepton = this->tauDaughter(genTtEvent->lepton());
+            }
+
+        }
+        if(genTtEvent->leptonBar()){
+            LogDebug("ZCounting::analyze")<<"hasAntiLepton";
+            genAntiLepton = genTtEvent->leptonBar();
+            if(this->isTau(genAntiLepton)){
+                decayMode_ += 15000000;
+                genAntiLepton = this->tauDaughter(genTtEvent->leptonBar());
+            }
+        }
+        LogDebug("ZCounting::analyze")<<"setDecayMode";
+        if(genLepton)
+            decayMode_ += 100*std::abs(genLepton->pdgId());
+        if(genAntiLepton)
+            decayMode_ += std::abs(genAntiLepton->pdgId());
+    }
+
+    if(!genLepton || ! genAntiLepton) return;
+
 
     //ZBoson->vertex().Coordinates().x();
 
-    edm::LogVerbatim("ZCounting") << "get trigger objects";
+    LogDebug("ZCounting") << "get trigger objects";
     const edm::TriggerNames &triggerNames = iEvent.triggerNames(*triggerBits);
 
     // --- gen muons from Z
-    edm::LogVerbatim("ZCounting") << "get gen muons";
-    const reco::GenParticle *ZLepton = genZCollection->at(0).stableLepton();
-    const reco::GenParticle *ZAntiLepton = genZCollection->at(0).stableAntiLepton();
+    LogDebug("ZCounting") << "get gen muons";
 
-    if(!ZLepton || ! ZAntiLepton) return;
+
 
     // PV selection
     const std::vector<reco::Vertex> *pvCol = pvCollection.product();
@@ -247,27 +299,27 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     }
 
     if(nPV_){
-        muon_genVtxToPV_ = pointsDistance(pv.position(), ZLepton->vertex());
-        antiMuon_genVtxToPV_ = pointsDistance(pv.position(), ZAntiLepton->vertex());
+        muon_genVtxToPV_ = pointsDistance(pv.position(), genLepton->vertex());
+        antiMuon_genVtxToPV_ = pointsDistance(pv.position(), genAntiLepton->vertex());
     }
 
-    muon_genPt_ = ZLepton->pt();
-    muon_genEta_ = ZLepton->eta();
-    muon_genPhi_ = ZLepton->phi();
+    muon_genPt_ = genLepton->pt();
+    muon_genEta_ = genLepton->eta();
+    muon_genPhi_ = genLepton->phi();
 
-    antiMuon_genPt_ = ZAntiLepton->pt();
-    antiMuon_genEta_ = ZAntiLepton->eta();
-    antiMuon_genPhi_ = ZAntiLepton->phi();
+    antiMuon_genPt_ = genAntiLepton->pt();
+    antiMuon_genEta_ = genAntiLepton->eta();
+    antiMuon_genPhi_ = genAntiLepton->phi();
 
-    z_genMass_ = (ZLepton->p4() + ZAntiLepton->p4()).M();
+    z_genMass_ = (genLepton->p4() + genAntiLepton->p4()).M();
 
     // --- find reco muons corresponding to the gen muons from Z
-    edm::LogVerbatim("ZCounting") << "find reco muons";
+    LogDebug("ZCounting") << "find reco muons";
     LorentzVector muon_reco;
     LorentzVector antiMuon_reco;
     for (pat::Muon mu : *muonCollection){
 
-        if(reco::deltaR(mu.eta(), mu.phi(), ZLepton->eta(), ZLepton->phi()) < 0.03 && mu.pdgId() == 13){
+        if(reco::deltaR(mu.eta(), mu.phi(), genLepton->eta(), genLepton->phi()) < 0.03 && mu.pdgId() == 13){
             muon_recoMatches_++;
             muon_reco = mu.p4();
             muon_hasRecoObj_ = true;
@@ -288,7 +340,7 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
             }
 
         }
-        if(reco::deltaR(mu.eta(), mu.phi(), ZAntiLepton->eta(), ZAntiLepton->phi()) < 0.03 && mu.pdgId() == -13){
+        if(reco::deltaR(mu.eta(), mu.phi(), genAntiLepton->eta(), genAntiLepton->phi()) < 0.03 && mu.pdgId() == -13){
             antiMuon_recoMatches_++;
             antiMuon_reco = mu.p4();
             antiMuon_hasRecoObj_ = true;
@@ -323,10 +375,10 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 
 
 // ------------ method called once each job just before starting event loop  ------------
-void 
+void
 ZCounting::beginJob()
 {
-    edm::LogInfo("ZCounting")<<"beginJob()";
+    LogDebug("ZCounting")<<"beginJob()";
 
     if( !fs ){
         edm::LogError("ZCounting") << "TFile Service is not registered in cfg file";
@@ -379,8 +431,8 @@ ZCounting::beginJob()
 }
 
 // ------------ method called once each job just after ending the event loop  ------------
-void 
-ZCounting::endJob() 
+void
+ZCounting::endJob()
 {
 }
 
@@ -396,7 +448,7 @@ ZCounting::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
 
 //--------------------------------------------------------------------------------------------------
 void ZCounting::clearVariables(){
-    edm::LogInfo("ZCounting")<<"clearVariables()";
+    LogDebug("ZCounting::clearVariables()");
 
     nPV_ = 0;
     nPU_ = 0;
@@ -615,6 +667,26 @@ bool ZCounting::isPVClosestVertex(const std::vector<reco::Vertex> &vtxCol, const
     }
     return true;
 }
+
+
+//--------------------------------------------------------------------------------------------------
+bool ZCounting::isTau(const reco::GenParticle* lepton)const
+{
+    return std::abs(lepton->pdgId()) == 15;
+}
+
+//--------------------------------------------------------------------------------------------------
+const reco::GenParticle* ZCounting::tauDaughter(const reco::GenParticle* tau)const
+{
+    for(size_t iDaughter = 0; iDaughter < tau->numberOfDaughters(); ++iDaughter){
+        const reco::GenParticle* daughter = dynamic_cast<const reco::GenParticle*>(tau->daughter(iDaughter));
+        if(std::abs(daughter->pdgId())==11 || std::abs(daughter->pdgId())==13) return daughter;
+        else if(this->isTau(daughter)) return this->tauDaughter(daughter);
+    }
+    return tau;
+}
+
+
 
 //define this as a plug-in
 DEFINE_FWK_MODULE(ZCounting);

@@ -26,7 +26,11 @@ zcounting = cms.EDAnalyzer('ZCounting',
                                       "HLT_IsoMu30_v*"),
 
     # For MC only
+    hasGenZ = cms.untracked.bool(False),
+    hasGenTt = cms.untracked.bool(False),
+
     genEventInfo         = cms.InputTag('generator'),
-    genZLeptonCollection = cms.InputTag('genZLeptonDecay'),
+    genZLeptonCollection = cms.InputTag(''),
+    genTtCollection = cms.InputTag(''),
 
 )
