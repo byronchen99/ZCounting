@@ -15,7 +15,6 @@ config.Data.inputDataset = '/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/R
 config.Data.inputDBS = 'global'
 config.Data.splitting = 'FileBased'
 config.Data.unitsPerJob = 1
-config.Data.outLFNDirBase = '/store/user/%s/ZCountAnalyze_Autumn18FlatPU_V01/' % (getUsernameFromSiteDB())
 config.Data.publication = False
 config.Data.outputDatasetTag = 'DY50_Autumn18FlatPU_V01'
 

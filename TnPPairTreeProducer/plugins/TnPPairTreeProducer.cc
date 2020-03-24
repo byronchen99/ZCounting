@@ -20,8 +20,6 @@ TnPPairTreeProducer::TnPPairTreeProducer(const edm::ParameterSet& iConfig)
     fMuonHLTObjectNames = iConfig.getParameter<std::vector<std::string>>("MuonTriggerObjectNames");
     fPVName = iConfig.getUntrackedParameter<std::string>("edmPVName", "offlinePrimaryVertices");
 
-    selectSameCharge_ = iConfig.getUntrackedParameter<bool>("SelectSameCharge");
-
     VtxNTracksFitCut_ = iConfig.getUntrackedParameter<double>("VtxNTracksFitMin");
     VtxNdofCut_ = iConfig.getUntrackedParameter<double>("VtxNdofMin");
     VtxAbsZCut_ = iConfig.getUntrackedParameter<double>("VtxAbsZMax");
@@ -167,7 +165,7 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
     for (auto const& itMu1 : *hMuonProduct) {
 
         this->clearTagVariables();
-    
+
         pt1_ = itMu1.muonBestTrack()->pt();
         eta1_ = itMu1.muonBestTrack()->eta();
         phi1_ = itMu1.muonBestTrack()->phi();
@@ -199,8 +197,6 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
             phi2_ = itMu2.muonBestTrack()->phi();
             q2_ = itMu2.muonBestTrack()->charge();
 
-            if( (selectSameCharge_ && q1_ != q2_) || (!selectSameCharge_ && q1_ == q2_) )
-                continue;
             if (pt2_ < PtCutL2_)
                 continue;
             if (fabs(eta2_) > EtaCutL2_)
@@ -264,8 +260,6 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
                 continue;
             if (fabs(eta2_) > EtaCutL2_)
                 continue;
-            if( (selectSameCharge_ && q1_ != q2_) || (!selectSameCharge_ && q1_ == q2_) )
-                continue;
 
             vProbe.SetPtEtaPhiM(pt2_, eta2_, phi2_, MUON_MASS);
 
@@ -287,7 +281,7 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
 
 
 // ------------ method called once each job just before starting event loop  ------------
-void 
+void
 TnPPairTreeProducer::beginJob()
 {
     if( !fs ){
@@ -330,7 +324,7 @@ TnPPairTreeProducer::beginJob()
 }
 
 // ------------ method called once each job just after ending the event loop  ------------
-void 
+void
 TnPPairTreeProducer::endJob()
 {
 }
@@ -452,15 +446,15 @@ bool TnPPairTreeProducer::passMuonIso(const reco::Muon& muon) {
 
 //--------------------------------------------------------------------------------------------------
 float TnPPairTreeProducer::getPFIso(const reco::Muon& muon) {
-    return muon.pfIsolationR04().sumChargedHadronPt +
+    return (muon.pfIsolationR04().sumChargedHadronPt +
                    std::max(0.,
                             muon.pfIsolationR04().sumNeutralHadronEt + muon.pfIsolationR04().sumPhotonEt -
-                                0.5 * muon.pfIsolationR04().sumPUPt);
+                                0.5 * muon.pfIsolationR04().sumPUPt)) / muon.pt();
 }
 
 //--------------------------------------------------------------------------------------------------
 float TnPPairTreeProducer::getTkIso(const reco::Muon& muon) {
-    return muon.isolationR03().sumPt;
+    return muon.isolationR03().sumPt / muon.pt();
 }
 
 //--------------------------------------------------------------------------------------------------

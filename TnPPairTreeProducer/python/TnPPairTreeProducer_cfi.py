@@ -1,8 +1,6 @@
 import FWCore.ParameterSet.Config as cms
 
 tnpPairTreeProducer = cms.EDAnalyzer('TnPPairTreeProducer',
-    SelectSameCharge = cms.untracked.bool(False),
-
     # Trigger - sources
     TriggerEvent   = cms.InputTag('hltTriggerSummaryAOD', '', 'HLT'),
     TriggerResults = cms.InputTag('TriggerResults', '', 'HLT'),
@@ -36,7 +34,7 @@ tnpPairTreeProducer = cms.EDAnalyzer('TnPPairTreeProducer',
     PtCutL2=cms.untracked.double(30.0),
     EtaCutL2=cms.untracked.double(2.4),
 
-    MassMin  = cms.untracked.double(56.0),
-    MassMax  = cms.untracked.double(126.0),
+    MassMin  = cms.untracked.double(50.0),
+    MassMax  = cms.untracked.double(150.0),
 
 )

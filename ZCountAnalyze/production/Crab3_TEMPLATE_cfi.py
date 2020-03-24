@@ -15,7 +15,7 @@ config.General.workArea = 'crab_projects'
 config.General.transferOutputs = True
 config.General.transferLogs = False
 
-config.JobType.pyCfgParams = ['isData=<False/True>','selectEvents=<False/True>']
+config.JobType.pyCfgParams = ['param1=<va1>','param2=<val2>']
 config.JobType.pluginName = 'Analysis'
 config.JobType.psetName = '<total path to project cfg file, e.g. /eos/home-d/<user>/CMSSW_9_4_13/src/ZCounting/ZCountAnalyze/test/ZCountAnalyze.py'
 #config.JobType.inputFiles = ['<specify, if resource files are needed>']
@@ -24,7 +24,6 @@ config.Data.inputDataset = '<source file from https://cmsweb.cern.ch/das has to 
 config.Data.inputDBS = 'global'
 config.Data.splitting = 'FileBased'
 config.Data.unitsPerJob = 10
-config.Data.outLFNDirBase = '/store/user/%s/<project name>/' % (getUsernameFromSiteDB())
 config.Data.publication = False
 config.Data.outputDatasetTag = '<output name>'
 
