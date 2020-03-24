@@ -1,15 +1,19 @@
 #include "TROOT.h"
 #include "TH1D.h"
-#include "RooDataSet.h"
-#include "RooRealVar.h"
+
 #include "RooAbsPdf.h"
+#include "RooAddPdf.h"
 #include "RooBreitWigner.h"
 #include "RooCBShape.h"
-#include "RooGaussian.h"
-#include "RooFFTConvPdf.h"
 #include "RooDataHist.h"
+#include "RooDataSet.h"
+#include "RooFFTConvPdf.h"
+#include "RooGaussian.h"
 #include "RooHistPdf.h"
 #include "RooKeysPdf.h"
+#include "RooRealVar.h"
+
+
 
 class CSignalModel
 {
@@ -40,6 +44,19 @@ public:
   TH1D        *inHist;
   RooDataHist *dataHist;
   RooHistPdf  *histPdf;
+};
+
+class CMCStackConvGaussian : public CSignalModel
+{
+public:
+    CMCStackConvGaussian(RooRealVar &m, TH1D* hist_dy, TH1D* hist_tt, const Bool_t pass, const int ibin, int intOrder=1);
+    ~CMCStackConvGaussian();
+    RooRealVar  *mean, *sigma, *frac;
+    RooGaussian *gaus;
+    TH1D        *inHist_dy, *inHist_tt;
+    RooDataHist *dataHist_dy, *dataHist_tt;
+    RooHistPdf  *histPdf_dy, *histPdf_tt;
+    RooAddPdf   *stack;
 };
 
 //--------------------------------------------------------------------------------------------------
@@ -126,4 +143,48 @@ CMCTemplateConvGaussian::~CMCTemplateConvGaussian()
   delete inHist;
   delete dataHist;
   delete histPdf;
+}
+
+//--------------------------------------------------------------------------------------------------
+CMCStackConvGaussian::CMCStackConvGaussian(RooRealVar &m, TH1D* hist_dy, TH1D* hist_tt, const Bool_t pass, const int ibin, int intOrder)
+{
+  char name[10];
+  if(pass) sprintf(name,"%s_%i","Pass",ibin);
+  else     sprintf(name,"%s_%i","Fail",ibin);
+  char vname[50];
+
+  sprintf(vname,"sig_mean%s",name);  mean  = new RooRealVar(vname,vname,0,-2.5,2.5);
+  sprintf(vname,"sig_sigma%s",name); sigma = new RooRealVar(vname,vname,2,0,5);
+  sprintf(vname,"sig_gaus%s",name);  gaus  = new RooGaussian(vname,vname,m,*mean,*sigma);
+
+  sprintf(vname,"sig_inHist_dy_%s",hist_dy->GetName()); inHist_dy = (TH1D*)hist_dy->Clone(vname);
+  sprintf(vname,"sig_inHist_tt_%s",hist_tt->GetName()); inHist_tt = (TH1D*)hist_tt->Clone(vname);
+
+  sprintf(vname,"sig_dataHist_dy_%s",name); dataHist_dy = new RooDataHist(vname,vname,RooArgSet(m),inHist_dy);
+  sprintf(vname,"sig_dataHist_tt_%s",name); dataHist_tt = new RooDataHist(vname,vname,RooArgSet(m),inHist_tt);
+
+  sprintf(vname,"sig_histPdf_dy_%s",name);  histPdf_dy  = new RooHistPdf(vname,vname,m,*dataHist_dy,intOrder);
+  sprintf(vname,"sig_histPdf_tt_%s",name);  histPdf_tt  = new RooHistPdf(vname,vname,m,*dataHist_tt,intOrder);
+
+  sprintf(vname,"sig_frac_%s",name);      frac = new RooRealVar(vname, "sig_frac", .95, 0.,1.);
+  sprintf(vname,"sig_stack_%s",name);
+  stack = new RooAddPdf(vname, "dy + tt", RooArgList(*histPdf_dy,*histPdf_tt), RooArgList(*frac));
+
+  sprintf(vname,"signal%s",name);
+  model = new RooFFTConvPdf(vname,"MC x Gaus",m,*stack,*gaus);
+}
+
+CMCStackConvGaussian::~CMCStackConvGaussian()
+{
+    delete mean;
+    delete sigma;
+    delete gaus;
+    delete inHist_dy;
+    delete inHist_tt;
+    delete dataHist_dy;
+    delete dataHist_tt;
+    delete histPdf_dy;
+    delete histPdf_tt;
+    delete frac;
+    delete stack;
 }

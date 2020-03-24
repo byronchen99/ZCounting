@@ -28,10 +28,15 @@ public:
         const Int_t     _sigModelType,
         const Int_t     _bkgModelType,
         const TString   _outputDir="",
-        const TString   _mcfilename="",
-        TH1D*           _hPV=0
+        const TString   _mcfilename_dy="",
+        const TString   _mcfilename_tt="",
+        TH1D*           _hPV=0,
+        const Float_t   _massLo  = 66.,
+        const Float_t   _massHi  = 116.
     );
     ~RooFitter(){}
+
+    void update_sigModel(const TString _mcfilename_dy="", const TString _mcfilename_tt="", TH1D* _hPV=0);
 
     void fit_backgroundmodel(TH1D* _hYield);
     std::vector<float> fit_simultanious(TH1D* _hYieldOS, TH1D* _hYieldSS, const TString _name="");
@@ -65,8 +70,6 @@ private:
 
     TH1D* generateTemplate_ZYield(
         const TString mcfilename,
-    	const Float_t ptCutTag,
-    	const Float_t ptCutProbe,
     	TH1D*         hPV
     );
 

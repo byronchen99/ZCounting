@@ -47,9 +47,12 @@ inputs_os_highPu = [inputs_os_highPu2017B, inputs_os_highPu2017C, inputs_os_high
 
 ptCut = 30
 byLS_file = "/nfs/dust/cms/user/dwalter/data/Lumi/ZMonitoring2017/Cert_306896-307082_13TeV_PromptReco_Collisions17_JSON_LowPU_lowPU.txt"
-#sigTemplates_DY = "/nfs/dust/cms/user/dwalter/data/Lumi/ZMonitoring2017/MCTemplates_DY50TuneCP1andCP5FlatPU0to75_Pt30HLT_L1SingleMu25/"
-sigTemplates_DY = "/nfs/dust/cms/user/dwalter/data/Lumi/ZMonitoring2017/MCTemplates_DY50TuneCP1andCP5FlatPU0to75_Pt30HLT_IsoMu27/"
 
+sigTemplates_DY_flatPU = "/nfs/dust/cms/user/dwalter/data/Lumi/ZMonitoring2017/MCTemplates/DY50_TuneCP5MadgraphMLMPythia8_Pt30_L1SingleMu25/"
+sigTemplates_DY_L1SingleMu25 = "/nfs/dust/cms/user/dwalter/data/Lumi/ZMonitoring2017/MCTemplates/DY50_TuneCP5amcatnloFXFXPythia8_Pt30_L1SingleMu25/"
+sigTemplates_DY = "/nfs/dust/cms/user/dwalter/data/Lumi/ZMonitoring2017/MCTemplates/DY50_TuneCP5amcatnloFXFXPythia8_IsoMu27/"
+
+sigTemplates_TT = "/nfs/dust/cms/user/dwalter/data/Lumi/ZMonitoring2017/MCTemplates/TTTo2L2Nu_TuneCP5PowhegPythia8_IsoMu27/"
 
 if os.path.isdir(output):
     print("output dir already exists, please remove or specify another name")
@@ -112,33 +115,67 @@ if byLS_file is not None:
     df_ss = df_ss.query('|'.join(['(run == {0} & ls >= {1} & ls <= {2})'.format(run,ls_start,ls_end) for run, ls_bounds in byLS.items() for ls_start, ls_end in ls_bounds]))
 
 
+hPV = TH1D("hPV_data", "th1d number of primary vertices shape", 75, -0.5, 74.5)
+
 hZReco = TH1D("hZReco", "th1d Z reco", MassBin, MassMin, MassMax)
 hZReco_ss = TH1D("hZReco_ss", "th1d Z reco same sign", MassBin, MassMin, MassMax)
-hZReco_ss_highPu = TH1D("hZReco_ss_highPu", "th1d Z reco same sign high pileup", MassBin, MassMin, MassMax)
-hZReco_os_highPu = TH1D("hZReco_os_highPu", "th1d Z reco opposite sign high pileup", MassBin, MassMin, MassMax)
 
 df_ss_highPu = pd.concat(list_ss_highPU)
-
 for p in df_ss_highPu.query("is2HLT==1 | isSel==1")['dilepMass']:
-    hZReco_ss_highPu.Fill(p)
-
-yieldfitter = ROOT.RooFitter(ptCut, ptCut, 2, 5, output, sigTemplates_DY+ "template_ZYield.root", 0)
-yieldfitter.fit_backgroundmodel(hZReco_ss_highPu)
-
-# fill z yield same histograms
-for p in df.query("is2HLT==1 | isSel==1")['dilepMass']:
-    hZReco.Fill(p)
+    hZReco_ss.Fill(p)
 
 for p in df_ss.query("is2HLT==1 | isSel==1")['dilepMass']:
     hZReco_ss.Fill(p)
 
-res = yieldfitter.fit_simultanious(hZReco, hZReco_ss, "H")
+yieldfitter = ROOT.RooFitter(ptCut, ptCut, 2, 5, output,
+    sigTemplates_DY + "template_ZYield.root")
+yieldfitter.fit_backgroundmodel(hZReco_ss)
+
+print(">>> Fill Hists 2017 H")
+for p in df.query("is2HLT==1 | isSel==1")['dilepMass']:
+    hZReco.Fill(p)
+for nPV in df['nPV']:
+    hPV.Fill(nPV)
+
+hZReco_ss.Delete()
+hZReco_ss = TH1D("hZReco_ss", "th1d Z reco same sign", MassBin, MassMin, MassMax)
+for p in df_ss.query("is2HLT==1 | isSel==1")['dilepMass']:
+    hZReco_ss.Fill(p)
+
+npv_mean = df.query("is2HLT==1 | isSel==1")['nPV'].mean()
+result = []
+
+print("fit flat PU template w/o nPV reweighting")
+res = yieldfitter.fit_simultanious(hZReco, hZReco_ss, "H_0")
+result.append(([res[i] for i in range(len(res))]+ [npv_mean]))
+
+# print("fit flat PU template with nPV reweighting")
+# yieldfitter.update_sigModel(sigTemplates_DY_flatPU+ "template_ZYield.root", hPV)
+# res = yieldfitter.fit_simultanious(hZReco, hZReco_ss, "H_1")
+# result.append(([res[i] for i in range(len(res))]+ [npv_mean]))
+#
+# print("fit high PU template with non Isolated Trigger w/o nPV reweighting")
+# yieldfitter.update_sigModel(sigTemplates_DY_L1SingleMu25+ "template_ZYield.root")
+# res = yieldfitter.fit_simultanious(hZReco, hZReco_ss, "H_2")
+# result.append(([res[i] for i in range(len(res))]+ [npv_mean]))
+#
+# print("fit high PU template w/o nPV reweighting")
+# yieldfitter.update_sigModel(sigTemplates_DY+ "template_ZYield.root")
+# res = yieldfitter.fit_simultanious(hZReco, hZReco_ss, "H_3")
+# result.append(([res[i] for i in range(len(res))]+ [npv_mean]))
+
+
 results = {}
-results["H"] = pd.DataFrame([[res[i] for i in range(len(res))] + [df.query("is2HLT==1 | isSel==1")['nPV'].mean()]],
+results["H"] = pd.DataFrame(result,
     columns=["fr","fr_err","tf","tf_err","chi2_OS","Chi2_SS","avgPU"])
 
+hPV.Delete()
+hZReco.Delete()
+hZReco_ss.Delete()
+
+
 eras = ["B", "C", "D", "E", "F"]
-iStep = 100000
+iStep = 120000
 # loop over eras B to F
 for df_os_highPu, df_ss_highPu, era in zip(list_os_highPU, list_ss_highPU, eras):
 
@@ -153,8 +190,6 @@ for df_os_highPu, df_ss_highPu, era in zip(list_os_highPU, list_ss_highPU, eras)
         print("era {0} do measurement {1}/{2}".format(era, iMeasure, len(dfReco_os_highPu)//iStep) )
         print("{0} < {1}".format((iMeasure+1)*iStep, len(dfReco_os_highPu)))
 
-
-
         hZReco_os_highPu = TH1D("hZReco_os_highPu", "th1d Z reco opposite sign high pileup", MassBin, MassMin, MassMax)
         hZReco_ss_highPu = TH1D("hZReco_ss_highPu", "th1d Z reco same sign high pileup", MassBin, MassMin, MassMax)
 
@@ -167,6 +202,7 @@ for df_os_highPu, df_ss_highPu, era in zip(list_os_highPU, list_ss_highPU, eras)
 
         selected_ss = dfReco_ss_highPu[dfReco_ss_highPu['nPV'].expanding().mean() < npv_cummmean]['dilepMass']
 
+
         for p in selected['dilepMass']:
             hZReco_os_highPu.Fill(p)
 
@@ -175,9 +211,16 @@ for df_os_highPu, df_ss_highPu, era in zip(list_os_highPU, list_ss_highPU, eras)
 
         iLast = len(selected_ss)
 
+        # # new nPV distribution
+        # hPV = TH1D("hPV_data", "th1d number of primary vertices shape", 75, -0.5, 74.5)
+        # for nPV in selected['nPV']:
+        #     hPV.Fill(nPV)
+        # yieldfitter.update_sigModel(sigTemplates_DY+ "template_ZYield.root", hPV)
+        # hPV.Delete()
+
         res = yieldfitter.fit_simultanious(hZReco_os_highPu, hZReco_ss_highPu, "{0}_{1}".format(era,iMeasure))
 
-        result.append(([res[i] for i in range(len(res))]+ [npv_mean]))
+        result.append(([res[i] for i in range(len(res))] + [npv_mean]))
 
         iMeasure += 1
         hZReco_os_highPu.Delete()

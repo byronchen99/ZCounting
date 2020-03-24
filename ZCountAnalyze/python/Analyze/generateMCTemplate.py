@@ -13,10 +13,6 @@ parser.add_argument(
     help='specify input root file'
 )
 parser.add_argument(
-    '--ptCut', type=float,
-    help='specify lower pt cut on tag and probe muons'
-)
-parser.add_argument(
     '-o', '--output', type=str, default='./',
     help='specify output dir'
 )
@@ -24,7 +20,6 @@ args = parser.parse_args()
 
 inputs = args.input
 output = args.output
-ptCut = args.ptCut
 
 if not os.path.isdir(output):
     os.mkdir(output)
@@ -51,14 +46,10 @@ for nPV in dfPV['nPV']:
 hPV.Scale(1. / hPV.Integral())
 
 # acceptance selection
-selection = 'z_recoMass > 66 ' \
-            '& z_recoMass < 116 ' \
-            '& muon_recoPt > {0} ' \
-            '& antiMuon_recoPt > {0} ' \
-            '& abs(muon_recoEta) < 2.4 ' \
+selection = 'abs(muon_recoEta) < 2.4 ' \
             '& abs(antiMuon_recoEta) < 2.4 ' \
             '& muon_recoMatches == 1 ' \
-            '& antiMuon_recoMatches == 1'.format(ptCut)
+            '& antiMuon_recoMatches == 1'
 
 # specify which branches to load
 branches = ['nPV', 'nPU', 'z_recoMass',
@@ -80,19 +71,25 @@ df = pd.concat(df)
 #  df = df.query('delRLL > 0.4')
 
 print(">>> convert bit code into bit map")
-for iBit in range(0, 5):
-    nBit = 2 ** iBit
-    iBit += 1
-    df['muon_hlt_{0}'.format(iBit)] = df['muon_triggerBits'].apply(
-        lambda x: 1 if x % (nBit * 2) >= nBit else 0)
-    df['antiMuon_hlt_{0}'.format(iBit)] = df['antiMuon_triggerBits'].apply(
-        lambda x: 1 if x % (nBit * 2) >= nBit else 0)
+#
+iBit = 3
+#   0: "HLT_L1SingleMu18_v*"
+#   1: "HLT_L1SingleMu25_v*"
+#   2: "HLT_IsoMu24_v*"
+#   3: "HLT_IsoMu27_v*"
+#   4: "HLT_IsoMu30_v*"
+
+nBit = 2 ** iBit
+df['muon_hlt'] = df['muon_triggerBits'].apply(
+    lambda x: 1 if x % (nBit * 2) >= nBit else 0)
+df['antiMuon_hlt'] = df['antiMuon_triggerBits'].apply(
+    lambda x: 1 if x % (nBit * 2) >= nBit else 0)
 
 print(">>> select events with a tag")
 
-df = df.query('(muon_hlt_2 == 1 & muon_ID > 4) | (antiMuon_hlt_2 == 1 & antiMuon_ID > 4)')
-df['passHLT'] = ((df['muon_ID'] >= 5) & (df['antiMuon_ID'] >= 5) & (df['muon_hlt_1'] == 1) & (df['antiMuon_hlt_1'] == 1))
-df['passSel'] = ((df['muon_ID'] >= 5) & (df['antiMuon_ID'] >= 5))
+df = df.query('(muon_hlt == 1 & muon_ID >= 4) | (antiMuon_hlt == 1 & antiMuon_ID >= 4)')
+df['passHLT'] = ((df['muon_ID'] >= 4) & (df['antiMuon_ID'] >= 4) & (df['muon_hlt'] == 1) & (df['antiMuon_hlt'] == 1))
+df['passSel'] = ((df['muon_ID'] >= 4) & (df['antiMuon_ID'] >= 4))
 df['passGlo'] = ((df['muon_ID'] >= 3) & (df['antiMuon_ID'] >= 3))
 df['passTrk'] = ((df['muon_ID'] >= 1) & (df['antiMuon_ID'] >= 1))
 
@@ -109,13 +106,13 @@ dfPassHLT2 = dfPassHLT2.rename(columns={'muon_recoPt': 'ptProbe',
                                         'muon_recoEta': 'etaProbe',
                                         'antiMuon_recoEta': 'etaTag'
                                         })
-dfFailHLT1 = df.query('passHLT == 0 & passSel == 1 & muon_hlt_1 == 0')
+dfFailHLT1 = df.query('passHLT == 0 & passSel == 1 & muon_hlt == 0')
 dfFailHLT1 = dfFailHLT1.rename(columns={'muon_recoPt': 'ptProbe',
                                         'antiMuon_recoPt': 'ptTag',
                                         'muon_recoEta': 'etaProbe',
                                         'antiMuon_recoEta': 'etaTag'
                                         })
-dfFailHLT2 = df.query('passHLT == 0 & passSel == 1 & antiMuon_hlt_1 == 0')
+dfFailHLT2 = df.query('passHLT == 0 & passSel == 1 & antiMuon_hlt == 0')
 dfFailHLT2 = dfFailHLT2.rename(columns={'muon_recoPt': 'ptTag',
                                         'antiMuon_recoPt': 'ptProbe',
                                         'muon_recoEta': 'etaTag',
@@ -153,13 +150,13 @@ tfile.Close()
 
 
 print(">>> Template for selection step")
-dfFailSel1 = df.query('passSel == 0 & passGlo == 1 & muon_hlt_1 == 0')
+dfFailSel1 = df.query('passSel == 0 & passGlo == 1 & muon_hlt == 0')
 dfFailSel1 = dfFailSel1.rename(columns={'muon_recoPt': 'ptProbe',
                                         'antiMuon_recoPt': 'ptTag',
                                         'muon_recoEta': 'etaProbe',
                                         'antiMuon_recoEta': 'etaTag'
                                         })
-dfFailSel2 = df.query('passSel == 0 & passGlo == 1 & antiMuon_hlt_1 == 0')
+dfFailSel2 = df.query('passSel == 0 & passGlo == 1 & antiMuon_hlt == 0')
 dfFailSel2 = dfFailSel2.rename(columns={'muon_recoPt': 'ptTag',
                                         'antiMuon_recoPt': 'ptProbe',
                                         'muon_recoEta': 'etaTag',
@@ -180,13 +177,13 @@ ttree.Delete()
 tfile.Close()
 
 print(">>> Template for global step")
-dfFailGlo1 = df.query('passGlo == 0 & passTrk == 1 & muon_hlt_1 == 0')
+dfFailGlo1 = df.query('passGlo == 0 & passTrk == 1 & muon_hlt == 0')
 dfFailGlo1 = dfFailGlo1.rename(columns={'muon_recoPt': 'ptProbe',
                                         'antiMuon_recoPt': 'ptTag',
                                         'muon_recoEta': 'etaProbe',
                                         'antiMuon_recoEta': 'etaTag'
                                         })
-dfFailGlo2 = df.query('passGlo == 0 & passTrk == 1 & antiMuon_hlt_1 == 0')
+dfFailGlo2 = df.query('passGlo == 0 & passTrk == 1 & antiMuon_hlt == 0')
 dfFailGlo2 = dfFailGlo2.rename(columns={'muon_recoPt': 'ptTag',
                                         'antiMuon_recoPt': 'ptProbe',
                                         'muon_recoEta': 'etaTag',

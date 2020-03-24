@@ -9,14 +9,19 @@ RooFitter::RooFitter(
     const Int_t     _sigModelType,
     const Int_t     _bkgModelType,
     const TString   _outputDir,
-    const TString   _mcfilename,
-    TH1D*           _hPV
+    const TString   _mcfilename_dy,
+    const TString   _mcfilename_tt,
+    TH1D*           _hPV,
+    const Float_t   _massLo,
+    const Float_t   _massHi
 ):
     ptCutTag(_ptCutTag),
     ptCutProbe(_ptCutProbe),
     m("m","mass",massLo,massHi),
     sigModelType(_sigModelType),
-    bkgModelType(_bkgModelType)
+    bkgModelType(_bkgModelType),
+    massLo(_massLo),
+    massHi(_massHi)
 {
     std::cout<<"init RooFitter"<<std::endl;
 
@@ -27,11 +32,20 @@ RooFitter::RooFitter(
         case 1:
             modelSig = new CBreitWignerConvCrystalBall(m, kFALSE, 0);
             ndfSig += 4; break;
-        case 2:
-            TH1D *h = generateTemplate_ZYield(_mcfilename, ptCutTag, ptCutProbe, _hPV);
+        case 2:{
+            TH1D *h = generateTemplate_ZYield(_mcfilename_dy, _hPV);
             assert(h);
             modelSig = new CMCTemplateConvGaussian(m,h,kFALSE,0);
             ndfSig += 2; break;
+        }
+        case 3:{
+            TH1D *h_dy = generateTemplate_ZYield(_mcfilename_dy, _hPV);
+            TH1D *h_tt = generateTemplate_ZYield(_mcfilename_tt, _hPV);
+            assert(h_dy);
+            assert(h_tt);
+            modelSig = new CMCStackConvGaussian(m,h_dy,h_tt,kFALSE,0);
+            ndfSig += 3; break;
+        }
     }
     switch(_bkgModelType) {
         case 1:
@@ -50,7 +64,33 @@ RooFitter::RooFitter(
             modelBkg = new CDasPlusExp(m, kFALSE, 0);
             ndfBkg += 6; break;
     }
+}
 
+//--------------------------------------------------------------------------------------------------
+void RooFitter::update_sigModel(
+    const TString   _mcfilename_dy,
+    const TString   _mcfilename_tt,
+    TH1D*           _hPV
+){
+    switch(sigModelType) {
+        case 1:
+            modelSig = new CBreitWignerConvCrystalBall(m, kFALSE, 0);
+            ndfSig = 4; break;
+        case 2:{
+            TH1D *h = generateTemplate_ZYield(_mcfilename_dy, _hPV);
+            assert(h);
+            modelSig = new CMCTemplateConvGaussian(m,h,kFALSE,0);
+            ndfSig += 2; break;
+        }
+        case 3:{
+            TH1D *h_dy = generateTemplate_ZYield(_mcfilename_dy, _hPV);
+            TH1D *h_tt = generateTemplate_ZYield(_mcfilename_tt, _hPV);
+            assert(h_dy);
+            assert(h_tt);
+            modelSig = new CMCStackConvGaussian(m,h_dy,h_tt,kFALSE,0);
+            ndfSig += 3; break;
+        }
+    }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -108,11 +148,14 @@ void RooFitter::fit_backgroundmodel(
 
     plotSS.AddTextBox("CMS Preliminary",0.19,0.83,0.54,0.89,0);
     plotSS.AddTextBox("|#eta| < 2.4",0.21,0.78,0.51,0.83,0,kBlack,-1);
-    plotSS.AddTextBox(std::to_string(ptCutProbe)+" GeV/c < p_{T} < 13000 GeV/c",0.21,0.73,0.51,0.78,0,kBlack,-1);
+    plotSS.AddTextBox(std::to_string((int)ptCutProbe)+" GeV/c < p_{T} < 13000 GeV/c",0.21,0.73,0.51,0.78,0,kBlack,-1);
     plotSS.AddTextBox(yield,0.21,0.69,0.51,0.73,0,kBlack,-1);
     plotSS.AddTextBox(modelBkg->model->GetTitle(), 0.21, 0.59, 0.41, 0.63, 0, 8, -1, 12);
     plotSS.AddTextBox(0.70,0.79,0.94,0.90,0,kBlack,-1,2,chi2str, nbkgstr);
 
+    const Double_t yMax = _hYield->GetMaximum() + _hYield->GetBinError(_hYield->GetMaximumBin());
+    const Double_t yMin = std::max(0., _hYield->GetMinimum() - _hYield->GetBinError(_hYield->GetMinimumBin()));
+    plotSS.SetYRange(yMin, yMax + 0.4*(yMax-yMin));
     plotSS.Draw(cSS,kTRUE,"png");
 
     delete data;
@@ -217,7 +260,7 @@ std::vector<float> RooFitter::fit_simultanious(
 
     plotOS.AddTextBox("CMS Preliminary",0.19,0.83,0.54,0.89,0);
     plotOS.AddTextBox("|#eta| < 2.4",0.21,0.78,0.51,0.83,0,kBlack,-1);
-    plotOS.AddTextBox(std::to_string(ptCutProbe)+" GeV/c < p_{T} < 13000 GeV/c",0.21,0.73,0.51,0.78,0,kBlack,-1);
+    plotOS.AddTextBox(std::to_string((int)ptCutProbe)+" GeV/c < p_{T} < 13000 GeV/c",0.21,0.73,0.51,0.78,0,kBlack,-1);
     plotOS.AddTextBox(yield,0.21,0.69,0.51,0.73,0,kBlack,-1);
     plotOS.AddTextBox(modelSig->model->GetTitle(), 0.21, 0.63, 0.41, 0.67, 0, 9, -1, 12);
     plotOS.AddTextBox(modelBkg->model->GetTitle(), 0.21, 0.59, 0.41, 0.63, 0, 8, -1, 12);
@@ -252,7 +295,7 @@ std::vector<float> RooFitter::fit_simultanious(
 
     plotSS.AddTextBox("CMS Preliminary",0.19,0.83,0.54,0.89,0);
     plotSS.AddTextBox("|#eta| < 2.4",0.21,0.78,0.51,0.83,0,kBlack,-1);
-    plotSS.AddTextBox(std::to_string(ptCutProbe)+" GeV/c < p_{T} < 13000 GeV/c",0.21,0.73,0.51,0.78,0,kBlack,-1);
+    plotSS.AddTextBox(std::to_string((int)ptCutProbe)+" GeV/c < p_{T} < 13000 GeV/c",0.21,0.73,0.51,0.78,0,kBlack,-1);
     plotSS.AddTextBox(yield,0.21,0.69,0.51,0.73,0,kBlack,-1);
     plotSS.AddTextBox(modelBkg->model->GetTitle(), 0.21, 0.59, 0.41, 0.63, 0, 8, -1, 12);
     plotSS.AddTextBox(0.70,0.79,0.94,0.90,0,kBlack,-1,2,chi2str, nbkgstr);
@@ -282,8 +325,6 @@ std::vector<float> RooFitter::fit_simultanious(
 //--------------------------------------------------------------------------------------------------
 TH1D* RooFitter::generateTemplate_ZYield(
 	const TString mcfilename,
-	const Float_t ptCutTag,
-	const Float_t ptCutProbe,
 	TH1D*         hPV
 ){
     cout << "Creating histogram templates... "; cout.flush();
