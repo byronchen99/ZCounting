@@ -16,7 +16,6 @@ cd $TOP
 cp -r ${workdir}/Utils $TOP
 cp -r ${workdir}/.rootlogon.C $TOP
 cp ${workdir}/calculateDataEfficiency.C $TOP
-cp ${workdir}/calculateZEfficiency.C $TOP
 cp ${workdir}/ZCounting.py $TOP
 
-python ZCounting.py -b $runNum -e $(($runNum + 1)) --dirDQM $3 --byLsCSV $4 -o $5 --mcCorrections $6 --sigTemplates $7 --ptCut $8
+python ZCounting.py -b $runNum -e $(($runNum + 1)) --dirDQM $3 --byLsCSV $4 -o $5 --mcCorrections $6 --sigTemplates $7 --bkgTemplates $8 --ptCut $9

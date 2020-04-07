@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-def zmonitoring(dirDQM, dirOut, byLsCSV, mcCorrections, sigTemplates, ptCut, runlist = None):
+def zmonitoring(dirDQM, dirOut, byLsCSV, mcCorrections, sigTemplates, bkgTemplates, ptCut, runlist = None):
     import os
     import pandas as pd
     import glob
@@ -33,7 +33,7 @@ def zmonitoring(dirDQM, dirOut, byLsCSV, mcCorrections, sigTemplates, ptCut, run
         if len(glob.glob(dirDQM+"/000*/*{0}*.root".format(run))) == 0:
             continue
         runs.append(run)
-        cs_file.write("arguments  = {0} {1} {2} {3} {4} {5} {6} {7}\n".format(
+        cs_file.write("arguments  = {0} {1} {2} {3} {4} {5} {6} {7} {8}\n".format(
             run,
             cmsswbase,
             dirDQM,
@@ -41,6 +41,7 @@ def zmonitoring(dirDQM, dirOut, byLsCSV, mcCorrections, sigTemplates, ptCut, run
             dirOut,
             mcCorrections,
             sigTemplates,
+            bkgTemplates,
             ptCut
     	))
 
@@ -63,6 +64,7 @@ def zmonitoring(dirDQM, dirOut, byLsCSV, mcCorrections, sigTemplates, ptCut, run
         'byLsCSV': byLsCSV,
         'mcCorrections': mcCorrections,
         'sigTemplates': sigTemplates,
+        'bkgTemplates': bkgTemplates,
         'ptCut': ptCut,
         'runs': runs,
         'njobs': njobs,
@@ -90,7 +92,7 @@ def check(projectdir, resubmit=False):
     unfinished_jobs = []
     for ijob in range(ji['njobs']):
         outfilename = "condor/{0}.{1}.err".format(ji['clusterId'], ijob)
-        if not os.path.isfile(outfilename):
+        if not os.path.isfile(outfilename) or os.stat(outfilename).st_size == 0: #file does not exist or is empty?
             unfinished_jobs.append(ijob)
             continue
         with open(outfilename, "r") as f:
@@ -120,7 +122,7 @@ def check(projectdir, resubmit=False):
                     if os.path.isfile(csvFile):
                         os.system("mv {0} {1}/csvFiles/".format(csvFile, faildir))
 
-                zmonitoring(ji['dirDQM'], ji['dirOut'], ji['byLsCSV'], ji['mcCorrections'], ji['sigTemplates'], ji['ptCut'],
+                zmonitoring(ji['dirDQM'], ji['dirOut'], ji['byLsCSV'], ji['mcCorrections'], ji['sigTemplates'], ji['bkgTemplates'], ji['ptCut'],
                             runlist=[ji['runs'][i] for i in unfinished_jobs])
 
 
@@ -128,7 +130,7 @@ def check(projectdir, resubmit=False):
 # parse command line arguments
 if __name__ == '__main__':
     # setup argument parser
-    import argparse
+    import argparse, pdb
     parser = argparse.ArgumentParser(prog='./submit')
     subparsers = parser.add_subparsers(dest='subparser')
 
@@ -147,6 +149,10 @@ if __name__ == '__main__':
     )
     parserA.add_argument(
         '--sigTemplates', default='./Resources/MCTemplates', type=str,
+        help='specify directory with MC template root tree files for signal shapes'
+    )
+    parserA.add_argument(
+        '--bkgTemplates', default='./Resources/MCTemplates', type=str,
         help='specify directory with MC template root tree files for signal shapes'
     )
     parserA.add_argument(
@@ -179,6 +185,6 @@ if __name__ == '__main__':
     # parse arguments and call subparser
     args = parser.parse_args()
     if args.subparser == 'zmonitoring':
-        zmonitoring(args.inputDQM, args.output, args.byLsCSV, args.mcCorrections, args.sigTemplates, args.ptCut)
+        zmonitoring(args.inputDQM, args.output, args.byLsCSV, args.mcCorrections, args.sigTemplates, args.bkgTemplates, args.ptCut)
     if args.subparser == 'check':
         check(args.project, args.resubmit)
