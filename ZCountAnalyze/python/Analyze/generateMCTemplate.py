@@ -58,6 +58,7 @@ branches = ['nPV', 'nPU', 'z_recoMass',
             'muon_recoPt',  'antiMuon_recoPt',
             'muon_ID', 'antiMuon_ID',
             'muon_triggerBits', 'antiMuon_triggerBits',
+            'muon_tkIso', 'antiMuon_tkIso'
             ]
 
 print(">>> Load Events in acceptance")
@@ -70,8 +71,7 @@ df = pd.concat(df)
 
 #  df = df.query('delRLL > 0.4')
 
-print(">>> convert bit code into bit map")
-#
+tkIsoCut = 0.05
 iBit = 3
 #   0: "HLT_L1SingleMu18_v*"
 #   1: "HLT_L1SingleMu25_v*"
@@ -79,6 +79,7 @@ iBit = 3
 #   3: "HLT_IsoMu27_v*"
 #   4: "HLT_IsoMu30_v*"
 
+print(">>> convert bit code into bit map")
 nBit = 2 ** iBit
 df['muon_hlt'] = df['muon_triggerBits'].apply(
     lambda x: 1 if x % (nBit * 2) >= nBit else 0)
@@ -87,9 +88,16 @@ df['antiMuon_hlt'] = df['antiMuon_triggerBits'].apply(
 
 print(">>> select events with a tag")
 
-df = df.query('(muon_hlt == 1 & muon_ID >= 4) | (antiMuon_hlt == 1 & antiMuon_ID >= 4)')
-df['passHLT'] = ((df['muon_ID'] >= 4) & (df['antiMuon_ID'] >= 4) & (df['muon_hlt'] == 1) & (df['antiMuon_hlt'] == 1))
-df['passSel'] = ((df['muon_ID'] >= 4) & (df['antiMuon_ID'] >= 4))
+df = df.query('(muon_hlt == 1 & muon_ID >= 4 & muon_tkIso < {0}) | \
+    (antiMuon_hlt == 1 & antiMuon_ID >= 4 & antiMuon_tkIso < {0})'.format(tkIsoCut))
+
+df['passHLT'] = ((df['muon_ID'] >= 4) & (df['antiMuon_ID'] >= 4) \
+    & (df['muon_hlt'] == 1) & (df['antiMuon_hlt'] == 1) \
+    & (df['muon_tkIso'] < tkIsoCut) & (df['antiMuon_tkIso'] < tkIsoCut))
+
+df['passSel'] = ((df['muon_ID'] >= 4) & (df['antiMuon_ID'] >= 4)\
+    & (df['muon_tkIso'] < tkIsoCut) & (df['antiMuon_tkIso'] < tkIsoCut))
+
 df['passGlo'] = ((df['muon_ID'] >= 3) & (df['antiMuon_ID'] >= 3))
 df['passTrk'] = ((df['muon_ID'] >= 1) & (df['antiMuon_ID'] >= 1))
 

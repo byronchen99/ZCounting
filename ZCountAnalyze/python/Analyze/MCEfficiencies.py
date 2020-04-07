@@ -131,26 +131,26 @@ class Efficiency:
         self.eff_tnp = [np.zeros(len(bins) - 1), np.zeros(len(bins) - 1)]
 
     def calculate(self, df, ibin):
-        denom = len(df.query('muon_recoMatches == 1 & muon_ID>={0} & muon_pfIso >= {1} & muon_tkIso >= {2}'
+        denom = len(df.query('muon_recoMatches == 1 & muon_ID>={0} & muon_pfIso < {1} & muon_tkIso < {2}'
                              .format(self.ID, self.pfIso, self.tkIso)))
         nom = len(df.query('muon_recoMatches == 1 & antiMuon_recoMatches == 1'
                            '& muon_ID >= {0} & antiMuon_ID >= {0}'
-                           '& muon_pfIso >= {1} & antiMuon_pfIso >= {1}'
-                           '& muon_tkIso >= {2} & antiMuon_tkIso >= {2}'
+                           '& muon_pfIso < {1} & antiMuon_pfIso < {1}'
+                           '& muon_tkIso < {2} & antiMuon_tkIso < {2}'
                            .format(self.ID, self.pfIso, self.tkIso)))
         MuEff, MuEff_Err = eff(nom, denom)
 
         if self.HLT:
             denom = len(df.query('muon_recoMatches == 1 & antiMuon_recoMatches == 1'
                                  '& muon_ID >= {0} & antiMuon_ID >= {0}'
-                                 '& muon_pfIso >= {1} & antiMuon_pfIso >= {1}'
-                                 '& muon_tkIso >= {2} & antiMuon_tkIso >= {2}'
+                                 '& muon_pfIso < {1} & antiMuon_pfIso < {1}'
+                                 '& muon_tkIso < {2} & antiMuon_tkIso < {2}'
                                  '& muon_hlt_{3} == 1'
                                  .format(self.ID, self.pfIso, self.tkIso, self.HLT)))
             nom = len(df.query('muon_ID>={0} & muon_recoMatches == 1'
                                '& antiMuon_ID>={0} & antiMuon_recoMatches == 1'
-                               '& muon_pfIso >= {1} & muon_tkIso >= {2}'
-                               '& antiMuon_pfIso >= {1} & antiMuon_tkIso >= {2}'
+                               '& muon_pfIso < {1} & muon_tkIso < {2}'
+                               '& antiMuon_pfIso < {1} & antiMuon_tkIso < {2}'
                                '& muon_hlt_{3} == 1 & antiMuon_hlt_{3} == 1'
                                .format(self.ID, self.pfIso, self.tkIso, self.HLT)))
             MuEff_HLT, MuEff_HLT_Err = eff(nom, denom)
@@ -166,8 +166,8 @@ class Efficiency:
 
         query = 'muon_recoMatches == 1 & antiMuon_recoMatches == 1 ' \
                 '& muon_ID>={0} & antiMuon_ID>={0} ' \
-                '& muon_pfIso >= {1} & antiMuon_pfIso >= {1} ' \
-                '& muon_tkIso >= {2} & antiMuon_tkIso >= {2}'.format(self.ID, self.pfIso, self.tkIso)
+                '& muon_pfIso < {1} & antiMuon_pfIso < {1} ' \
+                '& muon_tkIso < {2} & antiMuon_tkIso < {2}'.format(self.ID, self.pfIso, self.tkIso)
         if self.HLT:
             query += '& ( muon_hlt_{0} == 1 | antiMuon_hlt_{0} == 1)'.format(self.HLT)
         nZReco = len(df.query(query))
@@ -293,7 +293,8 @@ for iBit in range(0, 5):
 #eff_ZcTIsoMu24 = Efficiency("ZcTightIsoMu24", 4, 0, 0, 3, '$\mathrm{HLT\_IsoMu24\_v^{*}}$')
 #eff_ZcTIsoMu27 = Efficiency("ZcTightIsoMu27", 4, 0, 0, 4, '$\mathrm{HLT\_IsoMu27\_v^{*}}$')
 # Efficiency("ZcTightIsoMu30", 4, 0, 0, 5, '$\mathrm{HLT\_IsoMu30\_v^{*}}$')
-eff_ZTightIDIsoMu27 = Efficiency("ZTightID_IsoMu27", 5, 0, 0, 4, '$\mathrm{HLT\_IsoMu27\_v^{*}}$')
+eff_ZTightIDIsoMu27 = Efficiency("ZcTightID_tightTkIso_IsoMu27", 4, 999, 0.05, 4, '$\mathrm{HLT\_IsoMu27\_v^{*}}$')
+eff_ZTightIDL1SingleMu25 = Efficiency("ZcTightID_tightTkIso_L1SingleMu25", 4, 999, 0.05, 2, '$\mathrm{HLT\_L1SingleMu25\_v^{*}}$')
 
 zMCEff1D(dfGen, np.linspace(0.5, 74.5, 25), 'nPU', 'inclusive')
 zMCEff1D(dfGen, np.linspace(0.5, 74.5, 15), 'nPU', 'BB',
@@ -309,7 +310,9 @@ zMCEff1D(dfGen, np.linspace(0.5, 74.5, 15), 'nPU', 'EE',
 
 with open(output+'/MCCorrections_nPU_'+ eff_ZTightIDIsoMu27.name + '.json', 'w') as file:
     file.write(json.dumps(eff_ZTightIDIsoMu27.fitResults, sort_keys=True, indent=4))
-
+    
+with open(output+'/MCCorrections_nPU_'+ eff_ZTightIDL1SingleMu25.name + '.json', 'w') as file:
+    file.write(json.dumps(eff_ZTightIDL1SingleMu25.fitResults, sort_keys=True, indent=4))
 # --- differential efficiencies
 # zMCEff1D(dfGen, np.linspace(0., 5., 20), 'delRLL')
 # zMCEff1D(dfGen, np.linspace(0., 5., 20), 'delRLL', 'BB',
