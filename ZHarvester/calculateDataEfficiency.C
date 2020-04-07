@@ -59,6 +59,14 @@ void generateTemplate(
         const TString mcfilename,
         const Float_t ptCutTag, const Float_t ptCutProbe, TH1D *hPV=0, const TString outputDir="");
 
+void generateTemplate_ZYield(
+	const TString mcfilename,
+	const Float_t ptCutTag,
+	const Float_t ptCutProbe,
+	TH1D          *hPV,
+    const TString outputDir
+);
+
 void performCount(
         Double_t &resEff, Double_t &resErrl, Double_t &resErrh, TH1D *passHist, TH1D *failHist,
         const Float_t ptCutTag, const Float_t ptCutProbe,
@@ -82,6 +90,9 @@ std::vector<float> getZyield(
                 const Float_t ptCutTag,
                 const Float_t ptCutProbe,
                 const Float_t lumi=10.,     // luminosity for plot label
+                const TString  mcfilename="",
+                TH1D* _hQCD = 0,
+                TH1D* hPV = 0,
                 const TString format="png"  // plot format
 ){
 
@@ -110,24 +121,45 @@ std::vector<float> getZyield(
 
   Int_t nfl=0;
 
-  if(sigMod == 1){     // perform fit
-    sigModel = new CBreitWignerConvCrystalBall(m, kTRUE, 0);
-    nfl += 4;
-    if(bkgMod == 1){
+  TFile *histfile = 0;
+  if(sigMod==2) {
+      generateTemplate_ZYield(mcfilename, ptCutTag, ptCutProbe, hPV, outputDir);
+      histfile = new TFile(outputDir+"/histTemplates.root");
+      assert(histfile);
+  }
+
+  switch(sigMod) {
+    case 1:
+      sigModel = new CBreitWignerConvCrystalBall(m, kTRUE, 0);
+      nfl += 4; break;
+    case 2:
+      TH1D *h = (TH1D*)histfile->Get("h_mass_zyield");
+      assert(h);
+      sigModel = new CMCTemplateConvGaussian(m,h,kTRUE,0);
+      nfl += 2; break;
+  }
+
+  switch(bkgMod) {
+    case 1:
       bkgModel = new CExponential(m, kTRUE, 0);
-      nfl += 6;
-    }
-    if(bkgMod == 5){
+      nfl += 1; break;
+    case 2:
+      bkgModel = new CQuadratic(m, kTRUE, 0, 0.,0.,0.,0.,0.,0.);
+      nfl += 3; break;
+    case 3:
+      bkgModel = new CQuadPlusExp(m, kTRUE, 0, 0.,0.,0.,0.,0.,0.);
+      nfl += 4; break;
+    case 4:
+      bkgModel = new CDas(m, kTRUE, 0);
+      nfl += 4; break;
+    case 5:
       bkgModel = new CDasPlusExp(m, kTRUE, 0);
-      nfl += 6;
-    }
-    else{
-      std::cout <<"ERROR: unvalid background mode for computing Z yield"<< std::endl;
-    }
+      nfl += 6; break;
+    case 6:
+      bkgModel = new CQCD(m, _hQCD, kTRUE, 0);
+      nfl += 1; break;
   }
-  else{
-    std::cout <<"ERROR: unvalid signal mode for computing Z yield"<< std::endl;
-  }
+
 
   RooAbsData *data = 0;
   data = new RooDataHist("ZReco","ZReco",RooArgList(m),h_yield);
@@ -135,6 +167,8 @@ std::vector<float> getZyield(
   RooRealVar Nsig("Nsig","sigYield",NsigMax,0.,1.5*NsigMax);
   RooRealVar Nbkg("Nbkg","bkgYield",0.01*NsigMax,0.,NsigMax);
   RooAddPdf modelPdf("model","Z sig+bkg",RooArgList(*(sigModel->model),*(bkgModel->model)),RooArgList(Nsig,Nbkg));
+
+  RooFormulaVar fakerate("fr","@0/(@0 + @1)",RooArgList(Nbkg,Nsig));
 
   RooFitResult *fitResult=0;
   fitResult = modelPdf.fitTo(*data,
@@ -146,10 +180,12 @@ std::vector<float> getZyield(
                              //RooFit::Minos(RooArgSet()),
                              RooFit::Save());
 
-  double resNsig  = Nsig.getVal();
-  double resErrl = fabs(Nsig.getErrorLo());
-  double resErrh = Nsig.getErrorHi();
-  double resChi2 = 0.;
+  Double_t resNsig  = Nsig.getVal();
+  Double_t resErrl = fabs(Nsig.getErrorLo());
+  Double_t resErrh = Nsig.getErrorHi();
+  Double_t resChi2 = 0.;
+  Double_t resfr = fakerate.getVal();
+  Double_t errfr = fakerate.getPropagatedError(*fitResult);
 
   char binlabelx[100];
   char binlabely[100];
@@ -170,33 +206,34 @@ std::vector<float> getZyield(
   RooPlot *mframe = m.frame(Bins(massBin));
   data->plotOn(mframe,MarkerStyle(kFullCircle),MarkerSize(0.8),DrawOption("ZP"));
   if(bkgMod>0)
-    modelPdf.plotOn(mframe,Components("backgroundPass_0"),LineStyle(kDashed),LineColor(kRed));
-  modelPdf.plotOn(mframe);
+    modelPdf.plotOn(mframe, Components(*(bkgModel->model)), LineColor(8));
+  modelPdf.plotOn(mframe, Components(*(sigModel->model)), LineColor(9));
+  modelPdf.plotOn(mframe, LineColor(kRed));
 
   double a = Nsig.getVal(), aErr = Nsig.getPropagatedError(*fitResult);
   double b = Nbkg.getVal(), bErr = Nbkg.getPropagatedError(*fitResult);
-  double fpr = b/(a+b);
-  sprintf(effstr,"#frac{bkg}{sig+bkg} = %.4f #pm %.4f",fpr,1./((a+b)*(a+b))*(std::abs(b*aErr) + std::abs(a*bErr)));
+  sprintf(effstr,"fr = %.3f #pm %.3f",resfr, errfr);
   sprintf(pname,"ZYield_inclusive_%d", iBin);
   sprintf(yield,"%u Events",(Int_t)NsigMax);
   sprintf(nsigstr,"N_{sig} = %.1f #pm %.1f",a,aErr);
   resChi2 = mframe->chiSquare(nfl);
   sprintf(chi2str,"#chi^{2}/DOF = %.3f",resChi2);
-
   if(bkgMod>0)
     sprintf(nbkgstr,"N_{bkg} = %.1f #pm %.1f",b,bErr);
+
   CPlot plotPass(pname,mframe,"Z Yield","tag-probe mass [GeV/c^{2}]",ylabel);
   plotPass.AddTextBox(binlabelx,0.21,0.78,0.51,0.83,0,kBlack,-1);
   plotPass.AddTextBox(binlabely,0.21,0.73,0.51,0.78,0,kBlack,-1);
   plotPass.AddTextBox(yield,0.21,0.69,0.51,0.73,0,kBlack,-1);
   plotPass.AddTextBox(effstr,0.70,0.85,0.94,0.90,0,kBlack,-1);
+  plotPass.AddTextBox(sigModel->model->GetTitle(), 0.21, 0.63, 0.41, 0.67, 0, 9, -1, 12);
   if(bkgMod>0) {
+      plotPass.AddTextBox(bkgModel->model->GetTitle(), 0.21, 0.59, 0.41, 0.63, 0, 8, -1, 12);
     plotPass.AddTextBox(0.70,0.68,0.94,0.83,0,kBlack,-1,2,nsigstr,nbkgstr);
-    plotPass.AddTextBox(chi2str,0.70,0.62,0.94,0.67,0,kBlack,0);
   } else {
     plotPass.AddTextBox(0.70,0.73,0.94,0.83,0,kBlack,-1,1,nsigstr);
-    plotPass.AddTextBox(chi2str,0.70,0.62,0.94,0.67,0,kBlack,0);
   }
+  plotPass.AddTextBox(chi2str,0.70,0.62,0.94,0.67,0,kBlack,0);
   plotPass.AddTextBox("CMS Preliminary",0.19,0.83,0.54,0.89,0);
   plotPass.AddTextBox(lumitext,0.62,0.92,0.94,0.99,0,kBlack,-1);
 
@@ -213,7 +250,8 @@ std::vector<float> getZyield(
   resultEff.push_back(resErrl);
   resultEff.push_back(resErrh);
   resultEff.push_back(resChi2);
-  resultEff.push_back(fpr);
+  resultEff.push_back(resfr);
+  resultEff.push_back(errfr);
 
   return resultEff;
 }

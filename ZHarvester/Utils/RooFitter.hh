@@ -31,6 +31,7 @@ public:
         const TString   _mcfilename_dy="",
         const TString   _mcfilename_tt="",
         TH1D*           _hPV=0,
+        TH1D*           _hQCD=0,
         const Float_t   _massLo  = 66.,
         const Float_t   _massHi  = 116.
     );

@@ -295,7 +295,7 @@ CQCD::CQCD(RooRealVar &m, TH1D* hist, const Bool_t pass, const int ibin, int int
   sprintf(vname,"bkg_pdf%s",name);   histPdf  = new RooHistPdf(vname, "bkg_histPdf",m,*dataHist,intOrder);
 
   sprintf(vname,"background%s",name);
-  model = new RooHistPdf(vname,"qcd MC",m,*dataHist,intOrder);
+  model = new RooHistPdf(vname,"QCD",m,*dataHist,intOrder);
 }
 
 CQCD::~CQCD()
@@ -323,7 +323,7 @@ CQCDPlusTT::CQCDPlusTT(RooRealVar &m, TH1D* histQCD, TH1D* histTT, const Bool_t 
   sprintf(vname,"bkg_frac%s",name);       frac = new RooRealVar(vname,"bkg_frac", .5, 0.,1.);
 
   sprintf(vname,"background%s",name);
-  model = new RooAddPdf(vname,"qcd + ttbar MC",RooArgList(*histPdfQCD,*histPdfTT),RooArgList(*frac));
+  model = new RooAddPdf(vname,"QCD + ttbar MC",RooArgList(*histPdfQCD,*histPdfTT),RooArgList(*frac));
 
 }
 

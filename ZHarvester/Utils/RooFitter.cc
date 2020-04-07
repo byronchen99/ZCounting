@@ -12,6 +12,7 @@ RooFitter::RooFitter(
     const TString   _mcfilename_dy,
     const TString   _mcfilename_tt,
     TH1D*           _hPV,
+    TH1D*           _hQCD,
     const Float_t   _massLo,
     const Float_t   _massHi
 ):
@@ -63,6 +64,14 @@ RooFitter::RooFitter(
         case 5:
             modelBkg = new CDasPlusExp(m, kFALSE, 0);
             ndfBkg += 6; break;
+        case 6:
+            modelBkg = new CQCD(m, _hQCD, kTRUE, 0);
+            ndfBkg += 1; break;
+        case 7:
+            TH1D *h_tt = generateTemplate_ZYield(_mcfilename_tt, _hPV);
+            assert(h_tt);
+            modelBkg = new CQCDPlusTT(m, _hQCD, h_tt, kTRUE, 0);
+            ndfBkg += 2; break;
     }
 }
 
@@ -126,6 +135,8 @@ void RooFitter::fit_backgroundmodel(
         //RooFit::Minos(RooArgSet(eff)),
         RooFit::Save());
 
+    modelBkg->freeze_all_parameters();
+
     // --- plot same sign region
     char ylabel[50];
     char yield[50];
@@ -160,6 +171,7 @@ void RooFitter::fit_backgroundmodel(
 
     delete data;
     delete modelBkg_forBkg;
+
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -197,8 +209,6 @@ std::vector<float> RooFitter::fit_simultanious(
 
     RooAddPdf *modelSS = new RooAddPdf("modelSSLowPU","Model for SS sample Low PU", RooArgList(*(modelBkg->model)), RooArgList(nbkgSS));
     RooAddPdf *modelOS = new RooAddPdf("modelOSLowPU","Model for OS sample Low PU", RooArgList(*(modelSig->model),*(modelBkg->model)), RooArgList(nsigOS, nbkgOS));
-
-    modelBkg->freeze_all_parameters();
 
     RooFitResult *fitResult=0;
 
