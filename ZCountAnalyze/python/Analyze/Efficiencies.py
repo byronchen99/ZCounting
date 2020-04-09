@@ -5,8 +5,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 from root_numpy import root2array, list_trees
-from Utils import tree_to_df
 import math
+
+os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
+from ZUtils.python.utils import import tree_to_df
 
 import argparse
 parser = argparse.ArgumentParser(prog='./Efficiencies')
@@ -372,6 +374,3 @@ zMCEff1D(dfReco, dfGen, np.linspace(0.5, 59.5, 60), 'nPV', 'relPtLL01toInf', sel
 
 zMCEff1D(dfReco, dfGen, np.linspace(0.5, 59.5, 60), 'nPV', 'sumPtLL0to100', sel='sumPtLL < 100')
 zMCEff1D(dfReco, dfGen, np.linspace(0.5, 59.5, 60), 'nPV', 'sumPtLL100toInf', sel='sumPtLL > 100')
-
-
-

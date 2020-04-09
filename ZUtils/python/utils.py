@@ -16,6 +16,7 @@ def tree_to_df(tree, arrSize=5):
                     for i in range(arrSize):
                         df[key+"_"+str(i)] = df[key].apply(lambda x: x[i] if len(x) > i else float('NaN'))
                     df = df.drop([key],axis=1)
+
     return df
 
 def to_RootTime(time, currentYear):

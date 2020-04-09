@@ -26,9 +26,9 @@ outDir = args.saveDir
 if not os.path.isdir(outDir):
     os.mkdir(outDir)
 
-ref_xsec = 610.1401700042975
-ref_xsec_stat = 1.959
-ref_xsec_lumi = 10.44
+ref_xsec = 580.75443771
+ref_xsec_stat = ref_xsec * 0.003
+ref_xsec_lumi = ref_xsec * 0.017
 
 textsize = 0.03
 

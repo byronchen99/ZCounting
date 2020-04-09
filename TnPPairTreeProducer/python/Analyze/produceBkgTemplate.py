@@ -9,12 +9,14 @@ import pandas as pd
 import os
 from root_numpy import root2array, list_trees, array2hist
 import pdb
-from Utils.Utils import tree_to_df
 from ROOT import TH1D
 import ROOT
 import argparse
 import matplotlib.pyplot as plt
 import glob
+
+os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
+from ZUtils.python.utils import tree_to_df
 
 parser = argparse.ArgumentParser(prog='./Efficiencies')
 parser.add_argument(

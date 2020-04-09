@@ -324,7 +324,7 @@ if __name__ == '__main__':
     currentYear = 2017
 
     #from 2017H low PU, w/o PU corrections in pb. |eta| < 2.4,  pt>30
-    sigma_fid = 575.180476828
+    sigma_fid = 580.75443771
 
     MassBin_ = 50
     MassMin_ = 66.

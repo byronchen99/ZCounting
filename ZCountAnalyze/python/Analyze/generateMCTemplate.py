@@ -2,7 +2,9 @@ from __future__ import division, print_function
 import pandas as pd
 import os
 from root_numpy import root2array, list_trees, array2tree
-from Utils import tree_to_df
+
+os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
+from ZUtils.python.utils import import tree_to_df
 
 import argparse
 import ROOT

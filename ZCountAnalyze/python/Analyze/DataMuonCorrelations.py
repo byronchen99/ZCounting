@@ -4,9 +4,13 @@ import numpy as np
 import pandas as pd
 import os
 from root_numpy import root2array, list_trees
-from Utils import tree_to_df, plot_scatter
 import matplotlib.pyplot as plt
 import pdb
+
+#local imports
+from Utils import plot_scatter
+os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
+from ZUtils.python.utils import import tree_to_df
 
 import argparse
 
@@ -108,4 +112,3 @@ plot_scatter(df['dxy1'], df['dxy2'], '$\mu^{\mathrm{tag}} d_{xy}$', '$\mu^{\math
 plot_scatter(df['dz1'], df['dz2'], '$\mu^{\mathrm{tag}} d_{z}$', '$\mu^{\mathrm{probe}} d_{z}$',
              range=(0, 1.), title='2017H (lowPU)',
              saveas=output+'/MuMu_inclusive_dz.png')
-

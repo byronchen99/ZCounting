@@ -12,8 +12,8 @@ import pdb
 sys.path.append(os.getcwd())
 print(os.getcwd())
 
-from Utils.Utils import to_RootTime
-
+os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
+from ZUtils.python.utils import to_RootTime
 
 ROOT.gROOT.SetBatch(True)
 ROOT.gStyle.SetCanvasPreferGL(1)
@@ -40,7 +40,7 @@ secPerLS=float(23.3)
 
 #sigmaZ = 1870       # theory prediction from CMS PAS SMP-15-004
 #acceptanceZ = 0.342367
-sigmaZfid = 610.1401700042975
+#sigmaZfid = 610.1401700042975
 
 #ZeffE=0.01          # systematic uncertainty of Z reconstruction efficiency
 #sigmaZfidE = 0.03   # systematic uncertainty of fiducial Z cross section
@@ -123,6 +123,7 @@ metazcountsoverlumi=array('d')
 for c in ('HLTeffB_chi2pass', 'HLTeffB_chi2fail', 'HLTeffE_chi2pass', 'HLTeffE_chi2fail',
           'SeleffB_chi2pass', 'SeleffB_chi2fail', 'SeleffE_chi2pass', 'SeleffE_chi2fail',
           'GloeffB_chi2pass', 'GloeffB_chi2fail', 'GloeffE_chi2pass', 'GloeffE_chi2fail',
+          'zYield_chi2'
           #'StaeffB_chi2pass', 'StaeffB_chi2fail', 'StaeffE_chi2pass', 'StaeffE_chi2fail',
           #'TrkeffB_chi2pass', 'TrkeffB_chi2fail', 'TrkeffE_chi2pass', 'TrkeffE_chi2fail'
          ):
@@ -238,6 +239,8 @@ for fill in data.drop_duplicates('fill')['fill'].values:
                       #('StaeffE', 'Muon Sta-E efficiency'),
                       #('TrkeffB', 'Muon Trk-B efficiency'),
                       #('TrkeffE', 'Muon Trk-E efficiency'),
+                      ('zYield_fr', 'Z fake rate'),
+
                      ):
         graph_Zeff = ROOT.TGraph(len(dFill),dFill['pileUp'].values,dFill[eff].values )
         graph_Zeff.SetName("graph_Zeff")

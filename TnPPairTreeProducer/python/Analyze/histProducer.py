@@ -9,10 +9,14 @@ import pandas as pd
 import os
 import root_numpy as rn
 import pdb
-from Utils.Utils import tree_to_df
 import ROOT
 import argparse
 import glob
+
+#local imports
+os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
+from ZUtils.python.utils import tree_to_df
+
 
 parser = argparse.ArgumentParser(prog='./Efficiencies')
 parser.add_argument(
@@ -31,7 +35,7 @@ if os.path.isdir(output):
 os.mkdir(output)
 
 
-MassBin_ = 50
+MassBin_ = 60
 MassMin_ = 66.
 MassMax_ = 116.
 
@@ -40,7 +44,7 @@ LumiMin_ = 0.5
 LumiMax_ = 5000.5
 
 ptCut = 30.
-tkIsoCut = 0.05
+tkIsoCut = None# 0.05
 
 # acceptance selection
 selection = 'pt1 > {0} & pt2 > {0} & dilepMass > {1} &  dilepMass < {2} & q1 != q2'.format(ptCut, MassMin_, MassMax_)
@@ -73,26 +77,27 @@ for era, input in inputs.iteritems():
     print("##### era {0}".format(era))
 
     treeName = rn.list_trees(input[0])[0]
-    print(">>> Load Events")
-    _df = [tree_to_df(rn.root2array(i, treeName, selection=selection, branches=branches), 5) for i in input]
+    print(">>> Load Events from {0} files".format(len(input)))
+    _df = [tree_to_df(rn.root2array(i, treeName, selection=selection, branches=branches)) for i in input]
     print(">>> Concatenate")
     df = pd.concat(_df)
 
     ### additional requirement at Sel:
-    # case for is2HLT and only tag fails additional cut: tag and probe has to be chanched
-    selected = df['is2HLT'] & (df['tkIso1'] > tkIsoCut) & (df['tkIso2'] < tkIsoCut)
-    to_switch = df[selected]
-    df = df[selected==False]
-    to_switch = to_switch.rename(index=str, columns={
-        'tkIso1': 'tkIso2', 'tkIso2': 'tkIso1',
-        'pt1': 'pt2', 'pt2': 'pt1',
-        'eta1': 'eta2', 'eta2': 'eta1'
-        })
-    df = pd.concat([df,to_switch],sort=True)
-    # downgrade is2HLT and isSel to isGlo
-    df['isGlo'] = df['isGlo'] + df['is2HLT'] * (df['tkIso2'] > tkIsoCut) + df['isSel'] * (df['tkIso2'] > tkIsoCut)
-    df['is2HLT'] = df['is2HLT'] * (df['tkIso2'] < tkIsoCut)
-    df['isSel'] = df['isSel'] * (df['tkIso2'] < tkIsoCut)
+    if tkIsoCut is not None:
+        # case for is2HLT and only tag fails additional cut: tag and probe has to be chanched
+        selected = df['is2HLT'] & (df['tkIso1'] > tkIsoCut) & (df['tkIso2'] < tkIsoCut)
+        to_switch = df[selected]
+        df = df[selected==False]
+        to_switch = to_switch.rename(index=str, columns={
+            'tkIso1': 'tkIso2', 'tkIso2': 'tkIso1',
+            'pt1': 'pt2', 'pt2': 'pt1',
+            'eta1': 'eta2', 'eta2': 'eta1'
+            })
+        df = pd.concat([df,to_switch],sort=True)
+        # downgrade is2HLT and isSel to isGlo
+        df['isGlo'] = df['isGlo'] + df['is2HLT'] * (df['tkIso2'] > tkIsoCut) + df['isSel'] * (df['tkIso2'] > tkIsoCut)
+        df['is2HLT'] = df['is2HLT'] * (df['tkIso2'] < tkIsoCut)
+        df['isSel'] = df['isSel'] * (df['tkIso2'] < tkIsoCut)
 
 
 

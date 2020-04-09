@@ -6,9 +6,11 @@ import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 import os
 from root_numpy import root2array, list_trees
-from Utils import tree_to_df
 import math
 import json
+
+os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
+from ZUtils.python.utils import tree_to_df
 
 import argparse
 
@@ -310,7 +312,7 @@ zMCEff1D(dfGen, np.linspace(0.5, 74.5, 15), 'nPU', 'EE',
 
 with open(output+'/MCCorrections_nPU_'+ eff_ZTightIDIsoMu27.name + '.json', 'w') as file:
     file.write(json.dumps(eff_ZTightIDIsoMu27.fitResults, sort_keys=True, indent=4))
-    
+
 with open(output+'/MCCorrections_nPU_'+ eff_ZTightIDL1SingleMu25.name + '.json', 'w') as file:
     file.write(json.dumps(eff_ZTightIDL1SingleMu25.fitResults, sort_keys=True, indent=4))
 # --- differential efficiencies
