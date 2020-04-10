@@ -41,9 +41,9 @@
 
 
 // Set up fiducial region
-const Float_t massLo  = 66.;
+const Float_t massLo  = 56.;
 const Float_t massHi  = 116.;
-const UInt_t  massBin = 50;
+const UInt_t  massBin = (UInt_t)(massHi-massLo);
 
 const Float_t etaCutTag   = 2.4;
 const Float_t etaCutProbe = 2.4;
@@ -429,7 +429,19 @@ std::vector<float> getZyield(
 
   RooFormulaVar fakerate("fr","@0/(@0 + @1)",RooArgList(Nbkg,Nsig));
 
+  // fit bkg shape in failing probes to sideband region only
+  m.setRange("backgroundLow", massLo, 76);
+  m.setRange("backgroundHigh", 106, massHi);
+
   RooFitResult *fitResult=0;
+  fitResult = bkgModel->model->fitTo(*data,
+                            RooFit::Range("backgroundLow,backgroundHigh"),
+                             RooFit::PrintEvalErrors(-1),
+                             RooFit::PrintLevel(-1),
+                             RooFit::Warnings(0),
+                             RooFit::Strategy(1), // MINOS STRATEGY
+                             RooFit::Save());
+
   fitResult = modelPdf.fitTo(*data,
                              RooFit::PrintEvalErrors(-1),
                              RooFit::PrintLevel(-1),
@@ -713,6 +725,19 @@ void performFit(
   }
 
   RooMsgService::instance().setSilentMode(kTRUE);
+  // fit bkg shape in failing probes to sideband region only
+  m.setRange("backgroundLow", massLo, 76);
+  m.setRange("backgroundHigh", 106, massHi);
+
+  fitResult = bkgFail->model->fitTo(*dataFail,
+                            RooFit::Range("backgroundLow,backgroundHigh"),
+                             RooFit::PrintEvalErrors(-1),
+                             RooFit::PrintLevel(-1),
+                             RooFit::Warnings(0),
+                             RooFit::Strategy(strategy), // MINOS STRATEGY
+                             RooFit::Save());
+
+  // fit total pdf
   fitResult = totalPdf.fitTo(*dataCombined,
                              RooFit::PrintEvalErrors(-1),
                              RooFit::PrintLevel(-1),
@@ -773,17 +798,20 @@ void performFit(
 //--------------------------------------------------------------------------------------------------
 std::vector<double> preFit(TH1D* failHist){
     std::cout<<"PREFIT"<<std::endl;
+    // do not fit between 81 to 101 GeV
 
 //  std::vector<float> v = {1.,0.,1.,0.,1.,0.};return v;
   TH1D *h = new TH1D("h", "", massBin, massLo, massHi);
   TF1 *fq = new TF1("fq", "[0]+[1]*x+[2]*x*x", massLo, massHi);
   TF1 *fl = new TF1("fl", "[0]+[1]*x", massLo, massHi);
 
-  for(int i = 0; i < 15; i++){
+  const int binwidth = (massHi-massLo)/massBin;
+
+  for(int i = 0; i < (int)(81-massLo)/binwidth; i++){
     h->SetBinContent(i+1, failHist->GetBinContent(i+1));
     h->SetBinError(i+1, failHist->GetBinError(i+1));
   }
-  for(int i = 35; i < 50; i++){
+  for(int i = (int)(massHi-101)/binwidth; i < massBin; i++){
     h->SetBinContent(i+1, failHist->GetBinContent(i+1));
     h->SetBinError(i+1, failHist->GetBinError(i+1));
   }

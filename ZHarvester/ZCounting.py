@@ -10,16 +10,16 @@ def measurement(recLumi, m, outputDir, h1Reco,
     h1HLTBPass, h1HLTBFail, h1HLTEPass, h1HLTEFail,
     h1SITBPass, h1SITBFail, h1SITEPass, h1SITEFail,
     h1GloBPass, h1GloBFail, h1GloEPass, h1GloEFail,
-    sigmod_yield=1, bkgmod_yield=1,
+    sigmod_yield=1, bkgmod_yield=5,
     sigtempl_yield="", bkghist_yield=0,
     sigmod_hlt=[1,1,1,1], bkgmod_hlt=[5,5,5,5],
     sigtempl_hlt="", bkgshape_hlt="",
-    sigmod_sel=[1,1,1,1], bkgmod_sel=[1,1,1,1],
+    sigmod_sel=[1,1,1,1], bkgmod_sel=[5,5,5,5],
     sigtempl_sel="", bkgshape_sel="",
-    sigmod_glo=[1,1,1,1], bkgmod_glo=[2,2,2,2],
+    sigmod_glo=[1,1,1,1], bkgmod_glo=[5,5,5,5],
     sigtempl_glo="", bkgshape_glo="",
     ):
-    ### compute Z yield #TODO
+    ## compute Z yield #TODO
     Zyieldres_m = ROOT.getZyield(h1Reco, outputDir, m, sigmod_yield, bkgmod_yield,
         ptCutTag, ptCutProbe, recLumi, sigtempl_yield, bkghist_yield)
 
@@ -45,6 +45,7 @@ def measurement(recLumi, m, outputDir, h1Reco,
     GloeffresE_m = ROOT.calculateDataEfficiency(h1GloEPass, h1GloEFail,
                                                 outputDir, m, "Glo", 1, sigmod_glo[2], bkgmod_glo[2], sigmod_glo[3], bkgmod_glo[3],
                                                 ptCutTag, ptCutProbe, 0, recLumi, sigtempl_glo, bkgshape_glo)
+
 
     HLTeffB_m = HLTeffresB_m[0]
     HLTeffE_m = HLTeffresE_m[0]
@@ -326,8 +327,8 @@ if __name__ == '__main__':
     #from 2017H low PU, w/o PU corrections in pb. |eta| < 2.4,  pt>30
     sigma_fid = 580.75443771
 
-    MassBin_ = 50
-    MassMin_ = 66.
+    MassBin_ = 60
+    MassMin_ = 56.
     MassMax_ = 116.
 
     maximumLS = 5000
