@@ -185,6 +185,8 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
         dxy1_ = getDxy(itMu1, *pv);
         dz1_ = getDz(itMu1, *pv);
 
+        vTag.SetPtEtaPhiM(pt1_, eta1_, phi1_, MUON_MASS);
+
         // Probe loop
         for (auto const& itMu2 : *hMuonProduct) {
             if (&itMu2 == &itMu1)
@@ -202,7 +204,6 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
             if (fabs(eta2_) > EtaCutL2_)
                 continue;
 
-            vTag.SetPtEtaPhiM(pt1_, eta1_, phi1_, MUON_MASS);
             vProbe.SetPtEtaPhiM(pt2_, eta2_, phi2_, MUON_MASS);
             TLorentzVector vDilep = vTag + vProbe;
             dilepMass_ = vDilep.M();
@@ -265,6 +266,7 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
 
             TLorentzVector vDilep = vTag + vProbe;
             dilepMass_ = vDilep.M();
+
             if ((dilepMass_ < MassMin_) || (dilepMass_ > MassMax_))
                 continue;
 
@@ -352,7 +354,7 @@ void TnPPairTreeProducer::clearVariables(){
 
 //--------------------------------------------------------------------------------------------------
 void TnPPairTreeProducer::clearTagVariables(){
-    edm::LogInfo("TnPPairTreeProducer")<<"clearProbeVariables()";
+    edm::LogInfo("TnPPairTreeProducer")<<"clearTagVariables()";
 
     pt1_ = 0.;
     eta1_ = 0.;
