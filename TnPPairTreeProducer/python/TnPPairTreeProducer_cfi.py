@@ -34,7 +34,7 @@ tnpPairTreeProducer = cms.EDAnalyzer('TnPPairTreeProducer',
     PtCutL2=cms.untracked.double(30.0),
     EtaCutL2=cms.untracked.double(2.4),
 
-    MassMin  = cms.untracked.double(50.0),
+    MassMin  = cms.untracked.double(30.0),
     MassMax  = cms.untracked.double(150.0),
 
 )
