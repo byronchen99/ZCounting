@@ -90,8 +90,8 @@ def measurement(recLumi, m, outputDir, h1Reco,
         "zYield": Zyieldres_m[0],
         "zYield_err": max(Zyieldres_m[1:3]),
         "zYield_chi2": Zyieldres_m[3],
-        "zYield_fr": Zyieldres_m[4],
-        "zYield_fr_err": Zyieldres_m[5],
+        "zYield_purity": Zyieldres_m[4],
+        "zYield_purity_err": max(Zyieldres_m[5:]),
         "HLTeffB": HLTeffB_m,
         "HLTeffE": HLTeffE_m,
         "SeleffB": SeleffB_m,
@@ -125,9 +125,13 @@ def ls_corrections(data_m, result_m, m, h2Zyield, h1ZyieldBB, h1ZyieldEE):
     data_m['effEE_mc'] = result_m["ZEEeff"] - (data_m['avgpu'] * corr['EE_a'] + corr['EE_b'])
     data_m['eff_mc'] = full_efficiency(data_m['effBB_mc'], data_m['effBE_mc'], data_m['effEE_mc'])
 
-    data_m['zYield'] = data_m['ls'].apply(lambda ls: h2Zyield.ProjectionY("", ls, ls, "e").GetEntries() * (1.-result_m["zYield_fr"]))
-    data_m['zYieldBB'] = data_m['ls'].apply(lambda ls: h1ZyieldBB.GetBinContent(ls) * (1.-result_m["zYield_fr"]))
-    data_m['zYieldEE'] = data_m['ls'].apply(lambda ls: h1ZyieldEE.GetBinContent(ls) * (1.-result_m["zYield_fr"]))
+    data_m['yield'] = data_m['ls'].apply(lambda ls: h2Zyield.ProjectionY("", ls, ls, "e").GetEntries())
+    data_m['yieldBB'] = data_m['ls'].apply(lambda ls: h1ZyieldBB.GetBinContent(ls))
+    data_m['yieldEE'] = data_m['ls'].apply(lambda ls: h1ZyieldEE.GetBinContent(ls))
+
+    data_m['zYield'] = data_m['yield'] * result_m["zYield_purity"]
+    data_m['zYieldBB'] = data_m['yieldBB'] * result_m["zYield_purity"]
+    data_m['zYieldEE'] = data_m['yieldEE'] * result_m["zYield_purity"]
 
     data_m['zDel'] = data_m['zYield'] / result_m["Zeff"]
     data_m['zDelBB'] = data_m['zYieldBB'] / result_m["ZBBeff"]
@@ -139,7 +143,7 @@ def ls_corrections(data_m, result_m, m, h2Zyield, h1ZyieldBB, h1ZyieldEE):
 
     data_m['z_relstat'] = (1./np.sqrt(data_m['zYield']) \
         + result_m["Zeff_stat"]/result_m["Zeff"] \
-        + result_m["zYield_fr_err"]/(1-result_m["zYield_fr"])).replace(np.inf, 1.)
+        + result_m["zYield_purity_err"]/result_m["zYield_purity"]).replace(np.inf, 1.)
 
     data_m['time'] = data_m['time'].apply(lambda x: to_RootTime(x,currentYear))
     data_m['run'] = np.ones(len(data_m),dtype='int') * run
@@ -149,8 +153,8 @@ def ls_corrections(data_m, result_m, m, h2Zyield, h1ZyieldBB, h1ZyieldEE):
         data_m.to_csv(file, index=False)
 
     # --- per measurement result
-    delLumi_m = data_m['recorded(/pb)'].sum()
-    recLumi_m = data_m['delivered(/pb)'].sum()
+    delLumi_m = data_m['delivered(/pb)'].sum()
+    recLumi_m = data_m['recorded(/pb)'].sum()
     deadtime_m = recLumi_m / delLumi_m
     timeWindow_m = len(data_m) * secPerLS
 
@@ -169,6 +173,8 @@ def ls_corrections(data_m, result_m, m, h2Zyield, h1ZyieldBB, h1ZyieldEE):
         "run": run,
         "tdate_begin": min(data_m['time']),
         "tdate_end": max(data_m['time']),
+        "yield": data_m['yield'],
+        "zYield": data_m['zYield'],
         "zDel": zDel_m,
         "zDel_mc": zDel_mc_m,
         "z_relstat": z_relstat_m,
@@ -204,7 +210,7 @@ def writeSummaryCSV(outCSVDir):
     log.info("===Writing overall CSV file")
     rateFileList = sorted(glob.glob(outCSVDir + '/csvfile??????.csv'))
     df_merged = pd.concat([pd.read_csv(m) for m in rateFileList], ignore_index=True)
-
+    log.info("total number of delivered Z is: {0} fb".format(sum(df_merged['zDel_mc'])))
     log.info("total fiducial cross section is: {0} fb".format(sum(df_merged['zDel_mc'])/sum(df_merged['lumiRec'])))
 
     with open(outCSVDir + 'Mergedcsvfile_perMeasurement.csv', 'w') as file:
@@ -276,7 +282,7 @@ if __name__ == '__main__':
 
     # inputs: to build MC*Gaussian template for efficiency fitting
     fit_options={}
-    if args.sigTemplates:
+    if args.sigTemplates and args.sigTemplates != "None":
         _optns = {
             'sigmod_yield':2,
             'sigtempl_yield':args.sigTemplates+"/template_ZYield.root",
@@ -289,7 +295,7 @@ if __name__ == '__main__':
             }
         fit_options.update(_optns)
 
-    if args.bkgTemplates:
+    if args.bkgTemplates and args.bkgTemplates != "None":
         tfile = ROOT.TFile.Open(args.bkgTemplates+"/Reco.root","READ")
         hBkg_yield = tfile.Get("KDE_cosine")
         hBkg_yield.SetDirectory(0)
@@ -325,7 +331,8 @@ if __name__ == '__main__':
     currentYear = 2017
 
     #from 2017H low PU, w/o PU corrections in pb. |eta| < 2.4,  pt>30
-    sigma_fid = 580.75443771
+    #sigma_fid = 604.280260378
+    sigma_fid = 608.305132973
 
     MassBin_ = 60
     MassMin_ = 56.

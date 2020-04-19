@@ -390,7 +390,7 @@ std::vector<float> getZyield(
   CPlot::sOutDir = outputDir;
 
   Double_t NsigMax = h_yield->GetEntries();
-  if(sigMod == 0){      // perform count - expect 1% faces
+  if(sigMod == 0){      // perform count - expect 1% fakes
     std::vector<float> resultEff = {};
     resultEff.push_back(NsigMax*0.99);
     resultEff.push_back(std::sqrt(NsigMax)*0.99);
@@ -427,8 +427,6 @@ std::vector<float> getZyield(
   RooRealVar Nbkg("Nbkg","bkgYield",0.01*NsigMax,0.,NsigMax);
   RooAddPdf modelPdf("model","Z sig+bkg",RooArgList(*(sigModel->model),*(bkgModel->model)),RooArgList(Nsig,Nbkg));
 
-  RooFormulaVar fakerate("fr","@0/(@0 + @1)",RooArgList(Nbkg,Nsig));
-
   // fit bkg shape in failing probes to sideband region only
   m.setRange("backgroundLow", massLo, 76);
   m.setRange("backgroundHigh", 106, massHi);
@@ -451,20 +449,20 @@ std::vector<float> getZyield(
                              //RooFit::Minos(RooArgSet()),
                              RooFit::Save());
 
+  const Int_t nEntries = (Int_t)h_yield->GetEntries();
+
   Double_t resNsig  = Nsig.getVal();
   Double_t resErrl = fabs(Nsig.getErrorLo());
   Double_t resErrh = Nsig.getErrorHi();
   Double_t resChi2 = 0.;
-  Double_t resfr = fakerate.getVal();
-  Double_t errfr = fakerate.getPropagatedError(*fitResult);
-
-
-  const Int_t nEntries = (Int_t)h_yield->GetEntries();
+  Double_t resPurity = resNsig/nEntries;
+  Double_t resPurityErrl = resErrh/resNsig;
+  Double_t resPurityErrh = resErrl/resNsig;
 
   char pname[50];
-  char frstring[100];
-  sprintf(frstring,"fr = %.4f_{ -%.4f}^{ +%.4f}",resfr,errfr,errfr);
-  resChi2 = make_plot(ptCutTag, lumi, nfl, m, data, modelPdf, sigModel, bkgModel, fitResult, Nsig, Nbkg, frstring, nEntries, iBin);
+  char strPurity[100];
+  sprintf(strPurity,"purity = %.4f_{ -%.4f}^{ +%.4f}",resPurity,resPurityErrl,resPurityErrh);
+  resChi2 = make_plot(ptCutTag, lumi, nfl, m, data, modelPdf, sigModel, bkgModel, fitResult, Nsig, Nbkg, strPurity, nEntries, iBin);
 
   delete sigModel;
   delete bkgModel;
@@ -476,8 +474,9 @@ std::vector<float> getZyield(
   resultEff.push_back(resErrl);
   resultEff.push_back(resErrh);
   resultEff.push_back(resChi2);
-  resultEff.push_back(resfr);
-  resultEff.push_back(errfr);
+  resultEff.push_back(resPurity);
+  resultEff.push_back(resPurityErrl);
+  resultEff.push_back(resPurityErrh);
 
   return resultEff;
 }
