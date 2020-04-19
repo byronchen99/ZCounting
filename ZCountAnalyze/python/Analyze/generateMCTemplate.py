@@ -4,7 +4,7 @@ import os
 from root_numpy import root2array, list_trees, array2tree
 
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
-from ZUtils.python.utils import import tree_to_df
+from ZUtils.python.utils import tree_to_df
 
 import argparse
 import ROOT
@@ -73,7 +73,11 @@ df = pd.concat(df)
 
 #  df = df.query('delRLL > 0.4')
 
-tkIsoCut = 0.05
+tkIsoCut = 0.05#999999 #
+muonID = 5
+#   4: tight ID w/o dxy and dz cuts
+#   5: tight ID
+
 iBit = 3
 #   0: "HLT_L1SingleMu18_v*"
 #   1: "HLT_L1SingleMu25_v*"
@@ -93,11 +97,11 @@ print(">>> select events with a tag")
 df = df.query('(muon_hlt == 1 & muon_ID >= 4 & muon_tkIso < {0}) | \
     (antiMuon_hlt == 1 & antiMuon_ID >= 4 & antiMuon_tkIso < {0})'.format(tkIsoCut))
 
-df['passHLT'] = ((df['muon_ID'] >= 4) & (df['antiMuon_ID'] >= 4) \
+df['passHLT'] = ((df['muon_ID'] >= muonID) & (df['antiMuon_ID'] >= muonID) \
     & (df['muon_hlt'] == 1) & (df['antiMuon_hlt'] == 1) \
     & (df['muon_tkIso'] < tkIsoCut) & (df['antiMuon_tkIso'] < tkIsoCut))
 
-df['passSel'] = ((df['muon_ID'] >= 4) & (df['antiMuon_ID'] >= 4)\
+df['passSel'] = ((df['muon_ID'] >= muonID) & (df['antiMuon_ID'] >= muonID)\
     & (df['muon_tkIso'] < tkIsoCut) & (df['antiMuon_tkIso'] < tkIsoCut))
 
 df['passGlo'] = ((df['muon_ID'] >= 3) & (df['antiMuon_ID'] >= 3))
