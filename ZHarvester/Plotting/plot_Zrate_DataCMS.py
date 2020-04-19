@@ -38,6 +38,9 @@ if not os.path.isdir(outDir):
 
 secPerLS=float(23.3)
 
+MassMin_ = 56.
+MassMax_ = 116.
+
 #sigmaZ = 1870       # theory prediction from CMS PAS SMP-15-004
 #acceptanceZ = 0.342367
 #sigmaZfid = 610.1401700042975
@@ -96,6 +99,8 @@ data['zLumiInst_mc_stat'] = data['zLumiInst_mc'] * data['z_relstat']
 #sort out points with low statistics
 data = data[data['z_relstat'] < 0.05]
 
+data = data.replace([np.inf, -np.inf], np.nan).dropna().dropna()
+
 zcountl=array('d')
 timel=array('d')
 
@@ -117,7 +122,6 @@ metazcountsAccu=array('d')
 metazcountsoverlumi=array('d')
 
 ########## Plot ##########
-
 
 ### chi2 values of each category
 for c in ('HLTeffB_chi2pass', 'HLTeffB_chi2fail', 'HLTeffE_chi2pass', 'HLTeffE_chi2fail',
@@ -146,7 +150,7 @@ for c in ('HLTeffB_chi2pass', 'HLTeffB_chi2fail', 'HLTeffE_chi2pass', 'HLTeffE_c
     graph_chi2.GetXaxis().SetLabelSize(0.05)
     graph_chi2.GetYaxis().SetLabelSize(0.05)
     #graph_chi2.GetYaxis().SetRangeUser(-0.01,0.01)
-    c3=ROOT.TCanvas("c3","c3",1000,600)
+    c3=ROOT.TCanvas("c3_"+c,"c3 "+c,1000,600)
     c3.SetGrid()
 
     # mean, where outlier with sigma > 1 are rejected
@@ -168,7 +172,7 @@ for c in ('HLTeffB_chi2pass', 'HLTeffB_chi2fail', 'HLTeffE_chi2pass', 'HLTeffE_c
     c3.SaveAs(outDir+"/"+c+".png")
     c3.Close()
 
-    th1_chi2 = ROOT.TH1F("h1", "h1 title", 20, 0., 2.0*avg_chi2)
+    th1_chi2 = ROOT.TH1F("h1_"+c, "h1 title "+c, 20, 0., 2.0*avg_chi2)
     th1_chi2.GetXaxis().SetTitle("#chi^{2}/ndf")
     th1_chi2.GetYaxis().SetTitle("fits")
     th1_chi2.GetXaxis().SetTitleSize(0.06)
@@ -193,7 +197,7 @@ for c in ('HLTeffB_chi2pass', 'HLTeffB_chi2fail', 'HLTeffE_chi2pass', 'HLTeffE_c
     #legend.AddEntry(f_chi2,"chi2(x,1)","l")
     #legend.AddEntry(th1_chi2,"fits","f")
 
-    c4=ROOT.TCanvas("c4","c4",1000,600)
+    c4=ROOT.TCanvas("c4_"+c,"c4_"+c,1000,600)
 
     th1_chi2.Draw('HIST')
     #f_chi2.Draw("same")
@@ -239,7 +243,7 @@ for fill in data.drop_duplicates('fill')['fill'].values:
                       #('StaeffE', 'Muon Sta-E efficiency'),
                       #('TrkeffB', 'Muon Trk-B efficiency'),
                       #('TrkeffE', 'Muon Trk-E efficiency'),
-                      ('zYield_fr', 'Z fake rate'),
+                      ('zYield_purity', 'Z fake rate'),
 
                      ):
         graph_Zeff = ROOT.TGraph(len(dFill),dFill['pileUp'].values,dFill[eff].values )
@@ -404,7 +408,7 @@ for fill in data.drop_duplicates('fill')['fill'].values:
     #text=ROOT.TText(0.3,0.83,"CMS Automatic, produced: "+datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     #text.SetNDC()
     #text.Draw()
-    text2=ROOT.TLatex(0.6,0.23,"#splitline{66 GeV<M(#mu#mu) < 116 GeV}{p_{T}(#mu)>"+str(ptCut)+" GeV, |#eta(#mu)|<"+str(etaCut)+"}")
+    text2=ROOT.TLatex(0.6,0.23,"#splitline{"+str(MassMin_)+" GeV<M(#mu#mu) < "+str(MassMax_)+" GeV}{p_{T}(#mu)>"+str(ptCut)+" GeV, |#eta(#mu)|<"+str(etaCut)+"}")
     text2.SetNDC()
     text2.SetTextSize(0.04)
     text2.Draw()
@@ -488,7 +492,7 @@ graph_metacmsXsec.Draw("AP")
 #text=ROOT.TLatex(0.3,0.83,"CMS Automatic, produced: "+datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 #text.SetNDC()
 #text.Draw()
-text2=ROOT.TLatex(0.6,0.23,"#splitline{66 GeV<M(#mu#mu) < 116 GeV}{p_{T}(#mu)>"+str(ptCut)+" GeV, |#eta(#mu)|<"+str(etaCut)+"}")
+text2=ROOT.TLatex(0.6,0.23,"#splitline{"+str(MassMin_)+" GeV<M(#mu#mu) < "+str(MassMax_)+" GeV}{p_{T}(#mu)>"+str(ptCut)+" GeV, |#eta(#mu)|<"+str(etaCut)+"}")
 text2.SetNDC()
 text2.SetTextSize(0.04)
 text2.Draw()
@@ -522,7 +526,7 @@ graph_zcount.Draw("AP")
 #text=ROOT.TLatex(0.3,0.83,"CMS Automatic, produced: "+datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 #text.SetNDC()
 #text.Draw()
-text2=ROOT.TLatex(0.6,0.23,"#splitline{66 GeV<M(#mu#mu) < 116 GeV}{p_{T}(#mu)>"+str(ptCut)+" GeV, |#eta(#mu)|<"+str(etaCut)+"}")
+text2=ROOT.TLatex(0.6,0.23,"#splitline{"+str(MassMin_)+" GeV<M(#mu#mu) < "+str(MassMax_)+" GeV}{p_{T}(#mu)>"+str(ptCut)+" GeV, |#eta(#mu)|<"+str(etaCut)+"}")
 text2.SetNDC()
 text2.SetTextSize(0.04)
 text2.Draw()
@@ -562,7 +566,7 @@ graph_zcountA.Draw("AP")
 #text=ROOT.TLatex(0.3,0.83,"CMS Automatic, produced: "+datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
 #text.SetNDC()
 #text.Draw()
-text2=ROOT.TLatex(0.6,0.23,"#splitline{66 GeV<M(#mu#mu) < 116 GeV}{p_{T}(#mu)>"+str(ptCut)+" GeV, |#eta(#mu)|<"+str(etaCut)+"}")
+text2=ROOT.TLatex(0.6,0.23,"#splitline{"+str(MassMin_)+" GeV<M(#mu#mu) < "+str(MassMax_)+" GeV}{p_{T}(#mu)>"+str(ptCut)+" GeV, |#eta(#mu)|<"+str(etaCut)+"}")
 text2.SetNDC()
 text2.SetTextSize(0.04)
 text2.Draw()

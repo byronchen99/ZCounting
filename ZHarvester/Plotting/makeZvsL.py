@@ -16,8 +16,10 @@ latex.SetNDC()
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("cms", default="/eos/home-d/dwalter/www/ZCounting/CMS-2018-ZRateData/csvFiles/Mergedcsvfile.csv", type=str, help="give the CMS csv as input")
+parser.add_argument("-c", "--cms", default="/eos/home-d/dwalter/www/ZCounting/CMS-2018-ZRateData/csvFiles/Mergedcsvfile.csv", type=str, help="give the CMS csv as input")
 parser.add_argument("-s", "--saveDir", default='/eos/home-d/dwalter/www/ZCounting/CMS-2018-ZRateData/ZCrossSectionMonitoring/', type=str, help="give output dir")
+parser.add_argument("--xsec", default=None, type=float, help="give reference fiducial cross section")
+
 args = parser.parse_args()
 
 cmsfile=args.cms
@@ -26,9 +28,10 @@ outDir = args.saveDir
 if not os.path.isdir(outDir):
     os.mkdir(outDir)
 
-ref_xsec = 580.75443771
-ref_xsec_stat = ref_xsec * 0.003
-ref_xsec_lumi = ref_xsec * 0.017
+if args.xsec:
+    ref_xsec = args.xsec
+    ref_xsec_stat = ref_xsec * 0.003
+    ref_xsec_lumi = ref_xsec * 0.017
 
 textsize = 0.03
 
@@ -121,15 +124,16 @@ def make_plots(ZXSec, xAxis='lumi',run_range=None, xTitle="instantaneous recorde
     xmin = graphXsecL.GetXaxis().GetXmin()
     xmax = graphXsecL.GetXaxis().GetXmax()
 
-    ref_line = ROOT.TLine(xmin,ref_xsec,xmax,ref_xsec)
-    ref_line.SetLineColor(ROOT.kRed)
-    ref_line.SetLineWidth(2)
+    if args.xsec:
+        ref_line = ROOT.TLine(xmin,ref_xsec,xmax,ref_xsec)
+        ref_line.SetLineColor(ROOT.kRed)
+        ref_line.SetLineWidth(2)
 
-    ref_box_inner = ROOT.TBox(xmin,ref_xsec-ref_xsec_stat,xmax,ref_xsec+ref_xsec_stat)
-    ref_box_inner.SetFillColorAlpha(ROOT.kRed, 0.4)
+        ref_box_inner = ROOT.TBox(xmin,ref_xsec-ref_xsec_stat,xmax,ref_xsec+ref_xsec_stat)
+        ref_box_inner.SetFillColorAlpha(ROOT.kRed, 0.4)
 
-    ref_box_outer = ROOT.TBox(xmin,ref_xsec-ref_xsec_lumi,xmax,ref_xsec+ref_xsec_lumi)
-    ref_box_outer.SetFillColorAlpha(ROOT.kRed, 0.2)
+        ref_box_outer = ROOT.TBox(xmin,ref_xsec-ref_xsec_lumi,xmax,ref_xsec+ref_xsec_lumi)
+        ref_box_outer.SetFillColorAlpha(ROOT.kRed, 0.2)
 
     fit = graphXsecL.Fit("pol1","0S","",xmin,xmax)
     fit_a = fit.Value(0)
@@ -190,9 +194,10 @@ def make_plots(ZXSec, xAxis='lumi',run_range=None, xTitle="instantaneous recorde
 
     graphXsecL.Draw("AP")
 
-    ref_line.Draw("same")
-    ref_box_inner.Draw("same")
-    ref_box_outer.Draw("same")
+    if args.xsec:
+        ref_line.Draw("same")
+        ref_box_inner.Draw("same")
+        ref_box_outer.Draw("same")
 
     fit_line.Draw("3 same")
     #fit_line_lin.Draw("3 same")
@@ -225,19 +230,19 @@ def make_plots(ZXSec, xAxis='lumi',run_range=None, xTitle="instantaneous recorde
     c3.Close()
 
 # ------------------------------------------------------------------------------
-make_plots("zXSec", title="Z rate / lumi - 2017B-F")#, plot_fills=True)
+make_plots("zXSec", title="Z rate / lumi - 2017 All")#, plot_fills=True)
 
-make_plots("zXSec_mc", title="Corrected Z rate / lumi - 2017B-F", plot_fills=True)
-make_plots("zXSec_mc", title="Corrected Z rate / lumi - 2017B-E", run_range=(297046,304797))
-make_plots("zXSec_mc", title="Corrected Z rate / lumi - 2017B", run_range=(297046,299329))
+make_plots("zXSec_mc", title="Corrected Z rate / lumi - 2017 All", plot_fills=True)
+#make_plots("zXSec_mc", title="Corrected Z rate / lumi - 2017B-E", run_range=(297046,304797))
+#make_plots("zXSec_mc", title="Corrected Z rate / lumi - 2017B", run_range=(297046,299329))
 make_plots("zXSec_mc", title="Corrected Z rate / lumi - 2017C", run_range=(299368,302029))
 make_plots("zXSec_mc", title="Corrected Z rate / lumi - 2017D", run_range=(302030,303434))
 make_plots("zXSec_mc", title="Corrected Z rate / lumi - 2017E", run_range=(303434,304797))
-make_plots("zXSec_mc", title="Corrected Z rate / lumi - 2017F", run_range=(305040,306462))
+#make_plots("zXSec_mc", title="Corrected Z rate / lumi - 2017F", run_range=(305040,306462))
 
-make_plots("zXSec_mc", xAxis='time', xTitle="time", title="Corrected Z rate / lumi", nround=4)
-make_plots("zXSec_mc", xAxis='time', xTitle="time", title="Corrected Z rate / lumi - 2017B", run_range=(297046,299329), nround=4)
-make_plots("zXSec_mc", xAxis='time', xTitle="time", title="Corrected Z rate / lumi - 2017C", run_range=(299368,302029), nround=4)
-make_plots("zXSec_mc", xAxis='time', xTitle="time", title="Corrected Z rate / lumi - 2017D", run_range=(302030,303434), nround=4)
-make_plots("zXSec_mc", xAxis='time', xTitle="time", title="Corrected Z rate / lumi - 2017E", run_range=(303434,304797), nround=4)
-make_plots("zXSec_mc", xAxis='time', xTitle="time", title="Corrected Z rate / lumi - 2017F", run_range=(305040,306462), nround=4)
+# make_plots("zXSec_mc", xAxis='time', xTitle="time", title="Corrected Z rate / lumi", nround=4)
+# make_plots("zXSec_mc", xAxis='time', xTitle="time", title="Corrected Z rate / lumi - 2017B", run_range=(297046,299329), nround=4)
+# make_plots("zXSec_mc", xAxis='time', xTitle="time", title="Corrected Z rate / lumi - 2017C", run_range=(299368,302029), nround=4)
+# make_plots("zXSec_mc", xAxis='time', xTitle="time", title="Corrected Z rate / lumi - 2017D", run_range=(302030,303434), nround=4)
+# make_plots("zXSec_mc", xAxis='time', xTitle="time", title="Corrected Z rate / lumi - 2017E", run_range=(303434,304797), nround=4)
+# make_plots("zXSec_mc", xAxis='time', xTitle="time", title="Corrected Z rate / lumi - 2017F", run_range=(305040,306462), nround=4)
