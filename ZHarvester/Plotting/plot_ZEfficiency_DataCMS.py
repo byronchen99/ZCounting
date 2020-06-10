@@ -29,7 +29,7 @@ data = data.sort_values(['fill','tdate_begin','tdate_end'])
 
 # remove rows with invalid Z rates and low statistics
 #data = data[np.isfinite(data['ZRate'])]
-data = data[data['z_relstat'] < 0.05]
+#data = data[data['z_relstat'] < 0.05]
 
 data['tdate'] = data['tdate_begin'] + (data['tdate_end'] - data['tdate_begin'])/2
 
@@ -37,6 +37,28 @@ meta = dict()
 
 ########## Plot ##########
 fills = data.drop_duplicates('fill')['fill'].values
+
+features = (
+    ('ZBBeff_mc','corrected Z-BB-Reconstruction efficitency', 0.75, 1.0),
+    ('ZBEeff_mc','corrected Z-BE-Reconstruction efficitency', 0.75, 1.0),
+    ('ZEEeff_mc','corrected Z-EE-Reconstruction efficitency', 0.75, 1.0),
+    ('ZBBeff'  ,'Z-BB-Reconstruction efficitency', 0.75, 1.0),
+    ('ZBEeff'  ,'Z-BE-Reconstruction efficitency', 0.75, 1.0),
+    ('ZEEeff'  ,'Z-EE-Reconstruction efficitency', 0.75, 1.0),
+    ('HLTeffB' ,'Muon HLT-B efficiency',0.8, 1.0 ),
+    ('HLTeffE' ,'Muon HLT-E efficiency',0.8, 1.0),
+    ('SeleffB' ,'Muon Sel-B efficiency',0.9, 1.0),
+    ('SeleffE' ,'Muon Sel-E efficiency',0.9, 1.0),
+    ('GloeffB' ,'Muon Glo-B efficiency',0.9, 1.0),
+    ('GloeffE' ,'Muon Glo-E efficiency',0.9, 1.0),
+    #('StaeffB' ,'Muon Sta-B efficiency',0.9, 1.0),
+    #('StaeffE' ,'Muon Sta-E efficiency',0.9, 1.0),
+    #('TrkeffB' ,'Muon Trk-B efficiency',0.95,1.01),
+    #('TrkeffE' ,'Muon Trk-E efficiency',0.95,1.01),
+    ('zYieldBB_purity'    ,'Z BB purity',0.9,1.0),
+    ('zYieldBE_purity'    ,'Z BE purity',0.9,1.0),
+    ('zYieldEE_purity'    ,'Z EE purity',0.9,1.0),
+    )
 
 ##### loop over Fills and produce fill specific plots
 for fill in fills:
@@ -48,26 +70,7 @@ for fill in fills:
 
     ### Efficiency ###
 
-    for eff, name, ymin, ymax in (('ZMCeff'  ,'corrected Z-Reconstruction efficitency', 0.75, 1.0),
-                  ('ZMCeffBB','corrected Z-BB-Reconstruction efficitency', 0.75, 1.0),
-                  ('ZMCeffBE','corrected Z-BE-Reconstruction efficitency', 0.75, 1.0),
-                  ('ZMCeffEE','corrected Z-EE-Reconstruction efficitency', 0.75, 1.0),
-                  ('Zeff'    ,'Z-Reconstruction efficiency', 0.75, 1.0),
-                  ('ZBBeff'  ,'Z-BB-Reconstruction efficitency', 0.75, 1.0),
-                  ('ZBEeff'  ,'Z-BE-Reconstruction efficitency', 0.75, 1.0),
-                  ('ZEEeff'  ,'Z-EE-Reconstruction efficitency', 0.75, 1.0),
-                  ('HLTeffB' ,'Muon HLT-B efficiency',0.8, 1.0 ),
-                  ('HLTeffE' ,'Muon HLT-E efficiency',0.8, 1.0),
-                  ('SeleffB' ,'Muon Sel-B efficiency',0.9, 1.0),
-                  ('SeleffE' ,'Muon Sel-E efficiency',0.9, 1.0),
-                  ('GloeffB' ,'Muon Glo-B efficiency',0.9, 1.0),
-                  ('GloeffE' ,'Muon Glo-E efficiency',0.9, 1.0),
-                  #('StaeffB' ,'Muon Sta-B efficiency',0.9, 1.0),
-                  #('StaeffE' ,'Muon Sta-E efficiency',0.9, 1.0),
-                  #('TrkeffB' ,'Muon Trk-B efficiency',0.95,1.01),
-                  #('TrkeffE' ,'Muon Trk-E efficiency',0.95,1.01),
-                  ('zYield_purity'    ,'Z purity',0.9,1.0),
-                 ):
+    for eff, name, ymin, ymax in features:
         graph_Zeff = ROOT.TGraph(len(dFill),dFill['tdate'].values,dFill[eff].values )
         graph_Zeff.SetName("graph_Zeff")
         graph_Zeff.SetMarkerStyle(22)
@@ -105,26 +108,7 @@ for fill in fills:
 
 ### Efficiency of all fills###
 
-for eff, name, ymin, ymax in (('ZMCeff'  ,'corrected Z-Reconstruction efficitency', 0.75, 1.0),
-                  ('ZMCeffBB','corrected Z-BB-Reconstruction efficitency', 0.75, 1.0),
-                  ('ZMCeffBE','corrected Z-BE-Reconstruction efficitency', 0.75, 1.0),
-                  ('ZMCeffEE','corrected Z-EE-Reconstruction efficitency', 0.75, 1.0),
-                  ('Zeff'    ,'Z-Reconstruction efficiency', 0.75, 1.0),
-                  ('ZBBeff'  ,'Z-BB-Reconstruction efficitency', 0.75, 1.0),
-                  ('ZBEeff'  ,'Z-BE-Reconstruction efficitency', 0.75, 1.0),
-                  ('ZEEeff'  ,'Z-EE-Reconstruction efficitency', 0.75, 1.0),
-                  ('HLTeffB' ,'Muon HLT-B efficiency',0.8, 1.0 ),
-                  ('HLTeffE' ,'Muon HLT-E efficiency',0.8, 1.0),
-                  ('SeleffB' ,'Muon Sel-B efficiency',0.9, 1.0),
-                  ('SeleffE' ,'Muon Sel-E efficiency',0.9, 1.0),
-                  ('GloeffB' ,'Muon Glo-B efficiency',0.9, 1.0),
-                  ('GloeffE' ,'Muon Glo-E efficiency',0.9, 1.0),
-                  #('StaeffB' ,'Muon Sta-B efficiency',0.9, 1.0),
-                  #('StaeffE' ,'Muon Sta-E efficiency',0.9, 1.0),
-                  #('TrkeffB' ,'Muon Trk-B efficiency',0.95,1.01),
-                  #('TrkeffE' ,'Muon Trk-E efficiency',0.95,1.01),
-                  ('zYield_purity'    ,'Z purity',0.9,1.0),
-                 ):
+for eff, name, ymin, ymax in features:
     graph_meta = ROOT.TGraph(len(fills),fills.astype(float),np.array(meta[eff]))
     graph_meta.SetName("graph_meta")
     graph_meta.SetMarkerStyle(22)

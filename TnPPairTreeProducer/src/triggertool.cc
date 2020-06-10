@@ -7,6 +7,9 @@
 
 #include <algorithm>
 
+
+
+//--------------------------------------------------------------------------------------------------
 bool triggertool::readEvent(const edm::Event& iEvent){
     edm::LogVerbatim("triggertools") << "triggertools: readEvent";
 
@@ -52,34 +55,39 @@ int triggertool::getTriggerBit(const std::string &iName) const {
 }
 
 //--------------------------------------------------------------------------------------------------
-int triggertool::getTriggerObjectBit(const std::string &iName, const std::string &iObjName) const {
-    int lId = getTriggerBit(iName);
-    if (lId == -1)
-        return -1;
-
-    for (unsigned int i = 0; i < records.size(); i++) {
-        if (iObjName != records.at(i).hltObjName)
-            continue;
-        return i;
-    }
-    return -1;
+bool triggertool::pass(const std::string &iName) const {
+    const int lId = getTriggerBit(iName);
+    if(lId != -1 && triggerBits[lId])
+        return true;
+    return false;
 }
 
 //--------------------------------------------------------------------------------------------------
 bool triggertool::pass(const std::vector<std::string> &iNames) const {
     // return true, if one of the triggers, given by iNames has fired
-    int lId = -1;
     for(unsigned int i = 0; i < iNames.size(); i++){
-        lId = getTriggerBit(iNames.at(i));
-        if(lId != -1 && triggerBits[lId])
+        if(pass(iNames.at(i)))
             return true;
     }
     return false;
 }
 
 //--------------------------------------------------------------------------------------------------
+bool triggertool::passObj(const std::string &iName,
+                          const double eta,
+                          const double phi) const {
+    // return true, if the triggers, given by iName and iObjName has fired an Object, which is matched with
+    //   the given eta, phi direction
+    const TriggerObjectBits iTrigObj = matchHLT(eta, phi);
+
+    const int lId = getTriggerBit(iName);
+    if(lId != -1 && iTrigObj[lId])
+        return true;
+    return false;
+}
+
+//--------------------------------------------------------------------------------------------------
 bool triggertool::passObj(const std::vector<std::string> &iNames,
-                             const std::vector<std::string> &iObjNames,
                              const double eta,
                              const double phi) const {
     // return true, if one of the triggers, given by iNames and iObjNames has fired an Object, which is matched with
@@ -88,7 +96,7 @@ bool triggertool::passObj(const std::vector<std::string> &iNames,
 
     int lId = -1;
     for(unsigned int i = 0; i < iNames.size(); i++){
-        lId = getTriggerObjectBit(iNames.at(i), iObjNames.at(i));
+        lId = getTriggerBit(iNames.at(i));
         if(lId != -1 && iTrigObj[lId])
             return true;
     }
@@ -96,7 +104,61 @@ bool triggertool::passObj(const std::vector<std::string> &iNames,
 }
 
 //--------------------------------------------------------------------------------------------------
-void triggertool::initHLT(const edm::TriggerResults& result, const edm::TriggerNames& triggerNames) {
+void triggertool::initHLTObjects(const HLTConfigProvider& hltConfigProvider_){
+    /*
+        execture each run to initialize the last filter of each trigger corresponding to the corresponding object that has fired the trigger
+    */
+    auto const& triggerNames(hltConfigProvider_.triggerNames());
+    initPathNames(*hTrgRes, triggerNames);
+
+    for (auto &iRec: records) {
+
+        std::vector<std::string> hltFiltersWithTags_;
+        auto const& pathName_(iRec.hltPathName);
+
+        for (auto const& iPathName : triggerNames) {
+
+            const std::string iPathNameUnv(iPathName.substr(0, iPathName.rfind("_v")));
+
+            if(iPathNameUnv != pathName_ && iPathName != pathName_){
+                continue;
+            }
+
+            const uint iPathIndex(hltConfigProvider_.triggerIndex(iPathName));
+
+            auto const& moduleLabels(hltConfigProvider_.moduleLabels(iPathIndex));
+
+            for(int idx=moduleLabels.size()-1; idx >= 0; --idx){
+                auto const& moduleLabel(moduleLabels.at(idx));
+
+                auto const& moduleEDMType(hltConfigProvider_.moduleEDMType(moduleLabel));
+                if(moduleEDMType != "EDFilter"){
+                    continue;
+                }
+
+                auto const& moduleType(hltConfigProvider_.moduleType(moduleLabel));
+                if((moduleType == "HLTTriggerTypeFilter") or (moduleType == "HLTBool") or (moduleType == "HLTPrescaler")){
+                    continue;
+                }
+
+                if(!hltConfigProvider_.saveTags(moduleLabel)){
+                    continue;
+                }
+                iRec.hltObjName = moduleLabel;
+                break;
+            }
+
+            break;
+
+        }
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+void triggertool::initPathNames(const edm::TriggerResults& result, const std::vector<std::string>& triggerNames) {
+    /*
+        init HLT path every run (e.g. versions can change)
+    */
     edm::LogVerbatim("triggertools") << " initHLT" ;
     for (auto &iRec: records) {
         iRec.hltPathName = "";
@@ -104,7 +166,7 @@ void triggertool::initHLT(const edm::TriggerResults& result, const edm::TriggerN
         const std::string pattern = iRec.hltPattern;
         if (edm::is_glob(pattern)) {  // handle pattern with wildcards (*,?)
             std::vector<std::vector<std::string>::const_iterator> matches =
-                edm::regexMatch(triggerNames.triggerNames(), pattern);
+                edm::regexMatch(triggerNames, pattern);
             if (matches.empty()) {
                 edm::LogWarning("ZCounting") << "requested pattern [" << pattern << "] does not match any HLT paths";
             }
@@ -117,6 +179,17 @@ void triggertool::initHLT(const edm::TriggerResults& result, const edm::TriggerN
         else {  // take full HLT path name given
              iRec.hltPathName = pattern;
         }
+    }
+}
+
+//--------------------------------------------------------------------------------------------------
+void triggertool::initHLT(const edm::TriggerResults& result, const edm::TriggerNames& triggerNames) {
+    /*
+    init HLT index every event
+    */
+    edm::LogVerbatim("triggertools") << " initHLT" ;
+
+    for (auto &iRec: records) {
         // Retrieve index in trigger menu corresponding to HLT path
         unsigned int index = triggerNames.triggerIndex(iRec.hltPathName);
         if (index < result.size()) {  // check for valid index

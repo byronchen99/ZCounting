@@ -3,7 +3,7 @@ import FWCore.ParameterSet.Config as cms
 process = cms.Process("Demo")
 
 process.load("FWCore.MessageService.MessageLogger_cfi")
-process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(1) )
+process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(10) )
 
 process.source = cms.Source("PoolSource",
     fileNames = cms.untracked.vstring(
@@ -14,7 +14,7 @@ process.source = cms.Source("PoolSource",
         # data - SingleMuon - 2017H LowPU
         #'/store/data/Run2017H/SingleMuon/MINIAOD/17Nov2017-v2/90000/FA9FA831-8B34-E811-BA1D-008CFAC93CFC.root'
         # DYJets - Fall17 Flat PU
-        '/store/mc/RunIIFall17MiniAODv2/DYJetsToLL_M-50_TuneCP1_13TeV-madgraphMLM-pythia8/MINIAODSIM/FlatPU0to75TuneCP1_12Apr2018_94X_mc2017_realistic_v14-v2/90000/F8ACEB3C-072C-E911-B67D-002590A82B8E.root'
+        '/store/mc/RunIIFall17MiniAODv2/DYJetsToLL_M-50_TuneCP5_13TeV-amcatnloFXFX-pythia8/MINIAODSIM/PU2017_12Apr2018_new_pmx_94X_mc2017_realistic_v14-v1/00000/CE864285-6D1C-E911-B09D-34E6D7BDDECE.root'
     )
 )
 

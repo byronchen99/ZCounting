@@ -54,8 +54,9 @@ const Int_t minPU = 1;
 const Int_t maxPU = 60;
 
 void generateTemplate(
-        const TString mcfilename,
-        const Float_t ptCutTag, const Float_t ptCutProbe, TH1D *hPV=0, const TString outputDir="");
+    const TString mcfilename,
+    const Float_t ptCutTag, const Float_t ptCutProbe, TH1D *hPV=0, const TString outputDir=""
+);
 
 void generateTemplate_ZYield(
 	const TString mcfilename,
@@ -65,16 +66,25 @@ void generateTemplate_ZYield(
     const TString outputDir
 );
 
+
 void performCount(
-        Double_t &resEff, Double_t &resErrl, Double_t &resErrh, TH1D *passHist, TH1D *failHist,
-        const Float_t ptCutTag, const Float_t ptCutProbe,
-        const TString effType, const Bool_t etaRegion, const Int_t iBin, const Float_t lumi, const TString format);
+    Double_t &resEff, Double_t &resErrl, Double_t &resErrh, TH1D *passHist, TH1D *failHist,
+    const Float_t ptCutTag, const Float_t ptCutProbe,
+    const TString effType, const Bool_t etaRegion, const Int_t iBin, const Float_t lumi, const TString format
+);
 
 void performFit(
-        Double_t &resEff, Double_t &resErrl, Double_t &resErrh, Double_t &resChi2Pass, Double_t &resChi2Fail, TH1D *passHist, TH1D *failHist,
-        const Int_t sigpass, const Int_t bkgpass, const Int_t sigfail, const Int_t bkgfail,
-        const Float_t ptCutTag, const Float_t ptCutProbe, const TString outputDir, const TString bkgQCDTemplate, const TString bkgTTTemplate,
-        const TString effType, const Bool_t etaRegion, const Int_t iBin, const Float_t lumi, const TString format);
+	Double_t &resNsig, Double_t &resErrl, Double_t &resErrh, Double_t &resChi2, Double_t &resPurity, Double_t &resPurityErrl, Double_t &resPurityErrh,
+    TH1D *h, const Int_t sigMod, const Int_t bkgMod,
+	const Float_t ptCutTag, const Float_t ptCutProbe, const TString outputDir,
+	const TString etaRegion, const Int_t iBin, const Float_t lumi, const TString format, const Int_t fitStrategy=0
+);
+void performFit(
+    Double_t &resEff, Double_t &resErrl, Double_t &resErrh, Double_t &resChi2Pass, Double_t &resChi2Fail, TH1D *passHist, TH1D *failHist,
+    const Int_t sigpass, const Int_t bkgpass, const Int_t sigfail, const Int_t bkgfail,
+    const Float_t ptCutTag, const Float_t ptCutProbe, const TString outputDir, const TString bkgQCDTemplate, const TString bkgTTTemplate,
+    const TString effType, const Bool_t etaRegion, const Int_t iBin, const Float_t lumi, const TString format, const Int_t fitStrategy=0
+);
 
 std::vector<double> preFit(TH1D *failHist);
 
@@ -252,7 +262,9 @@ void generateTemplate_ZYield(
   eventTree->SetBranchAddress("nPV",        &npv);
   eventTree->SetBranchAddress("pass",       &pass);
 
-  TH1D *h_mass_zyield = new TH1D("h_mass_zyield", "", massBin, massLo, massHi);
+  TH1D *h_mass_zyieldBB = new TH1D("h_mass_zyieldBB", "", massBin, massLo, massHi);
+  TH1D *h_mass_zyieldBE = new TH1D("h_mass_zyieldBE", "", massBin, massLo, massHi);
+  TH1D *h_mass_zyieldEE = new TH1D("h_mass_zyieldEE", "", massBin, massLo, massHi);
 
 
   for(UInt_t ientry=0; ientry<eventTree->GetEntries(); ientry++) {
@@ -269,12 +281,22 @@ void generateTemplate_ZYield(
     if(hPV)
       wgt *= hPV->GetBinContent(hPV->FindBin(npv));
 
-    h_mass_zyield->Fill(mass, wgt);
+    if(fabs(etaProbe) < etaBound && fabs(etaTag) < etaBound){
+        h_mass_zyieldBB->Fill(mass, wgt);
+    }
+    else if(fabs(etaProbe) > etaBound && fabs(etaTag) > etaBound){
+        h_mass_zyieldEE->Fill(mass, wgt);
+    }
+    else{
+        h_mass_zyieldBE->Fill(mass, wgt);
+    }
 
   }
 
   TFile outfile = TFile(outputDir+"/histTemplates.root", "RECREATE");
-  h_mass_zyield->Write();
+  h_mass_zyieldBB->Write();
+  h_mass_zyieldBE->Write();
+  h_mass_zyieldEE->Write();
   outfile.Write();
   outfile.Close();
 
@@ -304,6 +326,7 @@ Double_t make_plot(
     const TString effType="yield",
     const Bool_t etaRegion=kTRUE,
     const Bool_t passRegion=kTRUE,
+    const Double_t yMax=0.,
     const TString format="png"
 ){
 
@@ -318,10 +341,15 @@ Double_t make_plot(
     char nbkgstr[100];
     char chi2str[100];
 
-    if(effType == "yield"){
-        sprintf(pname,"%s_%d", effType.Data(), iBin);
-        sprintf(ctitle,"%s %d ", effType.Data(), iBin);
-        sprintf(binlabelx, "0.0 < |#eta| < 2.4");
+    if(effType == "BB" || effType == "BE" || effType == "EE"){
+        sprintf(pname,"yield_%s_%d", effType.Data(), iBin);
+        sprintf(ctitle,"yield %s %d ", effType.Data(), iBin);
+        if(effType == "BB")
+            sprintf(binlabelx, "0.0 < |#eta| < %.1f",etaBound);
+        if(effType == "BE")
+            sprintf(binlabelx, "0.0 < |#eta| < 2.4");
+        if(effType == "EE")
+            sprintf(binlabelx, "%.1f < |#eta| < 2.4",etaBound);
     }
     else{
         sprintf(pname,"%s_%s_%s_%d", effType.Data(), etaRegion ? "forward" : "central", passRegion ? "pass" : "fail", iBin);
@@ -366,6 +394,10 @@ Double_t make_plot(
     plotPass.AddTextBox("CMS Preliminary",0.19,0.83,0.54,0.89,0);
     plotPass.AddTextBox(lumitext,0.62,0.92,0.94,0.99,0,kBlack,-1);
 
+    if(yMax > 0.)
+        plotPass.SetYRange(0., yMax);
+
+
     plotPass.Draw(cyield,kTRUE, format);
     delete cyield;
 
@@ -375,22 +407,24 @@ Double_t make_plot(
 //--------------------------------------------------------------------------------------------------
 std::vector<float> getZyield(
                 TH1D *h_yield,
-                const TString outputDir,    // output directory
-                const Int_t   iBin,         // Label of measurement in currect run
-                const Int_t   sigMod,
-                const Int_t   bkgMod,
-                const Float_t ptCutTag,
-                const Float_t ptCutProbe,
-                const Float_t lumi=10.,     // luminosity for plot label
+                const TString  outputDir,    // output directory
+                const Int_t    iBin,         // Label of measurement in currect run
+                const Int_t    sigMod,
+                const Int_t    bkgMod,
+                const Float_t  ptCutTag,
+                const Float_t  ptCutProbe,
+                const TString  etaRegion="",    // {BB, BE or EE}
+                const Float_t  lumi=10.,     // luminosity for plot label
                 const TString  mcfilename="",
-                TH1D* _hQCD = 0,
-                TH1D* hPV = 0
+                TH1D*          _hQCD=0,
+                TH1D*          hPV=0,
+                const TString format="png"          // plot format
 ){
 
   CPlot::sOutDir = outputDir;
 
-  Double_t NsigMax = h_yield->GetEntries();
   if(sigMod == 0){      // perform count - expect 1% fakes
+    const Double_t NsigMax = h_yield->GetEntries();
     std::vector<float> resultEff = {};
     resultEff.push_back(NsigMax*0.99);
     resultEff.push_back(std::sqrt(NsigMax)*0.99);
@@ -400,73 +434,34 @@ std::vector<float> getZyield(
     return resultEff;
   }
 
-  RooRealVar m("m","mass",massLo,massHi);
-  m.setBins(10000);
-
-  CSignalModel     *sigModel = 0;
-  CBackgroundModel *bkgModel = 0;
-
-  Int_t nfl=0;
 
   TH1D *h=0;
   if(sigMod==2) {
     TFile *histfile = 0;
     generateTemplate_ZYield(mcfilename, ptCutTag, ptCutProbe, hPV, outputDir);
-    histfile = new TFile(outputDir+"/histTemplates.root");
-    h = (TH1D*)histfile->Get("h_mass_zyield");
-    h->SetDirectory(0);
   }
 
-  nfl += set_signal_model(sigMod, sigModel, m, kTRUE, h);
-  nfl += set_background_model(bkgMod, bkgModel, m, kTRUE, _hQCD);
+  Double_t resNsig;
+  Double_t resErrl;
+  Double_t resErrh;
+  Double_t resChi2;
+  Double_t resPurity;
+  Double_t resPurityErrl;
+  Double_t resPurityErrh;
 
-  RooAbsData *data = 0;
-  data = new RooDataHist("ZReco","ZReco",RooArgList(m),h_yield);
+  int i = 0;
+  do{
+      performFit(resNsig, resErrl, resErrh, resChi2, resPurity, resPurityErrl, resPurityErrh, h_yield,
+        sigMod, bkgMod, ptCutTag, ptCutProbe, outputDir, etaRegion, iBin, lumi, format, i);
 
-  RooRealVar Nsig("Nsig","sigYield",NsigMax,0.,1.5*NsigMax);
-  RooRealVar Nbkg("Nbkg","bkgYield",0.01*NsigMax,0.,NsigMax);
-  RooAddPdf modelPdf("model","Z sig+bkg",RooArgList(*(sigModel->model),*(bkgModel->model)),RooArgList(Nsig,Nbkg));
+      std::cout<<"---------------------------------------"<<std::endl;
+      std::cout<<"------ Fit ("<<i<<") ------------------"<<std::endl;
+      std::cout<<"------ chi2 = " << resChi2 <<std::endl;
+      std::cout<<"---------------------------------------"<<std::endl;
+      i++;
 
-  // fit bkg shape in failing probes to sideband region only
-  m.setRange("backgroundLow", massLo, 76);
-  m.setRange("backgroundHigh", 106, massHi);
+  } while(i < 3 && (resChi2 > 5. || resChi2 < 0.));
 
-  RooFitResult *fitResult=0;
-  fitResult = bkgModel->model->fitTo(*data,
-                            RooFit::Range("backgroundLow,backgroundHigh"),
-                             RooFit::PrintEvalErrors(-1),
-                             RooFit::PrintLevel(-1),
-                             RooFit::Warnings(0),
-                             RooFit::Strategy(1), // MINOS STRATEGY
-                             RooFit::Save());
-
-  fitResult = modelPdf.fitTo(*data,
-                             RooFit::PrintEvalErrors(-1),
-                             RooFit::PrintLevel(-1),
-                             RooFit::Warnings(0),
-                             RooFit::Extended(),
-                             RooFit::Strategy(1), // MINOS STRATEGY
-                             //RooFit::Minos(RooArgSet()),
-                             RooFit::Save());
-
-  const Int_t nEntries = (Int_t)h_yield->GetEntries();
-
-  Double_t resNsig  = Nsig.getVal();
-  Double_t resErrl = fabs(Nsig.getErrorLo());
-  Double_t resErrh = Nsig.getErrorHi();
-  Double_t resChi2 = 0.;
-  Double_t resPurity = resNsig/nEntries;
-  Double_t resPurityErrl = resErrh/resNsig;
-  Double_t resPurityErrh = resErrl/resNsig;
-
-  char pname[50];
-  char strPurity[100];
-  sprintf(strPurity,"purity = %.4f_{ -%.4f}^{ +%.4f}",resPurity,resPurityErrl,resPurityErrh);
-  resChi2 = make_plot(ptCutTag, lumi, nfl, m, data, modelPdf, sigModel, bkgModel, fitResult, Nsig, Nbkg, strPurity, nEntries, iBin);
-
-  delete sigModel;
-  delete bkgModel;
-  delete data;
 
   std::vector<float> resultEff = {};
 
@@ -505,11 +500,6 @@ std::vector<float> calculateDataEfficiency(
 
   CPlot::sOutDir = outputDir;
 
-  // Generate histogram templates from MC if necessary
-  if(sigModPass==2 || sigModFail==2) {
-    generateTemplate(mcfilename, ptCutTag, ptCutProbe, hPV, outputDir);
-  }
-
   Double_t eff  = 0.;
   Double_t errl = 0.;
   Double_t errh = 0.;
@@ -520,10 +510,25 @@ std::vector<float> calculateDataEfficiency(
     performCount(eff, errl, errh, h_mass_pass, h_mass_fail, ptCutTag, ptCutProbe,
       effType, etaRegion, iBin, lumi, format);
   }else{
-    performFit(eff, errl, errh, chi2pass, chi2fail, h_mass_pass, h_mass_fail,
-      sigModPass, bkgModPass, sigModFail, bkgModFail,
-      ptCutTag, ptCutProbe, outputDir, bkgQCDFilename, bkgTTFilename,
-      effType, etaRegion, iBin, lumi, format);
+    // Generate histogram templates from MC if necessary
+    if(sigModPass==2 || sigModFail==2) {
+        generateTemplate(mcfilename, ptCutTag, ptCutProbe, hPV, outputDir);
+    }
+    int i = 0;
+    do {
+        performFit(eff, errl, errh, chi2pass, chi2fail, h_mass_pass, h_mass_fail,
+            sigModPass, bkgModPass, sigModFail, bkgModFail,
+            ptCutTag, ptCutProbe, outputDir, bkgQCDFilename, bkgTTFilename,
+            effType, etaRegion, iBin, lumi, format, i);
+
+        std::cout<<"---------------------------------------"<<std::endl;
+        std::cout<<"------ Fit ("<<i<<") ------------------"<<std::endl;
+        std::cout<<"------ chi2pass = " << chi2pass <<std::endl;
+        std::cout<<"------ chi2fail = " << chi2fail <<std::endl;
+        std::cout<<"---------------------------------------"<<std::endl;
+        i++;
+
+    } while(i < 3 && (chi2fail > 5. || chi2pass > 5. || chi2fail < 0. || chi2pass < 0.));
   }
 
   std::vector<float> resultEff = {};
@@ -539,6 +544,7 @@ std::vector<float> calculateDataEfficiency(
 
 
 //--------------------------------------------------------------------------------------------------
+// perform count for tag and probe efficiency
 void performCount(
 	Double_t &resEff, Double_t &resErrl, Double_t &resErrh, TH1D *passHist, TH1D *failHist,
 	const Float_t ptCutTag, const Float_t ptCutProbe,
@@ -599,15 +605,119 @@ void performCount(
   plotFail.AddTextBox(effstr,0.70,0.85,0.95,0.90,0,kBlack,-1);
   plotFail.AddTextBox("CMS Preliminary",0.19,0.83,0.54,0.89,0);
   plotFail.AddTextBox(lumitext,0.62,0.92,0.94,0.99,0,kBlack,-1);
+
   plotFail.Draw(cfail,kTRUE,format);
 }
 
+
 //--------------------------------------------------------------------------------------------------
+// perform fit on one histogram for yield extraxtion
+void performFit(
+	Double_t &resNsig, Double_t &resErrl, Double_t &resErrh, Double_t &resChi2, Double_t &resPurity, Double_t &resPurityErrl, Double_t &resPurityErrh,
+    TH1D *h_yield, const Int_t sigMod, const Int_t bkgMod,
+	const Float_t ptCutTag, const Float_t ptCutProbe, const TString outputDir,
+	const TString etaRegion, const Int_t iBin, const Float_t lumi, const TString format, const Int_t fitStrategy
+){
+
+    RooRealVar m("m","mass",massLo,massHi);
+    m.setBins(10000);
+
+    CSignalModel     *sigModel = 0;
+    CBackgroundModel *bkgModel = 0;
+
+    Int_t nfl=0;
+
+    TFile *histfile = 0;
+    TH1D *h=0;
+    if(sigMod==2) {
+      histfile = new TFile(outputDir+"/histTemplates.root");
+      h = (TH1D*)histfile->Get("h_mass_zyield"+etaRegion);
+      assert(h);
+    }
+
+    nfl += set_signal_model(sigMod, sigModel, m, kTRUE, h);
+    nfl += set_background_model(bkgMod, bkgModel, m, kTRUE);
+
+    RooAbsData *data = 0;
+    data = new RooDataHist("ZReco","ZReco",RooArgList(m),h_yield);
+
+    const Double_t NsigMax = h_yield->GetEntries();
+    RooRealVar Nsig("Nsig","sigYield",NsigMax,0.,1.5*NsigMax);
+    RooRealVar Nbkg("Nbkg","bkgYield",0.01*NsigMax,0.,NsigMax);
+    RooAddPdf modelPdf("model","Z sig+bkg",RooArgList(*(sigModel->model),*(bkgModel->model)),RooArgList(Nsig,Nbkg));
+
+    RooFitResult *fitResult=0;
+
+    if(fitStrategy == 1){
+        // fit bkg shape to sideband region only
+        m.setRange("backgroundLow", massLo, 76);
+        m.setRange("backgroundHigh", 106, massHi);
+
+        fitResult = bkgModel->model->fitTo(*data,
+            RooFit::Range("backgroundLow,backgroundHigh"),
+            RooFit::PrintEvalErrors(-1),
+            RooFit::PrintLevel(-1),
+            RooFit::Warnings(0),
+            RooFit::Strategy(1), // MINOS STRATEGY
+            RooFit::Save());
+    }
+    if(fitStrategy == 2){
+        // fit bkg shape to sideband region only
+        m.setRange("signalCenter", 81, 101);
+
+        fitResult = sigModel->model->fitTo(*data,
+            RooFit::Range("signalCenter"),
+            RooFit::PrintEvalErrors(-1),
+            RooFit::PrintLevel(-1),
+            RooFit::Warnings(0),
+            RooFit::Strategy(1), // MINOS STRATEGY
+            RooFit::Save());
+    }
+    fitResult = modelPdf.fitTo(*data,
+        RooFit::PrintEvalErrors(-1),
+        RooFit::PrintLevel(-1),
+        RooFit::Warnings(0),
+        RooFit::Extended(),
+        RooFit::Strategy(1), // MINOS STRATEGY
+        //RooFit::Minos(RooArgSet()),
+        RooFit::Save());
+
+    fitResult = modelPdf.fitTo(*data,
+        RooFit::PrintEvalErrors(-1),
+        RooFit::PrintLevel(-1),
+        RooFit::Warnings(0),
+        RooFit::Extended(),
+        RooFit::Strategy(1), // MINOS STRATEGY
+        //RooFit::Minos(RooArgSet()),
+        RooFit::Save());
+
+    const Int_t nEntries = (Int_t)h_yield->GetEntries();
+
+    resNsig  = Nsig.getVal();
+    resErrl = fabs(Nsig.getErrorLo());
+    resErrh = Nsig.getErrorHi();
+    resChi2 = 0.;
+    resPurity = resNsig/nEntries;
+    resPurityErrl = resErrh/resNsig;
+    resPurityErrh = resErrl/resNsig;
+
+    char pname[50];
+    char strPurity[100];
+    sprintf(strPurity,"purity = %.4f_{ -%.4f}^{ +%.4f}",resPurity,resPurityErrl,resPurityErrh);
+    resChi2 = make_plot(ptCutTag, lumi, nfl, m, data, modelPdf, sigModel, bkgModel, fitResult, Nsig, Nbkg, strPurity, nEntries, iBin, etaRegion);
+
+    delete sigModel;
+    delete bkgModel;
+    delete data;
+}
+
+//--------------------------------------------------------------------------------------------------
+// perform fit on two histograms for tag and probe efficiency
 void performFit(
 	Double_t &resEff, Double_t &resErrl, Double_t &resErrh, Double_t &resChi2Pass, Double_t &resChi2Fail, TH1D *passHist, TH1D *failHist,
 	const Int_t sigpass, const Int_t bkgpass, const Int_t sigfail, const Int_t bkgfail,
 	const Float_t ptCutTag, const Float_t ptCutProbe, const TString outputDir, const TString bkgQCDTemplate, const TString bkgTTTemplate,
-	const TString effType, const Bool_t etaRegion, const Int_t iBin, const Float_t lumi, const TString format
+	const TString effType, const Bool_t etaRegion, const Int_t iBin, const Float_t lumi, const TString format, const Int_t fitStrategy
 ){
 
   RooRealVar m("m","mass",massLo,massHi);
@@ -699,10 +809,10 @@ void performFit(
   Double_t NbkgFailMax = failHist->Integral();
   Double_t NbkgPassMax = passHist->Integral();
   RooRealVar Nsig("Nsig","Signal Yield",NsigMax,0,1.5*NsigMax);
-  RooRealVar eff("eff","Efficiency",1.0,0.0,1.0);
-  RooRealVar NbkgPass("NbkgPass","Background count in PASS sample",0.1*NbkgPassMax,0.01,NbkgPassMax);
+  RooRealVar eff("eff","Efficiency",0.98,0.,1.0);
+  RooRealVar NbkgPass("NbkgPass","Background count in PASS sample",0.01*NbkgPassMax, 0.0, NbkgPassMax);
   if(bkgpass==0) NbkgPass.setVal(0);
-  RooRealVar NbkgFail("NbkgFail","Background count in FAIL sample",0.1*NbkgFailMax,0.01,NbkgFailMax);
+  RooRealVar NbkgFail("NbkgFail","Background count in FAIL sample",0.1*NbkgFailMax, 0.0, NbkgFailMax);
 
   RooFormulaVar NsigPass("NsigPass","eff*Nsig",RooArgList(eff,Nsig));
   RooFormulaVar NsigFail("NsigFail","(1.0-eff)*Nsig",RooArgList(eff,Nsig));
@@ -725,52 +835,57 @@ void performFit(
 
   RooMsgService::instance().setSilentMode(kTRUE);
   // fit bkg shape in failing probes to sideband region only
-  m.setRange("backgroundLow", massLo, 76);
-  m.setRange("backgroundHigh", 106, massHi);
 
-  fitResult = bkgFail->model->fitTo(*dataFail,
-                            RooFit::Range("backgroundLow,backgroundHigh"),
-                             RooFit::PrintEvalErrors(-1),
-                             RooFit::PrintLevel(-1),
-                             RooFit::Warnings(0),
-                             RooFit::Strategy(strategy), // MINOS STRATEGY
-                             RooFit::Save());
+    if(fitStrategy==1) {
+        m.setRange("rangeLow", massLo, 81);
+        m.setRange("rangeHigh", 101, massHi);
+    }
+    else{
+        m.setRange("rangeLow", massLo, 76);
+        m.setRange("rangeHigh", 106, massHi);
+    }
 
-  // fit total pdf
-  fitResult = totalPdf.fitTo(*dataCombined,
-                             RooFit::PrintEvalErrors(-1),
-                             RooFit::PrintLevel(-1),
-                             RooFit::Warnings(0),
-                             RooFit::Extended(1),
-                             RooFit::Strategy(strategy), // MINOS STRATEGY
-                             //RooFit::Minos(RooArgSet(eff)),
-                             RooFit::Save());
+    if(fitStrategy !=2) {
+        fitResult = bkgFail->model->fitTo(*dataFail,
+                                 RooFit::Range("rangeLow,rangeHigh"),
+                                 RooFit::PrintEvalErrors(-1),
+                                 RooFit::PrintLevel(-1),
+                                 RooFit::Warnings(0),
+                                 RooFit::Strategy(strategy), // MINUIT STRATEGY
+                                 RooFit::Save());
 
-  fitResult = totalPdf.fitTo(*dataCombined,
-                             RooFit::PrintEvalErrors(-1),
-                             RooFit::PrintLevel(-1),
-                             RooFit::Warnings(0),
-                             RooFit::Extended(1),
-                             RooFit::Strategy(strategy), // MINOS STRATEGY
-                             //RooFit::Minos(RooArgSet(eff)),
-                             RooFit::Save());
+        // fit total pdf in Fail
+        fitResult = modelFail.fitTo(*dataFail,
+                                RooFit::PrintEvalErrors(-1),
+                                RooFit::PrintLevel(-1),
+                                RooFit::Warnings(0),
+                                RooFit::Extended(1),
+                                RooFit::Strategy(strategy), // MINUIT STRATEGY
+                                RooFit::Save());
+    }
 
-  fitResult = totalPdf.fitTo(*dataCombined,
-                             RooFit::PrintEvalErrors(-1),
-                             RooFit::PrintLevel(-1),
-                             RooFit::Warnings(0),
-                             RooFit::Extended(1),
-                             RooFit::Strategy(strategy), // MINOS STRATEGY
-                             //RooFit::Minos(RooArgSet(eff)),
-                             RooFit::Save());
+    fitResult = totalPdf.fitTo(*dataCombined,
+                           RooFit::PrintEvalErrors(-1),
+                           RooFit::PrintLevel(-1),
+                           RooFit::Warnings(0),
+                           RooFit::Extended(1),
+                           RooFit::Strategy(strategy), // MINUIT STRATEGY
+                           RooFit::Minos(RooArgSet(eff)),
+                           RooFit::Save());
 
-  if((fabs(eff.getErrorLo())<5e-4) || (eff.getErrorHi()<5e-4))
-    fitResult = totalPdf.fitTo(*dataCombined, RooFit::PrintEvalErrors(-1), RooFit::Extended(), RooFit::Strategy(1), RooFit::Save());
+    fitResult = totalPdf.fitTo(*dataCombined,
+                           RooFit::PrintEvalErrors(-1),
+                           RooFit::PrintLevel(-1),
+                           RooFit::Warnings(0),
+                           RooFit::Extended(1),
+                           RooFit::Strategy(strategy), // MINUIT STRATEGY
+                           RooFit::Minos(RooArgSet(eff)),
+                           RooFit::Save());
+
 
   resEff  = eff.getVal();
   resErrl = fabs(eff.getErrorLo());
   resErrh = eff.getErrorHi();
-
 
   char effstr[100];
   sprintf(effstr,"#varepsilon = %.4f_{ -%.4f}^{ +%.4f}",resEff,resErrl,resErrh);
@@ -778,8 +893,12 @@ void performFit(
   resChi2Pass = make_plot(ptCutTag, lumi, nflpass, m, dataPass, modelPass,
       sigPass, bkgPass, fitResult, NsigPass, NbkgPass, effstr, passHist->GetEntries(), iBin, effType.Data(), etaRegion, kTRUE);
 
+  Double_t yMax = 0.;
+  if(effType == "Glo")
+    yMax = 1.5*failHist->GetMaximum();
+
   resChi2Fail = make_plot(ptCutTag, lumi, nflfail, m, dataFail, modelFail,
-      sigFail, bkgFail, fitResult, NsigFail, NbkgFail, effstr, failHist->GetEntries(), iBin, effType.Data(), etaRegion, kFALSE);
+      sigFail, bkgFail, fitResult, NsigFail, NbkgFail, effstr, failHist->GetEntries(), iBin, effType.Data(), etaRegion, kFALSE, yMax);
 
 
   delete dataCombined;
@@ -829,389 +948,4 @@ std::vector<double> preFit(TH1D* failHist){
   }
 
   return v;
-}
-
-//--------------------------------------------------------------------------------------------------
-std::vector<float> calculateZYield(
-        TH1D           *hYieldOSLowPU,        // histogram with reconstructed z candidates
-        TH1D           *hYieldSSLowPU,        // histogram with reconstructed z candidates in same charge control region
-        TH1D           *hYieldOSHighPU,       // histogram with reconstructed z candidates in high PU
-        TH1D           *hYieldSSHighPU,       // histogram with reconstructed z candidates in high PU in same charge control region
-        Int_t          sigOS=1,
-        Int_t          bkgSS=2,
-        Int_t          fitStrategy=1,
-        Double_t       ptCutTag=27.,
-        Double_t       ptCutProbe=27.,
-        TH1D           *hPV=0,
-        const TString  mcfilename="",
-        const TString  outputDir="./",
-        Int_t          iMeasurement = 0
-){
-    CPlot::sOutDir = outputDir;
-
-    Int_t ptCut = 30;
-
-    // fitStrategy:
-    //  1: fit OS low PU region only
-    //  2: fit bkg on SS low PU -> freeze bkg model -> fit bkg(scale) + signal on OS Low PU
-    //  3: fit bkg + signal on OS and bkg on SS simultanious
-    //  4: git bkg model in SS high PU -> freeze bkg model -> fit bkg(scale) + signal on OS Low PU
-
-
-    RooRealVar m("m","mass",massLo,massHi);
-    m.setBins(10000);
-
-    RooCategory sample("sample","");
-    sample.defineType("OSLowPU",1);
-    sample.defineType("SSLowPU",2);
-    sample.defineType("OSHighPU",3);
-    sample.defineType("SSHighPU",4);
-
-    RooAbsData *dataOSLowPU  = new RooDataHist("dataOSLowPU","dataOSLowPU",RooArgSet(m),hYieldOSLowPU);
-    RooAbsData *dataSSLowPU  = new RooDataHist("dataSSLowPU","dataSSLowPU",RooArgSet(m),hYieldSSLowPU);
-    RooAbsData *dataOSHighPU = new RooDataHist("dataOSHighPU","dataOSHighPU",RooArgSet(m),hYieldOSHighPU);
-    RooAbsData *dataSSHighPU = new RooDataHist("dataSSHighPU","dataSSHighPU",RooArgSet(m),hYieldSSHighPU);
-    RooAbsData *dataSS = new RooDataHist("dataSS","dataSS",RooArgList(m),
-        RooFit::Index(sample),
-        RooFit::Import("SSLowPU",*((RooDataHist*)dataSSLowPU)),
-        RooFit::Import("SSHighPU",*((RooDataHist*)dataSSHighPU)));
-    RooAbsData *dataOS = new RooDataHist("dataOS","dataOS",RooArgList(m),
-        RooFit::Index(sample),
-        RooFit::Import("OSLowPU",*((RooDataHist*)dataOSLowPU)),
-        RooFit::Import("OSHighPU",*((RooDataHist*)dataOSHighPU)));
-    RooAbsData *dataLowPU = new RooDataHist("dataLowPU","dataLowPU",RooArgList(m),
-        RooFit::Index(sample),
-        RooFit::Import("OSLowPU",*((RooDataHist*)dataOSLowPU)),
-        RooFit::Import("SSLowPU",*((RooDataHist*)dataSSLowPU)));
-    RooAbsData *dataCombined = new RooDataHist("dataCombined","dataCombined",RooArgList(m),
-        RooFit::Index(sample),
-        RooFit::Import("OSLowPU",*((RooDataHist*)dataOSLowPU)),
-        RooFit::Import("SSLowPU",*((RooDataHist*)dataSSLowPU)),
-        RooFit::Import("OSHighPU",*((RooDataHist*)dataOSHighPU)),
-        RooFit::Import("SSHighPU",*((RooDataHist*)dataSSHighPU)));
-
-    TFile *histfile = 0;
-    if(sigOS==2) {
-        generateTemplate_ZYield(mcfilename, ptCutTag, ptCutProbe, hPV, outputDir);
-        histfile = new TFile(outputDir+"/histTemplates.root");
-        assert(histfile);
-    }
-
-    CSignalModel     *modelSigOS = 0;
-    CBackgroundModel *modelBkgSS = 0;
-
-    Int_t nflOS=0, nflSS=0;
-
-    switch(sigOS) {
-      case 1:
-        modelSigOS = new CBreitWignerConvCrystalBall(m, kFALSE, 0);
-        nflOS += 4; break;
-      case 2:
-        TH1D *h = (TH1D*)histfile->Get("h_mass_zyield");
-        assert(h);
-        modelSigOS = new CMCTemplateConvGaussian(m,h,kFALSE,0);
-        nflOS += 2; break;
-    }
-    switch(bkgSS) {
-      case 1:
-        modelBkgSS = new CExponential(m, kFALSE, 0);
-        nflSS += 1; break;
-      case 2:
-        modelBkgSS = new CQuadratic(m, kFALSE, 0);
-        nflSS += 3; break;
-      case 3:
-        modelBkgSS = new CQuadPlusExp(m, kFALSE, 0);
-        nflSS += 4; break;
-      case 4:
-        modelBkgSS = new CDas(m, kFALSE, 0);
-        nflSS += 4; break;
-      case 5:
-        modelBkgSS = new CDasPlusExp(m, kFALSE, 0);
-        nflSS += 6; break;
-    }
-
-    Double_t NsigLowPUMax = hYieldOSLowPU->Integral();
-    Double_t NbkgLowPUMax = hYieldSSLowPU->Integral();
-    Double_t NsigHighPUMax = hYieldOSHighPU->Integral();
-    Double_t NbkgHighPUMax = hYieldSSHighPU->Integral();
-
-    RooRealVar nsigOSLowPU("nsigOS","signalfraction in OS", 0.99*NsigLowPUMax, 0., 1.5*NsigLowPUMax);
-    RooRealVar nbkgOSLowPU("nbkgOS","backgroundfraction in OS", NbkgLowPUMax, 0., NsigLowPUMax);
-    RooRealVar nbkgSSLowPU("nbkgSS","backgroundfraction in SS", NbkgLowPUMax, 0., 1.5*NbkgLowPUMax);
-
-    RooRealVar nsigOSHighPU("nsigOSHighPU","signalfraction in OS high PU", 0.99*NsigHighPUMax, 0., 1.5*NsigHighPUMax);
-    RooRealVar nbkgOSHighPU("nbkgOSHighPU","backgroundfraction in OS high PU", NbkgHighPUMax, 0., NsigHighPUMax);
-    RooRealVar nbkgSSHighPU("nbkgSSHighPU","backgroundfraction in SS high PU", NbkgHighPUMax, 0., 1.5*NbkgHighPUMax);
-
-    RooFormulaVar fr_lowPU("fr_lowPU","@0/(@0 + @1)",RooArgList(nbkgOSLowPU,nsigOSLowPU));
-    RooFormulaVar fr_highPU("fr_highPU","@0/(@0 + @1)",RooArgList(nbkgOSHighPU,nsigOSHighPU));
-
-    RooFormulaVar tf_lowPU("tf_lowPU","@0/@1",RooArgList(nbkgOSLowPU,nbkgSSLowPU));
-    RooFormulaVar tf_highPU("tf_highPU","@0/@1",RooArgList(nbkgOSHighPU,nbkgSSHighPU));
-
-    RooAddPdf *modelOSLowPU = new RooAddPdf("modelOSLowPU","Model for OS sample Low PU", RooArgList(*(modelSigOS->model),*(modelBkgSS->model)), RooArgList(nsigOSHighPU, nbkgOSLowPU));
-    RooAddPdf *modelSSLowPU = new RooAddPdf("modelSSLowPU","Model for SS sample Low PU", RooArgList(*(modelBkgSS->model)), RooArgList(nbkgSSLowPU));
-    RooAddPdf *modelOSHighPU = new RooAddPdf("modelOSHighPU","Model for OS high PU sample", RooArgList(*(modelSigOS->model),*(modelBkgSS->model)), RooArgList(nsigOSHighPU, nbkgOSHighPU));
-    RooAddPdf *modelSSHighPU = new RooAddPdf("modelSSHighPU","Model for SS high PU sample", RooArgList(*(modelBkgSS->model)), RooArgList(nbkgSSHighPU));
-
-    RooSimultaneous modelOS("modelOS","modelOS",sample);
-    modelOS.addPdf(*modelOSLowPU,"OSLowPU");
-    modelOS.addPdf(*modelOSHighPU,"OSHighPU");
-
-    RooSimultaneous modelSS("modelSS","modelSS",sample);
-    modelSS.addPdf(*modelSSLowPU,"SSLowPU");
-    modelSS.addPdf(*modelSSHighPU,"SSHighPU");
-
-    RooSimultaneous modelLowPU("modelLowPU","modelLowPU",sample);
-    modelLowPU.addPdf(*modelSSLowPU,"SSLowPU");
-    modelLowPU.addPdf(*modelOSLowPU,"OSLowPU");
-
-    RooSimultaneous totalPdf("totalPdf","totalPdf",sample);
-    totalPdf.addPdf(*modelOSLowPU,"OSLowPU");
-    totalPdf.addPdf(*modelOSHighPU,"OSHighPU");
-    totalPdf.addPdf(*modelSSLowPU,"SSLowPU");
-    totalPdf.addPdf(*modelSSHighPU,"SSHighPU");
-
-
-
-    Int_t strategy = 1;
-    RooFitResult *fitResult=0;
-
-    if(fitStrategy == 5){
-        // --- fit bkg on SS region low PU and high PU simultaniously
-        fitResult = modelSS.fitTo(*dataSS,
-            RooFit::PrintEvalErrors(-1),
-            RooFit::PrintLevel(-1),
-            RooFit::Warnings(0),
-            RooFit::Extended(),
-            RooFit::Strategy(1),
-            //RooFit::Minos(RooArgSet(eff)),
-            RooFit::Save());
-
-        fitResult = modelSS.fitTo(*dataSS,
-            RooFit::PrintEvalErrors(-1),
-            RooFit::PrintLevel(-1),
-            RooFit::Warnings(0),
-            RooFit::Extended(),
-            RooFit::Strategy(2),
-            //RooFit::Minos(RooArgSet(eff)),
-            RooFit::Save());
-    }
-
-
-    if(fitStrategy==2 || fitStrategy==3 || fitStrategy==4 || fitStrategy==5){
-        if(fitStrategy==2 || fitStrategy==4 || fitStrategy==5){
-            modelBkgSS->freeze_all_parameters();
-        }
-
-        // --- fit on SS + OS together
-        fitResult = totalPdf.fitTo(*dataCombined,
-            RooFit::PrintEvalErrors(-1),
-            RooFit::PrintLevel(-1),
-            RooFit::Warnings(0),
-            //RooFit::Extended(),
-            RooFit::Strategy(strategy), // MINOS STRATEGY
-            //RooFit::Minos(RooArgSet(eff)),
-            RooFit::Save());
-
-        fitResult = totalPdf.fitTo(*dataCombined,
-            RooFit::PrintEvalErrors(-1),
-            RooFit::PrintLevel(-1),
-            RooFit::Warnings(0),
-            //RooFit::Extended(),
-            RooFit::Strategy(strategy), // MINOS STRATEGY
-            //RooFit::Minos(RooArgSet(eff)),
-            RooFit::Save());
-    }
-
-
-    //params = modelBkgSS->model->getVariables();
-    //params->Print("v");
-
-    Double_t resfr_lowPU = fr_lowPU.getVal();
-    Double_t errfr_lowPU = fr_lowPU.getPropagatedError(*fitResult);
-    Double_t restf_lowPU = tf_lowPU.getVal();
-    Double_t errtf_lowPU = tf_lowPU.getPropagatedError(*fitResult);
-
-    Double_t resfr_highPU = fr_highPU.getVal();
-    Double_t errfr_highPU = fr_highPU.getPropagatedError(*fitResult);
-    Double_t restf_highPU = tf_highPU.getVal();
-    Double_t errtf_highPU = tf_highPU.getPropagatedError(*fitResult);
-
-
-    // Plotting
-
-    char ylabel[50];
-    char yield[50];
-    char nsigstr[50];
-    char nbkgstr[50];
-    char chi2str[50];
-    char frstr[50];
-    char tfstr[50];
-    char sigstr[50];
-
-
-    // --- plot opposite sign low PU region
-    TCanvas *cOSL = MakeCanvas("cOSL","cOSL",720,540);
-    cOSL->SetWindowPosition(cOSL->GetWindowTopX()+cOSL->GetBorderSize()+800,0);
-
-
-    RooPlot *mframeOSL = m.frame(Bins(massBin));
-    dataOSLowPU->plotOn(mframeOSL,MarkerStyle(kFullCircle),MarkerSize(0.8),DrawOption("ZP"));
-    modelOSLowPU->plotOn(mframeOSL, Components(*(modelSigOS->model)), LineColor(9));
-    modelOSLowPU->plotOn(mframeOSL, Components(*(modelBkgSS->model)), LineColor(8));
-
-    modelOSLowPU->plotOn(mframeOSL, LineColor(kRed));
-
-    sprintf(yield,"%u Events",(Int_t)hYieldOSLowPU->GetEntries());
-    sprintf(nsigstr,"N_{sig} = %.1f #pm %.1f",nsigOSLowPU.getVal(),nsigOSLowPU.getPropagatedError(*fitResult));
-    sprintf(nbkgstr,"N_{bkg} = %.1f #pm %.1f",nbkgOSLowPU.getVal(),nbkgOSLowPU.getPropagatedError(*fitResult));
-    sprintf(chi2str,"#chi^{2}/DOF = %.3f",mframeOSL->chiSquare(nflOS+1));
-    sprintf(frstr,"fr = %.3f #pm %.3f",resfr_lowPU, errfr_lowPU);
-    sprintf(tfstr,"tf = %.3f #pm %.3f",restf_lowPU, errtf_lowPU);
-
-
-    CPlot plotOSL("plot_OSLowPU_"+std::to_string(100*fitStrategy+10*bkgSS+sigOS)+"_"+std::to_string(iMeasurement),
-        mframeOSL, "Opposite Sign - Low PU","tag-probe mass [GeV/c^{2}]","Events / 1 GeV/c^{2}");
-
-    plotOSL.AddTextBox("CMS Preliminary",0.19,0.83,0.54,0.89,0);
-    plotOSL.AddTextBox("|#eta| < 2.4",0.21,0.78,0.51,0.83,0,kBlack,-1);
-    plotOSL.AddTextBox(std::to_string(ptCut)+" GeV/c < p_{T} < 13000 GeV/c",0.21,0.73,0.51,0.78,0,kBlack,-1);
-    plotOSL.AddTextBox(yield,0.21,0.69,0.51,0.73,0,kBlack,-1);
-    plotOSL.AddTextBox(modelSigOS->model->GetTitle(), 0.21, 0.63, 0.41, 0.67, 0, 9, -1, 12);
-    plotOSL.AddTextBox(modelBkgSS->model->GetTitle(), 0.21, 0.59, 0.41, 0.63, 0, 8, -1, 12);
-    plotOSL.AddTextBox(0.70,0.62,0.94,0.90,0,kBlack,-1,5,chi2str, nbkgstr, nsigstr, frstr, tfstr);
-
-    plotOSL.Draw(cOSL,kTRUE,"png");
-
-    plotOSL.SetName("plot_OSLowPU_logscale_"+std::to_string(100*fitStrategy+10*bkgSS+sigOS));
-
-    double ymin = hYieldOSLowPU->GetMinimum();
-    if(ymin <= 0.) ymin = 1.;
-
-    plotOSL.SetYRange(0.5 * ymin, hYieldOSLowPU->GetMaximum()*2);
-    plotOSL.SetLogy();
-    plotOSL.Draw(cOSL,kTRUE,"png");
-
-
-    // --- plot opposite sign region high PU
-    TCanvas *cOSH = MakeCanvas("cOSH","cOSH",720,540);
-    cOSH->SetWindowPosition(cOSH->GetWindowTopX()+cOSH->GetBorderSize()+800,0);
-
-
-    RooPlot *mframeOSH = m.frame(Bins(massBin));
-    dataOSHighPU->plotOn(mframeOSH,MarkerStyle(kFullCircle),MarkerSize(0.8),DrawOption("ZP"));
-    modelOSHighPU->plotOn(mframeOSH, Components(*(modelSigOS->model)), LineColor(9));
-    modelOSHighPU->plotOn(mframeOSH, Components(*(modelBkgSS->model)), LineColor(8));
-
-    modelOSHighPU->plotOn(mframeOSH, LineColor(kRed));
-
-    sprintf(yield,"%u Events",(Int_t)hYieldOSHighPU->GetEntries());
-    sprintf(nsigstr,"N_{sig} = %.1f #pm %.1f",nsigOSHighPU.getVal(),nsigOSHighPU.getPropagatedError(*fitResult));
-    sprintf(nbkgstr,"N_{bkg} = %.1f #pm %.1f",nbkgOSHighPU.getVal(),nbkgOSHighPU.getPropagatedError(*fitResult));
-    sprintf(chi2str,"#chi^{2}/DOF = %.3f",mframeOSH->chiSquare(nflOS+1));
-    sprintf(frstr,"fr = %.3f #pm %.3f",resfr_highPU, errfr_highPU);
-    sprintf(tfstr,"tf = %.3f #pm %.3f",restf_highPU, errtf_highPU);
-
-
-    CPlot plotOSH("plot_OSHighPU_"+std::to_string(100*fitStrategy+10*bkgSS+sigOS)+"_"+std::to_string(iMeasurement),
-        mframeOSH,"Opposite Sign - High PU","tag-probe mass [GeV/c^{2}]","Events / 1 GeV/c^{2}");
-
-    plotOSH.AddTextBox("CMS Preliminary",0.19,0.83,0.54,0.89,0);
-    plotOSH.AddTextBox("|#eta| < 2.4",0.21,0.78,0.51,0.83,0,kBlack,-1);
-    plotOSH.AddTextBox(std::to_string(ptCut)+" GeV/c < p_{T} < 13000 GeV/c",0.21,0.73,0.51,0.78,0,kBlack,-1);
-    plotOSH.AddTextBox(yield,0.21,0.69,0.51,0.73,0,kBlack,-1);
-    plotOSH.AddTextBox(modelSigOS->model->GetTitle(), 0.21, 0.63, 0.41, 0.67, 0, 9, -1, 12);
-    plotOSH.AddTextBox(modelBkgSS->model->GetTitle(), 0.21, 0.59, 0.41, 0.63, 0, 8, -1, 12);
-    plotOSH.AddTextBox(0.70,0.62,0.94,0.90,0,kBlack,-1,5,chi2str, nbkgstr, nsigstr, frstr, tfstr);
-
-    plotOSH.Draw(cOSH,kTRUE,"png");
-
-    plotOSH.SetName("plot_OSHighPU_logscale_"+std::to_string(100*fitStrategy+10*bkgSS+sigOS)+"_"+std::to_string(iMeasurement));
-
-    ymin = hYieldOSHighPU->GetMinimum();
-    if(ymin <= 0.) ymin = 1.;
-
-    plotOSH.SetYRange(0.5 * ymin, hYieldOSHighPU->GetMaximum()*2);
-    plotOSH.SetLogy();
-    plotOSH.Draw(cOSH,kTRUE,"png");
-
-
-    // --- plot pulls in OS low PU region
-    TCanvas *cPullsOS = MakeCanvas("cResiOS","cResiOS",720,540);
-    cPullsOS->SetWindowPosition(cPullsOS->GetWindowTopX()+cPullsOS->GetBorderSize()+800,0);
-
-    RooHist* pullsHist = mframeOSL->pullHist();
-    pullsHist->SetPointError(0.,0.,0.,0.);
-
-    RooPlot *mframePullsOS = m.frame(Bins(massBin));
-    mframePullsOS->addPlotable(pullsHist, "P");
-    CPlot plotPullsOS("plot_ResidOS_"+std::to_string(100*fitStrategy+10*bkgSS+sigOS)+"_"+std::to_string(iMeasurement),
-        mframePullsOS,"Opposite Sign - Low PU","tag-probe mass [GeV/c^{2}]","pulls");
-
-    plotPullsOS.Draw(cOSL,kTRUE,"png");
-
-
-    // --- plot same sign region
-    TCanvas *cSS = MakeCanvas("cSS","cSS",720,540);
-    cSS->SetWindowPosition(cSS->GetWindowTopX()+cSS->GetBorderSize()+800,0);
-
-    RooPlot *mframeSS = m.frame(Bins(massBin));
-    dataSSLowPU->plotOn(mframeSS,MarkerStyle(kFullCircle),MarkerSize(0.8),DrawOption("ZP"));
-    modelSSLowPU->plotOn(mframeSS, Components(*(modelBkgSS->model)), LineColor(8));
-
-    sprintf(yield,"%u Events",(Int_t)hYieldSSLowPU->GetEntries());
-    sprintf(nbkgstr,"N_{bkg} = %.1f #pm %.1f",nbkgSSLowPU.getVal(),nbkgSSLowPU.getPropagatedError(*fitResult));
-    sprintf(chi2str,"#chi^{2}/DOF = %.3f",mframeSS->chiSquare(nflSS));
-
-    CPlot plotSS("plot_SSLowPU_"+std::to_string(100*fitStrategy+10*bkgSS+sigOS)+"_"+std::to_string(iMeasurement),
-        mframeSS,"Same Sign - Low PU","tag-probe mass [GeV/c^{2}]","Events / 1 GeV/c^{2}");
-
-    plotSS.AddTextBox("CMS Preliminary",0.19,0.83,0.54,0.89,0);
-    plotSS.AddTextBox("|#eta| < 2.4",0.21,0.78,0.51,0.83,0,kBlack,-1);
-    plotSS.AddTextBox(std::to_string(ptCut)+" GeV/c < p_{T} < 13000 GeV/c",0.21,0.73,0.51,0.78,0,kBlack,-1);
-    plotSS.AddTextBox(yield,0.21,0.69,0.51,0.73,0,kBlack,-1);
-    plotSS.AddTextBox(modelBkgSS->model->GetTitle(), 0.21, 0.59, 0.41, 0.63, 0, 8, -1, 12);
-    plotSS.AddTextBox(0.70,0.79,0.94,0.90,0,kBlack,-1,2,chi2str, nbkgstr);
-
-    plotSS.Draw(cSS,kTRUE,"png");
-
-    // --- plot same sign high pileup region
-    TCanvas *cSSHighPU = MakeCanvas("cSSHighPU","cSSHighPU",720,540);
-    cSSHighPU->SetWindowPosition(cSSHighPU->GetWindowTopX()+cSSHighPU->GetBorderSize()+800,0);
-
-    RooPlot *mframeSSHighPU = m.frame(Bins(massBin));
-    dataSSHighPU->plotOn(mframeSSHighPU,MarkerStyle(kFullCircle),MarkerSize(0.8),DrawOption("ZP"));
-    modelSSHighPU->plotOn(mframeSSHighPU, Components(*(modelBkgSS->model)), LineColor(8));
-
-    sprintf(yield,"%u Events",(Int_t)hYieldSSHighPU->GetEntries());
-    sprintf(nbkgstr,"N_{bkg} = %.1f #pm %.1f",nbkgSSHighPU.getVal(),nbkgSSHighPU.getPropagatedError(*fitResult));
-    sprintf(chi2str,"#chi^{2}/DOF = %.3f",mframeSSHighPU->chiSquare(nflSS));
-
-    CPlot plotSSHighPU("plot_SSHighPU_"+std::to_string(100*fitStrategy+10*bkgSS+sigOS)+"_"+std::to_string(iMeasurement),
-        mframeSSHighPU,"Same Sign - High PU","tag-probe mass [GeV/c^{2}]","Events / 1 GeV/c^{2}");
-
-    plotSSHighPU.AddTextBox("CMS Preliminary",0.19,0.83,0.54,0.89,0);
-    plotSSHighPU.AddTextBox("|#eta| < 2.4",0.21,0.78,0.51,0.83,0,kBlack,-1);
-    plotSSHighPU.AddTextBox(std::to_string(ptCut)+" GeV/c < p_{T} < 13000 GeV/c",0.21,0.73,0.51,0.78,0,kBlack,-1);
-    plotSSHighPU.AddTextBox(yield,0.21,0.69,0.51,0.73,0,kBlack,-1);
-    plotSSHighPU.AddTextBox(modelBkgSS->model->GetTitle(), 0.21, 0.59, 0.41, 0.63, 0, 8, -1, 12);
-    plotSSHighPU.AddTextBox(0.70,0.79,0.94,0.90,0,kBlack,-1,2,chi2str, nbkgstr);
-
-    const Double_t yMax = hYieldSSHighPU->GetMaximum() + hYieldSSHighPU->GetBinError(hYieldSSHighPU->GetMaximumBin());
-    const Double_t yMin = std::max(0., hYieldSSHighPU->GetMinimum() - hYieldSSHighPU->GetBinError(hYieldSSHighPU->GetMinimumBin()));
-    plotSSHighPU.SetYRange(yMin, yMax + 0.4*(yMax-yMin));
-    plotSSHighPU.Draw(cSSHighPU,kTRUE,"png");
-
-    // prepare return stuff
-    std::vector<float> result = {};
-
-    result.push_back(restf_lowPU);
-    result.push_back(errtf_lowPU);
-    result.push_back(errtf_lowPU);
-    result.push_back(mframeOSL->chiSquare(4));
-    result.push_back(mframeSS->chiSquare(3));
-
-    return result;
-
 }

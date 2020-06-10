@@ -8,7 +8,7 @@ from root_numpy import root2array, list_trees
 import math
 
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
-from ZUtils.python.utils import import tree_to_df
+from ZUtils.python.utils import tree_to_df
 
 import argparse
 parser = argparse.ArgumentParser(prog='./Efficiencies')

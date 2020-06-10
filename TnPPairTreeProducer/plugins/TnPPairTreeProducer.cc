@@ -12,12 +12,12 @@
 //
 // constructors and destructor
 //
-TnPPairTreeProducer::TnPPairTreeProducer(const edm::ParameterSet& iConfig)
+TnPPairTreeProducer::TnPPairTreeProducer(const edm::ParameterSet& iConfig):
+    triggerResultsInputTag_(iConfig.getParameter<edm::InputTag>("TriggerResults"))
 {
     fTrackName = iConfig.getUntrackedParameter<std::string>("edmTrackName", "generalTracks");
     fMuonName = iConfig.getUntrackedParameter<std::string>("edmMuonName", "muons");
     fMuonHLTNames  = iConfig.getParameter<std::vector<std::string>>("MuonTriggerNames");
-    fMuonHLTObjectNames = iConfig.getParameter<std::vector<std::string>>("MuonTriggerObjectNames");
     fPVName = iConfig.getUntrackedParameter<std::string>("edmPVName", "offlinePrimaryVertices");
 
     VtxNTracksFitCut_ = iConfig.getUntrackedParameter<double>("VtxNTracksFitMin");
@@ -63,17 +63,13 @@ TnPPairTreeProducer::TnPPairTreeProducer(const edm::ParameterSet& iConfig)
     MassMin_ = iConfig.getUntrackedParameter<double>("MassMin");
     MassMax_ = iConfig.getUntrackedParameter<double>("MassMax");
 
-    if (fMuonHLTNames.size() != fMuonHLTObjectNames.size()) {
-        edm::LogError("TnPPairTreeProducer") << "List of MuonTriggerNames and MuonTriggerObjectNames has to be the same length";
-    }
-
     triggers = new triggertool();
-    triggers->setTriggerResultsToken(consumes<edm::TriggerResults>(iConfig.getParameter<edm::InputTag>("TriggerResults")));
+    triggers->setTriggerResultsToken(consumes<edm::TriggerResults>(triggerResultsInputTag_));
     triggers->setTriggerEventToken(consumes<trigger::TriggerEvent>(iConfig.getParameter<edm::InputTag>("TriggerEvent")));
 
     edm::LogVerbatim("TnPPairTreeProducer") << "getInput: set trigger names";
     for(unsigned int i = 0; i < fMuonHLTNames.size(); ++i) {
-        triggers->addTriggerRecord(fMuonHLTNames.at(i), fMuonHLTObjectNames.at(i));
+        triggers->addTriggerRecord(fMuonHLTNames.at(i));
     }
 
     fPVName_token = consumes<std::vector<reco::Vertex>>(fPVName);
@@ -282,7 +278,27 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
 }
 
 
-// ------------ method called once each job just before starting event loop  ------------
+// ------------ method called once each run just before starting event loop  ------------
+void TnPPairTreeProducer::beginRun(edm::Run const& iRun, edm::EventSetup const& iSetup)
+{
+    std::cout<<"now at "<<iRun.id()<<std::endl;
+
+    bool hltChanged(true);
+    if (hltConfigProvider_.init(iRun, iSetup, triggerResultsInputTag_.process(), hltChanged)) {
+        edm::LogInfo("TnPPairTreeProducer")<< "[TriggerObjMatchValueMapsProducer::beginRun] HLTConfigProvider initialized [processName() = \""
+            << hltConfigProvider_.processName() << "\", tableName() = \"" << hltConfigProvider_.tableName()
+            << "\", size() = " << hltConfigProvider_.size() << "]";
+    } else {
+        edm::LogError("TnPPairTreeProducer") << "Initialization of HLTConfigProvider failed for Run=" << iRun.id() << " (process=\""
+        << triggerResultsInputTag_.process() << "\") -> plugin will not produce outputs for this Run";
+        return;
+    }
+
+    triggers->initHLTObjects(hltConfigProvider_);
+
+}
+
+// ------------ method called once each job just before beginRun ------------
 void
 TnPPairTreeProducer::beginJob()
 {
@@ -397,9 +413,22 @@ bool TnPPairTreeProducer::isMuonTrigger() {
 
 //--------------------------------------------------------------------------------------------------
 bool TnPPairTreeProducer::isMuonTriggerObj(const double eta, const double phi) {
-    if (triggers->passObj(fMuonHLTNames, fMuonHLTObjectNames, eta, phi))
+    if (triggers->passObj(fMuonHLTNames, eta, phi))
         return true;
     return false;
+}
+
+//--------------------------------------------------------------------------------------------------
+bool TnPPairTreeProducer::isCustomID(const reco::Muon& muon, const reco::Vertex& vtx){
+    return muon.isGlobalMuon()
+                && muon.isPFMuon()
+                && muon.globalTrack()->normalizedChi2() < 10.
+                && muon.globalTrack()->hitPattern().numberOfValidMuonHits() > 0
+                && muon.numberOfMatchedStations() > 1
+                && (getDxy(muon, vtx) < DxyCut_ || DxyCut_ <=0.)
+                && (getDz(muon, vtx) < DzCut_ || DzCut_ <=0.)
+                && muon.innerTrack()->hitPattern().numberOfValidPixelHits() > 0
+                && muon.innerTrack()->hitPattern().trackerLayersWithMeasurement() > 5;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -420,17 +449,6 @@ bool TnPPairTreeProducer::passMuonID(const reco::Muon& muon, const reco::Vertex&
     return false;
 }
 
-bool TnPPairTreeProducer::isCustomID(const reco::Muon& muon, const reco::Vertex& vtx){
-    return muon.isGlobalMuon()
-                && muon.isPFMuon()
-                && muon.globalTrack()->normalizedChi2() < 10.
-                && muon.globalTrack()->hitPattern().numberOfValidMuonHits() > 0
-                && muon.numberOfMatchedStations() > 1
-                && (getDxy(muon, vtx) < DxyCut_ || DxyCut_ <=0.)
-                && (getDz(muon, vtx) < DzCut_ || DzCut_ <=0.)
-                && muon.innerTrack()->hitPattern().numberOfValidPixelHits() > 0
-                && muon.innerTrack()->hitPattern().trackerLayersWithMeasurement() > 5;
-}
 
 //--------------------------------------------------------------------------------------------------
 bool TnPPairTreeProducer::passMuonIso(const reco::Muon& muon) {
@@ -445,6 +463,18 @@ bool TnPPairTreeProducer::passMuonIso(const reco::Muon& muon) {
 
     return false;
 }
+
+//--------------------------------------------------------------------------------------------------
+bool TnPPairTreeProducer::passBaseline(const reco::Muon& muon){
+    return muon.isGlobalMuon()
+                && muon.isPFMuon()
+                && muon.globalTrack()->normalizedChi2() < 10.
+                && muon.globalTrack()->hitPattern().numberOfValidMuonHits() > 0
+                && muon.numberOfMatchedStations() > 1
+                && muon.innerTrack()->hitPattern().numberOfValidPixelHits() > 0
+                && muon.innerTrack()->hitPattern().trackerLayersWithMeasurement() > 5;
+}
+
 
 //--------------------------------------------------------------------------------------------------
 float TnPPairTreeProducer::getPFIso(const reco::Muon& muon) {

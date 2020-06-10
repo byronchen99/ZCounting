@@ -295,8 +295,8 @@ for iBit in range(0, 5):
 #eff_ZcTIsoMu24 = Efficiency("ZcTightIsoMu24", 4, 0, 0, 3, '$\mathrm{HLT\_IsoMu24\_v^{*}}$')
 #eff_ZcTIsoMu27 = Efficiency("ZcTightIsoMu27", 4, 0, 0, 4, '$\mathrm{HLT\_IsoMu27\_v^{*}}$')
 # Efficiency("ZcTightIsoMu30", 4, 0, 0, 5, '$\mathrm{HLT\_IsoMu30\_v^{*}}$')
-eff_ZTightIDIsoMu27 = Efficiency("ZcTightID_tightTkIso_IsoMu27", 4, 999, 0.05, 4, '$\mathrm{HLT\_IsoMu27\_v^{*}}$')
-eff_ZTightIDL1SingleMu25 = Efficiency("ZcTightID_tightTkIso_L1SingleMu25", 4, 999, 0.05, 2, '$\mathrm{HLT\_L1SingleMu25\_v^{*}}$')
+eff_ZTightIDIsoMu27 = Efficiency("ZTightID_IsoMu27_tkIso05", 5, 9999, 0.05, 4, '$\mathrm{HLT\_IsoMu27\_v^{*}}$')
+eff_ZTightIDL1SingleMu25 = Efficiency("ZTightID_L1SingleMu25_tkIso05", 5, 0.05, 9999, 2, '$\mathrm{HLT\_L1SingleMu25\_v^{*}}$')
 
 zMCEff1D(dfGen, np.linspace(0.5, 74.5, 25), 'nPU', 'inclusive')
 zMCEff1D(dfGen, np.linspace(0.5, 74.5, 15), 'nPU', 'BB',

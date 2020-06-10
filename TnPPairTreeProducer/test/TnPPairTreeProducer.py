@@ -46,14 +46,12 @@ process.load("ZCounting.TnPPairTreeProducer.TnPPairTreeProducer_cfi")
 if options.era == '2017':
     print("set 2017 configuration")
     process.tnpPairTreeProducer.MuonTriggerNames = cms.vstring("HLT_IsoMu27_v*")
-    process.tnpPairTreeProducer.MuonTriggerObjectNames = cms.vstring("hltL3crIsoL1sMu22Or25L1f0L2f10QL3f27QL3trkIsoFiltered0p07", )
     process.tnpPairTreeProducer.PtCutL1 = cms.untracked.double(30.0)
     process.tnpPairTreeProducer.PtCutL2 = cms.untracked.double(30.0)
 
 elif options.era == '2017H':
     print("set 2017 Low PU configuration")
     process.tnpPairTreeProducer.MuonTriggerNames = cms.vstring("HLT_HIMu17_v*")
-    process.tnpPairTreeProducer.MuonTriggerObjectNames = cms.vstring("hltL3fL1sMu10lqL1f0L2f10L3Filtered17", )
     process.tnpPairTreeProducer.PtCutL1 = cms.untracked.double(27.0)
     process.tnpPairTreeProducer.PtCutL2 = cms.untracked.double(27.0)
 

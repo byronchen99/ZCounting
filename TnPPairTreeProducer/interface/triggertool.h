@@ -4,9 +4,10 @@
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
+#include "FWCore/Common/interface/TriggerNames.h"
 #include "DataFormats/HLTReco/interface/TriggerEvent.h"
 #include "DataFormats/Common/interface/TriggerResults.h"
-#include "FWCore/Common/interface/TriggerNames.h"
+#include "HLTrigger/HLTcore/interface/HLTConfigProvider.h"
 
 #include <bitset>
 
@@ -33,16 +34,25 @@ public:
         fHLTObjTag_token = token;
     }
 
-    void addTriggerRecord(const std::string &name = "",
-                          const std::string &objName = ""){
+    void addTriggerRecord(const std::string &name){
+        Record rec;
+        rec.hltPattern = name;
+        records.push_back(rec);
+    }
+    void addTriggerRecord(const std::string &name,
+                          const std::string &objName){
         Record rec;
         rec.hltPattern = name;
         rec.hltObjName = objName;
         records.push_back(rec);
     }
 
+    void initHLTObjects(const HLTConfigProvider& hltConfigProvider_);
+
     bool pass(const std::vector<std::string> &iNames) const;
-    bool passObj(const std::vector<std::string> &iNames, const std::vector<std::string> &iObjNames, const double eta, const double phi) const;
+    bool pass(const std::string &iName) const;
+    bool passObj(const std::string &iName, const double eta, const double phi) const;
+    bool passObj(const std::vector<std::string> &iNames, const double eta, const double phi) const;
 
 private:
 
@@ -63,12 +73,12 @@ private:
     edm::ParameterSetID fTriggerNamesID;
 
     // initialization from HLT menu; needs to be called on every change in HLT menu
+    void initPathNames(const edm::TriggerResults&, const std::vector<std::string>&);
     void initHLT(const edm::TriggerResults&, const edm::TriggerNames&);
 
     TriggerObjectBits matchHLT(const double eta, const double phi) const;
 
     int getTriggerBit(const std::string &iName) const;
-    int getTriggerObjectBit(const std::string &iName, const std::string &iObjName) const;
 
     TriggerBits triggerBits;
 

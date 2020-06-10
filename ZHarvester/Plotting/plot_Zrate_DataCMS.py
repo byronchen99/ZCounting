@@ -22,6 +22,7 @@ ROOT.gStyle.SetTitleX(.3)
 parser = argparse.ArgumentParser()
 
 parser.add_argument("-c", "--cms", default="nothing", type=str, help="give the CMS csv as input")
+parser.add_argument("-x", "--xSecCSV", default="nothing", type=str, help="give the CMS csv as input")
 parser.add_argument("-r", "--refLumi", default="nothing", type=str, help="give a ByLs.csv as input for reference Luminosity")
 parser.add_argument("-s", "--saveDir", default='./', type=str, help="give output dir")
 args = parser.parse_args()
@@ -93,11 +94,8 @@ zcountlist = data.groupby('fill')['zDel'].apply(list)
 data['time'] = data['tdate_begin'] + (data['tdate_end'] - data['tdate_begin'])/2
 data['timeE'] = (data['tdate_end'] - data['tdate_begin'])/2
 
-data['zLumiInst_mc'] = data['zLumi_mc'] / data['timewindow']
-data['zLumiInst_mc_stat'] = data['zLumiInst_mc'] * data['z_relstat']
-
 #sort out points with low statistics
-data = data[data['z_relstat'] < 0.05]
+#data = data[data['z_relstat'] < 0.05]
 
 data = data.replace([np.inf, -np.inf], np.nan).dropna().dropna()
 
@@ -127,9 +125,7 @@ metazcountsoverlumi=array('d')
 for c in ('HLTeffB_chi2pass', 'HLTeffB_chi2fail', 'HLTeffE_chi2pass', 'HLTeffE_chi2fail',
           'SeleffB_chi2pass', 'SeleffB_chi2fail', 'SeleffE_chi2pass', 'SeleffE_chi2fail',
           'GloeffB_chi2pass', 'GloeffB_chi2fail', 'GloeffE_chi2pass', 'GloeffE_chi2fail',
-          'zYield_chi2'
-          #'StaeffB_chi2pass', 'StaeffB_chi2fail', 'StaeffE_chi2pass', 'StaeffE_chi2fail',
-          #'TrkeffB_chi2pass', 'TrkeffB_chi2fail', 'TrkeffE_chi2pass', 'TrkeffE_chi2fail'
+          'zYieldBB_chi2', 'zYieldBE_chi2', 'zYieldEE_chi2'
          ):
 
     graph_chi2 = ROOT.TGraph(len(data),data['time'].values,data[c].values)
@@ -225,27 +221,23 @@ for fill in data.drop_duplicates('fill')['fill'].values:
 
     ### Efficiency vs Pileup plots ###
 
-    for eff, name in (('ZMCeff',  'corrected Z-Reconstruction efficitency'),
-                      ('ZMCeffBB','corrected Z-BB-Reconstruction efficitency'),
-                      ('ZMCeffBE','corrected Z-BE-Reconstruction efficitency'),
-                      ('ZMCeffEE','corrected Z-EE-Reconstruction efficitency'),
-                      ('Zeff',    'Z-Reconstruction efficitency'),
-                      ('ZBBeff',  'Z-BB-Reconstruction efficitency'),
-                      ('ZBEeff',  'Z-BE-Reconstruction efficitency'),
-                      ('ZEEeff',  'Z-EE-Reconstruction efficitency'),
-                      ('HLTeffB', 'Muon HLT-B efficiency'),
-                      ('HLTeffE', 'Muon HLT-E efficiency'),
-                      ('SeleffB', 'Muon Sel-B efficiency'),
-                      ('SeleffE', 'Muon Sel-E efficiency'),
-                      ('GloeffB', 'Muon Glo-B efficiency'),
-                      ('GloeffE', 'Muon Glo-E efficiency'),
-                      #('StaeffB', 'Muon Sta-B efficiency'),
-                      #('StaeffE', 'Muon Sta-E efficiency'),
-                      #('TrkeffB', 'Muon Trk-B efficiency'),
-                      #('TrkeffE', 'Muon Trk-E efficiency'),
-                      ('zYield_purity', 'Z fake rate'),
-
-                     ):
+    for eff, name in (
+        ('ZBBeff_mc','corrected Z-BB-Reconstruction efficitency'),
+        ('ZBEeff_mc','corrected Z-BE-Reconstruction efficitency'),
+        ('ZEEeff_mc','corrected Z-EE-Reconstruction efficitency'),
+        ('ZBBeff'  ,'Z-BB-Reconstruction efficitency'),
+        ('ZBEeff'  ,'Z-BE-Reconstruction efficitency'),
+        ('ZEEeff'  ,'Z-EE-Reconstruction efficitency'),
+        ('HLTeffB' ,'Muon HLT-B efficiency'),
+        ('HLTeffE' ,'Muon HLT-E efficiency'),
+        ('SeleffB' ,'Muon Sel-B efficiency'),
+        ('SeleffE' ,'Muon Sel-E efficiency'),
+        ('GloeffB' ,'Muon Glo-B efficiency'),
+        ('GloeffE' ,'Muon Glo-E efficiency'),
+        ('zYieldBB_purity'    ,'Z BB purity'),
+        ('zYieldBE_purity'    ,'Z BE purity'),
+        ('zYieldEE_purity'    ,'Z EE purity'),
+    ):
         graph_Zeff = ROOT.TGraph(len(dFill),dFill['pileUp'].values,dFill[eff].values )
         graph_Zeff.SetName("graph_Zeff")
         graph_Zeff.SetMarkerStyle(22)

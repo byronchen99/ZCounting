@@ -43,8 +43,8 @@ LumiMax_ = 5000.5
 
 ptCut = 30.
 tkIsoCut = 0.05 #99999
-dxyCut = 0.2 #99999
-dzCut = 0.5 #99999
+dxyCut = 0.2
+dzCut = 0.5
 
 # acceptance selection
 selection = 'pt1 >= {0} & pt2 >= {0} & dilepMass >= {1} &  dilepMass <= {2} & q1 != q2'.format(ptCut, MassMin_, MassMax_)
@@ -160,9 +160,9 @@ for era, input in inputs.iteritems():
         h_mass_GLO_fail_forward = ROOT.TH2D("h_mass_Glo_fail_forward", "Muon Glo failing probes forward",
             LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
 
-        h_mass_yield_Z = ROOT.TH2D("h_mass_yield_Z", "reconstructed Z bosons", LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
-        h_yieldBB_Z = ROOT.TH1D("h_yieldBB_Z", "reconstructed Z bosons in barrel", LumiBin_, LumiMin_, LumiMax_);
-        h_yieldEE_Z = ROOT.TH1D("h_yieldEE_Z", "reconstructed Z bosons in endcap", LumiBin_, LumiMin_, LumiMax_);
+        h_mass_yieldBB_Z = ROOT.TH2D("h_mass_yieldBB_Z", "reconstructed Z bosons, both muons in barrel",       LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
+        h_mass_yieldBE_Z = ROOT.TH2D("h_mass_yieldBE_Z", "reconstructed Z bosons, muons in barrel and endcap", LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
+        h_mass_yieldEE_Z = ROOT.TH2D("h_mass_yieldEE_Z", "reconstructed Z bosons, both muons in endcap",       LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
 
         #fill tag and probe histograms
         #--- barrel
@@ -176,17 +176,19 @@ for era, input in inputs.iteritems():
             h_mass_HLT_pass_central.Fill(ls,m)
             h_mass_SEL_pass_central.Fill(ls,m)
             h_mass_GLO_pass_central.Fill(ls,m)
-            h_mass_yield_Z.Fill(ls,m)
             if(abs(eta1) < 0.9):
-                h_yieldBB_Z.Fill(ls)
+                h_mass_yieldBB_Z.Fill(ls,m)
+            else:
+                h_mass_yieldBE_Z.Fill(ls,m)
 
         for m,ls,eta1 in data_run.query("isSel==1 & abs(eta2) < 0.9")[['dilepMass','ls','eta1']].values:
             h_mass_HLT_fail_central.Fill(ls,m)
             h_mass_SEL_pass_central.Fill(ls,m)
             h_mass_GLO_pass_central.Fill(ls,m)
-            h_mass_yield_Z.Fill(ls,m)
             if(abs(eta1) < 0.9):
-                h_yieldBB_Z.Fill(ls)
+                h_mass_yieldBB_Z.Fill(ls,m)
+            else:
+                h_mass_yieldBE_Z.Fill(ls,m)
 
         for m,ls in data_run.query("isGlo==1 & abs(eta2) < 0.9")[['dilepMass','ls']].values:
             h_mass_SEL_fail_central.Fill(ls,m)
@@ -207,23 +209,25 @@ for era, input in inputs.iteritems():
             h_mass_HLT_pass_forward.Fill(ls,m)
             h_mass_SEL_pass_forward.Fill(ls,m)
             h_mass_GLO_pass_forward.Fill(ls,m)
-            h_mass_yield_Z.Fill(ls,m)
             if(abs(eta1) > 0.9):
-                h_yieldEE_Z.Fill(ls)
+                h_mass_yieldEE_Z.Fill(ls,m)
+            else:
+                h_mass_yieldBE_Z.Fill(ls,m)
 
         for m,ls,eta1 in data_run.query("isSel==1 & abs(eta2) >= 0.9")[['dilepMass','ls','eta1']].values:
             h_mass_HLT_fail_forward.Fill(ls,m)
             h_mass_SEL_pass_forward.Fill(ls,m)
             h_mass_GLO_pass_forward.Fill(ls,m)
-            h_mass_yield_Z.Fill(ls,m)
             if(abs(eta1) > 0.9):
-                h_yieldEE_Z.Fill(ls)
+                h_mass_yieldEE_Z.Fill(ls,m)
+            else:
+                h_mass_yieldBE_Z.Fill(ls,m)
 
         for m,ls in data_run.query("isGlo==1 & abs(eta2) >= 0.9")[['dilepMass','ls']].values:
             h_mass_SEL_fail_forward.Fill(ls,m)
             h_mass_GLO_pass_forward.Fill(ls,m)
 
-        for m,ls in data_run.query("(isSta==1 | isTrk==1) & abs(eta2)  >= 0.9")[['dilepMass','ls']].values:
+        for m,ls in data_run.query("(isSta==1 | isTrk==1) & abs(eta2) >= 0.9")[['dilepMass','ls']].values:
             h_mass_GLO_fail_forward.Fill(ls,m)
 
         tfile.Write()

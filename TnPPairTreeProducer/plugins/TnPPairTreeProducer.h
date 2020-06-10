@@ -4,7 +4,7 @@
 // CMSSW includes
 #include "FWCore/ServiceRegistry/interface/Service.h"
 #include "FWCore/Framework/interface/Frameworkfwd.h"
-#include "FWCore/Framework/interface/one/EDAnalyzer.h"
+#include "FWCore/Framework/interface/EDAnalyzer.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
@@ -29,9 +29,11 @@
 //
 
 
-class TnPPairTreeProducer : public edm::one::EDAnalyzer<edm::one::SharedResources>  {
+class TnPPairTreeProducer :
+    public edm::EDAnalyzer
+{
 public:
-    explicit TnPPairTreeProducer(const edm::ParameterSet&);
+    TnPPairTreeProducer(const edm::ParameterSet&);
     ~TnPPairTreeProducer();
 
     static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
@@ -40,19 +42,23 @@ public:
     enum MuonIsoTypes { NoneIso, TrackerIso, PFIso };
 
 private:
+    void beginRun(const edm::Run&, const edm::EventSetup&) override;
     virtual void beginJob() override;
     virtual void analyze(const edm::Event&, const edm::EventSetup&) override;
     virtual void endJob() override;
+
+    bool  passBaseline(const reco::Muon& muon);
+    float getPFIso(const reco::Muon& muon);
+    float getTkIso(const reco::Muon& muon);
+    float getDxy(const reco::Muon& muon, const reco::Vertex& vtx);
+    float getDz(const reco::Muon& muon, const reco::Vertex& vtx);
+
+    bool isCustomID(const reco::Muon&, const reco::Vertex&);
 
     bool isMuonTrigger();
     bool isMuonTriggerObj(const double eta, const double phi);
     bool passMuonIso(const reco::Muon&);
     bool passMuonID(const reco::Muon&, const reco::Vertex&);
-    bool isCustomID(const reco::Muon&, const reco::Vertex&);
-    float getTkIso(const reco::Muon&);
-    float getPFIso(const reco::Muon&);
-    float getDxy(const reco::Muon&, const reco::Vertex&);
-    float getDz(const reco::Muon&, const reco::Vertex&);
 
     void clearVariables();
     void clearTagVariables();
@@ -65,12 +71,16 @@ private:
     edm::Service<TFileService> fs;
     TTree *tree_;
 
+    HLTConfigProvider hltConfigProvider_;
     triggertool *triggers;
 
     // --- input
 
     double MassMin_;
     double MassMax_;
+
+    // trigger
+    const edm::InputTag triggerResultsInputTag_;
 
     // Tracks
     std::string fTrackName;
@@ -80,7 +90,6 @@ private:
     std::string fMuonName;
     edm::EDGetTokenT<std::vector<reco::Muon>> fMuonName_token;
     std::vector<std::string> fMuonHLTNames;
-    std::vector<std::string> fMuonHLTObjectNames;
 
     std::string IDTypestr_;
     std::string IsoTypestr_;
