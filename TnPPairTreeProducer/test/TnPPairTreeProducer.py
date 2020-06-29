@@ -28,7 +28,9 @@ process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(options.nMax
 process.source = cms.Source("PoolSource",
     fileNames=cms.untracked.vstring(
      # local
-     'file:/nfs/dust/cms/user/dwalter/data/Lumi/AOD_files/Run2017B/SingleMuon/AOD/17Nov2017-v1/C6DAEE21-37D8-E711-8AC0-02163E0145B8.root'
+     #'file:/nfs/dust/cms/user/dwalter/data/Lumi/AOD_files/Run2017B/SingleMuon/AOD/17Nov2017-v1/C6DAEE21-37D8-E711-8AC0-02163E0145B8.root'
+     # remote test
+     '/store/data/Run2017F/SingleMuon/AOD/09Aug2019_UL2017-v1/270004/90E36450-548B-BF41-BA70-438F46B99A7D.root'
      # Single Mu 2017 Low PU -
      #'/store/data/Run2017H/SingleMuon/AOD/17Nov2017-v2/90000/FEE0C793-6A34-E811-BC0A-1866DA7F95AE.root'
      # Single Mu 2017 B UL-Reco

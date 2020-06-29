@@ -1,7 +1,7 @@
 from CRABClient.UserUtilities import config
 config = config()
 
-config.General.requestName = 'TnPPairTrees_UL_2017B_V06'
+config.General.requestName = 'TnPPairTrees_UL_2018B_V06'
 config.General.workArea = 'crab_projects'
 config.General.transferOutputs = True
 config.General.transferLogs = False
@@ -12,11 +12,11 @@ config.JobType.pyCfgParams = ['era=2017']
 config.JobType.allowUndistributedCMSSW = True
 #config.JobType.inputFiles = ['']
 
-config.Data.inputDataset = '/SingleMuon/Run2017B-09Aug2019_UL2017-v1/AOD'
+config.Data.inputDataset = '/SingleMuon/Run2018B-12Nov2019_UL2018-v2/AOD'
 config.Data.inputDBS = 'global'
 config.Data.splitting = 'LumiBased'
 config.Data.unitsPerJob = 100
-config.Data.runRange = '297020-299329'
+config.Data.runRange = '317080-319310'
 config.Data.publication = False
 config.Data.outputDatasetTag = 'TnPPairTrees_V06'
 
