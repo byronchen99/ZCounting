@@ -47,4 +47,4 @@ def chart_to_html(_chart, _name, **kwargs):
 </html>
 """)
 
-    os.system(f"mv {_name}.js {_name}.html")
+    os.system("mv {0}.js {0}.html".format(_name))
