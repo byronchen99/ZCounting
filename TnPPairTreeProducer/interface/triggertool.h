@@ -73,8 +73,7 @@ private:
     edm::ParameterSetID fTriggerNamesID;
 
     // initialization from HLT menu; needs to be called on every change in HLT menu
-    void initPathNames(const edm::TriggerResults&, const std::vector<std::string>&);
-    void initHLT(const edm::TriggerResults&, const edm::TriggerNames&);
+    void initPathNames(const std::vector<std::string>& triggerNames);
 
     TriggerObjectBits matchHLT(const double eta, const double phi) const;
 

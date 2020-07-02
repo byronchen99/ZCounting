@@ -23,16 +23,12 @@ bool triggertool::readEvent(const edm::Event& iEvent){
         edm::LogWarning("triggertool") << "No valid trigger event product found" ;
     }
 
-    const edm::TriggerNames& triggerNames = iEvent.triggerNames(*hTrgRes);
-    if (fTriggerNamesID != triggerNames.parameterSetID()) {
-        fTriggerNamesID = triggerNames.parameterSetID();
-        initHLT(*hTrgRes, triggerNames);
-    }
-
     triggerBits.reset();
     for (unsigned int i = 0; i < records.size(); i++) {
-        if (records.at(i).hltPathIndex == (unsigned int)-1)
+        if (records.at(i).hltPathIndex == (unsigned int)-1){
+            edm::LogWarning("triggertools")<<"hltPathIndex has not been set"<<std::endl;
             continue;
+        }
         if (hTrgRes->accept(records.at(i).hltPathIndex)) {
             triggerBits[i] = true;
         }
@@ -108,25 +104,24 @@ void triggertool::initHLTObjects(const HLTConfigProvider& hltConfigProvider_){
     /*
         execture each run to initialize the last filter of each trigger corresponding to the corresponding object that has fired the trigger
     */
-    auto const& triggerNames(hltConfigProvider_.triggerNames());
-    initPathNames(*hTrgRes, triggerNames);
+    edm::LogVerbatim("triggertools")<<"initHLTObjects";
+    const std::vector<std::string>& triggerNames(hltConfigProvider_.triggerNames());
+
+    initPathNames(triggerNames);
 
     for (auto &iRec: records) {
 
         std::vector<std::string> hltFiltersWithTags_;
-        auto const& pathName_(iRec.hltPathName);
 
         for (auto const& iPathName : triggerNames) {
 
-            const std::string iPathNameUnv(iPathName.substr(0, iPathName.rfind("_v")));
-
-            if(iPathNameUnv != pathName_ && iPathName != pathName_){
+            if(iPathName != iRec.hltPathName){
                 continue;
             }
 
-            const uint iPathIndex(hltConfigProvider_.triggerIndex(iPathName));
+            iRec.hltPathIndex = hltConfigProvider_.triggerIndex(iPathName);
 
-            auto const& moduleLabels(hltConfigProvider_.moduleLabels(iPathIndex));
+            auto const& moduleLabels(hltConfigProvider_.moduleLabels(iRec.hltPathIndex));
 
             for(int idx=moduleLabels.size()-1; idx >= 0; --idx){
                 auto const& moduleLabel(moduleLabels.at(idx));
@@ -144,6 +139,8 @@ void triggertool::initHLTObjects(const HLTConfigProvider& hltConfigProvider_){
                 if(!hltConfigProvider_.saveTags(moduleLabel)){
                     continue;
                 }
+                edm::LogVerbatim("triggertools")<<"new hlt object name: "<< moduleLabel;
+
                 iRec.hltObjName = moduleLabel;
                 break;
             }
@@ -155,7 +152,7 @@ void triggertool::initHLTObjects(const HLTConfigProvider& hltConfigProvider_){
 }
 
 //--------------------------------------------------------------------------------------------------
-void triggertool::initPathNames(const edm::TriggerResults& result, const std::vector<std::string>& triggerNames) {
+void triggertool::initPathNames(const std::vector<std::string>& triggerNames) {
     /*
         init HLT path every run (e.g. versions can change)
     */
@@ -178,22 +175,6 @@ void triggertool::initPathNames(const edm::TriggerResults& result, const std::ve
         }
         else {  // take full HLT path name given
              iRec.hltPathName = pattern;
-        }
-    }
-}
-
-//--------------------------------------------------------------------------------------------------
-void triggertool::initHLT(const edm::TriggerResults& result, const edm::TriggerNames& triggerNames) {
-    /*
-    init HLT index every event
-    */
-    edm::LogVerbatim("triggertools") << " initHLT" ;
-
-    for (auto &iRec: records) {
-        // Retrieve index in trigger menu corresponding to HLT path
-        unsigned int index = triggerNames.triggerIndex(iRec.hltPathName);
-        if (index < result.size()) {  // check for valid index
-            iRec.hltPathIndex = index;
         }
     }
 }
