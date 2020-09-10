@@ -110,9 +110,10 @@ for suffix, zLumi, zLumiErr in (
 
         # startTime=dFill.iloc[0]['time']
         # endTime = dFill.iloc[-1]['time']
+        subdir = outDir+"/PlotsFill_"+str(fill)
 
-        if not os.path.isdir(outDir):
-            os.mkdir(outDir+"/PlotsFill_"+str(fill))
+        if not os.path.isdir(subdir):
+            os.mkdir(subdir)
 
         ### Z Luminosity vs reference Luminosity ###
 
@@ -159,5 +160,5 @@ for suffix, zLumi, zLumiErr in (
         #text1=ROOT.TText(0.3,0.83,"CMS Automatic, produced: "+datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         #text1.SetNDC()
         #text1.Draw()
-        c2.SaveAs(outDir+"/PlotsFill_"+str(fill)+"/ZLumi"+str(fill)+"_"+suffix+".png")
+        c2.SaveAs(subdir+"/ZLumi"+str(fill)+"_"+suffix+".png")
         c2.Close()
