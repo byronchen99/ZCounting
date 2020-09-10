@@ -14,7 +14,7 @@ options.parseArguments()
 
 if options.samplename == '':
     raise RuntimeError('ZCountAnalyze.py: cannot run without specifying a samplename')
-elif options.samplename not in ('tt', 'dy',):
+elif options.samplename not in ('tt', 'dy', 'w', 'qcd', 'zz', 'wz', 'ww'):
     raise RuntimeError('ZCountAnalyze.py: unknown samplename '+options.samplename)
 
 print("processing {0} events".format(options.maxEvents))
@@ -47,8 +47,8 @@ process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(options.maxE
 
 process.source = cms.Source("PoolSource",
     fileNames=cms.untracked.vstring(
-        #'/store/mc/RunIIFall17MiniAODv2/DYJetsToLL_M-50_TuneCP5_13TeV-amcatnloFXFX-pythia8/MINIAODSIM/PU2017_12Apr2018_new_pmx_94X_mc2017_realistic_v14-v1/00000/CE864285-6D1C-E911-B09D-34E6D7BDDECE.root'
-        '/store/mc/RunIIFall17MiniAODv2/TTTo2L2Nu_TuneCP5_13TeV-powheg-pythia8/MINIAODSIM/PU2017_12Apr2018_94X_mc2017_realistic_v14-v1/20000/0075FEFF-D341-E811-AD4B-001E673D35A9.root'
+        '/store/mc/RunIIFall17MiniAODv2/DYJetsToLL_M-50_TuneCP5_13TeV-amcatnloFXFX-pythia8/MINIAODSIM/PU2017_12Apr2018_new_pmx_94X_mc2017_realistic_v14-v1/00000/CE864285-6D1C-E911-B09D-34E6D7BDDECE.root'
+        # '/store/mc/RunIIFall17MiniAODv2/TTTo2L2Nu_TuneCP5_13TeV-powheg-pythia8/MINIAODSIM/PU2017_12Apr2018_94X_mc2017_realistic_v14-v1/20000/0075FEFF-D341-E811-AD4B-001E673D35A9.root'
     )
 )
 
@@ -79,5 +79,6 @@ elif options.samplename == 'tt':
 
     process.zcounting.hasGenTt = True
     process.zcounting.genTtCollection = cms.InputTag("genEvt")
+
 
 process.p = cms.Path(process.zcounting, tasks)
