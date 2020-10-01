@@ -60,7 +60,8 @@ branches = ['nPV', 'nPU', 'z_recoMass',
             'muon_recoPt',  'antiMuon_recoPt',
             'muon_ID', 'antiMuon_ID',
             'muon_triggerBits', 'antiMuon_triggerBits',
-            'muon_tkIso', 'antiMuon_tkIso'
+            'muon_tkIso', 'antiMuon_tkIso',
+            'muon_pfIso', 'antiMuon_pfIso'
             ]
 
 print(">>> Load Events in acceptance")
@@ -74,6 +75,7 @@ df = pd.concat(df)
 #  df = df.query('delRLL > 0.4')
 
 tkIsoCut = 0.05#999999 #
+pfIsoCut = 0.12
 muonID = 5
 #   4: tight ID w/o dxy and dz cuts
 #   5: tight ID
@@ -94,15 +96,17 @@ df['antiMuon_hlt'] = df['antiMuon_triggerBits'].apply(
 
 print(">>> select events with a tag")
 
-df = df.query('(muon_hlt == 1 & muon_ID >= 4 & muon_tkIso < {0}) | \
-    (antiMuon_hlt == 1 & antiMuon_ID >= 4 & antiMuon_tkIso < {0})'.format(tkIsoCut))
+df = df.query('(muon_hlt == 1 & muon_ID >= 4 & muon_tkIso < {0} & muon_pfIso < {1}) | \
+    (antiMuon_hlt == 1 & antiMuon_ID >= 4 & antiMuon_tkIso < {0} & antiMuon_pfIso < {1})'.format(tkIsoCut, pfIsoCut))
 
 df['passHLT'] = ((df['muon_ID'] >= muonID) & (df['antiMuon_ID'] >= muonID) \
     & (df['muon_hlt'] == 1) & (df['antiMuon_hlt'] == 1) \
-    & (df['muon_tkIso'] < tkIsoCut) & (df['antiMuon_tkIso'] < tkIsoCut))
+    & (df['muon_tkIso'] < tkIsoCut) & (df['antiMuon_tkIso'] < tkIsoCut) \
+    & (df['muon_pfIso'] < pfIsoCut) & (df['antiMuon_pfIso'] < pfIsoCut))
 
 df['passSel'] = ((df['muon_ID'] >= muonID) & (df['antiMuon_ID'] >= muonID)\
-    & (df['muon_tkIso'] < tkIsoCut) & (df['antiMuon_tkIso'] < tkIsoCut))
+    & (df['muon_tkIso'] < tkIsoCut) & (df['antiMuon_tkIso'] < tkIsoCut) \
+    & (df['muon_pfIso'] < pfIsoCut) & (df['antiMuon_pfIso'] < pfIsoCut))
 
 df['passGlo'] = ((df['muon_ID'] >= 3) & (df['antiMuon_ID'] >= 3))
 df['passTrk'] = ((df['muon_ID'] >= 1) & (df['antiMuon_ID'] >= 1))

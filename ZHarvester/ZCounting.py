@@ -23,6 +23,10 @@ def measurement(recLumi, m, outputDir,
     ZyieldresEE_m = ROOT.getZyield(h1RecoEE, outputDir, m, sigmod_yield, bkgmod_yield,
         ptCutTag, ptCutProbe, "EE", recLumi, sigtempl_yield, bkghist_yield)
 
+    # check if there is was enough statistics
+    if np.isnan(ZyieldresBB_m[0]) or np.isnan(ZyieldresBE_m[0]) or np.isnan(ZyieldresEE_m[0]) or ZyieldresBB_m[0] * ZyieldresBE_m[0] * ZyieldresEE_m[0] == 0:
+        return None
+
     ### compute muon efficiencies
     HLTeffresB_m = ROOT.calculateDataEfficiency(h1HLTBPass, h1HLTBFail,
                                                 outputDir, m, "HLT", 0, sigmod_hlt[0], bkgmod_hlt[0], sigmod_hlt[1], bkgmod_hlt[1],
@@ -44,6 +48,7 @@ def measurement(recLumi, m, outputDir,
     GloeffresE_m = ROOT.calculateDataEfficiency(h1GloEPass, h1GloEFail,
                                                 outputDir, m, "Glo", 1, sigmod_glo[2], bkgmod_glo[2], sigmod_glo[3], bkgmod_glo[3],
                                                 ptCutTag, ptCutProbe, 0, recLumi, sigtempl_glo, bkgshape_glo)
+
 
 
     HLTeffB_m = HLTeffresB_m[0]
@@ -124,9 +129,9 @@ def measurement(recLumi, m, outputDir,
         "ZBEeff_stat": max(ZBEeff_EStat),
         "ZEEeff_stat": max(ZEEeff_EStat),
     }
-    res["zBB_relstat"] = result_m['zYieldBB_err']/ZyieldresBB_m[0] + result_m["ZBBeff_stat"]/result_m["ZBBeff"],
-    res["zBE_relstat"] = result_m['zYieldBE_err']/ZyieldresBE_m[0] + result_m["ZBEeff_stat"]/result_m["ZBEeff"],
-    res["zEE_relstat"] = result_m['zYieldEE_err']/ZyieldresEE_m[0] + result_m["ZEEeff_stat"]/result_m["ZEEeff"],
+    res["zBB_relstat"] = res['zYieldBB_err']/ZyieldresBB_m[0] + res["ZBBeff_stat"]/res["ZBBeff"]
+    res["zBE_relstat"] = res['zYieldBE_err']/ZyieldresBE_m[0] + res["ZBEeff_stat"]/res["ZBEeff"]
+    res["zEE_relstat"] = res['zYieldEE_err']/ZyieldresEE_m[0] + res["ZEEeff_stat"]/res["ZEEeff"]
     return res
 
 def ls_corrections(data_m, result_m, m, h2ZyieldBB, h2ZyieldBE, h2ZyieldEE):
@@ -229,7 +234,8 @@ if __name__ == '__main__':
     import json
     import pdb
 
-    from Utils.Utils import to_RootTime
+    os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
+    from ZUtils.python.utils import to_RootTime
 
     # disable panda warnings when assigning a new column in the dataframe
     pd.options.mode.chained_assignment = None
@@ -508,6 +514,9 @@ if __name__ == '__main__':
                     load("h_mass_Glo_fail_forward"),
                     **fit_options
                     )
+
+            if result is None:
+                continue
 
             df = data_run.loc[data_run['ls'].isin(goodLSlist)]
 

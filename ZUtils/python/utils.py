@@ -11,12 +11,12 @@ def tree_to_df(tree, arrSize=5):
         else:
             df[key] = tree[key]
             # zero padding because variable length arrays in dataframe columns can not be stored properly
-            for key in df.keys():
-                if df[key].dtype =='O':
-                    for i in range(arrSize):
-                        df[key+"_"+str(i)] = df[key].apply(lambda x: x[i] if len(x) > i else float('NaN'))
-                    df = df.drop([key],axis=1)
-
+            if arrSize is not None:
+                for key in df.keys():
+                    if df[key].dtype =='O':
+                        for i in range(arrSize):
+                            df[key+"_"+str(i)] = df[key].apply(lambda x: x[i] if len(x) > i else float('NaN'))
+                        df = df.drop([key],axis=1)
     return df
 
 def to_RootTime(time, currentYear):

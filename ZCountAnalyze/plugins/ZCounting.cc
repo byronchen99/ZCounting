@@ -452,6 +452,7 @@ ZCounting::beginJob()
 
     // reco level info
     tree_->Branch("nMuon", &nMuon_,"nMuon_/s");
+    tree_->Branch("Muon_charge", &muon_charge_);
     tree_->Branch("Muon_ID", &muon_ID_);
     tree_->Branch("Muon_genPartFlav", &muon_genPartFlav_);
     tree_->Branch("Muon_tkRelIso", &muon_tkRelIso_);

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-def zmonitoring(dirDQM, dirOut, byLsCSV, mcCorrections, sigTemplates, bkgTemplates, ptCut, runlist = None):
+def zmonitoring(dirDQM, dirOut, byLsCSV, mcCorrections, sigTemplates, bkgTemplates, ptCut, runlist = None, beginRun=0, endRun=400000):
     import os
     import pandas as pd
     import glob
@@ -30,6 +30,8 @@ def zmonitoring(dirDQM, dirOut, byLsCSV, mcCorrections, sigTemplates, bkgTemplat
 
     runs = []
     for run in runlist:
+        if int(run) < beginRun or int(run) > endRun:
+            continue
         if len(glob.glob(dirDQM+"/000*/*{0}*.root".format(run))) == 0:
             continue
         runs.append(run)
@@ -144,6 +146,14 @@ if __name__ == '__main__':
         help='specify directory to input histogram .root files'
     )
     parserA.add_argument(
+        "-b", "--beginRun", default=272007, type=int,
+        help="first run to analyze [%(default)s]"
+    )
+    parserA.add_argument(
+        "-e", "--endRun", default=1000000, type=int,
+        help="analyze stops when comes to this run [%(default)s]"
+    )
+    parserA.add_argument(
         '--mcCorrections', default='./Resources/MCCorrections.json', type=str,
         help='specify .json file with MC corrections for muon correlations'
     )
@@ -185,6 +195,6 @@ if __name__ == '__main__':
     # parse arguments and call subparser
     args = parser.parse_args()
     if args.subparser == 'zmonitoring':
-        zmonitoring(args.inputDQM, args.output, args.byLsCSV, args.mcCorrections, args.sigTemplates, args.bkgTemplates, args.ptCut)
+        zmonitoring(args.inputDQM, args.output, args.byLsCSV, args.mcCorrections, args.sigTemplates, args.bkgTemplates, args.ptCut, beginRun=args.beginRun, endRun=args.endRun)
     if args.subparser == 'check':
         check(args.project, args.resubmit)

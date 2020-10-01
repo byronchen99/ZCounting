@@ -44,14 +44,15 @@ if (len(treeName) > 1):
     exit()
 
 # acceptance selection
-selection = 'z_genMass > 66 ' \
+selection = 'z_genMass > 56 ' \
             '& z_genMass < 116 ' \
-            '& muon_genPt > 27 ' \
-            '& antiMuon_genPt > 27 ' \
+            '& muon_genPt > 30 ' \
+            '& antiMuon_genPt > 30 ' \
             '& abs(muon_genEta) < 2.4 ' \
             '& abs(antiMuon_genEta) < 2.4 ' \
             '& muon_recoMatches == 1' \
-            '& antiMuon_recoMatches == 1'
+            '& antiMuon_recoMatches == 1' \
+            '& decayMode == 13'
 
 # specify which branches to load
 branches = ['nPU',
@@ -68,47 +69,49 @@ print(">>> Load Events in gen acceptance")
 df = [tree_to_df(root2array(i, treeName[0], selection=selection, branches=branches), 5) for i in inputs]
 df = pd.concat(df)
 
-print(">>> add new columns")
-df['delRLL'] = np.sqrt(
-    (df['muon_genEta'] - df['antiMuon_genEta']) ** 2 + (df['muon_genPhi'] - df['antiMuon_genPhi']) ** 2)
+# print(">>> add new columns")
+# df['delRLL'] = np.sqrt(
+#     (df['muon_genEta'] - df['antiMuon_genEta']) ** 2 + (df['muon_genPhi'] - df['antiMuon_genPhi']) ** 2)
+#
+#
+# df = df.query('delRLL > 0.4')
 
-
-df = df.query('delRLL > 0.4')
-
-dfFromPV = df.query('muon_isFromPV == 1 & antiMuon_isFromPV == 1')
-dfNotFromPV = df.query('muon_isFromPV == 0 & antiMuon_isFromPV == 0')
-
-plot_scatter(dfFromPV['muon_dxy'], dfFromPV['antiMuon_dxy'], '$\mu^{-} d_{xy}$', '$\mu^{+} d_{xy}$',
-             range=(0, 0.5), title='Events with Z from PV',
-             saveas=output+'/MuMu_FromPV_dxy.png')
-plot_scatter(dfFromPV['muon_dz'], dfFromPV['antiMuon_dz'], '$\mu^{-} d_{z}$', '$\mu^{+} d_{z}$',
-             range=(0, .5), title='Events with Z from PV',
-             saveas=output+'/MuMu_FromPV_dz.png')
-
-plot_scatter(dfNotFromPV['muon_dxy'], dfNotFromPV['antiMuon_dxy'], '$\mu^{-} d_{xy}$', '$\mu^{+} d_{xy}$',
-             range=(0, 0.5), title='Events with Z not from PV',
-             saveas=output+'/MuMu_NotFromPV_dxy.png')
-plot_scatter(dfNotFromPV['muon_dz'], dfNotFromPV['antiMuon_dz'], '$\mu^{-} d_{z}$', '$\mu^{+} d_{z}$',
-             range=(0, .5), title='Events with Z not from PV',
-             saveas=output+'/MuMu_NotFromPV_dz.png')
-
-exit()
+# dfFromPV = df.query('muon_isFromPV == 1 & antiMuon_isFromPV == 1')
+# dfNotFromPV = df.query('muon_isFromPV == 0 & antiMuon_isFromPV == 0')
+#
+# plot_scatter(dfFromPV['muon_dxy'], dfFromPV['antiMuon_dxy'], '$\mu^{-} d_{xy}$', '$\mu^{+} d_{xy}$',
+#              range=(0, 0.5), title='Events with Z from PV',
+#              saveas=output+'/MuMu_FromPV_dxy.png')
+# plot_scatter(dfFromPV['muon_dz'], dfFromPV['antiMuon_dz'], '$\mu^{-} d_{z}$', '$\mu^{+} d_{z}$',
+#              range=(0, .5), title='Events with Z from PV',
+#              saveas=output+'/MuMu_FromPV_dz.png')
+#
+# plot_scatter(dfNotFromPV['muon_dxy'], dfNotFromPV['antiMuon_dxy'], '$\mu^{-} d_{xy}$', '$\mu^{+} d_{xy}$',
+#              range=(0, 0.5), title='Events with Z not from PV',
+#              saveas=output+'/MuMu_NotFromPV_dxy.png')
+# plot_scatter(dfNotFromPV['muon_dz'], dfNotFromPV['antiMuon_dz'], '$\mu^{-} d_{z}$', '$\mu^{+} d_{z}$',
+#              range=(0, .5), title='Events with Z not from PV',
+#              saveas=output+'/MuMu_NotFromPV_dz.png')
+#
+# exit()
 
 
 plot_scatter(df['muon_tkIso'], df['antiMuon_tkIso'], '$\mu^{-}\ Tracker\ Isolation$', '$\mu^{+}\ Tracker\ Isolation$',
-             range=(0, 1.), title='CMS Simulation',
+             range=(0, 1.), #title='CMS Simulation',
              saveas='MuMu_inclusive_tkIso.png')
 plot_scatter(df['muon_pfIso'], df['antiMuon_pfIso'], '$\mu^{-}\ PF\ Isolation$', '$\mu^{+}\ PF\ Isolation$',
-             range=(0, 1.), title='CMS Simulation',
+             range=(0, 1.), #title='CMS Simulation',
              saveas='MuMu_inclusive_pfIso.png')
 
 
 plot_scatter(df['muon_dxy'], df['antiMuon_dxy'], '$\mu^{-} d_{xy}$', '$\mu^{+} d_{xy}$',
-             range=(0, 0.5), title='CMS Simulation',
+             range=(0, 0.5), #title='CMS Simulation',
              saveas='MuMu_inclusive_dxy.png')
 plot_scatter(df['muon_dz'], df['antiMuon_dz'], '$\mu^{-} d_{z}$', '$\mu^{+} d_{z}$',
-             range=(0, 1.), title='CMS Simulation',
+             range=(0, 1.), #title='CMS Simulation',
              saveas='MuMu_inclusive_dz.png')
+
+exit()
 
 dfLPU = df.query('nPU < 30')
 

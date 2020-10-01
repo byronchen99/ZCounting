@@ -278,6 +278,30 @@ def make_plots(data, ZXSec, relstat,
         graphXsecL.GetYaxis().SetTitle("#sigma^{fid}_{Z} [pb]")
     graphXsecL.GetYaxis().SetTitleOffset(1.2)
 
+    xmin = min(xx_centers) - x_step
+    xmax = max(xx_centers) + x_step
+    ymin = min(np.array(yy)-np.array(yy_err))
+    ymax = max(np.array(yy)+np.array(yy_err))
+    graphXsecL.GetXaxis().SetRangeUser(xmin, xmax)
+    graphXsecL.GetYaxis().SetRangeUser(ymin - 0.05*(ymax-ymin), ymax + 0.2*(ymax-ymin))
+
+    fit = graphXsecL.Fit("pol1","0S","",xmin,xmax)
+    fit_a = fit.Value(0)
+    fit_a_err = fit.ParError(0)
+    fit_b = fit.Value(1)
+    fit_b_err = fit.ParError(1)
+
+    print("fit: ",fit_a, fit_b)
+
+    # line with statistical error
+    xx_fit = np.linspace(xmin,xmax,50)
+    yy_fit = fit_a + xx_fit * fit_b
+    yy_fit_err_up = fit_a+fit_a_err + xx_fit * (fit_b+fit_b_err)
+    yy_fit_err_down = fit_a-fit_a_err + xx_fit * (fit_b-fit_b_err)
+    fit_line = ROOT.TGraphAsymmErrors(len(xx_fit), xx_fit, yy_fit, np.zeros(len(xx_fit)), np.zeros(len(xx_fit)), yy_fit - yy_fit_err_down, yy_fit_err_up - yy_fit)
+    fit_line.SetFillColorAlpha(ROOT.kAzure-4,0.4)
+    fit_line.SetLineColor(ROOT.kBlack)
+
     canvas=ROOT.TCanvas("canvas","canvas",1000,600)
     canvas.SetLeftMargin(0.12)
     canvas.SetRightMargin(0.03)
@@ -287,12 +311,27 @@ def make_plots(data, ZXSec, relstat,
 
     textsize = 24./(canvas.GetWh()*canvas.GetAbsHNDC())
 
-    xmin = min(xx_centers) - x_step
-    xmax = max(xx_centers) + x_step
-    ymin = min(np.array(yy)-np.array(yy_err))
-    ymax = max(np.array(yy)+np.array(yy_err))
-    graphXsecL.GetXaxis().SetRangeUser(xmin, xmax)
-    graphXsecL.GetYaxis().SetRangeUser(ymin - 0.05*(ymax-ymin), ymax + 0.2*(ymax-ymin))
+    entry = ROOT.TLegendEntry()
+    entry.SetLabel("Fit (#pm stat.)")
+    entry.SetOption("fl")
+    entry.SetTextSize(textsize)
+    entry.SetTextFont(42)
+    entry.SetLineColor(ROOT.kBlack)
+    #entry.SetLineWidth(2)
+    entry.SetFillColorAlpha(ROOT.kAzure-4,0.4)
+    entry.SetTextAlign(12)
+    entry.SetMarkerSize(0)
+
+    legend=ROOT.TLegend(0.2,0.8,0.5,0.9)
+    legend.AddEntry(graphXsecL, "2017 High PU (#pm stat.)", "pe")
+    if plot_lowPU:
+        legend.GetListOfPrimitives().Add(entry2)
+
+    legend=ROOT.TLegend(0.16,0.85,0.4,0.97)
+    legend.AddEntry(graphXsecL, "Measurements (#pm stat.)", "pe")
+    legend.GetListOfPrimitives().Add(entry)
+    legend.SetTextSize(textsize)
+    legend.SetTextFont(42)
 
     graphXsecL.GetYaxis().SetTitleFont(42)
     graphXsecL.GetYaxis().SetTitleSize(textsize*1.2)
@@ -305,10 +344,11 @@ def make_plots(data, ZXSec, relstat,
 
     graphXsecL.Draw("AP")
 
+    fit_line.Draw("3L same")
+    legend.Draw("same")
     # latex.SetTextAlign(31)
 
     # latex.DrawLatex(0.97, 0.95, "2017")
-    latex.SetTextSize(textsize*1.2)
     latex.SetTextFont(42)
 
     if region == 'BB':
@@ -320,16 +360,18 @@ def make_plots(data, ZXSec, relstat,
     else:
         str = "inclusive"
 
-    latex.DrawLatex(0.77, 0.92, year)
-    latex.DrawLatex(0.77, 0.87, str)
+    latex.SetTextSize(textsize)
+    latex.DrawLatex(0.77, 0.93, year)
+    latex.DrawLatex(0.77, 0.875, str)
     # latex.DrawLatex(0.12, 0.95, title)
 
+    latex.SetTextSize(textsize*1.2)
     latex.SetTextAlign(11)
-    latex.DrawLatex(0.22, 0.92, "Preliminary")
+    latex.DrawLatex(0.22, 0.18, "Preliminary")
 
     latex.SetTextAlign(11)
     latex.SetTextFont(62)
-    latex.DrawLatex(0.15, 0.92, 'CMS')
+    latex.DrawLatex(0.15, 0.18, 'CMS')
 
     outstring = "{0}/{1}_vs_{2}".format(outDir,ZXSec,xAxis)
     if run_range:

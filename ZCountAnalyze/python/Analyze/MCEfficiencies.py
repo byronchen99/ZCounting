@@ -28,6 +28,10 @@ args = parser.parse_args()
 inputs = args.input
 output = args.output[0]
 
+massLo=56
+massHi=116
+ptCut=30
+
 if not os.path.isdir(output):
     os.mkdir(output)
 
@@ -62,7 +66,7 @@ def eff(nReco, nAcc):
 
 
 def zMCEff1D(df, bins, obs, region='inclusive', sel='',
-             cutsPtEta='p_\mathrm{t}(\mu) > 30\ \mathrm{GeV} \qquad |\eta(\mu)| < 2.4'):
+             cutsPtEta='p_\mathrm{t}(\mu) > '+str(ptCut)+'\ \mathrm{GeV} \qquad |\eta(\mu)| < 2.4'):
     """
     compute Z efficiency from MC and Z->mumu efficiency from tag and probe
     :param df: dataframe with events satisfying the gen accepance
@@ -182,14 +186,15 @@ class Efficiency:
         fig.subplots_adjust(hspace=0)
 
         ax[0].errorbar(self.x, self.eff_true[0], xerr=np.zeros(len(self.x)), yerr=self.eff_true[1], fmt='bo',
-                       label='true')
-        ax[0].errorbar(self.x, self.eff_tnp[0], xerr=np.zeros(len(self.x)), yerr=self.eff_tnp[1], fmt='ro', label='tnp')
+            label='true', markeredgecolor='black')
+        ax[0].errorbar(self.x, self.eff_tnp[0], xerr=np.zeros(len(self.x)), yerr=self.eff_tnp[1], fmt='ro',
+            label='tnp', markeredgecolor='black')
         ymin = min([min(self.eff_true[0]), min(self.eff_tnp[0])])
         ymax = max([max(self.eff_true[0]), max(self.eff_tnp[0])])
         ymax += (ymax-ymin)*0.4
         ax[0].set(xlim=(self.bins[0], self.bins[-1]), ylim=(ymin, ymax))
         ax[0].legend()
-        ax[0].text(0.05, 0.9, r'$66\ \mathrm{GeV} < \mathrm{M}_{\mu\mu} < 116\ \mathrm{GeV}$',
+        ax[0].text(0.05, 0.9, str(massLo)+r' $\mathrm{GeV} < \mathrm{M}_{\mu\mu} < '+str(massHi)+r'\ \mathrm{GeV}$',
                    transform=ax[0].transAxes)
         ax[0].text(0.05, 0.82, r'${0}$'.format(cutsPtEta),
                    transform=ax[0].transAxes)
@@ -201,7 +206,7 @@ class Efficiency:
         ax[0].set_ylabel(r'$\epsilon_\mathrm{Z}$')
         ax[0].set_xlabel(self.obs)
         # ax[0].set_yticks([0.8, 0.85, 0.9, 0.95, 1.0, 1.05])
-        ax[0].set_title("Z efficiency at {0} muon level".format(self.name))
+        #ax[0].set_title("Z efficiency at {0} muon level".format(self.name))
 
         pulls = self.eff_tnp[0] - self.eff_true[0]
         pulls_sig = np.sqrt(self.eff_tnp[1] ** 2 + self.eff_true[1] ** 2)
@@ -221,28 +226,34 @@ class Efficiency:
 
         ax[1].plot(self.x, linear(self.x, *popt), 'm-')
         ax[1].fill_between(self.x, linear(self.x, *(popt-perr)), linear(self.x, *(popt+perr)), color='magenta', alpha=0.5)
-        ax[1].text(0.05, 0.1, r'fit: $(%5.1e\ \pm\ %5.1e) \cdot x + %5.1e\ \pm\ %5.1e $' % (popt[0],perr[0], popt[1],perr[1]), color='magenta', transform=ax[1].transAxes)
+        if popt[1] > 0:
+            ax[1].text(0.04, 0.05, r'fit: $(%5.1e\ \pm\ %5.1e) \cdot x + %5.1e\ \pm\ %5.1e $' % (popt[0],perr[0], popt[1],perr[1]), color='magenta', transform=ax[1].transAxes)
+        else:
+            ax[1].text(0.04, 0.05, r'fit: $(%5.1e\ \pm\ %5.1e) \cdot x - %5.1e\ \pm\ %5.1e $' % (popt[0],perr[0], abs(popt[1]),perr[1]), color='magenta', transform=ax[1].transAxes)
 
         ax[1].errorbar(self.x, pulls, xerr=np.zeros(len(self.x)), yerr=pulls_sig,
                        fmt='ko')  # , label='factorized - true')
         ax[1].set_ylim(-0.01, 0.03)
         ax[1].set_ylabel(r'$\epsilon^\mathrm{tnp}_\mathrm{Z} - \epsilon^\mathrm{true}_\mathrm{Z}$')
-        ax[1].set_xlabel(self.obs)
+        if self.obs == 'nPU':
+            ax[1].set_xlabel(r'$N^\mathrm{PU}$')
+        else:
+            ax[1].set_xlabel(self.obs)
         ax[1].set_yticks([-0.01, 0., 0.01, 0.02])
         plt.savefig(output + '/ZMuMu_{0}_{1}_{2}_level.png'.format(self.obs, self.region, self.name))
         plt.close()
 
 
 # acceptance selection
-selection = 'z_genMass > 66 ' \
-            '& z_genMass < 116 ' \
-            '& muon_genPt > 30 ' \
-            '& antiMuon_genPt > 30 ' \
+selection = 'z_genMass > {0} ' \
+            '& z_genMass < {1} ' \
+            '& muon_genPt > {2} ' \
+            '& antiMuon_genPt > {2} ' \
             '& abs(muon_genEta) < 2.4 ' \
             '& abs(antiMuon_genEta) < 2.4 ' \
             '& muon_recoMatches <= 1' \
             '& antiMuon_recoMatches <= 1' \
-            '& (decayMode == 13 | decayMode == 151313)'
+            '& (decayMode == 13 | decayMode == 151313)'.format(massLo, massHi, ptCut)
 
 # specify which branches to load
 branches = ['nPV', 'nPU', 'z_recoMass', 'z_genMass',
@@ -295,8 +306,11 @@ for iBit in range(0, 5):
 #eff_ZcTIsoMu24 = Efficiency("ZcTightIsoMu24", 4, 0, 0, 3, '$\mathrm{HLT\_IsoMu24\_v^{*}}$')
 #eff_ZcTIsoMu27 = Efficiency("ZcTightIsoMu27", 4, 0, 0, 4, '$\mathrm{HLT\_IsoMu27\_v^{*}}$')
 # Efficiency("ZcTightIsoMu30", 4, 0, 0, 5, '$\mathrm{HLT\_IsoMu30\_v^{*}}$')
-eff_ZTightIDIsoMu27 = Efficiency("ZTightID_IsoMu27_tkIso05", 5, 9999, 0.05, 4, '$\mathrm{HLT\_IsoMu27\_v^{*}}$')
-eff_ZTightIDL1SingleMu25 = Efficiency("ZTightID_L1SingleMu25_tkIso05", 5, 0.05, 9999, 2, '$\mathrm{HLT\_L1SingleMu25\_v^{*}}$')
+#eff_ZTightIDIsoMu27 = Efficiency("ZTightID_IsoMu27_tkIso05", 5, 9999, 0.05, 4, '$\mathrm{HLT\_IsoMu27\_v^{*}}$')
+#eff_ZTightIDL1SingleMu25 = Efficiency("ZTightID_L1SingleMu25_tkIso05", 5, 0.05, 9999, 2, '$\mathrm{HLT\_L1SingleMu25\_v^{*}}$')
+
+eff_ZTightIDIsoMu27 = Efficiency("ZTightID_IsoMu27_tkIso05_pfIso12", 5, 0.12, 0.05, 4, '$\mathrm{HLT\_IsoMu27\_v^{*}}$')
+eff_ZTightIDL1SingleMu25 = Efficiency("ZCustomID_L1SingleMu25", 4, 9999, 9999, 2, '$\mathrm{HLT\_L1SingleMu25\_v^{*}}$')
 
 zMCEff1D(dfGen, np.linspace(0.5, 74.5, 25), 'nPU', 'inclusive')
 zMCEff1D(dfGen, np.linspace(0.5, 74.5, 15), 'nPU', 'BB',
