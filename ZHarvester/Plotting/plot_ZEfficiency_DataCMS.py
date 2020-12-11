@@ -14,7 +14,7 @@ ROOT.gStyle.SetTitleX(.3)
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("-c", "--cms", type=str, help="give the CMS csv as input", required=True)
+parser.add_argument("-c", "--cms", type=str, help="give the CMS csv per Measurement as input", required=True)
 parser.add_argument("-s", "--saveDir", default='./', type=str, help="give output dir")
 args = parser.parse_args()
 
@@ -39,18 +39,20 @@ meta = dict()
 fills = data.drop_duplicates('fill')['fill'].values
 
 features = (
-    ('ZBBeff_mc','corrected Z-BB-Reconstruction efficitency', 0.75, 1.0),
-    ('ZBEeff_mc','corrected Z-BE-Reconstruction efficitency', 0.75, 1.0),
-    ('ZEEeff_mc','corrected Z-EE-Reconstruction efficitency', 0.75, 1.0),
-    ('ZBBeff'  ,'Z-BB-Reconstruction efficitency', 0.75, 1.0),
-    ('ZBEeff'  ,'Z-BE-Reconstruction efficitency', 0.75, 1.0),
-    ('ZEEeff'  ,'Z-EE-Reconstruction efficitency', 0.75, 1.0),
+    ('ZBBeff_mc','corrected Z-BB-Reconstruction efficiency', 0.7, 1.0),
+    ('ZBEeff_mc','corrected Z-BE-Reconstruction efficiency', 0.7, 1.0),
+    ('ZEEeff_mc','corrected Z-EE-Reconstruction efficiency', 0.7, 1.0),
+    ('ZBBeff'  ,'Z-BB-Reconstruction efficiency', 0.7, 1.0),
+    ('ZBEeff'  ,'Z-BE-Reconstruction efficiency', 0.7, 1.0),
+    ('ZEEeff'  ,'Z-EE-Reconstruction efficiency', 0.7, 1.0),
     ('HLTeffB' ,'Muon HLT-B efficiency',0.8, 1.0 ),
     ('HLTeffE' ,'Muon HLT-E efficiency',0.8, 1.0),
-    ('SeleffB' ,'Muon Sel-B efficiency',0.9, 1.0),
-    ('SeleffE' ,'Muon Sel-E efficiency',0.9, 1.0),
-    ('GloeffB' ,'Muon Glo-B efficiency',0.9, 1.0),
-    ('GloeffE' ,'Muon Glo-E efficiency',0.9, 1.0),
+    ('SeleffB' ,'Muon Sel-B efficiency',0.8, 1.0),
+    ('SeleffE' ,'Muon Sel-E efficiency',0.8, 1.0),
+    ('GloeffB' ,'Muon Glo to Trk -B efficiency',0.9, 1.0),
+    ('GloeffE' ,'Muon Glo to Trk -E efficiency',0.9, 1.0),
+    ('GloToStaeffB' ,'Muon Glo to Sta -B efficiency',0.98, 1.01),
+    ('GloToStaeffE' ,'Muon Glo to Sta -E efficiency',0.98, 1.01),
     #('StaeffB' ,'Muon Sta-B efficiency',0.9, 1.0),
     #('StaeffE' ,'Muon Sta-E efficiency',0.9, 1.0),
     #('TrkeffB' ,'Muon Trk-B efficiency',0.95,1.01),

@@ -56,6 +56,7 @@ data = data.replace([np.inf, -np.inf], np.nan).dropna().dropna()
 for category in ('HLTeffB_chi2pass', 'HLTeffB_chi2fail', 'HLTeffE_chi2pass', 'HLTeffE_chi2fail',
           'SeleffB_chi2pass', 'SeleffB_chi2fail', 'SeleffE_chi2pass', 'SeleffE_chi2fail',
           'GloeffB_chi2pass', 'GloeffB_chi2fail', 'GloeffE_chi2pass', 'GloeffE_chi2fail',
+          'GloToStaeffB_chi2pass', 'GloToStaeffB_chi2fail', 'GloToStaeffE_chi2pass', 'GloToStaeffE_chi2fail',
           'zYieldBB_chi2', 'zYieldBE_chi2', 'zYieldEE_chi2'
          ):
 

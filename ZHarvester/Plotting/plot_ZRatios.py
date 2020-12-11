@@ -61,7 +61,6 @@ def make_ratio(data_lo, data_hi, run_range_lo=None, run_range_hi=None,
     points_err = np.array([rLumi*lumiUnc, rZ_BB_err, rZ_BE_err, rZ_EE_err, rZ_tot_err])
     points_err2 = np.array([0., rZ_BB_err_PU, rZ_BE_err_PU, rZ_EE_err_PU, rZ_tot_err_PU])
 
-
     ########## Plot ##########
     xmin = 0.9
     xmax = 1.5
@@ -256,20 +255,21 @@ data_2 = data_2.query('zDel_mc != 0')
 
 #make_ratio(data_2, data_2, run_range_lo=(317080,319310), run_range_hi=(315252,316995), name="2018 A / 2018 B", lumiUnc=0.)
 
-make_ratio(data_1, data_2,
-    run_range_lo=(297046,306462),
-    run_range_hi=(315252,320065),
-    name="2018 ABC / 2017 B-F",
-    lumiUnc=np.sqrt(0.022**2 + 0.015**2),
-    lumi_name='recorded(/pb)')
+# make_ratio(data_1, data_2,
+#     run_range_lo=(297046,306462),
+#     run_range_hi=(315252,320065),
+#     name="2018 ABC / 2017 B-F",
+#     lumiUnc=np.sqrt(0.022**2 + 0.015**2),
+#     lumi_name='recorded(/pb)')
 
 # make_ratio(data_1, data_2,
 #     name="2018 ABC / 2017 H",
+#     run_range_hi=(315252,320065),
 #     lumiUnc=np.sqrt(0.015**2 + 0.015**2),
 #     lumi_name='recorded(/pb)')
-#
-# make_ratio(data_1, data_2,
-#     run_range_hi=(297046,306462),
-#     name="2017 B-F / 2017 H",
-#     lumiUnc=0.013,
-#     lumi_name='recorded(/pb)')
+
+make_ratio(data_1, data_2,
+    run_range_hi=(297046,306462),
+    name="2017 B-F / 2017 H",
+    lumiUnc=0.013,
+    lumi_name='recorded(/pb)')

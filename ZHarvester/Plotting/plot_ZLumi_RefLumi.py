@@ -20,8 +20,9 @@ ROOT.gStyle.SetTitleX(.3)
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--rates", required=True, type=str, help="csv file with z rates")
-parser.add_argument("--xsec",  required=True, type=str, help="csv file where xsec should be taken from (e.g. from low pileup run)")
+parser.add_argument("--rates", required=True, type=str, help="csv file with z rates per measurement")
+parser.add_argument("--xsec",  required=True, type=str,
+    help="csv file with z rates per measurement where xsec should be taken from (e.g. from low pileup run)")
 parser.add_argument("--refLumi",  required=True, type=str, help="give a ByLs.csv as input for reference Luminosity")
 parser.add_argument("-s","--saveDir",  default='./',  type=str, help="give output dir")
 args = parser.parse_args()

@@ -4,6 +4,7 @@ def measurement(recLumi, m, outputDir,
     h1HLTBPass, h1HLTBFail, h1HLTEPass, h1HLTEFail,
     h1SITBPass, h1SITBFail, h1SITEPass, h1SITEFail,
     h1GloBPass, h1GloBFail, h1GloEPass, h1GloEFail,
+    h1GloToStaBPass, h1GloToStaBFail, h1GloToStaEPass, h1GloToStaEFail,
     sigmod_yield=1, bkgmod_yield=5,
     sigtempl_yield="", bkghist_yield=0,
     sigmod_hlt=[1,1,1,1], bkgmod_hlt=[5,5,5,5],
@@ -12,6 +13,8 @@ def measurement(recLumi, m, outputDir,
     sigtempl_sel="", bkgshape_sel="",
     sigmod_glo=[1,1,1,1], bkgmod_glo=[5,5,5,5],
     sigtempl_glo="", bkgshape_glo="",
+    sigmod_gloToSta=[1,1,1,1], bkgmod_gloToSta=[5,5,5,5],
+    sigtempl_gloToSta="", bkgshape_gloToSta="",
     ):
     # compute Z yield
     ZyieldresBB_m = ROOT.getZyield(h1RecoBB, outputDir, m, sigmod_yield, bkgmod_yield,
@@ -49,6 +52,12 @@ def measurement(recLumi, m, outputDir,
                                                 outputDir, m, "Glo", 1, sigmod_glo[2], bkgmod_glo[2], sigmod_glo[3], bkgmod_glo[3],
                                                 ptCutTag, ptCutProbe, 0, recLumi, sigtempl_glo, bkgshape_glo)
 
+    GloToStaeffresB_m = ROOT.calculateDataEfficiency(h1GloToStaBPass, h1GloToStaBFail,
+                                                outputDir, m, "GloToSta", 0, sigmod_gloToSta[0], bkgmod_gloToSta[0], sigmod_gloToSta[1], bkgmod_gloToSta[1],
+                                                ptCutTag, ptCutProbe, 0, recLumi, sigtempl_gloToSta, bkgshape_gloToSta)
+    GloToStaeffresE_m = ROOT.calculateDataEfficiency(h1GloToStaEPass, h1GloToStaEFail,
+                                                outputDir, m, "GloToSta", 1, sigmod_gloToSta[2], bkgmod_gloToSta[2], sigmod_gloToSta[3], bkgmod_gloToSta[3],
+                                                ptCutTag, ptCutProbe, 0, recLumi, sigtempl_gloToSta, bkgshape_gloToSta)
 
 
     HLTeffB_m = HLTeffresB_m[0]
@@ -57,11 +66,13 @@ def measurement(recLumi, m, outputDir,
     SeleffE_m = SeleffresE_m[0]
     GloeffB_m = GloeffresB_m[0]
     GloeffE_m = GloeffresE_m[0]
+    GloToStaeffB_m = GloToStaeffresB_m[0]
+    GloToStaeffE_m = GloToStaeffresE_m[0]
 
     # ZtoMuMu efficiency purely from data
-    ZBBeff = (GloeffB_m * GloeffB_m * SeleffB_m * SeleffB_m * (1 - (1 - HLTeffB_m) * (1 - HLTeffB_m)))
-    ZBEeff = (GloeffB_m * GloeffE_m * SeleffB_m * SeleffE_m * (1 - (1 - HLTeffB_m) * (1 - HLTeffE_m)))
-    ZEEeff = (GloeffE_m * GloeffE_m * SeleffE_m * SeleffE_m * (1 - (1 - HLTeffE_m) * (1 - HLTeffE_m)))
+    ZBBeff = (GloToStaeffB_m * GloToStaeffB_m * GloeffB_m * GloeffB_m * SeleffB_m * SeleffB_m * (1 - (1 - HLTeffB_m) * (1 - HLTeffB_m)))
+    ZBEeff = (GloToStaeffB_m * GloToStaeffE_m * GloeffB_m * GloeffE_m * SeleffB_m * SeleffE_m * (1 - (1 - HLTeffB_m) * (1 - HLTeffE_m)))
+    ZEEeff = (GloToStaeffE_m * GloToStaeffE_m * GloeffE_m * GloeffE_m * SeleffE_m * SeleffE_m * (1 - (1 - HLTeffE_m) * (1 - HLTeffE_m)))
 
     # Statistic Uncertainties (low,high) error propagation
     ZBBeff_EStat = [0., 0.]
@@ -70,17 +81,21 @@ def measurement(recLumi, m, outputDir,
     for i in (1, 2):
         ZBBeff_EStat[i - 1] = 2 * ZBBeff * np.sqrt(
             (GloeffresB_m[i] / GloeffB_m) ** 2 +
+            (GloToStaeffresB_m[i] / GloToStaeffB_m) ** 2 +
             (SeleffresB_m[i] / SeleffB_m) ** 2 +
             ((1 - HLTeffB_m) / (1 - (1 - HLTeffB_m) ** 2) * HLTeffresB_m[i]) ** 2
         )
         ZEEeff_EStat[i - 1] = 2 * ZEEeff * np.sqrt(
             (GloeffresE_m[i] / GloeffE_m) ** 2 +
+            (GloToStaeffresE_m[i] / GloToStaeffE_m) ** 2 +
             (SeleffresE_m[i] / SeleffE_m) ** 2 +
             ((1 - HLTeffE_m) / (1 - (1 - HLTeffE_m) ** 2) * HLTeffresE_m[i]) ** 2
         )
         ZBEeff_EStat[i - 1] = ZBEeff * np.sqrt(
             (GloeffresB_m[i] / GloeffB_m) ** 2 +
             (GloeffresE_m[i] / GloeffE_m) ** 2 +
+            (GloToStaeffresB_m[i] / GloToStaeffB_m) ** 2 +
+            (GloToStaeffresE_m[i] / GloToStaeffE_m) ** 2 +
             (SeleffresB_m[i] / SeleffB_m) ** 2 +
             (SeleffresE_m[i] / SeleffE_m) ** 2 +
             ((1 - HLTeffE_m) / (1 - (1 - HLTeffB_m) * (1 - HLTeffE_m)) * HLTeffresB_m[i]) ** 2 +
@@ -110,6 +125,8 @@ def measurement(recLumi, m, outputDir,
         "SeleffE": SeleffE_m,
         "GloeffB": GloeffB_m,
         "GloeffE": GloeffE_m,
+        "GloToStaeffB": GloToStaeffB_m,
+        "GloToStaeffE": GloToStaeffE_m,
         "HLTeffB_chi2pass": HLTeffresB_m[3],
         "HLTeffB_chi2fail": HLTeffresB_m[4],
         "HLTeffE_chi2pass": HLTeffresE_m[3],
@@ -122,6 +139,10 @@ def measurement(recLumi, m, outputDir,
         "GloeffB_chi2fail": GloeffresB_m[4],
         "GloeffE_chi2pass": GloeffresE_m[3],
         "GloeffE_chi2fail": GloeffresE_m[4],
+        "GloToStaeffB_chi2pass": GloToStaeffresB_m[3],
+        "GloToStaeffB_chi2fail": GloToStaeffresB_m[4],
+        "GloToStaeffE_chi2pass": GloToStaeffresE_m[3],
+        "GloToStaeffE_chi2fail": GloToStaeffresE_m[4],
         "ZBBeff": ZBBeff,
         "ZBEeff": ZBEeff,
         "ZEEeff": ZEEeff,
@@ -293,6 +314,8 @@ if __name__ == '__main__':
             'sigtempl_sel':args.sigTemplates+"/template_Sel.root",
             'sigmod_glo':[2,2,2,2],
             'sigtempl_glo':args.sigTemplates+"/template_Glo.root",
+            'sigmod_gloToSta':[2,2,2,2],
+            'sigtempl_gloToSta':args.sigTemplates+"/template_GloToSta.root",
             }
         fit_options.update(_optns)
 
@@ -391,6 +414,10 @@ if __name__ == '__main__':
         hGlofailB = ROOT.TH1D("h_mass_Glo_fail_central","",MassBin_, MassMin_, MassMax_)
         hGlopassE = ROOT.TH1D("h_mass_Glo_pass_forward","",MassBin_, MassMin_, MassMax_)
         hGlofailE = ROOT.TH1D("h_mass_Glo_fail_forward","",MassBin_, MassMin_, MassMax_)
+        hGloToStapassB = ROOT.TH1D("h_mass_GloToSta_pass_central","",MassBin_, MassMin_, MassMax_)
+        hGloToStafailB = ROOT.TH1D("h_mass_GloToSta_fail_central","",MassBin_, MassMin_, MassMax_)
+        hGloToStapassE = ROOT.TH1D("h_mass_GloToSta_pass_forward","",MassBin_, MassMin_, MassMax_)
+        hGloToStafailE = ROOT.TH1D("h_mass_GloToSta_fail_forward","",MassBin_, MassMin_, MassMax_)
 
         for run, data_run in byLS_data.groupby('run'):
             if run < int(args.beginRun) or run >= int(args.endRun):
@@ -427,6 +454,10 @@ if __name__ == '__main__':
             hGlofailB.Add(load("h_mass_Glo_fail_central"))
             hGlopassE.Add(load("h_mass_Glo_pass_forward"))
             hGlofailE.Add(load("h_mass_Glo_fail_forward"))
+            hGloToStapassB.Add(load("h_mass_GloToSta_pass_central"))
+            hGloToStafailB.Add(load("h_mass_GloToSta_fail_central"))
+            hGloToStapassE.Add(load("h_mass_GloToSta_pass_forward"))
+            hGloToStafailE.Add(load("h_mass_GloToSta_fail_forward"))
 
         outSubDir = outDir + "Fits_Inclusive/"
         os.mkdir(outSubDir)
@@ -436,6 +467,7 @@ if __name__ == '__main__':
             hHLTpassB, hHLTfailB, hHLTpassE, hHLTfailE,
             hSITpassB, hSITfailB, hSITpassE, hSITfailE,
             hGlopassB, hGlofailB, hGlopassE, hGlofailE,
+            hGloToStapassB, hGloToStafailB, hGloToStapassE, hGloToStafailE,
             **fit_options
             )
 
@@ -512,6 +544,10 @@ if __name__ == '__main__':
                     load("h_mass_Glo_fail_central"),
                     load("h_mass_Glo_pass_forward"),
                     load("h_mass_Glo_fail_forward"),
+                    load("h_mass_GloToSta_pass_central"),
+                    load("h_mass_GloToSta_fail_central"),
+                    load("h_mass_GloToSta_pass_forward"),
+                    load("h_mass_GloToSta_fail_forward"),
                     **fit_options
                     )
 

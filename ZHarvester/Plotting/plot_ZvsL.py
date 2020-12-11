@@ -17,7 +17,7 @@ latex.SetNDC()
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--rates", required=True, type=str, help="csv file with z rates")
+parser.add_argument("--rates", required=True, type=str, help="csv file with z rates per Measurement")
 parser.add_argument("--xsec",  type=str, help="csv file where xsec should be taken from (e.g. from low pileup run)")
 parser.add_argument("-s","--saveDir",  default='./',  type=str, help="give output dir")
 
@@ -401,37 +401,51 @@ data['z_relstat'] = np.sqrt(data['zEE_relstat']**2 + data['zBB_relstat']**2) + d
 # make_plots(data, "xsecEE_mc", 'zEE_relstat', title="corrected Z EE rate / lumi - 2017 All", normalized=True)
 #
 
-make_plots(data, "xsecBB_mc", 'zBB_relstat', region='BB', year="2017 B", title="corrected", run_range=(297046,299329), normalized=True)
-make_plots(data, "xsecBE_mc", 'zBE_relstat', region='BE', year="2017 B", title="corrected", run_range=(297046,299329), normalized=True)
-make_plots(data, "xsecEE_mc", 'zEE_relstat', region='EE', year="2017 B", title="corrected", run_range=(297046,299329), normalized=True)
+### 2017
 
-make_plots(data, "xsecBB_mc", 'zBB_relstat', region='BB', year="2017 C", title="corrected", run_range=(299368,302029), normalized=True)
-make_plots(data, "xsecBE_mc", 'zBE_relstat', region='BE', year="2017 C", title="corrected", run_range=(299368,302029), normalized=True)
-make_plots(data, "xsecEE_mc", 'zEE_relstat', region='EE', year="2017 C", title="corrected", run_range=(299368,302029), normalized=True)
-
-make_plots(data, "xsecBB_mc", 'zBB_relstat', region='BB', year="2017 D", title="corrected", run_range=(302030,303434), normalized=True)
-make_plots(data, "xsecBE_mc", 'zBE_relstat', region='BE', year="2017 D", title="corrected", run_range=(302030,303434), normalized=True)
-make_plots(data, "xsecEE_mc", 'zEE_relstat', region='EE', year="2017 D", title="corrected", run_range=(302030,303434), normalized=True)
-
-make_plots(data, "xsecBB_mc", 'zBB_relstat', region='BB', year="2017 E", title="corrected", run_range=(303434,304797), normalized=True)
-make_plots(data, "xsecBE_mc", 'zBE_relstat', region='BE', year="2017 E", title="corrected", run_range=(303434,304797), normalized=True)
-make_plots(data, "xsecEE_mc", 'zEE_relstat', region='EE', year="2017 E", title="corrected", run_range=(303434,304797), normalized=True)
-
-make_plots(data, "xsecBB_mc", 'zBB_relstat', region='BB', year="2017 F", title="corrected", run_range=(305040,306462), normalized=True)
-make_plots(data, "xsecBE_mc", 'zBE_relstat', region='BE', year="2017 F", title="corrected", run_range=(305040,306462), normalized=True)
-make_plots(data, "xsecEE_mc", 'zEE_relstat', region='EE', year="2017 F", title="corrected", run_range=(305040,306462), normalized=True)
-
-# make_plots(data, "xsecBB_mc", 'zBB_relstat', title="corrected Z BB rate / lumi - 2018A", run_range=(315252,316995), normalized=True)
-# make_plots(data, "xsecBE_mc", 'zBE_relstat', title="corrected Z BE rate / lumi - 2018A", run_range=(315252,316995), normalized=True)
-# make_plots(data, "xsecEE_mc", 'zEE_relstat', title="corrected Z EE rate / lumi - 2018A", run_range=(315252,316995), normalized=True)
+# make_plots(data, "xsecBB_mc", 'zBB_relstat', region='BB', year="2017 B", title="corrected", run_range=(297046,299329), normalized=True)
+# make_plots(data, "xsecBE_mc", 'zBE_relstat', region='BE', year="2017 B", title="corrected", run_range=(297046,299329), normalized=True)
+# make_plots(data, "xsecEE_mc", 'zEE_relstat', region='EE', year="2017 B", title="corrected", run_range=(297046,299329), normalized=True)
 #
-# make_plots(data, "xsecBB_mc", 'zBB_relstat', title="corrected Z BB rate / lumi - 2018B", run_range=(317080,319310), normalized=True)
-# make_plots(data, "xsecBE_mc", 'zBE_relstat', title="corrected Z BE rate / lumi - 2018B", run_range=(317080,319310), normalized=True)
-# make_plots(data, "xsecEE_mc", 'zEE_relstat', title="corrected Z EE rate / lumi - 2018B", run_range=(317080,319310), normalized=True)
+# make_plots(data, "xsecBB_mc", 'zBB_relstat', region='BB', year="2017 C", title="corrected", run_range=(299368,302029), normalized=True)
+# make_plots(data, "xsecBE_mc", 'zBE_relstat', region='BE', year="2017 C", title="corrected", run_range=(299368,302029), normalized=True)
+# make_plots(data, "xsecEE_mc", 'zEE_relstat', region='EE', year="2017 C", title="corrected", run_range=(299368,302029), normalized=True)
 #
-# make_plots(data, "xsecBB_mc", 'zBB_relstat', title="corrected Z BB rate / lumi - 2018C", run_range=(319337,320065), normalized=True)
-# make_plots(data, "xsecBE_mc", 'zBE_relstat', title="corrected Z BE rate / lumi - 2018C", run_range=(319337,320065), normalized=True)
-# make_plots(data, "xsecEE_mc", 'zEE_relstat', title="corrected Z EE rate / lumi - 2018C", run_range=(319337,320065), normalized=True)
+# make_plots(data, "xsecBB_mc", 'zBB_relstat', region='BB', year="2017 D", title="corrected", run_range=(302030,303434), normalized=True)
+# make_plots(data, "xsecBE_mc", 'zBE_relstat', region='BE', year="2017 D", title="corrected", run_range=(302030,303434), normalized=True)
+# make_plots(data, "xsecEE_mc", 'zEE_relstat', region='EE', year="2017 D", title="corrected", run_range=(302030,303434), normalized=True)
+#
+# make_plots(data, "xsecBB_mc", 'zBB_relstat', region='BB', year="2017 E", title="corrected", run_range=(303434,304797), normalized=True)
+# make_plots(data, "xsecBE_mc", 'zBE_relstat', region='BE', year="2017 E", title="corrected", run_range=(303434,304797), normalized=True)
+# make_plots(data, "xsecEE_mc", 'zEE_relstat', region='EE', year="2017 E", title="corrected", run_range=(303434,304797), normalized=True)
+#
+# make_plots(data, "xsecBB_mc", 'zBB_relstat', region='BB', year="2017 F", title="corrected", run_range=(305040,306462), normalized=True)
+# make_plots(data, "xsecBE_mc", 'zBE_relstat', region='BE', year="2017 F", title="corrected", run_range=(305040,306462), normalized=True)
+# make_plots(data, "xsecEE_mc", 'zEE_relstat', region='EE', year="2017 F", title="corrected", run_range=(305040,306462), normalized=True)
+#
+# ### total 2017
+# make_plots(data, "xsecBB_mc", 'zBB_relstat', region='BB', year="2017", title="corrected", run_range=(297046,306462), normalized=True)
+# make_plots(data, "xsecBE_mc", 'zBE_relstat', region='BE', year="2017", title="corrected", run_range=(297046,306462), normalized=True)
+# make_plots(data, "xsecEE_mc", 'zEE_relstat', region='EE', year="2017", title="corrected", run_range=(297046,306462), normalized=True)
+#
+
+### 2018
+make_plots(data, "xsecBB_mc", 'zBB_relstat', region='BB', title="corrected", year="2018 A", run_range=(315252,316995), normalized=True)
+make_plots(data, "xsecBE_mc", 'zBE_relstat', region='BE', title="corrected", year="2018 A", run_range=(315252,316995), normalized=True)
+make_plots(data, "xsecEE_mc", 'zEE_relstat', region='EE', title="corrected", year="2018 A", run_range=(315252,316995), normalized=True)
+
+make_plots(data, "xsecBB_mc", 'zBB_relstat', region='BB', title="corrected", year="2018 B", run_range=(317080,319310), normalized=True)
+make_plots(data, "xsecBE_mc", 'zBE_relstat', region='BE', title="corrected", year="2018 B", run_range=(317080,319310), normalized=True)
+make_plots(data, "xsecEE_mc", 'zEE_relstat', region='EE', title="corrected", year="2018 B", run_range=(317080,319310), normalized=True)
+
+make_plots(data, "xsecBB_mc", 'zBB_relstat', region='BB', title="corrected", year="2018 C", run_range=(319337,320065), normalized=True)
+make_plots(data, "xsecBE_mc", 'zBE_relstat', region='BE', title="corrected", year="2018 C", run_range=(319337,320065), normalized=True)
+make_plots(data, "xsecEE_mc", 'zEE_relstat', region='EE', title="corrected", year="2018 C", run_range=(319337,320065), normalized=True)
+
+## total 2018
+make_plots(data, "xsecBB_mc", 'zBB_relstat', region='BB', title="corrected", year="2018", run_range=(315252,320065), normalized=True)
+make_plots(data, "xsecBE_mc", 'zBE_relstat', region='BE', title="corrected", year="2018", run_range=(315252,320065), normalized=True)
+make_plots(data, "xsecEE_mc", 'zEE_relstat', region='EE', title="corrected", year="2018", run_range=(315252,320065), normalized=True)
 
 # make_plots(data, "xsec_mc",   title="Corrected Z rate / lumi - 2017 All", plot_fills=True)
 # make_plots(data, "zXSec_mc", title="Corrected Z rate / lumi - 2017B-E", run_range=(297046,304797))

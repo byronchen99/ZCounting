@@ -77,6 +77,9 @@ df = pd.concat(df)
 tkIsoCut = 0.05#999999 #
 pfIsoCut = 0.12
 muonID = 5
+#   1: Trk
+#   2: Sta
+#   3: Glo
 #   4: tight ID w/o dxy and dz cuts
 #   5: tight ID
 
@@ -109,7 +112,8 @@ df['passSel'] = ((df['muon_ID'] >= muonID) & (df['antiMuon_ID'] >= muonID)\
     & (df['muon_pfIso'] < pfIsoCut) & (df['antiMuon_pfIso'] < pfIsoCut))
 
 df['passGlo'] = ((df['muon_ID'] >= 3) & (df['antiMuon_ID'] >= 3))
-df['passTrk'] = ((df['muon_ID'] >= 1) & (df['antiMuon_ID'] >= 1))
+df['isSta'] = ((df['muon_ID'] == 2) & (df['antiMuon_ID'] == 2))
+df['isTrk'] = ((df['muon_ID'] == 1) & (df['antiMuon_ID'] == 1))
 
 print(">>> Template for hlt step")
 dfPassHLT1 = df.query('passHLT == 1')
@@ -194,14 +198,15 @@ ttree.Delete()
 
 tfile.Close()
 
+### --- global to track
 print(">>> Template for global step")
-dfFailGlo1 = df.query('passGlo == 0 & passTrk == 1 & muon_hlt == 0')
+dfFailGlo1 = df.query('passGlo == 0 & isTrk == 1 & muon_hlt == 0')
 dfFailGlo1 = dfFailGlo1.rename(columns={'muon_recoPt': 'ptProbe',
                                         'antiMuon_recoPt': 'ptTag',
                                         'muon_recoEta': 'etaProbe',
                                         'antiMuon_recoEta': 'etaTag'
                                         })
-dfFailGlo2 = df.query('passGlo == 0 & passTrk == 1 & antiMuon_hlt == 0')
+dfFailGlo2 = df.query('passGlo == 0 & isTrk == 1 & antiMuon_hlt == 0')
 dfFailGlo2 = dfFailGlo2.rename(columns={'muon_recoPt': 'ptTag',
                                         'antiMuon_recoPt': 'ptProbe',
                                         'muon_recoEta': 'etaTag',
@@ -213,6 +218,34 @@ dfOut = dfOut.rename(columns={'z_recoMass': 'mass', 'passGlo': 'pass'})
 dfOut = dfOut[['nPV', 'nPU', 'ptTag', 'ptProbe', 'etaTag', 'etaProbe', 'mass', 'pass']]
 
 tfile = ROOT.TFile.Open(output+"/template_Glo.root", "RECREATE")
+
+ttree = array2tree(dfOut.to_records(index=False))
+ttree.Write()
+ttree.Delete()
+hPV.Write()
+
+tfile.Close()
+
+### --- global to standalone
+print(">>> Template for global step")
+dfFailGloToSta1 = df.query('passGlo == 0 & isSta == 1 & muon_hlt == 0')
+dfFailGloToSta1 = dfFailGlo1.rename(columns={'muon_recoPt': 'ptProbe',
+                                        'antiMuon_recoPt': 'ptTag',
+                                        'muon_recoEta': 'etaProbe',
+                                        'antiMuon_recoEta': 'etaTag'
+                                        })
+dfFailGloToSta2 = df.query('passGlo == 0 & isSta == 1 & antiMuon_hlt == 0')
+dfFailGloToSta2 = dfFailGlo2.rename(columns={'muon_recoPt': 'ptTag',
+                                        'antiMuon_recoPt': 'ptProbe',
+                                        'muon_recoEta': 'etaTag',
+                                        'antiMuon_recoEta': 'etaProbe'
+                                        })
+
+dfOut = pd.concat([dfPassHLT1, dfPassHLT2, dfFailHLT1, dfFailHLT2, dfFailSel1, dfFailSel2, dfFailGloToSta1, dfFailGloToSta2], sort=True)
+dfOut = dfOut.rename(columns={'z_recoMass': 'mass', 'passGlo': 'pass'})
+dfOut = dfOut[['nPV', 'nPU', 'ptTag', 'ptProbe', 'etaTag', 'etaProbe', 'mass', 'pass']]
+
+tfile = ROOT.TFile.Open(output+"/template_GloToSta.root", "RECREATE")
 
 ttree = array2tree(dfOut.to_records(index=False))
 ttree.Write()
