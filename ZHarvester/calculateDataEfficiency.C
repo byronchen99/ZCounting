@@ -153,6 +153,9 @@ Int_t set_background_model(
             model = new CDasPlusExp(param_mass, pass, 0);
             return 6;
         case 6:
+            model = new CRooCMSShape(param_mass, pass, 0);
+            return 3;
+        case 7:
             model = new CQCD(param_mass, hist, pass, 0);
             return 1;
     }
@@ -673,14 +676,6 @@ void performFit(
             RooFit::Strategy(1), // MINOS STRATEGY
             RooFit::Save());
     }
-    fitResult = modelPdf.fitTo(*data,
-        RooFit::PrintEvalErrors(-1),
-        RooFit::PrintLevel(-1),
-        RooFit::Warnings(0),
-        RooFit::Extended(),
-        RooFit::Strategy(1), // MINOS STRATEGY
-        //RooFit::Minos(RooArgSet()),
-        RooFit::Save());
 
     fitResult = modelPdf.fitTo(*data,
         RooFit::PrintEvalErrors(-1),
@@ -690,6 +685,19 @@ void performFit(
         RooFit::Strategy(1), // MINOS STRATEGY
         //RooFit::Minos(RooArgSet()),
         RooFit::Save());
+
+    // bkgModel->Print();
+
+    fitResult = modelPdf.fitTo(*data,
+        RooFit::PrintEvalErrors(-1),
+        RooFit::PrintLevel(-1),
+        RooFit::Warnings(0),
+        RooFit::Extended(),
+        RooFit::Strategy(1), // MINOS STRATEGY
+        //RooFit::Minos(RooArgSet()),
+        RooFit::Save());
+
+    bkgModel->Print();
 
     const Int_t nEntries = (Int_t)h_yield->GetEntries();
 

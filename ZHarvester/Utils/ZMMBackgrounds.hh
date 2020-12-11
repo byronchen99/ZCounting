@@ -4,6 +4,7 @@
 #include "RooExponential.h"
 #include "RooGenericPdf.h"
 #include "RooGaussDoubleSidedExp.h"
+#include "RooCMSShape.h"
 
 class CBackgroundModel
 {
@@ -12,6 +13,8 @@ public:
     virtual ~CBackgroundModel() { delete model; }
     RooAbsPdf *model;
     virtual void freeze_all_parameters() = 0;
+
+    virtual void Print() = 0;
 };
 
 class CExponential : public CBackgroundModel
@@ -21,6 +24,8 @@ public:
     ~CExponential();
     RooRealVar *t1;
     void freeze_all_parameters();
+    void Print(){};
+
 };
 
 class CQuadratic : public CBackgroundModel
@@ -33,6 +38,7 @@ public:
   RooRealVar *a1;
   RooRealVar *a2;
   void freeze_all_parameters();
+  void Print(){};
 
 };
 
@@ -45,6 +51,8 @@ public:
     RooAbsPdf *exp, *quad;
     ~CQuadPlusExp();
     void freeze_all_parameters();
+    void Print(){};
+
 };
 
 class CDas: public CBackgroundModel
@@ -54,6 +62,8 @@ public:
     RooRealVar *mean,*sigma,*kLo,*kHi;
     ~CDas();
     void freeze_all_parameters();
+    void Print(){};
+
 };
 
 class CDasPlusExp: public CBackgroundModel
@@ -64,7 +74,20 @@ public:
     RooGaussDoubleSidedExp *dd;
     RooExponential *exp1;
     ~CDasPlusExp();
-     void freeze_all_parameters();
+    void freeze_all_parameters();
+    void Print(){};
+
+};
+
+class CRooCMSShape: public CBackgroundModel
+{
+public:
+    CRooCMSShape(RooRealVar &m, const Bool_t pass, const int ibin);
+    RooRealVar *alpha,*beta,*gamma,*peak;
+    ~CRooCMSShape();
+    void freeze_all_parameters();
+    void Print();
+
 };
 
 class CQCD: public CBackgroundModel
@@ -76,6 +99,8 @@ public:
     RooHistPdf  *histPdf;
     ~CQCD();
     void freeze_all_parameters(){};
+    void Print(){};
+
 };
 
 class CQCDPlusTT: public CBackgroundModel
@@ -91,6 +116,8 @@ public:
     RooHistPdf  *histPdfTT;
     ~CQCDPlusTT();
     void freeze_all_parameters();
+    void Print(){};
+
 };
 
 //--------------------------------------------------------------------------------------------------
@@ -277,6 +304,48 @@ CDasPlusExp::~CDasPlusExp()
   delete frac;
   delete exp1;
   delete dd;
+}
+
+//--------------------------------------------------------------------------------------------------
+CRooCMSShape::CRooCMSShape(RooRealVar &m, const Bool_t pass, const int ibin)
+{
+  char name[10];
+  if(pass) sprintf(name,"%s_%d","Pass",ibin);
+  else     sprintf(name,"%s_%d","Fail",ibin);
+  char vname[50];
+
+  sprintf(vname,"bkg_alpha%s",name);   alpha = new RooRealVar(vname, "bkg_alpha", 60., 50., 70.);
+  sprintf(vname,"bkg_beta%s",name);    beta  = new RooRealVar(vname, "bkg_beta",  0.001, 0.0, 0.1);
+  sprintf(vname,"bkg_gamma%s",name);   gamma = new RooRealVar(vname, "bkg_gamma",   0.1, 0.0, 10.);
+  sprintf(vname,"bkg_peak%s",name);    peak  = new RooRealVar(vname, "bkg_peak"  ,     90.);
+  sprintf(vname,"background%s",name);
+
+  model  = new RooCMSShape(vname, "RooCMSShape", m, *alpha, *beta, *gamma, *peak);
+
+}
+
+void CRooCMSShape::Print(){
+    std::cout<<"CRooCMSShape::Print() --- "<<std::endl;
+    alpha->Print();
+    beta->Print();
+    gamma->Print();
+    peak->Print();
+}
+
+void CRooCMSShape::freeze_all_parameters(){
+    std::cout<<"freeze all parameters"<<std::endl;
+    alpha->setConstant(kTRUE);
+    beta->setConstant(kTRUE);
+    gamma->setConstant(kTRUE);
+    peak->setConstant(kTRUE);
+}
+
+CRooCMSShape::~CRooCMSShape()
+{
+  delete alpha;
+  delete beta;
+  delete gamma;
+  delete peak;
 }
 
 //--------------------------------------------------------------------------------------------------

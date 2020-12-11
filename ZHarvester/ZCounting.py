@@ -326,10 +326,19 @@ if __name__ == '__main__':
         tfile.Close()
 
         _optns = {
-            'bkgmod_yield':6,
+            'bkgmod_yield':7,
             'bkghist_yield':hBkg_yield,
             }
         fit_options.update(_optns)
+
+    _optns = {
+        "bkgmod_yield": 6,
+        "bkgmod_hlt": [6,6,6,6],
+        "bkgmod_sel": [6,6,6,6],
+        "bkgmod_glo": [6,6,6,6],
+        "bkgmod_gloToSta": [6,6,6,6],
+        }
+    fit_options.update(_optns)
 
     ptCutTag = args.ptCut
     ptCutProbe = args.ptCut
