@@ -181,7 +181,6 @@ void triggertool::initPathNames(const std::vector<std::string>& triggerNames) {
 
 //--------------------------------------------------------------------------------------------------
 TriggerObjectBits triggertool::matchHLT(const double eta, const double phi) const {
-    const double dRMax = 0.2;
 
     TriggerObjectBits matchBits;
     for (unsigned int i = 0; i < records.size(); i++) {
@@ -197,7 +196,7 @@ TriggerObjectBits triggertool::matchHLT(const double eta, const double phi) cons
             for (unsigned int hlto = 0; hlto < keys.size(); hlto++) {
                 trigger::size_type hltf = keys[hlto];
                 const trigger::TriggerObject& tobj(toc[hltf]);
-                if (reco::deltaR(eta, phi, tobj.eta(), tobj.phi()) < dRMax) {
+                if (reco::deltaR(eta, phi, tobj.eta(), tobj.phi()) < DRMAX) {
                     matchBits[filterBit] = true;
                 }
             }

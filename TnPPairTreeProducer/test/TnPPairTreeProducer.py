@@ -29,8 +29,11 @@ process.source = cms.Source("PoolSource",
     fileNames=cms.untracked.vstring(
      # local
      #'file:/nfs/dust/cms/user/dwalter/data/Lumi/AOD_files/Run2017B/SingleMuon/AOD/17Nov2017-v1/C6DAEE21-37D8-E711-8AC0-02163E0145B8.root'
+     #'file:/pnfs/desy.de/cms/tier2/store/data/Run2017H/SingleMuon/AOD/17Nov2017-v2/20000/52841501-AE34-E811-B159-008CFAC93D88.root'
+     #'file:/pnfs/desy.de/cms/tier2/store/data/Run2017H/SingleMuon/AOD/17Nov2017-v2/90000/B0ED78EE-7234-E811-BE5D-001EC94BA153.root'
      # remote test
-     '/store/data/Run2017F/SingleMuon/AOD/09Aug2019_UL2017-v1/270004/90E36450-548B-BF41-BA70-438F46B99A7D.root'
+     #'/store/data/Run2017F/SingleMuon/AOD/09Aug2019_UL2017-v1/270004/90E36450-548B-BF41-BA70-438F46B99A7D.root'
+     'file:/afs/desy.de/user/d/dwalter/nfsHome/data/Lumi/AOD/FE9FE5BF-03BF-834D-8720-1E917906FDD0.root'
      # Single Mu 2017 Low PU -
      #'/store/data/Run2017H/SingleMuon/AOD/17Nov2017-v2/90000/FEE0C793-6A34-E811-BC0A-1866DA7F95AE.root'
      # Single Mu 2017 B UL-Reco
@@ -47,9 +50,9 @@ print("producing for era "+options.era)
 process.load("ZCounting.TnPPairTreeProducer.TnPPairTreeProducer_cfi")
 if options.era == '2017':
     print("set 2017 configuration")
-    process.tnpPairTreeProducer.MuonTriggerNames = cms.vstring("HLT_IsoMu27_v*")
-    process.tnpPairTreeProducer.PtCutL1 = cms.untracked.double(30.0)
-    process.tnpPairTreeProducer.PtCutL2 = cms.untracked.double(30.0)
+    process.tnpPairTreeProducer.MuonTriggerNames = cms.vstring("HLT_L1SingleMu25_v*")
+    process.tnpPairTreeProducer.PtCutL1 = cms.untracked.double(23.0)
+    process.tnpPairTreeProducer.PtCutL2 = cms.untracked.double(23.0)
 
 elif options.era == '2017H':
     print("set 2017 Low PU configuration")

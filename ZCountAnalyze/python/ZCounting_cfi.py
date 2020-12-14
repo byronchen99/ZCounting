@@ -24,6 +24,7 @@ zcounting = cms.EDAnalyzer('ZCounting',
                                       "HLT_IsoMu24_v*",
                                       "HLT_IsoMu27_v*",
                                       "HLT_IsoMu30_v*"),
+    muon_trigger_DRMAX=cms.untracked.double(1.0),
 
     # For MC only
     hasGenZ = cms.untracked.bool(False),

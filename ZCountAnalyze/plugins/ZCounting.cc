@@ -114,8 +114,6 @@ private:
     edm::Service<TFileService> fs;
     TTree *tree_;
 
-    const double DRMAX = 0.2;
-
     // --- input
     edm::EDGetTokenT<edm::TriggerResults> triggerBits_;
     edm::EDGetTokenT<std::vector<pat::TriggerObjectStandAlone> > triggerObjects_;
@@ -128,6 +126,8 @@ private:
     bool hltChanged_;
     std::vector<std::string> muonTriggerPatterns_;
     std::vector<std::string> muonTriggerPaths_;
+    // max dR matching between muon and hlt object
+    double DRMAX;
 
     // flags
     bool hasGenZ_;
@@ -201,6 +201,7 @@ ZCounting::ZCounting(const edm::ParameterSet& iConfig):
     hasGenTt_ = iConfig.getUntrackedParameter<bool>("hasGenTt");
 
     muonTriggerPatterns_ = iConfig.getParameter<std::vector<std::string>>("muon_trigger_patterns");
+    DRMAX = iConfig.getUntrackedParameter<double>("muon_trigger_DRMAX");
 
     VtxNTracksFitCut_ = iConfig.getUntrackedParameter<double>("VtxNTracksFitMin");
     VtxNdofCut_       = iConfig.getUntrackedParameter<double>("VtxNdofMin");

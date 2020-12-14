@@ -18,6 +18,7 @@ TnPPairTreeProducer::TnPPairTreeProducer(const edm::ParameterSet& iConfig):
     fTrackName = iConfig.getUntrackedParameter<std::string>("edmTrackName", "generalTracks");
     fMuonName = iConfig.getUntrackedParameter<std::string>("edmMuonName", "muons");
     fMuonHLTNames  = iConfig.getParameter<std::vector<std::string>>("MuonTriggerNames");
+    fMuonHLTDRMAX = iConfig.getParameter<double>("MuonTriggerDRMAX");
     fPVName = iConfig.getUntrackedParameter<std::string>("edmPVName", "offlinePrimaryVertices");
 
     VtxNTracksFitCut_ = iConfig.getUntrackedParameter<double>("VtxNTracksFitMin");
@@ -66,11 +67,13 @@ TnPPairTreeProducer::TnPPairTreeProducer(const edm::ParameterSet& iConfig):
     triggers = new triggertool();
     triggers->setTriggerResultsToken(consumes<edm::TriggerResults>(triggerResultsInputTag_));
     triggers->setTriggerEventToken(consumes<trigger::TriggerEvent>(iConfig.getParameter<edm::InputTag>("TriggerEvent")));
+    triggers->setDRMAX(fMuonHLTDRMAX);
 
     edm::LogVerbatim("TnPPairTreeProducer") << "getInput: set trigger names";
     for(unsigned int i = 0; i < fMuonHLTNames.size(); ++i) {
         triggers->addTriggerRecord(fMuonHLTNames.at(i));
     }
+    //triggers->addTriggerRecord("HLT_IsoMu27_v*");
 
     fPVName_token = consumes<std::vector<reco::Vertex>>(fPVName);
     fMuonName_token = consumes<std::vector<reco::Muon>>(fMuonName);
@@ -92,7 +95,7 @@ TnPPairTreeProducer::~TnPPairTreeProducer()
 void
 TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 {
-    edm::LogInfo("TnPPairTreeProducer")<<"analyze";
+    edm::LogVerbatim("TnPPairTreeProducer")<<"analyze event "<<iEvent.id().event();
 
     this->clearVariables();
 
@@ -180,6 +183,7 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
         tkIso1_ = getTkIso(itMu1);
         dxy1_ = getDxy(itMu1, *pv);
         dz1_ = getDz(itMu1, *pv);
+        // is1IsoMu27_ = triggers->passObj("HLT_IsoMu27_v*", eta1_, phi1_);
 
         vTag.SetPtEtaPhiM(pt1_, eta1_, phi1_, MUON_MASS);
 
@@ -229,6 +233,8 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
             tkIso2_ = getTkIso(itMu2);
             dxy2_ = getDxy(itMu2, *pv);
             dz2_ = getDz(itMu2, *pv);
+            // is2IsoMu27_ = triggers->passObj("HLT_IsoMu27_v*", eta2_, phi2_);
+
             tree_->Fill();
         }
 
@@ -251,6 +257,7 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
             eta2_ = itTrk.eta();
             phi2_ = itTrk.phi();
             q2_ = itTrk.charge();
+            // is2IsoMu27_ = triggers->passObj("HLT_IsoMu27_v*", eta2_, phi2_);
 
             // Probe selection:  kinematic cuts and opposite charge requirement
             if (pt2_ < PtCutL2_)
@@ -281,11 +288,11 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
 // ------------ method called once each run just before starting event loop  ------------
 void TnPPairTreeProducer::beginRun(edm::Run const& iRun, edm::EventSetup const& iSetup)
 {
-    std::cout<<"now at "<<iRun.id()<<std::endl;
+    edm::LogVerbatim("TnPPairTreeProducer") << "now at "<<iRun.id();
 
     bool hltChanged(true);
     if (hltConfigProvider_.init(iRun, iSetup, triggerResultsInputTag_.process(), hltChanged)) {
-        edm::LogInfo("TnPPairTreeProducer")<< "[TriggerObjMatchValueMapsProducer::beginRun] HLTConfigProvider initialized [processName() = \""
+        edm::LogVerbatim("TnPPairTreeProducer")<<" [TriggerObjMatchValueMapsProducer::beginRun] HLTConfigProvider initialized [processName() = \""
             << hltConfigProvider_.processName() << "\", tableName() = \"" << hltConfigProvider_.tableName()
             << "\", size() = " << hltConfigProvider_.size() << "]";
     } else {
@@ -293,6 +300,7 @@ void TnPPairTreeProducer::beginRun(edm::Run const& iRun, edm::EventSetup const& 
         << triggerResultsInputTag_.process() << "\") -> plugin will not produce outputs for this Run";
         return;
     }
+    edm::LogVerbatim("TnPPairTreeProducer") << "hlt: "<<hltChanged;
 
     triggers->initHLTObjects(hltConfigProvider_);
 
@@ -322,6 +330,7 @@ TnPPairTreeProducer::beginJob()
     tree_->Branch("tkIso1", &tkIso1_,"tkIso1_/f");
     tree_->Branch("dxy1", &dxy1_,"dxy1_/f");
     tree_->Branch("dz1", &dz1_,"dz1_/f");
+    //tree_->Branch("is1IsoMu27", &is1IsoMu27_,"is1IsoMu27_/b");
 
     tree_->Branch("pt2", &pt2_,"pt2_/f");
     tree_->Branch("eta2", &eta2_,"eta2_/f");
@@ -331,6 +340,8 @@ TnPPairTreeProducer::beginJob()
     tree_->Branch("tkIso2", &tkIso2_,"tkIso2_/f");
     tree_->Branch("dxy2", &dxy2_,"dxy2_/f");
     tree_->Branch("dz2", &dz2_,"dz2_/f");
+    //tree_->Branch("is2IsoMu27", &is2IsoMu27_,"is2IsoMu27_/b");
+
     tree_->Branch("is2HLT", &is2HLT_,"is2HLT_/b");
     tree_->Branch("isSel", &isSel_,"isSel_/b");
     tree_->Branch("isGlo", &isGlo_,"isGlo_/b");
@@ -359,7 +370,7 @@ TnPPairTreeProducer::fillDescriptions(edm::ConfigurationDescriptions& descriptio
 
 //--------------------------------------------------------------------------------------------------
 void TnPPairTreeProducer::clearVariables(){
-    edm::LogInfo("TnPPairTreeProducer")<<"clearVariables()";
+    edm::LogVerbatim("TnPPairTreeProducer")<<"clearVariables()";
 
     nPV_ = 0;
     run_ = 0;
@@ -370,7 +381,7 @@ void TnPPairTreeProducer::clearVariables(){
 
 //--------------------------------------------------------------------------------------------------
 void TnPPairTreeProducer::clearTagVariables(){
-    edm::LogInfo("TnPPairTreeProducer")<<"clearTagVariables()";
+    edm::LogVerbatim("TnPPairTreeProducer")<<"clearTagVariables()";
 
     pt1_ = 0.;
     eta1_ = 0.;
@@ -380,11 +391,12 @@ void TnPPairTreeProducer::clearTagVariables(){
     tkIso1_ = 0.;
     dxy1_ = 0.;
     dz1_ = 0.;
+    // is1IsoMu27_ = false;
 }
 
 //--------------------------------------------------------------------------------------------------
 void TnPPairTreeProducer::clearProbeVariables(){
-    edm::LogInfo("TnPPairTreeProducer")<<"clearProbeVariables()";
+    //edm::LogVerbatim("TnPPairTreeProducer")<<"clearProbeVariables()";
 
     pt2_ = 0.;
     eta2_ = 0.;
@@ -394,6 +406,7 @@ void TnPPairTreeProducer::clearProbeVariables(){
     tkIso2_ = 0.;
     dxy2_ = 0.;
     dz2_ = 0.;
+    //is2IsoMu27_ = false;
 
     is2HLT_ = false;
     isSel_ = false;
@@ -406,8 +419,9 @@ void TnPPairTreeProducer::clearProbeVariables(){
 
 //--------------------------------------------------------------------------------------------------
 bool TnPPairTreeProducer::isMuonTrigger() {
-    if (triggers->pass(fMuonHLTNames))
+    if (triggers->pass(fMuonHLTNames)){
         return true;
+    }
     return false;
 }
 

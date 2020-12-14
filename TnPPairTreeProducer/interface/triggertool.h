@@ -34,6 +34,10 @@ public:
         fHLTObjTag_token = token;
     }
 
+    void setDRMAX(const double _drMax) {
+        DRMAX = _drMax;
+    }
+
     void addTriggerRecord(const std::string &name){
         Record rec;
         rec.hltPattern = name;
@@ -80,6 +84,9 @@ private:
     int getTriggerBit(const std::string &iName) const;
 
     TriggerBits triggerBits;
+
+    // Matching parameter
+    double DRMAX = 0.1;
 
 };
 

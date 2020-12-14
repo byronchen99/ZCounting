@@ -90,6 +90,7 @@ private:
     std::string fMuonName;
     edm::EDGetTokenT<std::vector<reco::Muon>> fMuonName_token;
     std::vector<std::string> fMuonHLTNames;
+    double fMuonHLTDRMAX;
 
     std::string IDTypestr_;
     std::string IsoTypestr_;
@@ -126,6 +127,7 @@ private:
     float tkIso1_;
     float dxy1_;
     float dz1_;
+    bool is1IsoMu27_;
 
     float pt2_;
     float eta2_;
@@ -135,6 +137,7 @@ private:
     float tkIso2_;
     float dxy2_;
     float dz2_;
+    bool is2IsoMu27_;
 
     bool is2HLT_;
     bool isSel_;
