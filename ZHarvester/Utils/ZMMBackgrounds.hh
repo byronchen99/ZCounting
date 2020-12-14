@@ -314,10 +314,10 @@ CRooCMSShape::CRooCMSShape(RooRealVar &m, const Bool_t pass, const int ibin)
   else     sprintf(name,"%s_%d","Fail",ibin);
   char vname[50];
 
-  sprintf(vname,"bkg_alpha%s",name);   alpha = new RooRealVar(vname, "bkg_alpha", 60., 50., 70.);
+  sprintf(vname,"bkg_alpha%s",name);   alpha = new RooRealVar(vname, "bkg_alpha", 91., 56., 116.);
   sprintf(vname,"bkg_beta%s",name);    beta  = new RooRealVar(vname, "bkg_beta",  0.001, 0.0, 0.1);
-  sprintf(vname,"bkg_gamma%s",name);   gamma = new RooRealVar(vname, "bkg_gamma",   0.1, 0.0, 10.);
-  sprintf(vname,"bkg_peak%s",name);    peak  = new RooRealVar(vname, "bkg_peak"  ,     90.);
+  sprintf(vname,"bkg_gamma%s",name);   gamma = new RooRealVar(vname, "bkg_gamma",   0.1, 0.0, 1.0);
+  sprintf(vname,"bkg_peak%s",name);    peak  = new RooRealVar(vname, "bkg_peak"  ,  91.1876);
   sprintf(vname,"background%s",name);
 
   model  = new RooCMSShape(vname, "RooCMSShape", m, *alpha, *beta, *gamma, *peak);

@@ -55,8 +55,9 @@ RooCMSShape::RooCMSShape(const RooCMSShape& other, const char* name)
 Double_t RooCMSShape::evaluate() const {
   // ENTER EXPRESSION IN TERMS OF VARIABLE ARGUMENTS HERE
   std::cout<<"evaluate"<<std::endl;
-  //Double_t erf = TMath::Erfc((alpha - x) * beta);
-  Double_t erf = RooMath::erfc((alpha - x) * beta);
+  Double_t v = (alpha - x) * beta;
+  // Double_t erf = RooMath::erfc((alpha - x) * beta);
+  // Double_t erf = 1 - TMath::Erf((alpha - x) * beta);
   Double_t u = (x - peak) * gamma;
 
   if (u < -70)
@@ -65,5 +66,13 @@ Double_t RooCMSShape::evaluate() const {
     u = 0;
   else
     u = exp(-u);  //exponential decay
-  return erf * u;
+
+  if(v > 5)
+    v = 2.;
+  else if(v < -5.)
+    v = 0.;
+  else
+    v = 1 - TMath::Erf(v);
+
+  return v * u;
 }

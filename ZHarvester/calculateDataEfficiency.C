@@ -647,7 +647,7 @@ void performFit(
     const Double_t NsigMax = h_yield->GetEntries();
     RooRealVar Nsig("Nsig","sigYield",NsigMax,0.,1.5*NsigMax);
     RooRealVar Nbkg("Nbkg","bkgYield",0.01*NsigMax,0.,NsigMax);
-    RooAddPdf modelPdf("model","Z sig+bkg",RooArgList(*(sigModel->model),*(bkgModel->model)),RooArgList(Nsig,Nbkg));
+    RooAddPdf modelPdf("modelTot","Z sig+bkg",RooArgList(*(sigModel->model),*(bkgModel->model)),RooArgList(Nsig,Nbkg));
 
     RooFitResult *fitResult=0;
 
@@ -890,6 +890,8 @@ void performFit(
                            RooFit::Minos(RooArgSet(eff)),
                            RooFit::Save());
 
+  bkgFail->Print();
+  bkgPass->Print();
 
   resEff  = eff.getVal();
   resErrl = fabs(eff.getErrorLo());
