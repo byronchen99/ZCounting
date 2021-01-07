@@ -114,7 +114,7 @@ def plot(range, diff, acc, xlabel='', plot_max_diff=False):
         diff_max = xx[np.argmax(yy_diff)]
         ymin = min(yy_diff)#min(min(yy_diff), min(yy_acc))
         ymax = max(yy_diff)#max(max(yy_diff), max(yy_acc))
-        plt.plot([diff_max,diff_max], [ymin,ymax], '-k', label='max($\delta X$)')
+        plt.plot([diff_max,diff_max], [ymin,ymax], '-k', label='max(1-$\delta X$)')
 
     plt.xlabel(xlabel)
     plt.legend()
@@ -138,13 +138,12 @@ def plot2d(xrange, yrange, diff, acc, xlabel='', ylabel='', suffix=''):
             ylabel, str(yrange[0]).replace(".",""), str(yrange[1]).replace(".",""),
             name, suffix))
 
-    _plot2d(diff, '$\delta X$', 'difference')
+    _plot2d(diff, '1-$\delta X$', 'difference')
     _plot2d(acc, '$A$', 'acceptance')
 
-pdb.set_trace()
-df = df.query('tkIso < 0.05 & pfIso < 0.12')
+#df = df.query('tkIso < 0.05 & pfIso < 0.12')
 
-plot((27, 35), diff_pt, acc_pt, xlabel="pt", plot_max_diff=True)
+#plot((27, 35), diff_pt, acc_pt, xlabel="pt", plot_max_diff=True)
 #plot((27, 30), diff_pt, acc_pt, xlabel="pt")
 
 #plot((27, 33), diff_pt, acc_pt, xlabel="pt")
@@ -162,8 +161,8 @@ plot((27, 35), diff_pt, acc_pt, xlabel="pt", plot_max_diff=True)
 # df = df.query('pt > 28')
 # plot2d((0.025, 0.2), (0.06, 0.4), diff_tkIso_pfIso, acc_tkIso_pfIso, 'tkIso', 'pfIso','_pt28')
 #
-# df = df.query('pt > 30')
-# plot2d((0.025, 0.2), (0.06, 0.4), diff_tkIso_pfIso, acc_tkIso_pfIso, 'tkIso', 'pfIso','_pt30')
+df = df.query('pt > 30')
+plot2d((0.025, 0.2), (0.06, 0.4), diff_tkIso_pfIso, acc_tkIso_pfIso, 'tkIso', 'pfIso','_pt30')
 #
 # df = df.query('pt > 32')
 # plot2d((0.025, 0.2), (0.06, 0.4), diff_tkIso_pfIso, acc_tkIso_pfIso, 'tkIso', 'pfIso','_pt32')

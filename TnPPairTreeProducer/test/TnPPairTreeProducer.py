@@ -33,7 +33,12 @@ process.source = cms.Source("PoolSource",
      #'file:/pnfs/desy.de/cms/tier2/store/data/Run2017H/SingleMuon/AOD/17Nov2017-v2/90000/B0ED78EE-7234-E811-BE5D-001EC94BA153.root'
      # remote test
      #'/store/data/Run2017F/SingleMuon/AOD/09Aug2019_UL2017-v1/270004/90E36450-548B-BF41-BA70-438F46B99A7D.root'
-     'file:/afs/desy.de/user/d/dwalter/nfsHome/data/Lumi/AOD/FE9FE5BF-03BF-834D-8720-1E917906FDD0.root'
+     #'file:/afs/desy.de/user/d/dwalter/nfsHome/data/Lumi/AOD/FE9FE5BF-03BF-834D-8720-1E917906FDD0.root'
+     # Single Mu 2016 B UL-Reco -
+     # '/store/data/Run2016B/SingleMuon/AOD/21Feb2020_ver2_UL2016_HIPM-v1/100000/0040B1E4-7F91-1D47-BC8E-4212B390A5B3.root'
+     # Single Mu 2016 Prompt-Reco -
+     # '/store/data/Run2016B/SingleMuon/AOD/PromptReco-v2/000/273/158/00000/0470F84C-2B1A-E611-BC8B-02163E0139E0.root'
+     '/store/data/Run2016C/SingleMuon/AOD/PromptReco-v2/000/275/657/00000/1C22BAD7-753B-E611-99E6-02163E012262.root'
      # Single Mu 2017 Low PU -
      #'/store/data/Run2017H/SingleMuon/AOD/17Nov2017-v2/90000/FEE0C793-6A34-E811-BC0A-1866DA7F95AE.root'
      # Single Mu 2017 B UL-Reco
@@ -48,11 +53,16 @@ process.TFileService = cms.Service("TFileService", fileName=cms.string(outFileNa
 
 print("producing for era "+options.era)
 process.load("ZCounting.TnPPairTreeProducer.TnPPairTreeProducer_cfi")
-if options.era == '2017':
+if options.era == '2016':
+    print("set 2016 configuration")
+    process.tnpPairTreeProducer.MuonTriggerNames = cms.vstring("HLT_IsoMu24_v*","HLT_IsoTkMu24_v*")
+    process.tnpPairTreeProducer.PtCutL1 = cms.untracked.double(27.0)
+    process.tnpPairTreeProducer.PtCutL2 = cms.untracked.double(27.0)
+elif options.era == '2017':
     print("set 2017 configuration")
-    process.tnpPairTreeProducer.MuonTriggerNames = cms.vstring("HLT_L1SingleMu25_v*")
-    process.tnpPairTreeProducer.PtCutL1 = cms.untracked.double(23.0)
-    process.tnpPairTreeProducer.PtCutL2 = cms.untracked.double(23.0)
+    process.tnpPairTreeProducer.MuonTriggerNames = cms.vstring("HLT_IsoMu27_v*")
+    process.tnpPairTreeProducer.PtCutL1 = cms.untracked.double(30.0)
+    process.tnpPairTreeProducer.PtCutL2 = cms.untracked.double(30.0)
 
 elif options.era == '2017H':
     print("set 2017 Low PU configuration")

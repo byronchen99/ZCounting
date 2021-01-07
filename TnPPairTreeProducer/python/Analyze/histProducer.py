@@ -66,9 +66,17 @@ pfIsoCut = args.pfIso if args.pfIso else 99999
 dxyCut = args.dxy if args.dxy else 99999
 dzCut = args.dz if args.dz else 99999
 
+dxyDistCut = None# 0.2
+dzDistCut = None#0.5
+
 
 # acceptance selection
 selection = 'pt1 >= {0} & pt2 >= {0} & dilepMass >= {1} &  dilepMass <= {2} & q1 != q2'.format(ptCut, MassMin_, MassMax_)
+
+if dxyDistCut is not None:
+    selection += ' & abs(dxy1 - dxy2) < {0}'.format(dxyDistCut)
+if dzDistCut is not None:
+    selection += ' & abs(dz1 - dz2) < {0}'.format(dzDistCut)
 
 if tkIsoCut is not None:
     selection += ' & (tkIso1 < {0} | (is2HLT & tkIso2 < {0}))'.format(tkIsoCut)

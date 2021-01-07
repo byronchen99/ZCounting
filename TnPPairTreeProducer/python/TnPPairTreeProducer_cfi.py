@@ -20,6 +20,7 @@ tnpPairTreeProducer = cms.EDAnalyzer('TnPPairTreeProducer',
 
     # Muons - triggers
     MuonTriggerNames=cms.vstring("HLT_IsoMu27_v*"),
+    MuonTriggerDRMAX = cms.double(1.0),
 
     # Muon selection
     IDType   = cms.untracked.string("Custom"),  # Custom, Tight, Medium, Loose
