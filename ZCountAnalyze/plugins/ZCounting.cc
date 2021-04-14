@@ -63,8 +63,9 @@
 // ROOT includes
 #include "TTree.h"
 #include "Math/Vector4D.h"
+#include <TLorentzVector.h>
 
-
+// typedef ROOT::Math::LorentzVector<ROOT::Math::PtEtaPhiM4D<double>> LV
 //
 // class declaration
 //
@@ -114,6 +115,11 @@ private:
     edm::Service<TFileService> fs;
     TTree *tree_;
 
+    const double MUON_MASS = 0.105658369;
+
+    TLorentzVector vMuon;
+    TLorentzVector vAntiMuon;
+
     // --- input
     edm::EDGetTokenT<edm::TriggerResults> triggerBits_;
     edm::EDGetTokenT<std::vector<pat::TriggerObjectStandAlone> > triggerObjects_;
@@ -144,6 +150,7 @@ private:
     int nPV_;
     int decayMode_;
     float z_genMass_;
+    float z_recoMass_;
 
     int muon_genRecoMatches_;
     int muon_genRecoObj_;
@@ -172,14 +179,20 @@ private:
     std::vector<float> muon_eta_;
     std::vector<float> muon_phi_;
     std::vector<bool> muon_isFromPV_;
+    std::vector<bool> muon_isMedium_;
     std::vector<bool> muon_isStandalone_;
+    std::vector<bool> muon_isTracker_;
     std::vector<bool> muon_isGlobal_;
     std::vector<bool> muon_isPFCand_;
     std::vector<float> muon_normChi2_;
     std::vector<int> muon_nTrackHits_;
     std::vector<int> muon_nStations_;
+    std::vector<float> muon_SegmentCompatibility_;
+    std::vector<float> muon_chi2LocalPosition_;
+    std::vector<float> muon_trkKink_;
     std::vector<int> muon_nPixelHits_;
     std::vector<int> muon_nTrackerLayers_;
+    std::vector<float> muon_validFraction_;
 
 };
 
@@ -337,17 +350,26 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
         muon_eta_.push_back(mu.eta());
         muon_phi_.push_back(mu.phi());
         muon_ID_.push_back(getMuonID(mu, pv));
+
+        muon_isMedium_.push_back(mu.isMediumMuon());
         muon_isStandalone_.push_back(mu.isStandAloneMuon());
+        muon_isTracker_.push_back(mu.isTrackerMuon());
         muon_isGlobal_.push_back(mu.isGlobalMuon());
         muon_isPFCand_.push_back(mu.isPFMuon());
         muon_nStations_.push_back(mu.numberOfMatchedStations());
-        if(mu.isStandAloneMuon()){
-            muon_nPixelHits_.push_back(-1);
-            muon_nTrackerLayers_.push_back(-1);
-        }
-        else{
+        muon_SegmentCompatibility_.push_back(mu.segmentCompatibility());
+        muon_chi2LocalPosition_.push_back(mu.combinedQuality().chi2LocalPosition);
+        muon_trkKink_.push_back(mu.combinedQuality().trkKink);
+
+        if(mu.isTrackerMuon()){
             muon_nPixelHits_.push_back(mu.innerTrack()->hitPattern().numberOfValidPixelHits());
             muon_nTrackerLayers_.push_back(mu.innerTrack()->hitPattern().trackerLayersWithMeasurement());
+            muon_validFraction_.push_back(mu.innerTrack()->validFraction());
+        }
+        else{
+            muon_nPixelHits_.push_back(-1);
+            muon_nTrackerLayers_.push_back(-1);
+            muon_validFraction_.push_back(-1);
         }
 
         if(mu.isGlobalMuon()){
@@ -358,6 +380,7 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
             muon_normChi2_.push_back(-1);
             muon_nTrackHits_.push_back(-1);
         }
+
         muon_tkRelIso_.push_back(tkIso(mu));
         muon_pfRelIso04_all_.push_back(pfIso(mu));
         muon_dxy_.push_back(dxy(mu, pv));
@@ -376,7 +399,7 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 
             if(genLepton && mu.pdgId() == 13 && reco::deltaR(mu.eta(), mu.phi(), genLepton->eta(), genLepton->phi()) < 0.03){
                 muon_genRecoMatches_++;
-                if(muon_genRecoObj_ != -1
+                if(muon_genRecoObj_ == -1
                     || std::abs(mu.pt() - muon_genPt_) < std::abs(muon_pt_[muon_genRecoObj_] - muon_genPt_)
                 ){
                     // store index of reco match for the one with the closest pt in case of ambiguity
@@ -386,7 +409,7 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 
             if(genAntiLepton && mu.pdgId() == -13 && reco::deltaR(mu.eta(), mu.phi(), genAntiLepton->eta(), genAntiLepton->phi()) < 0.03){
                 antiMuon_genRecoMatches_++;
-                if(antiMuon_genRecoObj_ != -1
+                if(antiMuon_genRecoObj_ == -1
                     || std::abs(mu.pt() - antiMuon_genPt_) < std::abs(muon_pt_[antiMuon_genRecoObj_] - antiMuon_genPt_)
                 ){
                     // store index of reco match for the one with the closest pt in case of ambiguity
@@ -397,6 +420,13 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 
         nMuon_++;
 
+    }
+
+    if(antiMuon_genRecoObj_ != -1 && muon_genRecoObj_ != -1){
+        vMuon.SetPtEtaPhiM(muon_pt_[muon_genRecoObj_], muon_eta_[muon_genRecoObj_], muon_phi_[muon_genRecoObj_], MUON_MASS);
+        vAntiMuon.SetPtEtaPhiM(muon_pt_[antiMuon_genRecoObj_], muon_eta_[antiMuon_genRecoObj_], muon_phi_[antiMuon_genRecoObj_], MUON_MASS);
+
+        z_recoMass_ = (vMuon + vAntiMuon).M();
     }
 
     for(std::vector<PileupSummaryInfo>::const_iterator puI = pileupInfoCollection->begin(); puI != pileupInfoCollection->end(); ++puI)
@@ -436,6 +466,7 @@ ZCounting::beginJob()
     // gen level info
     tree_->Branch("decayMode", &decayMode_, "decayMode_/i");
     tree_->Branch("z_genMass", &z_genMass_,"z_genMass_/f");
+    tree_->Branch("z_recoMass", &z_recoMass_,"z_recoMass_/f");
 
     tree_->Branch("muon_genVtxToPV", &muon_genVtxToPV_,"muon_genVtxToPV_/f");
     tree_->Branch("muon_genRecoMatches", &muon_genRecoMatches_,"muon_genRecoMatches_/i");
@@ -465,12 +496,19 @@ ZCounting::beginJob()
     tree_->Branch("Muon_eta", &muon_eta_);
     tree_->Branch("Muon_phi", &muon_phi_);
     tree_->Branch("Muon_isFromPV", &muon_isFromPV_);
+
+    tree_->Branch("Muon_isMedium", &muon_isMedium_);
     tree_->Branch("Muon_isStandalone", &muon_isStandalone_);
+    tree_->Branch("Muon_isTracker", &muon_isTracker_);
     tree_->Branch("Muon_isGlobal", &muon_isGlobal_);
     tree_->Branch("Muon_isPFCand", &muon_isPFCand_);
     tree_->Branch("Muon_normChi2", &muon_normChi2_);
     tree_->Branch("Muon_nTrackHits", &muon_nTrackHits_);
     tree_->Branch("Muon_nStations", &muon_nStations_);
+    tree_->Branch("Muon_SegmentCompatibility", &muon_SegmentCompatibility_);
+    tree_->Branch("Muon_chi2LocalPosition", &muon_chi2LocalPosition_);
+    tree_->Branch("Muon_validFraction", &muon_validFraction_);
+    tree_->Branch("Muon_trkKink", &muon_trkKink_);
     tree_->Branch("Muon_nPixelHits", &muon_nPixelHits_);
     tree_->Branch("Muon_nTrackerLayers", &muon_nTrackerLayers_);
 
@@ -500,6 +538,7 @@ void ZCounting::clearVariables(){
     nPU_ = 0;
     decayMode_ = 0;
     z_genMass_ = 0.;
+    z_recoMass_ = 0;
 
     muon_genPt_ = 0.;
     muon_genEta_ = 0.;
@@ -528,14 +567,20 @@ void ZCounting::clearVariables(){
     muon_eta_.clear();
     muon_phi_.clear();
     muon_isFromPV_.clear();
+    muon_isMedium_.clear();
     muon_isStandalone_.clear();
+    muon_isTracker_.clear();
     muon_isGlobal_.clear();
     muon_isPFCand_.clear();
     muon_normChi2_.clear();
     muon_nTrackHits_.clear();
     muon_nStations_.clear();
+    muon_SegmentCompatibility_.clear();
+    muon_chi2LocalPosition_.clear();
+    muon_trkKink_.clear();
     muon_nPixelHits_.clear();
     muon_nTrackerLayers_.clear();
+    muon_validFraction_.clear();
 
 
 }
