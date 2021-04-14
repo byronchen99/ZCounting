@@ -1,7 +1,9 @@
 from __future__ import division, print_function
 import pandas as pd
 import os
+import numpy as np
 from root_numpy import root2array, list_trees, array2tree
+import pdb
 
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
 from ZUtils.python.utils import tree_to_df
@@ -13,6 +15,10 @@ parser = argparse.ArgumentParser(prog='./Efficiencies')
 parser.add_argument(
     '-i', '--input', nargs='+',
     help='specify input root file'
+)
+parser.add_argument(
+    '-y', '--year', default=2017, type=int,
+    help='specify year'
 )
 parser.add_argument(
     '-o', '--output', type=str, default='./',
@@ -48,25 +54,61 @@ for nPV in dfPV['nPV']:
 hPV.Scale(1. / hPV.Integral())
 
 # acceptance selection
-selection = 'abs(muon_recoEta) < 2.4 ' \
-            '& abs(antiMuon_recoEta) < 2.4 ' \
-            '& muon_recoMatches == 1 ' \
-            '& antiMuon_recoMatches == 1'
+selection = 'muon_genRecoMatches == 1 ' \
+            '& antiMuon_genRecoMatches == 1 '
+
 
 # specify which branches to load
-branches = ['nPV', 'nPU', 'z_recoMass',
-            'muon_recoEta', 'antiMuon_recoEta',
-            'muon_recoPhi', 'antiMuon_recoPhi',
-            'muon_recoPt',  'antiMuon_recoPt',
-            'muon_ID', 'antiMuon_ID',
-            'muon_triggerBits', 'antiMuon_triggerBits',
-            'muon_tkIso', 'antiMuon_tkIso',
-            'muon_pfIso', 'antiMuon_pfIso'
+branches = ['nPV', 'nPU',
+            'Muon_eta[muon_genRecoObj]',
+            'Muon_phi[muon_genRecoObj]',
+            'Muon_pt[muon_genRecoObj]',
+            'Muon_ID[muon_genRecoObj]',
+            'Muon_triggerBits[muon_genRecoObj]',
+            'Muon_tkRelIso[muon_genRecoObj]',
+            'Muon_pfRelIso04_all[muon_genRecoObj]',
+            'Muon_eta[antiMuon_genRecoObj]',
+            'Muon_phi[antiMuon_genRecoObj]',
+            'Muon_pt[antiMuon_genRecoObj]',
+            'Muon_ID[antiMuon_genRecoObj]',
+            'Muon_triggerBits[antiMuon_genRecoObj]',
+            'Muon_tkRelIso[antiMuon_genRecoObj]',
+            'Muon_pfRelIso04_all[antiMuon_genRecoObj]',
+            'z_recoMass'
             ]
 
 print(">>> Load Events in acceptance")
-df = [tree_to_df(root2array(i, treeName[0], selection=selection, branches=branches), 5) for i in inputs]
+df = [tree_to_df(root2array(i, treeName[0], selection=selection, branches=branches), 1) for i in inputs]
 df = pd.concat(df)
+
+df = df.rename(columns={
+    'Muon_eta[muon_genRecoObj]_0': 'muon_recoEta',
+    'Muon_eta[antiMuon_genRecoObj]_0': 'antiMuon_recoEta',
+    'Muon_phi[muon_genRecoObj]_0': 'muon_recoPhi',
+    'Muon_phi[antiMuon_genRecoObj]_0': 'antiMuon_recoPhi',
+    'Muon_pt[muon_genRecoObj]_0': 'muon_recoPt',
+    'Muon_pt[antiMuon_genRecoObj]_0': 'antiMuon_recoPt',
+    'Muon_ID[muon_genRecoObj]_0': 'muon_ID',
+    'Muon_ID[antiMuon_genRecoObj]_0': 'antiMuon_ID',
+    'Muon_triggerBits[muon_genRecoObj]_0': 'muon_triggerBits',
+    'Muon_triggerBits[antiMuon_genRecoObj]_0': 'antiMuon_triggerBits',
+    'Muon_tkRelIso[muon_genRecoObj]_0': 'muon_tkIso',
+    'Muon_tkRelIso[antiMuon_genRecoObj]_0': 'antiMuon_tkIso',
+    'Muon_pfRelIso04_all[muon_genRecoObj]_0': 'muon_pfIso',
+    'Muon_pfRelIso04_all[antiMuon_genRecoObj]_0': 'antiMuon_pfIso',
+    'z_recoMass':'mass'
+    })
+
+df = df[abs(df['muon_recoEta']) < 2.4]
+df = df[abs(df['antiMuon_recoEta']) < 2.4]
+
+df = df.astype({'mass': np.float64})
+
+# print(">>> compute Z mass")
+# df['mass'] = df.apply(lambda x: (
+#     ROOT.Math.PtEtaPhiMVector(x['muon_recoPt'], x['muon_recoEta'], x['muon_recoPhi'], 0.105658369)
+#     + ROOT.Math.PtEtaPhiMVector(x['antiMuon_recoPt'], x['antiMuon_recoEta'], x['antiMuon_recoPhi'], 0.105658369)).M(),
+#     axis=1)
 
 #print(">>> add new columns")
 #df['delRLL'] = np.sqrt(
@@ -83,22 +125,32 @@ muonID = 5
 #   4: tight ID w/o dxy and dz cuts
 #   5: tight ID
 
-iBit = 3
-#   0: "HLT_L1SingleMu18_v*"
-#   1: "HLT_L1SingleMu25_v*"
-#   2: "HLT_IsoMu24_v*"
-#   3: "HLT_IsoMu27_v*"
-#   4: "HLT_IsoMu30_v*"
-
 print(">>> convert bit code into bit map")
-nBit = 2 ** iBit
-df['muon_hlt'] = df['muon_triggerBits'].apply(
-    lambda x: 1 if x % (nBit * 2) >= nBit else 0)
-df['antiMuon_hlt'] = df['antiMuon_triggerBits'].apply(
-    lambda x: 1 if x % (nBit * 2) >= nBit else 0)
+if args.year == 2016:
+    # For 2016:
+    #   0: "HLT_IsoMu24_v*"
+    #   1: "HLT_IsoTkMu24_v*"
+    # -> Do an or of both triggers
+    df['muon_hlt'] = df['muon_triggerBits'].apply(
+        lambda x: 1 if x >= 1 else 0)
+    df['antiMuon_hlt'] = df['antiMuon_triggerBits'].apply(
+        lambda x: 1 if x >= 1 else 0)
+else:
+    # For 2017/2018:
+    #   0: "HLT_L1SingleMu18_v*"
+    #   1: "HLT_L1SingleMu25_v*"
+    #   2: "HLT_IsoMu24_v*"
+    #   3: "HLT_IsoMu27_v*"
+    #   4: "HLT_IsoMu30_v*"
+    iBit = 3
+
+    nBit = 2 ** iBit
+    df['muon_hlt'] = df['muon_triggerBits'].apply(
+        lambda x: 1 if x % (nBit * 2) >= nBit else 0)
+    df['antiMuon_hlt'] = df['antiMuon_triggerBits'].apply(
+        lambda x: 1 if x % (nBit * 2) >= nBit else 0)
 
 print(">>> select events with a tag")
-
 df = df.query('(muon_hlt == 1 & muon_ID >= 4 & muon_tkIso < {0} & muon_pfIso < {1}) | \
     (antiMuon_hlt == 1 & antiMuon_ID >= 4 & antiMuon_tkIso < {0} & antiMuon_pfIso < {1})'.format(tkIsoCut, pfIsoCut))
 
@@ -198,26 +250,26 @@ ttree.Delete()
 
 tfile.Close()
 
-### --- global to track
+### --- global to track -> fail outer track (standalone)
 print(">>> Template for global step")
-dfFailGlo1 = df.query('passGlo == 0 & isTrk == 1 & muon_hlt == 0')
-dfFailGlo1 = dfFailGlo1.rename(columns={'muon_recoPt': 'ptProbe',
+dfFailSta1 = df.query('passGlo == 0 & isTrk == 1 & muon_hlt == 0')
+dfFailSta1 = dfFailSta1.rename(columns={'muon_recoPt': 'ptProbe',
                                         'antiMuon_recoPt': 'ptTag',
                                         'muon_recoEta': 'etaProbe',
                                         'antiMuon_recoEta': 'etaTag'
                                         })
-dfFailGlo2 = df.query('passGlo == 0 & isTrk == 1 & antiMuon_hlt == 0')
-dfFailGlo2 = dfFailGlo2.rename(columns={'muon_recoPt': 'ptTag',
+dfFailSta2 = df.query('passGlo == 0 & isTrk == 1 & antiMuon_hlt == 0')
+dfFailSta2 = dfFailSta2.rename(columns={'muon_recoPt': 'ptTag',
                                         'antiMuon_recoPt': 'ptProbe',
                                         'muon_recoEta': 'etaTag',
                                         'antiMuon_recoEta': 'etaProbe'
                                         })
 
-dfOut = pd.concat([dfPassHLT1, dfPassHLT2, dfFailHLT1, dfFailHLT2, dfFailSel1, dfFailSel2, dfFailGlo1, dfFailGlo2], sort=True)
+dfOut = pd.concat([dfPassHLT1, dfPassHLT2, dfFailHLT1, dfFailHLT2, dfFailSel1, dfFailSel2, dfFailSta1, dfFailSta2], sort=True)
 dfOut = dfOut.rename(columns={'z_recoMass': 'mass', 'passGlo': 'pass'})
 dfOut = dfOut[['nPV', 'nPU', 'ptTag', 'ptProbe', 'etaTag', 'etaProbe', 'mass', 'pass']]
 
-tfile = ROOT.TFile.Open(output+"/template_Glo.root", "RECREATE")
+tfile = ROOT.TFile.Open(output+"/template_Sta.root", "RECREATE")
 
 ttree = array2tree(dfOut.to_records(index=False))
 ttree.Write()
@@ -226,26 +278,26 @@ hPV.Write()
 
 tfile.Close()
 
-### --- global to standalone
+### --- global to standalone -> fail inner track
 print(">>> Template for global step")
-dfFailGloToSta1 = df.query('passGlo == 0 & isSta == 1 & muon_hlt == 0')
-dfFailGloToSta1 = dfFailGlo1.rename(columns={'muon_recoPt': 'ptProbe',
+dfFailTrk1 = df.query('passGlo == 0 & isSta == 1 & muon_hlt == 0')
+dfFailTrk1 = dfFailTrk1.rename(columns={'muon_recoPt': 'ptProbe',
                                         'antiMuon_recoPt': 'ptTag',
                                         'muon_recoEta': 'etaProbe',
                                         'antiMuon_recoEta': 'etaTag'
                                         })
-dfFailGloToSta2 = df.query('passGlo == 0 & isSta == 1 & antiMuon_hlt == 0')
-dfFailGloToSta2 = dfFailGlo2.rename(columns={'muon_recoPt': 'ptTag',
+dfFailTrk2 = df.query('passGlo == 0 & isSta == 1 & antiMuon_hlt == 0')
+dfFailTrk2 = dfFailTrk2.rename(columns={'muon_recoPt': 'ptTag',
                                         'antiMuon_recoPt': 'ptProbe',
                                         'muon_recoEta': 'etaTag',
                                         'antiMuon_recoEta': 'etaProbe'
                                         })
 
-dfOut = pd.concat([dfPassHLT1, dfPassHLT2, dfFailHLT1, dfFailHLT2, dfFailSel1, dfFailSel2, dfFailGloToSta1, dfFailGloToSta2], sort=True)
+dfOut = pd.concat([dfPassHLT1, dfPassHLT2, dfFailHLT1, dfFailHLT2, dfFailSel1, dfFailSel2, dfFailTrk1, dfFailTrk2], sort=True)
 dfOut = dfOut.rename(columns={'z_recoMass': 'mass', 'passGlo': 'pass'})
 dfOut = dfOut[['nPV', 'nPU', 'ptTag', 'ptProbe', 'etaTag', 'etaProbe', 'mass', 'pass']]
 
-tfile = ROOT.TFile.Open(output+"/template_GloToSta.root", "RECREATE")
+tfile = ROOT.TFile.Open(output+"/template_Trk.root", "RECREATE")
 
 ttree = array2tree(dfOut.to_records(index=False))
 ttree.Write()

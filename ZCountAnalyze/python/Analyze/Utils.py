@@ -3,18 +3,21 @@ import matplotlib.pyplot as plt
 from scipy.stats import pearsonr
 
 def plot_scatter(x, y, xlabel, ylabel, range,
-                 cutsPtEta='p_\mathrm{t}(\mu) > 30\ \mathrm{GeV} \qquad |\eta(\mu)| < 2.4',
+                 cutsPtEta='p_\mathrm{T}(\mu) > 30\ \mathrm{GeV} \qquad |\eta(\mu)| < 2.4',
                  cutsAdditional=None,
                  title=None,
+                 scatter=False,
                  saveas='./scat.png'):
     import matplotlib.colors as colors
     plt.clf()
     #cmap = plt.get_cmap("Greys")
     cmap = plt.get_cmap("RdBu")
 
-    plt.scatter(x, y, marker='.', color='k')
-    #plt.hist2d(x, y, bins=50, range=(range, range), cmap=cmap, normed=True, norm=colors.LogNorm())
-    #plt.colorbar()
+    if scatter:
+        plt.scatter(x, y, marker='.', color='k')
+    else:
+        plt.hist2d(x, y, bins=50, range=(range, range), cmap=cmap, normed=True, norm=colors.LogNorm())
+        plt.colorbar()
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     corr, _ = pearsonr(x, y)
@@ -26,7 +29,7 @@ def plot_scatter(x, y, xlabel, ylabel, range,
         r'$56\ \mathrm{GeV} < \mathrm{M}_{\mu\mu} < 116\ \mathrm{GeV}$',
         r'${0}$'.format(cutsPtEta),
     #    r'$\Delta R(\mu, \mu) > 0.4$',
-    #    r'$\rho_{pearson} = $' + '${0}$'.format(round(corr, 3))
+       r'$\rho_\mathrm{pearson} = $' + '${0}$'.format(round(corr, 3))
     ))
     if cutsAdditional:
         textstr = '\n'.join((textstr, r'${0}$'.format(cutsAdditional)))
