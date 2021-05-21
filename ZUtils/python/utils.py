@@ -1,5 +1,8 @@
 from pandas import DataFrame
 import ROOT
+import numpy as np
+import pickle
+import pdb
 
 def tree_to_df(tree, arrSize=5):
     #if tree has arrays with variable length, split into 'arrSize' new columns and fill empty values with 'NaN'
@@ -25,3 +28,71 @@ def to_RootTime(time, currentYear):
     return ROOT.TDatime(currentYear, int(time[0].split("/")[0]),
                          int(time[0].split("/")[1]), int(time[1].split(":")[0]),
                          int(time[1].split(":")[1]), int(time[1].split(":")[2])).Convert() + 7200
+
+def getMCCorrection(fIn):
+    # input file has to be a picked dictionary with
+    #   eta region, function name and parameters for the function
+    #   supported functions are linear and linear_step
+
+    # first order polynomial
+    def linear(a, b):
+        return lambda x: a * x + b
+
+    # two first order polynomial with step
+    def linear_step(a1, b1, a2, b2, step=35):
+        return lambda x: (a1 * x + b1) * (x <= step) + (a2 * x + b2) * (x > step)
+
+
+    functions = pickle.load(open(fIn,"r"))
+    corrections = {}
+    for key, val in functions.items():
+        if val["name"] == "linear":
+            corrections[key] = linear(*val["params"])
+        if val["name"] == "linear_step":
+            corrections[key] = linear_step(*val["params"])
+
+    return corrections
+
+
+
+latex = ROOT.TLatex()
+latex.SetNDC()
+def workinprogress(x=0.23, y=0.88, space=0.1, textsize=0.04, offset_x=0.13):
+    cms(x, y, textsize)
+    latex.SetTextAlign(11)
+    latex.SetTextFont(52)
+    latex.SetTextSize(textsize)
+    latex.DrawLatex(x+space, y, 'Work in progress')
+def cms(x=0.13, y=0.88, textsize=0.04):
+    latex.SetTextAlign(11)
+    latex.SetTextFont(61)
+    latex.SetTextSize(textsize*1.2)
+    latex.DrawLatex(x, y, 'CMS')
+def preliminary(x=0.23, y=0.88, space=0.1, textsize=0.04, align=11):
+    cms(x, y, textsize)
+    latex.SetTextAlign(11)
+    latex.SetTextFont(52)
+    latex.SetTextSize(textsize)
+    latex.DrawLatex(x+space, y, 'Preliminary')
+def simulation(x=0.23, y=0.88, textsize=0.04):
+    cms(x-0.08*textsize/0.04, y, textsize)
+    latex.SetTextAlign(11)
+    latex.SetTextFont(52)
+    latex.SetTextSize(textsize)
+    latex.DrawLatex(x, y, 'Simulation')
+def text(text, x, y, color=1, textsize=0.04, align=11, textfont=42):
+    latex.SetTextAlign(align)
+    latex.SetTextFont(textfont)
+    latex.SetTextColor(color)
+    latex.SetTextSize(textsize)
+    latex.DrawLatex(x, y, text)
+
+def custom_labels_y(_h, _labels, _rotation=-1, _align=-1, _offset=None,):
+
+    _h.GetYaxis().SetNdivisions(len(_labels))
+
+    if _offset:
+        _h.GetYaxis().SetLabelOffset(_offset)
+
+    for i in range(len(_labels)):
+        _h.GetYaxis().ChangeLabel(i+1,_rotation,-1,_align,-1,-1,_labels[i])

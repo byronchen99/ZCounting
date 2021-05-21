@@ -2,7 +2,8 @@
 export PATH=$HOME/.local/bin:/afs/cern.ch/cms/lumi/brilconda-1.1.7/bin:$PATH
 
 #2016
-brilcalc lumi --begin 272786 --end 284044 -b "STABLE BEAMS" --byls -o ~/FillByLs_2016.csv --hltpath="HLT_Iso*Mu24_v*" --normtag="pcc16PaperV2"
+# brilcalc lumi --begin 272786 --end 284044 -b "STABLE BEAMS" --byls -o ~/FillByLs_2016.csv --hltpath="HLT_Iso*Mu24_v*" --normtag="pcc16PaperV2"
+brilcalc lumi --begin 272786 --end 284044 -b "STABLE BEAMS" --byls -o ~/FillByLs_2016.csv --hltpath="HLT_Iso*Mu24_v*" --normtag=/cvmfs/cms-bril.cern.ch/cms-lumi-pog/Normtags/normtag_PHYSICS.json -u /fb -i /afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions16/13TeV/Legacy_2016/Cert_271036-284044_13TeV_Legacy2016_Collisions16_JSON.txt
 
 #2017
 brilcalc lumi --begin 297046 --end 306462 -b "STABLE BEAMS" --byls -o ~/FillByLs_2017.csv --hltpath="HLT_IsoMu27_v*" --normtag=/cvmfs/cms-bril.cern.ch/cms-lumi-pog/Normtags/normtag_PHYSICS.json -u /fb -i Cert_294927-306462_13TeV_PromptReco_Collisions17_JSON.txt

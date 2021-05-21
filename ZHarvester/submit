@@ -142,7 +142,7 @@ if __name__ == '__main__':
         help='submit ZMonitoring jobs to HTCondor'
     )
     parserA.add_argument(
-        '-i', '--inputDQM', type=str, required=True,
+        '-i', '--inputDQM', type=str, default=None,
         help='specify directory to input histogram .root files'
     )
     parserA.add_argument(
@@ -154,7 +154,7 @@ if __name__ == '__main__':
         help="analyze stops when comes to this run [%(default)s]"
     )
     parserA.add_argument(
-        '--mcCorrections', default='./Resources/MCCorrections.json', type=str,
+        '--mcCorrections', default=None, type=str,
         help='specify .json file with MC corrections for muon correlations'
     )
     parserA.add_argument(
