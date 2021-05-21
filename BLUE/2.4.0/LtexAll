@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# Run pdflatex on all tex output of all B_*cxx files (Richard.Nisius@mpp.mpg.de)
+#
+################################################################################
+#
+#-- Run all Latex files
+#
+set -e `ls B_*tex`
+
+if test $# -eq 0
+then
+    echo "... LtexAll: Sorry there are no B_tex files available"
+    exit
+else
+    for i
+    do
+	echo "... LtexAll: pdflatex $i"
+                           pdflatex $i
+    done
+fi

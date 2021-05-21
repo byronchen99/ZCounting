@@ -1,0 +1,36 @@
+#!/bin/sh
+#
+# Perform one combination in current directory (Richard.Nisius@mpp.mpg.de)
+#
+# $1 = B_name or B_name.inp
+#
+################################################################################
+#
+#-- Test for input
+#
+if test $# -ne 0
+then
+    inp=${1%.inp}
+else
+    echo "... BlueOne: I expect B_name or B_name.inp as input"
+    exit
+fi 
+
+############################################################
+#
+#-- Set the names
+#
+oup=$inp.out
+inp=$inp.inp
+
+############################################################
+#
+#-- Do the job
+#
+if test -f $inp
+then
+    echo "... BlueOne: I will use $inp"
+              root -b <$inp >$oup
+else
+    echo "... BlueOne: Sorry, but the input file -- $inp -- does not exist"
+fi

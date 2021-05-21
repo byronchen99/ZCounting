@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# Perform all combinations in current directory (Richard.Nisius@mpp.mpg.de)
+#
+################################################################################
+#
+#-- Find all input files
+#
+set `ls B_*inp`
+echo "... BlueAll: I use this list: $*"
+
+############################################################
+#
+#-- Run all combinations
+#
+for i
+do
+    inp=${i%.inp}
+    echo "... BlueAll: ./BlueOne $inp"
+                       ./BlueOne $inp
+done

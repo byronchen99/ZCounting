@@ -1,0 +1,67 @@
+#!/bin/sh
+#
+# Install the software and run all examples
+#
+################################################################################
+#
+#-- Look at input
+#
+if test $# -ne 0
+then
+    dumm=${1%.gz}
+    vers=${dumm%.tar}
+    dir=${vers#*-}
+    if test $dir = $vers
+    then
+        dumm=Blue-$vers
+        vers=$dumm
+    fi
+else
+    echo "... Install: I expect a version tag. The options are:"
+    echo "... Install: 1.8.0, Blue-1.8.0, Blue-1.8.0.tar, Blue-1.8.0.tar.gz"
+    exit
+fi 
+
+############################################################
+#
+#-- Check if file exits
+#
+nogz=0
+if test -f $vers.tar.gz
+then
+    echo "... Install: I install from file $vers.tar.gz"
+elif test -f $vers.tar
+then	
+    nogz=1
+    echo "... Install: I install from file $vers.tar"
+    echo $nogz
+else
+    echo "... Install: The tar file $vers.tar does not exist"
+    exit
+fi
+
+############################################################
+#
+#-- Install and run
+#
+if test $nogz = '0'
+then
+    echo "... Install: gzip -d $vers.tar.gz"
+                       gzip -d $vers.tar.gz
+fi
+
+echo "... Install: tar -xf $vers.tar"
+                   tar -xf $vers.tar
+
+echo "... Install: cd $dir"
+                   cd $dir
+
+echo "... Install: make"
+                   make
+
+echo "... Install: ./BlueAll"
+                   ./BlueAll
+
+echo "... Install: ./LtexAll"
+                   ./LtexAll
+

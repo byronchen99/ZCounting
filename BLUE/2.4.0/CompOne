@@ -1,0 +1,36 @@
+#!/bin/sh
+#
+# Compile one example function in current directory (Richard.Nisius@mpp.mpg.de)
+#
+# $1 = B_name or B_name.cxx
+#
+################################################################################
+#
+#-- Test for input
+#
+if test $# -ne 0
+then
+    inp=${1%.cxx}
+else
+    echo "... CompOne: I expect B_name or B_name.cxx as input"
+    exit
+fi 
+
+############################################################
+#
+#-- Set the names
+#
+oup=$inp.o
+inp=$inp.cxx
+
+############################################################
+#
+#-- Do the job
+#
+if test -f $inp
+then
+    echo "... CompOne: gcc `root-config --cflags` -c $inp -o $oup"
+                       gcc `root-config --cflags` -c $inp -o $oup
+else
+    echo "... CompOne: Sorry, but the input file -- $inp -- does not exist"
+fi

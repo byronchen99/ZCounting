@@ -1,0 +1,197 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage{underscore}
+\usepackage{rotating}
+\usepackage{color}
+\setlength{\textheight} {23.5 true cm} 
+\setlength{\textwidth} {17 true cm} 
+\setlength{\oddsidemargin} {0 mm} 
+\setlength{\evensidemargin} {0 mm} 
+\begin{document}
+ \section{Results} 
+ \label{sec:result} 
+ The name of the file was LUMI_COMBINATION_2 
+ The results have been obtained with the BLUE Software Version 2.4.0 
+ on Apr 29, 2021 
+ \par 
+%
+% -------------------------------------------------------
+%
+\begin{sidewaystable}[tbp!]
+\begin{center}
+\begin{tabular}{|l|r|r|r|r|r||r|r|r|}
+\cline{2- 9}
+  \multicolumn{1}{c}{} 
+& \multicolumn{ 5}{|c||}{Estimates} 
+& \multicolumn{ 3}{|c|}{Observables} \\ 
+\hline
+Uncertainty & $   P_16$ & $   P_17$ & $   P_18$ & $   Z_17$ & $   Z_18$ & L(2016) & L(2017) & L(2018) \\ 
+Observable & L(2016) & L(2017) & L(2018) & L(2017) & L(2018) &   &   &   \\ 
+ & [] & [] & [] & [] & [] & [] & [] & [] \\ 
+\hline
+Values  & 36.330 & 41.480 & 59.830 & 41.480 & 59.830 & 36.330 & 41.480 & 59.830 \\ 
+ Uncorr & 0.363 & 0.830 & 0.897 & 0.415 & 1.197 & 0.342 & 0.329 & 0.494 \\ 
+  Corr1 & 0.218 & 0.373 & 1.197 & 0.249 & 0.538 & 0.215 & 0.363 & 0.705 \\ 
+  Corr2 & 0.000 & 0.249 & 0.120 & 0.000 & 0.359 & 0.030 & 0.069 & \color{red}{-0.057} \\ 
+      Z & 0.000 & 0.000 & 0.000 & 0.415 & 0.598 & 0.026 & 0.205 & 0.621 \\ 
+\hline
+Total Syst & 0.218 & 0.449 & 1.203 & 0.484 & 0.881 & 0.218 & 0.423 & 0.938 \\ 
+Total    & 0.424 & 0.943 & 1.501 & 0.637 & 1.486 & 0.405 & 0.536 & 1.060 \\ 
+\hline
+\end{tabular}
+\end{center}
+\caption{Combination of  3 observables from  5 correlated estimates using the BLUE software.}
+\label{tab:BlueRes}
+\end{sidewaystable}
+%
+% -------------------------------------------------------
+%
+\begin{sidewaystable}[tbp!]
+\begin{center}
+\begin{tabular}{|l|r|r|r|r|r|}\hline 
+ Uncorr & \rotatebox{90}{$   P_16$ \,} & \rotatebox{90}{$   P_17$ \,} & \rotatebox{90}{$   P_18$ \,} & \rotatebox{90}{$   Z_17$ \,} & \rotatebox{90}{$   Z_18$ \,} \\ \hline
+$   P_16$ & 1.000 &       &       &       &       \\
+$   P_17$ & 0.000 & 1.000 &       &       &       \\
+$   P_18$ & 0.000 & 0.000 & 1.000 &       &       \\
+$   Z_17$ & 1.000 & 0.000 & 0.000 & 1.000 &       \\
+$   Z_18$ & 0.000 & 1.000 & 0.000 & 0.000 & 1.000 \\ \hline 
+\end{tabular}
+\end{center}
+\caption{Correlation matrix for source 0 =  Uncorr.} 
+\label{tab:BlueCor:0}
+\end{sidewaystable}
+%
+% -------------------------------------------------------
+%
+\begin{sidewaystable}[tbp!]
+\begin{center}
+\begin{tabular}{|l|r|r|r|r|r|}\hline 
+  Corr1 & \rotatebox{90}{$   P_16$ \,} & \rotatebox{90}{$   P_17$ \,} & \rotatebox{90}{$   P_18$ \,} & \rotatebox{90}{$   Z_17$ \,} & \rotatebox{90}{$   Z_18$ \,} \\ \hline
+$   P_16$ & 1.000 &       &       &       &       \\
+$   P_17$ & 1.000 & 1.000 &       &       &       \\
+$   P_18$ & 1.000 & 1.000 & 1.000 &       &       \\
+$   Z_17$ & 1.000 & 1.000 & 1.000 & 1.000 &       \\
+$   Z_18$ & 1.000 & 1.000 & 1.000 & 1.000 & 1.000 \\ \hline 
+\end{tabular}
+\end{center}
+\caption{Correlation matrix for source 1 =   Corr1.} 
+\label{tab:BlueCor:1}
+\end{sidewaystable}
+%
+% -------------------------------------------------------
+%
+\begin{sidewaystable}[tbp!]
+\begin{center}
+\begin{tabular}{|l|r|r|r|r|r|}\hline 
+  Corr2 & \rotatebox{90}{$   P_16$ \,} & \rotatebox{90}{$   P_17$ \,} & \rotatebox{90}{$   P_18$ \,} & \rotatebox{90}{$   Z_17$ \,} & \rotatebox{90}{$   Z_18$ \,} \\ \hline
+$   P_16$ & 1.000 &       &       &       &       \\
+$   P_17$ & 0.000 & 1.000 &       &       &       \\
+$   P_18$ & 0.000 & 1.000 & 1.000 &       &       \\
+$   Z_17$ & 1.000 & 0.000 & 0.000 & 1.000 &       \\
+$   Z_18$ & 0.000 & 1.000 & 0.000 & 0.000 & 1.000 \\ \hline 
+\end{tabular}
+\end{center}
+\caption{Correlation matrix for source 2 =   Corr2.} 
+\label{tab:BlueCor:2}
+\end{sidewaystable}
+%
+% -------------------------------------------------------
+%
+\begin{sidewaystable}[tbp!]
+\begin{center}
+\begin{tabular}{|l|r|r|r|r|r|}\hline 
+      Z & \rotatebox{90}{$   P_16$ \,} & \rotatebox{90}{$   P_17$ \,} & \rotatebox{90}{$   P_18$ \,} & \rotatebox{90}{$   Z_17$ \,} & \rotatebox{90}{$   Z_18$ \,} \\ \hline
+$   P_16$ & 1.000 &       &       &       &       \\
+$   P_17$ & 0.000 & 1.000 &       &       &       \\
+$   P_18$ & 0.000 & 0.000 & 1.000 &       &       \\
+$   Z_17$ & 0.000 & 0.000 & 0.000 & 1.000 &       \\
+$   Z_18$ & 0.000 & 0.000 & 0.000 & 1.000 & 1.000 \\ \hline 
+\end{tabular}
+\end{center}
+\caption{Correlation matrix for source 3 =       Z.} 
+\label{tab:BlueCor:3}
+\end{sidewaystable}
+%
+% -------------------------------------------------------
+%
+\begin{sidewaystable}[tbp!]
+\begin{center}
+\begin{tabular}{|l|r|r|r|r|r|}\hline 
+Total & \rotatebox{90}{$   P_16$ \,} & \rotatebox{90}{$   P_17$ \,} & \rotatebox{90}{$   P_18$ \,} & \rotatebox{90}{$   Z_17$ \,} & \rotatebox{90}{$   Z_18$ \,} \\ \hline
+$   P_16$ & 1.000 &       &       &       &       \\
+$   P_17$ & 0.204 & 1.000 &       &       &       \\
+$   P_18$ & 0.410 & 0.337 & 1.000 &       &       \\
+$   Z_17$ & 0.759 & 0.155 & 0.311 & 1.000 &       \\
+$   Z_18$ & 0.186 & 0.915 & 0.289 & 0.404 & 1.000 \\ \hline 
+\end{tabular}
+\end{center}
+\caption{Total correlation matrix.}
+\label{tab:BlueCor}
+\end{sidewaystable}
+%
+% -------------------------------------------------------
+%
+\begin{sidewaystable}[tbp!]
+\begin{center}
+\begin{tabular}{|l|r|r|r|r|r|}\hline 
+Estimates & \rotatebox{90}{$   P_16$ \,} & \rotatebox{90}{$   P_17$ \,} & \rotatebox{90}{$   P_18$ \,} & \rotatebox{90}{$   Z_17$ \,} & \rotatebox{90}{$   Z_18$ \,} \\ \hline
+$   P_16$ & 0.000 &       &       &       &       \\
+$   P_17$ &   & 0.000 &       &       &       \\
+$   P_18$ &   &   & 0.000 &       &       \\
+$   Z_17$ &   & 0.000 &   & 0.000 &       \\
+$   Z_18$ &   &   & 0.000 &   & 0.000 \\ \hline 
+\end{tabular}
+\end{center}
+\caption{Compatibility matrix for the  5 correlated estimates, for pairs
+ determining the same observable using the BLUE software.}
+\label{tab:BlueCom}
+\end{sidewaystable}
+%
+% -------------------------------------------------------
+%
+\begin{sidewaystable}[tbp!]
+\begin{center}
+\begin{tabular}{|l|r|r|r|r|r|}\hline 
+Estimates   & $   P_16$ & $   P_17$ & $   P_18$ & $   Z_17$ & $   Z_18$ \\ 
+Observables & L(2016) & L(2017) & L(2018) & L(2017) & L(2018) \\ \hline
+Weights (L(2016)) & 1.000 & 0.096 & -0.023 & -0.096 & 0.023 \\
+Weights (L(2017)) & -0.000 & 0.352 & 0.107 & 0.648 & -0.107 \\
+Weights (L(2018)) & -0.000 & -0.576 & 0.362 & 0.576 & 0.638 \\
+ \hline
+Pull & 0.000 & 0.000 & 0.000 & 0.000 & 0.000 \\ \hline 
+\end{tabular}
+\end{center}
+\caption{Weights and pulls of  5 correlated estimates 
+for  3 observables using the BLUE software.}
+\label{tab:BlueWeight}
+\end{sidewaystable}
+%
+% -------------------------------------------------------
+%
+\begin{sidewaystable}[tbp!]
+\begin{center}
+\begin{tabular}{|l|r|r|r|}\hline 
+Observables & \rotatebox{90}{L(2016) \,} & \rotatebox{90}{L(2017) \,} & \rotatebox{90}{L(2018) \,} \\ \hline
+L(2016) & 1.000 &       &       \\
+L(2017) & 0.814 & 1.000 &       \\
+L(2018) & 0.560 & 0.937 & 1.000 \\ \hline 
+\end{tabular}
+\end{center}
+\caption{Correlation matrix for the  3 correlated observables using the BLUE software.}
+\label{tab:BlueCorRes}.
+\end{sidewaystable}
+%
+% -------------------------------------------------------
+%
+\begin{sidewaystable}[tbp!]
+\begin{center}
+\begin{tabular}{|l|r|r|r|}\hline 
+Observables & \rotatebox{90}{L(2016) \,} & \rotatebox{90}{L(2017) \,} & \rotatebox{90}{L(2018) \,} \\ \hline
+L(2016) & 0.000 &       &       \\
+L(2017) & 271.680 & 0.000 &       \\
+L(2018) & 684.717 & 972.881 & 0.000 \\ \hline 
+\end{tabular}
+\end{center}
+\caption{Compatibility matrix for the  3 correlated observables using the BLUE software.}
+\label{tab:BlueComRes}.
+\end{sidewaystable}
+\end{document}

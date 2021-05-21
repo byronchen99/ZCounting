@@ -1,0 +1,32 @@
+#!/bin/ksh
+#
+# remove a single set of B_* files in current directory
+#
+#########################################
+# set -x
+
+#
+#-- Test for input
+#
+if test $# -ne 1
+then
+   echo "... CleaOne: Usage is CleaOne B_xxx"
+   exit
+fi
+
+inp=${1%.cxx}
+
+if test -f $inp.cxx
+then
+   echo "... CleaOne: I clean $inp"
+   echo "... rm $inp*.log $inp*.pdf $inp*.tex $inp*.aux"
+             rm $inp*.log $inp*.pdf $inp*.tex $inp*.aux
+   echo "... rm $inp*.o $inp*.so $inp*.pcm $inp*.d $inp*_Obs_*.cxx"
+             rm $inp*.o $inp*.so $inp*.pcm $inp*.d $inp*_Obs_*.cxx
+ 
+   echo "... rm $inp*_DisPai.cxx $inp*_CorPai.cxx $inp.out"
+             rm $inp*_DisPai.cxx $inp*_CorPai.cxx $inp.out
+else
+   echo "... CleaOne: The files $inp.cxx do not exist"
+fi
+  

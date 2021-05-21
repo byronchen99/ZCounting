@@ -1,0 +1,34 @@
+#!/bin/sh
+#
+# Run pdflatex on all tex output of one example (Richard.Nisius@mpp.mpg.de)
+# $1 == B_name or B_name.tex
+#
+################################################################################
+#
+#-- Test for input
+#
+if test $# -ne 0
+then
+    inp=${1%.tex}
+    shift
+else
+    echo "... LtexOne: I expect B_name or B_name.tex as input"
+    exit
+fi 
+
+############################################################
+#
+#-- Do the job
+#
+ set -e `ls $inp*.tex`
+ if test $# -eq 0
+ then
+     echo "... LtexAll: Sorry there are no $inp*.tex files available"
+     exit
+ fi
+
+ for i
+ do
+   echo "... LtexOne: pdflatex $i"
+                      pdflatex $i
+ done

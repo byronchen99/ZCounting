@@ -1,0 +1,22 @@
+#!/bin/ksh
+#
+# Clean all B_*.inp
+#
+#########################################
+# set -x
+
+##############
+#-- Find all input files
+#
+set `ls B_*inp`
+echo "... CleaAll: I use this list: $*"
+
+#############
+#-- Clean all
+#
+for i
+do
+  inp=${i%.inp}
+  echo "... CleaAll: ./CleaOne $inp"
+                     ./CleaOne $inp
+done
