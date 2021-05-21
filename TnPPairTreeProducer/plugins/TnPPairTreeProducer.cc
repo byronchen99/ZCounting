@@ -219,13 +219,22 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
                 else // category 1HLT: probe passing selection but not trigger
                     isSel_ = true;
             }
-            else if (itMu2.isGlobalMuon())
+            else if (itMu2.isGlobalMuon()
+                || (itMu2.isStandAloneMuon()
+                    && (itMu2.innerTrack().isNonnull()
+                        && itMu2.innerTrack()->hitPattern().trackerLayersWithMeasurement() >= 6
+                        && itMu2.innerTrack()->hitPattern().numberOfValidPixelHits() >= 1)
+                )
+            ){
                 isGlo_ = true;
-            else if (itMu2.isStandAloneMuon())
+            }
+            else if (itMu2.isStandAloneMuon()){
                 isSta_ = true;
+            }
             else if (itMu2.innerTrack()->hitPattern().trackerLayersWithMeasurement() >= 6
-                      && itMu2.innerTrack()->hitPattern().numberOfValidPixelHits() >= 1)
+                      && itMu2.innerTrack()->hitPattern().numberOfValidPixelHits() >= 1){
                 isTrk_ = true;
+            }
             else
                 continue;
 
@@ -234,6 +243,7 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
             dxy2_ = getDxy(itMu2, *pv);
             dz2_ = getDz(itMu2, *pv);
             // is2IsoMu27_ = triggers->passObj("HLT_IsoMu27_v*", eta2_, phi2_);
+            delR_ = vTag.DeltaR(vProbe);
 
             tree_->Fill();
         }
@@ -274,6 +284,7 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
                 continue;
 
             if (itTrk.hitPattern().trackerLayersWithMeasurement() >= 6 && itTrk.hitPattern().numberOfValidPixelHits() >= 1) {
+                delR_ = vTag.DeltaR(vProbe);
                 isTrk_ = true;
                 tree_->Fill();
             }
@@ -349,6 +360,7 @@ TnPPairTreeProducer::beginJob()
     tree_->Branch("isTrk", &isTrk_,"isTrk_/b");
 
     tree_->Branch("dilepMass", &dilepMass_,"dilepMass_/f");
+    tree_->Branch("delR", &delR_,"delR_/f");
 
 }
 
@@ -415,6 +427,7 @@ void TnPPairTreeProducer::clearProbeVariables(){
     isTrk_ = false;
 
     dilepMass_ = 0.;
+    delR_ = 0.;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -477,18 +490,6 @@ bool TnPPairTreeProducer::passMuonIso(const reco::Muon& muon) {
 
     return false;
 }
-
-//--------------------------------------------------------------------------------------------------
-bool TnPPairTreeProducer::passBaseline(const reco::Muon& muon){
-    return muon.isGlobalMuon()
-                && muon.isPFMuon()
-                && muon.globalTrack()->normalizedChi2() < 10.
-                && muon.globalTrack()->hitPattern().numberOfValidMuonHits() > 0
-                && muon.numberOfMatchedStations() > 1
-                && muon.innerTrack()->hitPattern().numberOfValidPixelHits() > 0
-                && muon.innerTrack()->hitPattern().trackerLayersWithMeasurement() > 5;
-}
-
 
 //--------------------------------------------------------------------------------------------------
 float TnPPairTreeProducer::getPFIso(const reco::Muon& muon) {

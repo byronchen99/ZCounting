@@ -47,7 +47,6 @@ private:
     virtual void analyze(const edm::Event&, const edm::EventSetup&) override;
     virtual void endJob() override;
 
-    bool  passBaseline(const reco::Muon& muon);
     float getPFIso(const reco::Muon& muon);
     float getTkIso(const reco::Muon& muon);
     float getDxy(const reco::Muon& muon, const reco::Vertex& vtx);
@@ -146,6 +145,7 @@ private:
     bool isTrk_;
 
     float dilepMass_;
+    float delR_;
 };
 
 
