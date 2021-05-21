@@ -20,21 +20,21 @@ tnpPairTreeProducer = cms.EDAnalyzer('TnPPairTreeProducer',
 
     # Muons - triggers
     MuonTriggerNames=cms.vstring("HLT_IsoMu27_v*"),
-    MuonTriggerDRMAX = cms.double(1.0),
+    MuonTriggerDRMAX = cms.double(0.1),
 
     # Muon selection
-    IDType   = cms.untracked.string("Custom"),  # Custom, Tight, Medium, Loose
+    IDType   = cms.untracked.string("Tight"),  # Custom, Tight, Medium, Loose
     DxyCut=cms.untracked.double(-1.),
     DzCut=cms.untracked.double(-1.),
     IsoType  = cms.untracked.string("None"),  # Tracker-based, PF-based
     IsoCut   = cms.untracked.double(0.),
 
-    PtCutL1  = cms.untracked.double(30.0),
+    PtCutL1  = cms.untracked.double(27.0),
     EtaCutL1 = cms.untracked.double(2.4),
-    PtCutL2=cms.untracked.double(30.0),
+    PtCutL2=cms.untracked.double(27.0),
     EtaCutL2=cms.untracked.double(2.4),
 
     MassMin  = cms.untracked.double(30.0),
-    MassMax  = cms.untracked.double(150.0),
+    MassMax  = cms.untracked.double(300.0),
 
 )
