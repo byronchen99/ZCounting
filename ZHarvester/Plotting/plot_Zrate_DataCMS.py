@@ -6,7 +6,7 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 import shutil
-
+import uncertainties as unc
 import pdb
 
 sys.path.append(os.getcwd())
@@ -22,7 +22,7 @@ ROOT.gStyle.SetTitleX(.3)
 parser = argparse.ArgumentParser()
 
 parser.add_argument("-c", "--cms", default="nothing", type=str, help="give the CMS csv as input")
-parser.add_argument("-x", "--xSecCSV", default="nothing", type=str, help="give the CMS csv as input")
+parser.add_argument("-x", "--xsec", default="nothing", type=str, help="give the CMS csv as input")
 parser.add_argument("-r", "--refLumi", default="nothing", type=str, help="give a ByLs.csv as input for reference Luminosity")
 parser.add_argument("-s", "--saveDir", default='./', type=str, help="give output dir")
 args = parser.parse_args()
@@ -85,22 +85,46 @@ data_ref['timeE'] = data_ref['time'] - data_ref['time']
 data_ref['dLRec(/pb)'] = data_ref['recorded(/pb)']/secPerLS
 data_ref = data_ref[['fill','dLRec(/pb)','time']]		#Keep only what you need
 
+# --- get Z xsec
+data_xsec = pd.read_csv(str(args.xsec), sep=',',low_memory=False)#, skiprows=[1,2,3,4,5])
+
+data_xsec['zDelBB_mc'] = data_xsec['zDelBB_mc'].apply(lambda x: unc.ufloat_fromstr(x))
+data_xsec['zDelBE_mc'] = data_xsec['zDelBE_mc'].apply(lambda x: unc.ufloat_fromstr(x))
+data_xsec['zDelEE_mc'] = data_xsec['zDelEE_mc'].apply(lambda x: unc.ufloat_fromstr(x))
+
+
+xsecBB = sum(data_xsec['zDelBB_mc'])/sum(data_xsec['lumiRec'])
+xsecBE = sum(data_xsec['zDelBE_mc'])/sum(data_xsec['lumiRec'])
+xsecEE = sum(data_xsec['zDelEE_mc'])/sum(data_xsec['lumiRec'])
+
+xsec = xsecBB + xsecBE + xsecEE
+
 # --- z luminosity
 data = pd.read_csv(str(args.cms), sep=',',low_memory=False)#, skiprows=[1,2,3,4,5])
 data = data.sort_values(['fill','tdate_begin','tdate_end'])
 
-zcountlist = data.groupby('fill')['zDel'].apply(list)
 
 data['time'] = data['tdate_begin'] + (data['tdate_end'] - data['tdate_begin'])/2
 data['timeE'] = (data['tdate_end'] - data['tdate_begin'])/2
+
+data['zDelBB_mc'] = data['zDelBB_mc'].apply(lambda x: unc.ufloat_fromstr(x))
+data['zDelBE_mc'] = data['zDelBE_mc'].apply(lambda x: unc.ufloat_fromstr(x))
+data['zDelEE_mc'] = data['zDelEE_mc'].apply(lambda x: unc.ufloat_fromstr(x))
+data['zDel_mc'] = data['zDelBB_mc'] + data['zDelBE_mc'] + data['zDelEE_mc']
+data['zRate_mc'] = data['zDel_mc'] / data['timewindow']
+data['zLumiInst_mc'] = data['zDel_mc'] / (data['timewindow'] * xsec)
+
+data['zXSec_mc'] = data['zDel_mc'] / data['lumiDel']
+
+zcountlist = data.groupby('fill')['zDel_mc'].apply(list)
 
 #sort out points with low statistics
 #data = data[data['z_relstat'] < 0.05]
 
 data = data.replace([np.inf, -np.inf], np.nan).dropna().dropna()
 
-zcountl=array('d')
-timel=array('d')
+zcountl = []
+timel = []
 
 suffix=""
 
@@ -109,26 +133,28 @@ if "Central" in str(args.cms):
 else:
 	suffix="Inclusive"
 
-metaFills=array('d')
-metaXsecCMS=array('d')
+metaFills= []
+metaXsecCMS= []
 
 slope = dict()
 chi2 = dict()
 
 zcountsAccu=0
-metazcountsAccu=array('d')
-metazcountsoverlumi=array('d')
+metazcountsAccu=[]
+metazcountsoverlumi=[]
 
 ########## Plot ##########
 
 ### chi2 values of each category
 for c in ('HLTeffB_chi2pass', 'HLTeffB_chi2fail', 'HLTeffE_chi2pass', 'HLTeffE_chi2fail',
           'SeleffB_chi2pass', 'SeleffB_chi2fail', 'SeleffE_chi2pass', 'SeleffE_chi2fail',
-          'GloeffB_chi2pass', 'GloeffB_chi2fail', 'GloeffE_chi2pass', 'GloeffE_chi2fail',
+          # 'GloeffB_chi2pass', 'GloeffB_chi2fail', 'GloeffE_chi2pass', 'GloeffE_chi2fail',
+          'TrkeffB_chi2pass', 'TrkeffB_chi2fail', 'TrkeffE_chi2pass', 'TrkeffE_chi2fail',
+          'StaeffB_chi2pass', 'StaeffB_chi2fail', 'StaeffE_chi2pass', 'StaeffE_chi2fail',
           'zYieldBB_chi2', 'zYieldBE_chi2', 'zYieldEE_chi2'
          ):
 
-    graph_chi2 = ROOT.TGraph(len(data),data['time'].values,data[c].values)
+    graph_chi2 = ROOT.TGraph(len(data), data['time'].values, data[c].values)
     graph_chi2.SetName("graph_chi2")
     graph_chi2.SetMarkerStyle(23)
     graph_chi2.SetMarkerColor(ROOT.kAzure-4)
@@ -204,6 +230,7 @@ for c in ('HLTeffB_chi2pass', 'HLTeffB_chi2fail', 'HLTeffE_chi2pass', 'HLTeffE_c
     c4.Close()
 
 
+
 ##### loop over Fills and produce fill specific plots
 for fill in data.drop_duplicates('fill')['fill'].values:
     dFill = data.loc[data['fill'] == fill]
@@ -232,13 +259,21 @@ for fill in data.drop_duplicates('fill')['fill'].values:
         ('HLTeffE' ,'Muon HLT-E efficiency'),
         ('SeleffB' ,'Muon Sel-B efficiency'),
         ('SeleffE' ,'Muon Sel-E efficiency'),
-        ('GloeffB' ,'Muon Glo-B efficiency'),
-        ('GloeffE' ,'Muon Glo-E efficiency'),
+        # ('GloeffB' ,'Muon Glo-B efficiency'),
+        # ('GloeffE' ,'Muon Glo-E efficiency'),
+        ('TrkeffB' ,'Muon Trk-B efficiency'),
+        ('TrkeffE' ,'Muon Trk-E efficiency'),
+        ('StaeffB' ,'Muon Sta-B efficiency'),
+        ('StaeffE' ,'Muon Sta-E efficiency'),
         ('zYieldBB_purity'    ,'Z BB purity'),
         ('zYieldBE_purity'    ,'Z BE purity'),
         ('zYieldEE_purity'    ,'Z EE purity'),
     ):
-        graph_Zeff = ROOT.TGraph(len(dFill),dFill['pileUp'].values,dFill[eff].values )
+
+        yy = dFill[eff].apply(lambda x: unc.ufloat_fromstr(x).nominal_value).values
+        yyErr = dFill[eff].apply(lambda x: unc.ufloat_fromstr(x).std_dev).values
+
+        graph_Zeff = ROOT.TGraphErrors(len(dFill), dFill['pileUp'].values, yy, yyErr)
         graph_Zeff.SetName("graph_Zeff")
         graph_Zeff.SetMarkerStyle(22)
         graph_Zeff.SetMarkerColor(ROOT.kOrange+8)
@@ -288,7 +323,10 @@ for fill in data.drop_duplicates('fill')['fill'].values:
 
     ### Z Rates ###
 
-    graph_zrates=ROOT.TGraphErrors(len(dFill),dFill['time'].values,dFill['zRate_mc'].values, dFill['timeE'].values, (dFill['zRate_mc']*dFill['z_relstat']).values )
+    yy = dFill['zRate_mc'].apply(unc.nominal_value).values
+    yyErr = dFill['zRate_mc'].apply(unc.std_dev).values
+
+    graph_zrates=ROOT.TGraphErrors(len(dFill),dFill['time'].values, yy, dFill['timeE'].values, yyErr )
     graph_zrates.SetName("graph_zrates")
     graph_zrates.SetMarkerStyle(22)
     graph_zrates.SetMarkerColor(ROOT.kOrange+8)
@@ -329,7 +367,10 @@ for fill in data.drop_duplicates('fill')['fill'].values:
     graph_Lumi.SetFillStyle(0)
     graph_Lumi.SetMarkerSize(1.5)
 
-    graph_ZLumi=ROOT.TGraphErrors(len(dFill),dFill['time'].values,dFill['zLumiInst_mc'].values, dFill['timeE'].values, dFill['zLumiInst_mc_stat'].values )
+    yy = dFill['zLumiInst_mc'].apply(unc.nominal_value).values
+    yyErr = dFill['zLumiInst_mc'].apply(unc.std_dev).values
+
+    graph_ZLumi=ROOT.TGraphErrors(len(dFill),dFill['time'].values, yy, dFill['timeE'].values, yyErr )
     graph_ZLumi.SetName("graph_ZLumi")
     graph_ZLumi.SetMarkerStyle(22)
     graph_ZLumi.SetMarkerColor(ROOT.kOrange+8)
@@ -372,7 +413,10 @@ for fill in data.drop_duplicates('fill')['fill'].values:
     metaXsecCMS.append(sum(dFill['zXSec_mc'].values)/len(dFill))
     metaFills.append(float(fill))
 
-    graph_xsec=ROOT.TGraph(len(dFill),dFill['time'].values,dFill['zXSec_mc'].values)
+    yy = dFill['zXSec_mc'].apply(unc.nominal_value).values
+    yyErr = dFill['zXSec_mc'].apply(unc.std_dev).values
+
+    graph_xsec=ROOT.TGraphErrors(len(dFill), dFill['time'].values, yy, yyErr)
     graph_xsec.SetName("graph_xsec")
     graph_xsec.SetMarkerStyle(22)
     graph_xsec.SetMarkerColor(ROOT.kOrange+8)
@@ -410,9 +454,11 @@ for fill in data.drop_duplicates('fill')['fill'].values:
 
 
 ### Efficiency-vs-Pileup slopes vs fill
-for key in slope.keys():
-    i_slope = np.array(slope[key])
-    graph_slopesEffPu = ROOT.TGraph(len(metaFills),metaFills,i_slope)
+for key, values in slope.items():
+
+    i_slope = np.array(values)
+
+    graph_slopesEffPu = ROOT.TGraph(len(metaFills), np.array(metaFills), i_slope)
     graph_slopesEffPu.SetName("graph_slopesEffPu")
     graph_slopesEffPu.SetMarkerStyle(22)
     graph_slopesEffPu.SetMarkerColor(ROOT.kOrange+8)
@@ -450,19 +496,19 @@ for key in slope.keys():
 ### fiducial cross section vs fill
 
 ROOT.gROOT.SetBatch(True)
-metaXsecCMS2=array('d')
+metaXsecCMS2= []
 for n in range(0,len(metaXsecCMS)):
 	metaXsecCMS2.append(metaXsecCMS[n]/(sum(metaXsecCMS)/len(metaXsecCMS)))
 
 
-graph_metacmsXsec=ROOT.TGraph(len(metaFills),metaFills,metaXsecCMS)
+graph_metacmsXsec=ROOT.TGraph(len(metaFills), np.array(metaFills), np.array(metaXsecCMS))
 graph_metacmsXsec.SetName("graph_metaXsecCms")
 graph_metacmsXsec.SetMarkerStyle(22)
 graph_metacmsXsec.SetMarkerColor(ROOT.kOrange+8)
 graph_metacmsXsec.SetMarkerSize(2.5)
 graph_metacmsXsec.SetTitle("Cross Section Summary, "+suffix+" Z-Rates")
 
-multMetaGraphXsec=ROOT.TMultiGraph("multMetaGraphXsec",suffix+" Z-Rates")
+multMetaGraphXsec=ROOT.TMultiGraph("multMetaGraphXsec", suffix+" Z-Rates")
 multMetaGraphXsec.SetName("multMetaGraphXsec")
 graph_metacmsXsec.GetXaxis().SetTitle("Fill")
 graph_metacmsXsec.GetYaxis().SetTitle("#sigma^{fid}_{Z} [pb]")
@@ -492,8 +538,10 @@ c3.SaveAs(outDir+"/summaryZStability"+suffix+".png")
 c3.Close()
 
 ### corrected Z Counts vs fill
+yy = np.array([y.n for y in zcountl])
+yyErr = np.array([y.s for y in zcountl])
 
-graph_zcount=ROOT.TGraph(len(metaFills),metaFills,zcountl)
+graph_zcount=ROOT.TGraphErrors(len(metaFills), np.array(metaFills), yy, yyErr)
 graph_zcount.SetName("graph_zcount")
 graph_zcount.SetMarkerStyle(22)
 graph_zcount.SetMarkerColor(ROOT.kOrange+8)
@@ -532,8 +580,10 @@ c5.Close()
 
 
 ### Accumalated corrected Z counts
+yy = np.array([y.n for y in metazcountsAccu])
+yyErr = np.array([y.s for y in metazcountsAccu])
 
-graph_zcountA=ROOT.TGraph(len(metaFills),timel,metazcountsAccu)
+graph_zcountA=ROOT.TGraphErrors(len(metaFills), np.array(timel), yy, yyErr)
 graph_zcountA.SetName("graph_zcountAccu")
 graph_zcountA.SetMarkerStyle(22)
 graph_zcountA.SetMarkerColor(ROOT.kOrange+8)
