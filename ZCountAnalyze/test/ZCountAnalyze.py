@@ -4,12 +4,30 @@ import FWCore.ParameterSet.VarParsing as VarParsing
 
 options = VarParsing.VarParsing()
 
-options.register('outputFile','output',VarParsing.VarParsing.multiplicity.singleton,VarParsing.VarParsing.varType.string,"output File (w/o .root)")
-options.register('job', 0, VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.int, "job number")
-options.register('verbosity', 1, VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.int, "verbosity level ()")
-options.register('maxEvents', -1, VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.int, "specify number of events")
-options.register('samplename', '', VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.string, "specify sample name (dy, tt) ")
-options.register('year', 2017, VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.int, "specify year (2016, 2017, 2018) ")
+options.register('outputFile','output',
+    VarParsing.VarParsing.multiplicity.singleton,VarParsing.VarParsing.varType.string,
+    "output File (w/o .root)"
+    )
+options.register('job', 0,
+    VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.int,
+    "job number"
+    )
+options.register('verbosity', 1,
+    VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.int,
+    "verbosity level ()"
+    )
+options.register('maxEvents', -1,
+    VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.int,
+    "specify number of events"
+    )
+options.register('samplename', '',
+    VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.string,
+    "specify sample name (dy, tt) "
+    )
+options.register('era', '2017',
+    VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.string,
+    "specify era (2016preVFP, 2016postVFP, 2017, 2018) "
+    )
 options.parseArguments()
 
 
@@ -18,8 +36,8 @@ if options.samplename == '':
 elif options.samplename not in ('tt', 'dy', 'w', 'qcd', 'zz', 'wz', 'ww'):
     raise RuntimeError('ZCountAnalyze.py: unknown samplename '+options.samplename)
 
-if options.year not in (2016, 2017, 2018):
-    raise RuntimeError('ZCountAnalyze.py: unknown year '+options.year)
+if options.era not in ("2016preVFP", "2016postVFP", "2017", "2018"):
+    raise RuntimeError('ZCountAnalyze.py: unknown era '+options.era)
 
 print("processing {0} events".format(options.maxEvents))
 
@@ -64,9 +82,9 @@ process.source = cms.Source("PoolSource",
         # '/store/mc/RunIISummer20UL16MiniAODAPV/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/MINIAODSIM/FlatPU0to75_106X_mcRun2_asymptotic_preVFP_v8-v2/00000/0040C830-7251-BA46-BE12-86EE8CFD0907.root'
 
         # UL 2017
-        # '/store/mc/RunIISummer20UL18MiniAODv2/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/MINIAODSIM/106X_upgrade2018_realistic_v16_L1v1-v2/120000/02FD7B88-3EDC-C64D-8E18-F9A8F9E7E7DF.root'
+        '/store/mc/RunIISummer20UL18MiniAODv2/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/MINIAODSIM/106X_upgrade2018_realistic_v16_L1v1-v2/120000/02FD7B88-3EDC-C64D-8E18-F9A8F9E7E7DF.root'
         # '/store/mc/RunIISummer20UL18MiniAODv2/DYJetsToLL_0J_TuneCP5_13TeV-amcatnloFXFX-pythia8/MINIAODSIM/106X_upgrade2018_realistic_v16_L1v1-v1/230000/0271F29A-6EA5-054E-B733-EB5EC7A80F2C.root'
-        '/store/mc/RunIISummer20UL18MiniAODv2/ZZTo2L2Nu_TuneCP5_13TeV_powheg_pythia8/MINIAODSIM/106X_upgrade2018_realistic_v16_L1v1-v1/00000/E17A5D77-2DC3-F24A-A13D-C65191D2BDCC.root'
+        # '/store/mc/RunIISummer20UL18MiniAODv2/ZZTo2L2Nu_TuneCP5_13TeV_powheg_pythia8/MINIAODSIM/106X_upgrade2018_realistic_v16_L1v1-v1/00000/E17A5D77-2DC3-F24A-A13D-C65191D2BDCC.root'
         # UL 2018
         # '/store/mc/RunIISummer20UL18MiniAOD/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/MINIAODSIM/106X_upgrade2018_realistic_v11_L1v1-v1/260000/0071F930-6376-7A48-89F1-74E189BD3BFC.root'
     )
@@ -83,7 +101,43 @@ process.load("ZCounting.ZCountAnalyze.CountEventAnalyzer_cfi")
 # pileup MC template maker
 process.load("ZCounting.ZCountAnalyze.PileupMCTemplateMaker_cfi")
 
+from PhysicsTools.PatUtils.l1PrefiringWeightProducer_cfi import l1PrefiringWeightProducer
+if options.era == "2016preVFP":
+    l1PrefireECAL = "UL2016preVFP"
+    l1PrefireMuon = "2016preVFP"
+elif options.era == "2016postVFP":
+    l1PrefireECAL = "UL2016postVFP"
+    l1PrefireMuon = "2016H"
+elif options.era == "2017":
+    l1PrefireECAL = "UL2017BtoF"
+    l1PrefireMuon = "20172018"
+elif options.era == "2018":
+    l1PrefireECAL = "None"
+    l1PrefireMuon = "20172018"
+
+process.prefiringweight = l1PrefiringWeightProducer.clone(
+DataEraECAL = cms.string(l1PrefireECAL),
+DataEraMuon = cms.string(l1PrefireMuon),
+UseJetEMPt = cms.bool(False),
+PrefiringRateSystematicUnctyECAL = cms.double(0.2),
+PrefiringRateSystematicUnctyMuon = cms.double(0.2)
+)
+
+if options.era == "2016postVFP":
+    process.prefiringweight2016H = l1PrefiringWeightProducer.clone(
+    DataEraECAL = cms.string("None"),
+    DataEraMuon = cms.string("2016BG"),
+    UseJetEMPt = cms.bool(False),
+    PrefiringRateSystematicUnctyECAL = cms.double(0.2),
+    PrefiringRateSystematicUnctyMuon = cms.double(0.2)
+    )
+    process.prefireSequence = cms.Sequence(process.prefiringweight + process.prefiringweight2016H)
+else:
+    process.prefireSequence = cms.Sequence(prefiringweight)
+
 tasks = cms.Task()
+
+process.zcounting.era = options.era
 
 # if no good Z candidate is found. E.g. if gamma is found instead
 if options.samplename in ('dy', 'zz', 'wz'):
@@ -109,5 +163,6 @@ elif options.samplename == 'tt':
 process.p = cms.Path(
     process.countEvents *
     process.pileupMCTemplateMaker *
+    process.prefireSequence *
     process.zcounting,
     tasks)

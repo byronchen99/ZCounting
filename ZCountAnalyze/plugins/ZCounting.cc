@@ -131,6 +131,28 @@ private:
     edm::EDGetTokenT<std::vector<PileupSummaryInfo> > pileupInfoCollection_;
     edm::EDGetTokenT<GenEventInfoProduct> genEventInfo_;
 
+    edm::EDGetTokenT< double > prefweightECAL_token;
+    edm::EDGetTokenT< double > prefweightupECAL_token;
+    edm::EDGetTokenT< double > prefweightdownECAL_token;
+
+    edm::EDGetTokenT< double > prefweightMuon_token;
+    edm::EDGetTokenT< double > prefweightupMuon_token;
+    edm::EDGetTokenT< double > prefweightdownMuon_token;
+    edm::EDGetTokenT< double > prefweightupSystMuon_token;
+    edm::EDGetTokenT< double > prefweightdownSystMuon_token;
+    edm::EDGetTokenT< double > prefweightupStatMuon_token;
+    edm::EDGetTokenT< double > prefweightdownStatMuon_token;
+
+    edm::EDGetTokenT< double > prefweightMuon2016H_token;
+    edm::EDGetTokenT< double > prefweightupMuon2016H_token;
+    edm::EDGetTokenT< double > prefweightdownMuon2016H_token;
+    edm::EDGetTokenT< double > prefweightupSystMuon2016H_token;
+    edm::EDGetTokenT< double > prefweightdownSystMuon2016H_token;
+    edm::EDGetTokenT< double > prefweightupStatMuon2016H_token;
+    edm::EDGetTokenT< double > prefweightdownStatMuon2016H_token;
+
+    std::string era_;
+
     bool hltChanged_;
     std::vector<std::string> muonTriggerPatterns_;
     std::vector<std::string> muonTriggerPaths_;
@@ -155,6 +177,26 @@ private:
     unsigned int eventNumber_;
 
     float eventweight_;
+
+    float prefiringweightECAL_;
+    float prefiringweightECALup_;
+    float prefiringweightECALdown_;
+    float prefiringweightMuon_;
+    float prefiringweightMuonup_;
+    float prefiringweightMuondown_;
+    float prefiringweightMuonupSyst_;
+    float prefiringweightMuondownSyst_;
+    float prefiringweightMuonupStat_;
+    float prefiringweightMuondownStat_;
+
+    float prefiringweightMuon2016H_;
+    float prefiringweightMuonup2016H_;
+    float prefiringweightMuondown2016H_;
+    float prefiringweightMuonupSyst2016H_;
+    float prefiringweightMuondownSyst2016H_;
+    float prefiringweightMuonupStat2016H_;
+    float prefiringweightMuondownStat2016H_;
+
     int nPU_;
     int nPV_;
     int decayMode_;
@@ -220,6 +262,8 @@ ZCounting::ZCounting(const edm::ParameterSet& iConfig):
 {
     LogDebug("ZCounting")<<"ZCounting(...)";
 
+    era_ = iConfig.getParameter<std::string>("era");
+
     hasGenZ_ = iConfig.getUntrackedParameter<bool>("hasGenZ");
     hasGenTt_ = iConfig.getUntrackedParameter<bool>("hasGenTt");
 
@@ -231,6 +275,30 @@ ZCounting::ZCounting(const edm::ParameterSet& iConfig):
     VtxAbsZCut_       = iConfig.getUntrackedParameter<double>("VtxAbsZMax");
     VtxRhoCut_        = iConfig.getUntrackedParameter<double>("VtxRhoMax");
     hltChanged_ = true;
+
+    prefweightECAL_token = consumes< double >(edm::InputTag("prefiringweight:nonPrefiringProbECAL"));
+    prefweightupECAL_token = consumes< double >(edm::InputTag("prefiringweight:nonPrefiringProbECALUp"));
+    prefweightdownECAL_token = consumes< double >(edm::InputTag("prefiringweight:nonPrefiringProbECALDown"));
+
+    prefweightMuon_token = consumes< double >(edm::InputTag("prefiringweight:nonPrefiringProbMuon"));
+    prefweightupMuon_token = consumes< double >(edm::InputTag("prefiringweight:nonPrefiringProbMuonUp"));
+    prefweightdownMuon_token = consumes< double >(edm::InputTag("prefiringweight:nonPrefiringProbMuonDown"));
+    prefweightupSystMuon_token = consumes< double >(edm::InputTag("prefiringweight:nonPrefiringProbMuonSystUp"));
+    prefweightdownSystMuon_token = consumes< double >(edm::InputTag("prefiringweight:nonPrefiringProbMuonSystDown"));
+    prefweightupStatMuon_token = consumes< double >(edm::InputTag("prefiringweight:nonPrefiringProbMuonStatUp"));
+    prefweightdownStatMuon_token = consumes< double >(edm::InputTag("prefiringweight:nonPrefiringProbMuonStatDown"));
+
+    if(era_ == "2016postVFP"){
+        std::cout<<"2016 post VFP era"<<std::endl;
+
+        prefweightMuon2016H_token = consumes< double >(edm::InputTag("prefiringweight2016H:nonPrefiringProbMuon"));
+        prefweightupMuon2016H_token = consumes< double >(edm::InputTag("prefiringweight2016H:nonPrefiringProbMuonUp"));
+        prefweightdownMuon2016H_token = consumes< double >(edm::InputTag("prefiringweight2016H:nonPrefiringProbMuonDown"));
+        prefweightupSystMuon2016H_token = consumes< double >(edm::InputTag("prefiringweight2016H:nonPrefiringProbMuonSystUp"));
+        prefweightdownSystMuon2016H_token = consumes< double >(edm::InputTag("prefiringweight2016H:nonPrefiringProbMuonSystDown"));
+        prefweightupStatMuon2016H_token = consumes< double >(edm::InputTag("prefiringweight2016H:nonPrefiringProbMuonStatUp"));
+        prefweightdownStatMuon2016H_token = consumes< double >(edm::InputTag("prefiringweight2016H:nonPrefiringProbMuonStatDown"));
+    }
 
 }
 
@@ -270,6 +338,67 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     iEvent.getByToken(pvCollection_, pvCollection);
     iEvent.getByToken(pileupInfoCollection_, pileupInfoCollection);
 
+    // --- >>> prefiring
+    edm::Handle< double > theprefweightECAL;
+    edm::Handle< double > theprefweightupECAL;
+    edm::Handle< double > theprefweightdownECAL;
+    edm::Handle< double > theprefweightMuon;
+    edm::Handle< double > theprefweightupMuon;
+    edm::Handle< double > theprefweightdownMuon;
+    edm::Handle< double > theprefweightupsystMuon;
+    edm::Handle< double > theprefweightdownsystMuon;
+    edm::Handle< double > theprefweightupstatMuon;
+    edm::Handle< double > theprefweightdownstatMuon;
+
+    iEvent.getByToken(prefweightECAL_token, theprefweightECAL ) ;
+    iEvent.getByToken(prefweightupECAL_token, theprefweightupECAL ) ;
+    iEvent.getByToken(prefweightdownECAL_token, theprefweightdownECAL ) ;
+    iEvent.getByToken(prefweightMuon_token, theprefweightMuon ) ;
+    iEvent.getByToken(prefweightupMuon_token, theprefweightupMuon ) ;
+    iEvent.getByToken(prefweightdownMuon_token, theprefweightdownMuon ) ;
+    iEvent.getByToken(prefweightupSystMuon_token, theprefweightupsystMuon ) ;
+    iEvent.getByToken(prefweightdownSystMuon_token, theprefweightdownsystMuon ) ;
+    iEvent.getByToken(prefweightupStatMuon_token, theprefweightupstatMuon ) ;
+    iEvent.getByToken(prefweightdownStatMuon_token, theprefweightdownstatMuon ) ;
+
+    prefiringweightECAL_ =(*theprefweightECAL);
+    prefiringweightECALup_ =(*theprefweightupECAL);
+    prefiringweightECALdown_ =(*theprefweightdownECAL);
+    prefiringweightMuon_ =(*theprefweightMuon);
+    prefiringweightMuonup_ =(*theprefweightupMuon);
+    prefiringweightMuondown_ =(*theprefweightdownMuon);
+    prefiringweightMuonupSyst_ =(*theprefweightupMuon);
+    prefiringweightMuondownSyst_ =(*theprefweightdownMuon);
+    prefiringweightMuonupStat_ =(*theprefweightupMuon);
+    prefiringweightMuondownStat_ =(*theprefweightdownMuon);
+
+    if(era_ == "2016postVFP"){
+        edm::Handle< double > theprefweightMuon2016H;
+        edm::Handle< double > theprefweightupMuon2016H;
+        edm::Handle< double > theprefweightdownMuon2016H;
+        edm::Handle< double > theprefweightupsystMuon2016H;
+        edm::Handle< double > theprefweightdownsystMuon2016H;
+        edm::Handle< double > theprefweightupstatMuon2016H;
+        edm::Handle< double > theprefweightdownstatMuon2016H;
+
+        iEvent.getByToken(prefweightMuon2016H_token, theprefweightMuon2016H);
+        iEvent.getByToken(prefweightupMuon2016H_token, theprefweightupMuon2016H);
+        iEvent.getByToken(prefweightdownMuon2016H_token, theprefweightdownMuon2016H);
+        iEvent.getByToken(prefweightupSystMuon2016H_token, theprefweightupsystMuon2016H);
+        iEvent.getByToken(prefweightdownSystMuon2016H_token, theprefweightdownsystMuon2016H);
+        iEvent.getByToken(prefweightupStatMuon2016H_token, theprefweightupstatMuon2016H);
+        iEvent.getByToken(prefweightdownStatMuon2016H_token, theprefweightdownstatMuon2016H);
+
+        prefiringweightMuon2016H_ =(*theprefweightMuon2016H);
+        prefiringweightMuonup2016H_ =(*theprefweightupMuon2016H);
+        prefiringweightMuondown2016H_ =(*theprefweightdownMuon2016H);
+        prefiringweightMuonupSyst2016H_ =(*theprefweightupsystMuon2016H);
+        prefiringweightMuondownSyst2016H_ =(*theprefweightdownsystMuon2016H);
+        prefiringweightMuonupStat2016H_ =(*theprefweightupstatMuon2016H);
+        prefiringweightMuondownStat2016H_ =(*theprefweightdownstatMuon2016H);
+    }
+
+    // <<< ---
 
     const reco::GenParticle* genLepton = 0;
     const reco::GenParticle* genAntiLepton = 0;
@@ -487,12 +616,35 @@ ZCounting::beginJob()
     tree_->Branch("lumiBlock", &lumiBlock_,"lumiBlock/i");
     tree_->Branch("eventNumber", &eventNumber_, "eventNumber/i");
 
-
     tree_->Branch("nPV", &nPV_,"nPV_/i");
     tree_->Branch("nPU", &nPU_,"nPU_/i");
 
-    // gen level info
+    // weights
+    // ME weight
     tree_->Branch("eventweight", &eventweight_, "eventweight_/f");
+    // prefire weights
+    tree_->Branch("prefiringweightECAL",         &prefiringweightECAL_,     "prefiringweightECAL_/f");
+    tree_->Branch("prefiringweightECALup",       &prefiringweightECALup_,   "prefiringweightECALup_/f");
+    tree_->Branch("prefiringweightECALdown",     &prefiringweightECALdown_, "prefiringweightECALdown_/f");
+    tree_->Branch("prefiringweightMuon",         &prefiringweightMuon_,         "prefiringweightMuon_/f");
+    tree_->Branch("prefiringweightMuonup",       &prefiringweightMuonup_,       "prefiringweightMuonup_/f");
+    tree_->Branch("prefiringweightMuondown",     &prefiringweightMuondown_,     "prefiringweightMuondown_/f");
+    tree_->Branch("prefiringweightMuonupSyst",   &prefiringweightMuonupSyst_,   "prefiringweightMuonupSyst_/f");
+    tree_->Branch("prefiringweightMuondownSyst", &prefiringweightMuondownSyst_, "prefiringweightMuondownSyst_/f");
+    tree_->Branch("prefiringweightMuonupStat",   &prefiringweightMuonupStat_,   "prefiringweightMuonupStat_/f");
+    tree_->Branch("prefiringweightMuondownStat", &prefiringweightMuondownStat_, "prefiringweightMuondownStat_/f");
+
+    if(era_ == "2016postVFP"){
+        tree_->Branch("prefiringweightMuon2016H",         &prefiringweightMuon2016H_,         "prefiringweightMuon2016H_/f");
+        tree_->Branch("prefiringweightMuonup2016H",       &prefiringweightMuonup2016H_,       "prefiringweightMuonup2016H_/f");
+        tree_->Branch("prefiringweightMuondown2016H",     &prefiringweightMuondown2016H_,     "prefiringweightMuondown2016H_/f");
+        tree_->Branch("prefiringweightMuonupSyst2016H",   &prefiringweightMuonupSyst2016H_,   "prefiringweightMuonupSyst2016H_/f");
+        tree_->Branch("prefiringweightMuondownSyst2016H", &prefiringweightMuondownSyst2016H_, "prefiringweightMuondownSyst2016H_/f");
+        tree_->Branch("prefiringweightMuonupStat2016H",   &prefiringweightMuonupStat2016H_,   "prefiringweightMuonupStat2016H_/f");
+        tree_->Branch("prefiringweightMuondownStat2016H", &prefiringweightMuondownStat2016H_, "prefiringweightMuondownStat2016H_/f");
+    }
+
+    // gen level info
     tree_->Branch("decayMode", &decayMode_, "decayMode_/i");
     tree_->Branch("z_genMass", &z_genMass_,"z_genMass_/f");
     tree_->Branch("z_recoMass", &z_recoMass_,"z_recoMass_/f");
