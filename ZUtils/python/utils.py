@@ -3,6 +3,7 @@ import ROOT
 import numpy as np
 import pickle
 import pdb
+import uncertainties as unc
 
 def tree_to_df(tree, arrSize=5):
     #if tree has arrays with variable length, split into 'arrSize' new columns and fill empty values with 'NaN'
@@ -53,7 +54,12 @@ def getMCCorrection(fIn):
 
     return corrections
 
-
+def unorm(x):
+    # for counting experiments: define ufloat with poisson uncertainty
+    if x > 0.:
+        return unc.ufloat(x, np.sqrt(abs(x)))
+    else:
+        return unc.ufloat(0.0, 0.0)
 
 latex = ROOT.TLatex()
 latex.SetNDC()

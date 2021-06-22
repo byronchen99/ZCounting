@@ -1,0 +1,132 @@
+{
+"DYJetsToLL_0J_M_50_Autumn18": {
+    "OutputSplitFiles": 1,
+    "crab3": {
+      "Data.inputDataset": "/DYJetsToLL_0J_TuneCP5_13TeV-amcatnloFXFX-pythia8/RunIISummer20UL18MiniAODv2-106X_upgrade2018_realistic_v16_L1v1-v1/MINIAODSIM",
+      "Data.splitting": "FileBased",
+      "Data.unitsPerJob": 1,
+      "JobType.maxMemoryMB": 2500,
+      "JobType.pyCfgParams": [
+        "samplename=dy",
+        "outputFile=DYJetsToLL_0J_M_50_Autumn18"
+      ]
+    }
+},
+"DYJetsToLL_1J_M_50_Autumn18": {
+    "OutputSplitFiles": 1,
+    "crab3": {
+      "Data.inputDataset": "/DYJetsToLL_1J_TuneCP5_13TeV-amcatnloFXFX-pythia8/RunIISummer20UL18MiniAODv2-106X_upgrade2018_realistic_v16_L1v1-v1/MINIAODSIM",
+      "Data.splitting": "FileBased",
+      "Data.unitsPerJob": 1,
+      "JobType.maxMemoryMB": 2500,
+      "JobType.pyCfgParams": [
+        "samplename=dy",
+        "outputFile=DYJetsToLL_1J_M_50_Autumn18"
+      ]
+    }
+},
+"DYJetsToLL_2J_M_50_Autumn18": {
+    "OutputSplitFiles": 1,
+    "crab3": {
+      "Data.inputDataset": "/DYJetsToLL_2J_TuneCP5_13TeV-amcatnloFXFX-pythia8/RunIISummer20UL18MiniAODv2-106X_upgrade2018_realistic_v16_L1v1-v1/MINIAODSIM",
+      "Data.splitting": "FileBased",
+      "Data.unitsPerJob": 1,
+      "JobType.maxMemoryMB": 2500,
+      "JobType.pyCfgParams": [
+        "samplename=dy",
+        "outputFile=DYJetsToLL_2J_M_50_Autumn18"
+      ]
+    }
+},
+"WJetsToLNu_0J_Autumn18": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/WJetsToLNu_0J_TuneCP5_13TeV-amcatnloFXFX-pythia8/RunIISummer20UL18MiniAOD-106X_upgrade2018_realistic_v11_L1v1-v2/MINIAODSIM",
+    "Data.splitting": "FileBased",
+    "Data.unitsPerJob": 1,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "samplename=w",
+      "outputFile=WJetsToLNu_0J_Autumn18"
+    ]
+  }
+},
+"WJetsToLNu_1J_Autumn18": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/WJetsToLNu_1J_TuneCP5_13TeV-amcatnloFXFX-pythia8/RunIISummer20UL18MiniAODv2-106X_upgrade2018_realistic_v16_L1v1-v1/MINIAODSIM",
+    "Data.splitting": "FileBased",
+    "Data.unitsPerJob": 1,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "samplename=w",
+      "outputFile=WJetsToLNu_1J_Autumn18"
+    ]
+  }
+},
+"WJetsToLNu_2J_Autumn18": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/WJetsToLNu_2J_TuneCP5_13TeV-amcatnloFXFX-pythia8/RunIISummer20UL18MiniAOD-106X_upgrade2018_realistic_v11_L1v1-v1/MINIAODSIM",
+    "Data.splitting": "FileBased",
+    "Data.unitsPerJob": 1,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "samplename=w",
+      "outputFile=WJetsToLNu_2J_Autumn18"
+    ]
+  }
+},
+"TTJets_Autumn18": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/TTJets_TuneCP5_13TeV-amcatnloFXFX-pythia8/RunIISummer20UL18MiniAOD-106X_upgrade2018_realistic_v11_L1v1-v1/MINIAODSIM",
+    "Data.splitting": "FileBased",
+    "Data.unitsPerJob": 1,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "samplename=tt",
+      "outputFile=TTJets_Autumn18"
+    ]
+  }
+},
+"WW_Autumn18": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/WW_TuneCP5_13TeV-pythia8/RunIISummer20UL17MiniAOD-106X_mc2017_realistic_v6-v2/MINIAODSIM",
+    "Data.splitting": "FileBased",
+    "Data.unitsPerJob": 1,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "samplename=ww",
+      "outputFile=WW_Autumn18"
+    ]
+  }
+},
+"WZ_Autumn18": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/WZ_TuneCP5_13TeV-pythia8/RunIISummer20UL17MiniAOD-106X_mc2017_realistic_v6-v2/MINIAODSIM",
+    "Data.splitting": "FileBased",
+    "Data.unitsPerJob": 1,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "samplename=wz",
+      "outputFile=WZ_Autumn18"
+    ]
+  }
+},
+"ZZ_Autumn18": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/ZZ_TuneCP5_13TeV-pythia8/RunIISummer20UL17MiniAOD-106X_mc2017_realistic_v6-v2/MINIAODSIM",
+    "Data.splitting": "FileBased",
+    "Data.unitsPerJob": 1,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "samplename=zz",
+      "outputFile=ZZ_Autumn18"
+    ]
+  }
+}
+}

@@ -1,6 +1,20 @@
 #!/usr/bin/env python
 
-def zmonitoring(dirDQM, dirOut, byLsCSV, mcCorrections, sigTemplates, bkgTemplates, ptCut, runlist = None, beginRun=0, endRun=400000):
+def zmonitoring(
+    dirDQM,
+    dirOut,
+    byLsCSV,
+    mcCorrections,
+    sigTemplates,
+    bkgTemplates,
+    ptCut,
+    mass,
+    LumiPerMeasurement,
+    test,
+    runlist = None,
+    beginRun=0,
+    endRun=400000
+):
     import os
     import pandas as pd
     import glob
@@ -26,7 +40,7 @@ def zmonitoring(dirDQM, dirOut, byLsCSV, mcCorrections, sigTemplates, bkgTemplat
     cs_file.write("output      = condor/$(ClusterId).$(ProcId).out \n")
     cs_file.write("error       = condor/$(ClusterId).$(ProcId).err \n")
     cs_file.write("log         = condor/$(ClusterId).$(ProcId).log \n")
-    cs_file.write("+JobFlavour =\"workday\" \n")
+    cs_file.write("+JobFlavour =\"tomorrow\" \n")
 
     runs = []
     for run in runlist:
@@ -35,7 +49,7 @@ def zmonitoring(dirDQM, dirOut, byLsCSV, mcCorrections, sigTemplates, bkgTemplat
         if len(glob.glob(dirDQM+"/000*/*{0}*.root".format(run))) == 0:
             continue
         runs.append(run)
-        cs_file.write("arguments  = {0} {1} {2} {3} {4} {5} {6} {7} {8}\n".format(
+        cs_file.write("arguments  = {0} {1} {2} {3} {4} {5} {6} {7} {8} {9} {10} {11}\n".format(
             run,
             cmsswbase,
             dirDQM,
@@ -44,14 +58,21 @@ def zmonitoring(dirDQM, dirOut, byLsCSV, mcCorrections, sigTemplates, bkgTemplat
             mcCorrections,
             sigTemplates,
             bkgTemplates,
-            ptCut
+            ptCut,
+            mass[0],
+            mass[1],
+            LumiPerMeasurement
     	))
 
         cs_file.write("queue\n")
     cs_file.close()
-
-    out = os.popen("condor_submit cs_tmp.sub").read()
-    print(out)
+    if test:
+        print("Execute command to run jobs: ")
+        print("condor_submit cs_tmp.sub")
+        exit()
+    else:
+        out = os.popen("condor_submit cs_tmp.sub").read()
+        print(out)
     #os.system("rm cs_tmp.sub")
 
     out = out.split("\n")[-2].split(" ")
@@ -67,6 +88,9 @@ def zmonitoring(dirDQM, dirOut, byLsCSV, mcCorrections, sigTemplates, bkgTemplat
         'mcCorrections': mcCorrections,
         'sigTemplates': sigTemplates,
         'bkgTemplates': bkgTemplates,
+        'mass_lo': mass[0],
+        'mass_hi': mass[1],
+        'luminosity': LumiPerMeasurement,
         'ptCut': ptCut,
         'runs': runs,
         'njobs': njobs,
@@ -125,7 +149,8 @@ def check(projectdir, resubmit=False):
                         os.system("mv {0} {1}/csvFiles/".format(csvFile, faildir))
 
                 zmonitoring(ji['dirDQM'], ji['dirOut'], ji['byLsCSV'], ji['mcCorrections'], ji['sigTemplates'], ji['bkgTemplates'], ji['ptCut'],
-                            runlist=[ji['runs'][i] for i in unfinished_jobs])
+                    (ji['mass_lo'], ji['mass_hi']), ji['luminosity'], False,
+                    runlist=[ji['runs'][i] for i in unfinished_jobs])
 
 
 # ------------------------------------------------------------------------------
@@ -142,7 +167,7 @@ if __name__ == '__main__':
         help='submit ZMonitoring jobs to HTCondor'
     )
     parserA.add_argument(
-        '-i', '--inputDQM', type=str, default=None,
+        '-i', '--inputDQM', type=str, default="default",
         help='specify directory to input histogram .root files'
     )
     parserA.add_argument(
@@ -154,19 +179,25 @@ if __name__ == '__main__':
         help="analyze stops when comes to this run [%(default)s]"
     )
     parserA.add_argument(
-        '--mcCorrections', default=None, type=str,
+        '--mcCorrections', default="default", type=str,
         help='specify .json file with MC corrections for muon correlations'
     )
     parserA.add_argument(
-        '--sigTemplates', default=None, type=str,
-        help='specify directory with MC template root tree files for signal shapes'
+        '--sigTemplates', default="default", type=str,
+        help='specify if MC template is unsigned for signal shapes'
     )
     parserA.add_argument(
-        '--bkgTemplates', default=None, type=str,
-        help='specify directory with MC template root tree files for signal shapes'
+        '--bkgTemplates', default="None", type=str,
+        help='specify if MC template is unsigned for background shapes'
     )
     parserA.add_argument(
-        '--byLsCSV', default=None, type=str,
+        '--LumiPerMeasurement', default=20, type=float,
+        help='specify amount of luminosity per measurement in pb-1')
+    parser.add_argument(
+        '--mass', nargs=2, metavar=('LOW', 'HIGH'), default=(70,250),
+        help='specify mass range for tag and probe muon pairs')
+    parserA.add_argument(
+        '--byLsCSV', default="default", type=str,
         help='specify byLsCSV to select specific lumi sections'
     )
     parserA.add_argument(
@@ -176,6 +207,10 @@ if __name__ == '__main__':
     parserA.add_argument(
         '-o', '--output', default='./',
         help='specify output dir'
+    )
+    parserA.add_argument(
+        '-t', '--test', default=False, action="store_true",
+        help='test without submitting, just create the submit script'
     )
 
     # command line arguments: check
@@ -195,6 +230,18 @@ if __name__ == '__main__':
     # parse arguments and call subparser
     args = parser.parse_args()
     if args.subparser == 'zmonitoring':
-        zmonitoring(args.inputDQM, args.output, args.byLsCSV, args.mcCorrections, args.sigTemplates, args.bkgTemplates, args.ptCut, beginRun=args.beginRun, endRun=args.endRun)
+        zmonitoring(
+            args.inputDQM,
+            args.output,
+            args.byLsCSV,
+            args.mcCorrections,
+            args.sigTemplates,
+            args.bkgTemplates,
+            args.ptCut,
+            args.mass,
+            args.LumiPerMeasurement,
+            args.test,
+            beginRun=args.beginRun,
+            endRun=args.endRun)
     if args.subparser == 'check':
         check(args.project, args.resubmit)

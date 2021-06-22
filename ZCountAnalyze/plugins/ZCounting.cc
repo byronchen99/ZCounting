@@ -55,6 +55,7 @@
 #include "DataFormats/HepMCCandidate/interface/GenParticle.h"
 #include "DataFormats/VertexReco/interface/Vertex.h"
 #include "SimDataFormats/PileupSummaryInfo/interface/PileupSummaryInfo.h"
+#include "SimDataFormats/GeneratorProducts/interface/GenEventInfoProduct.h"
 
 #include "ZCounting/ZUtils/interface/GenZDecayProperties.h"
 
@@ -128,6 +129,7 @@ private:
     edm::EDGetTokenT<std::vector<GenZDecayProperties> > genZCollection_;
     edm::EDGetTokenT<TtGenEvent> genTtEvent_;
     edm::EDGetTokenT<std::vector<PileupSummaryInfo> > pileupInfoCollection_;
+    edm::EDGetTokenT<GenEventInfoProduct> genEventInfo_;
 
     bool hltChanged_;
     std::vector<std::string> muonTriggerPatterns_;
@@ -146,6 +148,13 @@ private:
     double VtxRhoCut_;
 
     // --- output
+
+    // ... for event info
+    unsigned int runNumber_;
+    unsigned int lumiBlock_;
+    unsigned int eventNumber_;
+
+    float eventweight_;
     int nPU_;
     int nPV_;
     int decayMode_;
@@ -206,7 +215,8 @@ ZCounting::ZCounting(const edm::ParameterSet& iConfig):
     pvCollection_    (consumes<std::vector<reco::Vertex> > (iConfig.getParameter<edm::InputTag>("edmPVName"))),
     genZCollection_  (consumes<std::vector<GenZDecayProperties> > (iConfig.getParameter<edm::InputTag>("genZLeptonCollection"))),
     genTtEvent_  (consumes<TtGenEvent> (iConfig.getParameter<edm::InputTag>("genTtCollection"))),
-    pileupInfoCollection_  (consumes<std::vector<PileupSummaryInfo> >(iConfig.getParameter<edm::InputTag>("pileupSummaryInfoCollection")))
+    pileupInfoCollection_  (consumes<std::vector<PileupSummaryInfo> >(iConfig.getParameter<edm::InputTag>("pileupSummaryInfoCollection"))),
+    genEventInfo_(consumes<GenEventInfoProduct>(iConfig.getParameter<edm::InputTag>("genEventInfo")))
 {
     LogDebug("ZCounting")<<"ZCounting(...)";
 
@@ -242,6 +252,12 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 
     this->clearVariables();
 
+    // Event info
+    runNumber_ = iEvent.id().run();
+    lumiBlock_ = iEvent.id().luminosityBlock();
+    eventNumber_ = iEvent.id().event();
+
+
     edm::Handle<edm::TriggerResults> triggerBits;
     edm::Handle<std::vector<pat::TriggerObjectStandAlone> > triggerObjects;
     edm::Handle<pat::MuonCollection> muonCollection;
@@ -258,6 +274,12 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     const reco::GenParticle* genLepton = 0;
     const reco::GenParticle* genAntiLepton = 0;
     if(!iEvent.isRealData()){
+
+        edm::Handle<GenEventInfoProduct> evt_info;
+        iEvent.getByToken(genEventInfo_, evt_info);
+
+        eventweight_ = evt_info->weight();
+
         if(hasGenZ_){
             edm::Handle<std::vector<GenZDecayProperties> > genZCollection;
             iEvent.getByToken(genZCollection_, genZCollection);
@@ -284,7 +306,7 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
                 LogDebug("ZCounting::analyze")<<"hasAntiLepton";
                 genAntiLepton = genTtEvent->leptonBar();
                 if(this->isTau(genAntiLepton)){
-                    decayMode_ += 15000000;
+                    decayMode_ += 150000;
                     genAntiLepton = this->tauDaughter(genTtEvent->leptonBar());
                 }
             }
@@ -460,10 +482,17 @@ ZCounting::beginJob()
 
     tree_=(fs->make<TTree>("tree" ,"tree" ));
 
+    // Event info
+    tree_->Branch("runNumber", &runNumber_, "runNumber/i");
+    tree_->Branch("lumiBlock", &lumiBlock_,"lumiBlock/i");
+    tree_->Branch("eventNumber", &eventNumber_, "eventNumber/i");
+
+
     tree_->Branch("nPV", &nPV_,"nPV_/i");
     tree_->Branch("nPU", &nPU_,"nPU_/i");
 
     // gen level info
+    tree_->Branch("eventweight", &eventweight_, "eventweight_/f");
     tree_->Branch("decayMode", &decayMode_, "decayMode_/i");
     tree_->Branch("z_genMass", &z_genMass_,"z_genMass_/f");
     tree_->Branch("z_recoMass", &z_recoMass_,"z_recoMass_/f");
@@ -534,6 +563,12 @@ ZCounting::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
 void ZCounting::clearVariables(){
     LogDebug("ZCounting::clearVariables()");
 
+    // Event info
+    runNumber_ = 0;
+    lumiBlock_ = 0;
+    eventNumber_ = 0;
+
+    eventweight_ = 0.;
     nPV_ = 0;
     nPU_ = 0;
     decayMode_ = 0;

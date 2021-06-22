@@ -1,0 +1,106 @@
+{
+"DYJetsToLL_M_50_LO_Summer16postVFP_Part0": {
+    "OutputSplitFiles": 1,
+    "crab3": {
+      "Data.inputDataset": "/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2/MINIAODSIM",
+      "Data.splitting": "FileBased",
+      "Data.unitsPerJob": 1,
+      "JobType.maxMemoryMB": 2500,
+      "JobType.pyCfgParams": [
+        "samplename=dy",
+        "outputFile=DYJetsToLL_M_50_LO_Summer16postVFP_Part0"
+      ]
+    }
+},
+"WJetsToLNu_Summer16postVFP_Part0": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/WJetsToLNu_TuneCP5_13TeV-madgraphMLM-pythia8/RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2/MINIAODSIM",
+    "Data.splitting": "FileBased",
+    "Data.unitsPerJob": 1,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "samplename=w",
+      "outputFile=WJetsToLNu_Summer16postVFP_Part0"
+    ]
+  }
+},
+"TTTo2L2Nu_Summer16postVFP": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/TTTo2L2Nu_TuneCP5_13TeV-powheg-pythia8/RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2/MINIAODSIM",
+    "Data.splitting": "FileBased",
+    "Data.unitsPerJob": 1,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "samplename=tt",
+      "outputFile=TTTo2L2Nu_Summer16postVFP"
+    ]
+  }
+},
+"TTToSemiLeptonic_Summer16postVFP": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/TTToSemiLeptonic_TuneCP5_13TeV-powheg-pythia8/RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2/MINIAODSIM",
+    "Data.splitting": "FileBased",
+    "Data.unitsPerJob": 1,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "samplename=tt",
+      "outputFile=TTToSemiLeptonic_Summer16postVFP"
+    ]
+  }
+},
+"TTToHadronic_Summer16postVFP": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/TTToHadronic_TuneCP5_13TeV-powheg-pythia8/RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2/MINIAODSIM",
+    "Data.splitting": "FileBased",
+    "Data.unitsPerJob": 1,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "samplename=tt",
+      "outputFile=TTToHadronic_Summer16postVFP"
+    ]
+  }
+},
+"WW_Summer16postVFP": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/WW_TuneCP5_13TeV-pythia8/RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2/MINIAODSIM",
+    "Data.splitting": "FileBased",
+    "Data.unitsPerJob": 1,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "samplename=ww",
+      "outputFile=WW_Summer16postVFP"
+    ]
+  }
+},
+"WZ_Summer16postVFP": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/WZ_TuneCP5_13TeV-pythia8/RunIISummer20UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2/MINIAODSIM",
+    "Data.splitting": "FileBased",
+    "Data.unitsPerJob": 1,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "samplename=wz",
+      "outputFile=WZ_Summer16postVFP"
+    ]
+  }
+},
+"ZZ_Summer16postVFP": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/ZZ_TuneCP5_13TeV-pythia8/RunIISummer19UL16MiniAOD-106X_mcRun2_asymptotic_v13-v2/MINIAODSIM",
+    "Data.splitting": "FileBased",
+    "Data.unitsPerJob": 1,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "samplename=zz",
+      "outputFile=ZZ_Summer16postVFP"
+    ]
+  }
+}
+}

@@ -61,7 +61,14 @@ process.source = cms.Source("PoolSource",
         # '/store/mc/RunIISummer20UL16MiniAOD/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/MINIAODSIM/FlatPU0to75_106X_mcRun2_asymptotic_v13-v2/230000/0ACCBC6C-6308-2D42-8D55-18F3522FE776.root'
         # 'root://cmsxrootd.fnal.gov//store/mc/RunIISummer20UL16MiniAOD/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/MINIAODSIM/FlatPU0to75_106X_mcRun2_asymptotic_v13-v2/230000/10E0D710-F696-7248-9A7C-80B0F127C6B5.root'
         # UL 2016 APV
-        '/store/mc/RunIISummer20UL16MiniAODAPV/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/MINIAODSIM/FlatPU0to75_106X_mcRun2_asymptotic_preVFP_v8-v2/00000/0040C830-7251-BA46-BE12-86EE8CFD0907.root'
+        # '/store/mc/RunIISummer20UL16MiniAODAPV/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/MINIAODSIM/FlatPU0to75_106X_mcRun2_asymptotic_preVFP_v8-v2/00000/0040C830-7251-BA46-BE12-86EE8CFD0907.root'
+
+        # UL 2017
+        # '/store/mc/RunIISummer20UL18MiniAODv2/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/MINIAODSIM/106X_upgrade2018_realistic_v16_L1v1-v2/120000/02FD7B88-3EDC-C64D-8E18-F9A8F9E7E7DF.root'
+        # '/store/mc/RunIISummer20UL18MiniAODv2/DYJetsToLL_0J_TuneCP5_13TeV-amcatnloFXFX-pythia8/MINIAODSIM/106X_upgrade2018_realistic_v16_L1v1-v1/230000/0271F29A-6EA5-054E-B733-EB5EC7A80F2C.root'
+        '/store/mc/RunIISummer20UL18MiniAODv2/ZZTo2L2Nu_TuneCP5_13TeV_powheg_pythia8/MINIAODSIM/106X_upgrade2018_realistic_v16_L1v1-v1/00000/E17A5D77-2DC3-F24A-A13D-C65191D2BDCC.root'
+        # UL 2018
+        # '/store/mc/RunIISummer20UL18MiniAOD/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/MINIAODSIM/106X_upgrade2018_realistic_v11_L1v1-v1/260000/0071F930-6376-7A48-89F1-74E189BD3BFC.root'
     )
 )
 
@@ -69,12 +76,17 @@ outFileName = options.outputFile + '_' + str(options.job) + '.root'
 print('Using output file ' + outFileName)
 process.TFileService = cms.Service("TFileService", fileName=cms.string(outFileName))
 
+# main analyzer
 process.load("ZCounting.ZCountAnalyze.ZCounting_cfi")
+# events before selection
+process.load("ZCounting.ZCountAnalyze.CountEventAnalyzer_cfi")
+# pileup MC template maker
+process.load("ZCounting.ZCountAnalyze.PileupMCTemplateMaker_cfi")
 
 tasks = cms.Task()
 
 # if no good Z candidate is found. E.g. if gamma is found instead
-if options.samplename == 'dy':
+if options.samplename in ('dy', 'zz', 'wz'):
     from ZCounting.ZUtils.GenZLeptonDecay_cfi import genZLeptonDecay
     process.genZLeptonDecay = genZLeptonDecay.clone(src="prunedGenParticles",)
     tasks.add(process.genZLeptonDecay)
@@ -94,4 +106,8 @@ elif options.samplename == 'tt':
     process.zcounting.genTtCollection = cms.InputTag("genEvt")
 
 
-process.p = cms.Path(process.zcounting, tasks)
+process.p = cms.Path(
+    process.countEvents *
+    process.pileupMCTemplateMaker *
+    process.zcounting,
+    tasks)

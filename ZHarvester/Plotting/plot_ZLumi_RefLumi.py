@@ -30,7 +30,7 @@ ROOT.gStyle.SetEndErrorSize(2)
 parser = argparse.ArgumentParser()
 
 parser.add_argument("-c", "--rates", required=True, type=str, help="csv file with z rates per measurement")
-parser.add_argument("-x", "--xsec",  required=True, type=str,
+parser.add_argument("-x", "--xsec",  default=None, type=str,
     help="csv file with z rates per measurement where xsec should be taken from (e.g. from low pileup run)")
 parser.add_argument("-r", "--refLumi",  required=True, type=str, help="give a ByLs.csv as input for reference Luminosity")
 parser.add_argument("-s", "--saveDir",  default='./',  type=str, help="give output dir")
@@ -89,17 +89,6 @@ data_ref['timeE'] = data_ref['time'] - data_ref['time']
 data_ref['dLRec(/pb)'] = data_ref['recorded(/pb)']/secPerLS
 data_ref = data_ref[['fill','dLRec(/pb)','time', 'recorded(/pb)', 'avgpu']]		#Keep only what you need
 
-# --- get Z xsec
-data_xsec = pd.read_csv(str(args.xsec), sep=',',low_memory=False)#, skiprows=[1,2,3,4,5])
-
-data_xsec['zDelBB_mc'] = data_xsec['zDelBB_mc'].apply(lambda x: unc.ufloat_fromstr(x))
-data_xsec['zDelBE_mc'] = data_xsec['zDelBE_mc'].apply(lambda x: unc.ufloat_fromstr(x))
-data_xsec['zDelEE_mc'] = data_xsec['zDelEE_mc'].apply(lambda x: unc.ufloat_fromstr(x))
-
-xsecBB = sum(data_xsec['zDelBB_mc']) / sum(data_xsec['lumiRec'])
-xsecBE = sum(data_xsec['zDelBE_mc']) / sum(data_xsec['lumiRec'])
-xsecEE = sum(data_xsec['zDelEE_mc']) / sum(data_xsec['lumiRec'])
-
 # --- z luminosity
 data = pd.read_csv(str(args.rates), sep=',',low_memory=False) #, skiprows=[1,2,3,4,5])
 if args.fill != 0:
@@ -110,40 +99,93 @@ data = data.sort_values(['fill','tdate_begin','tdate_end'])
 data['time'] = data['tdate_begin'] + (data['tdate_end'] - data['tdate_begin'])/2
 data['timeE'] = (data['tdate_end'] - data['tdate_begin'])/2
 
-data['zDelBB'] = data['zDelBB'].apply(lambda x: unc.ufloat_fromstr(x))
-data['zDelBE'] = data['zDelBE'].apply(lambda x: unc.ufloat_fromstr(x))
-data['zDelEE'] = data['zDelEE'].apply(lambda x: unc.ufloat_fromstr(x))
+def unorm(x):
+    # for counting experiments: define ufloat with poisson uncertainty
+    return unc.ufloat(x, np.sqrt(abs(x)))
+
+data['yieldBB'] = data['yieldBB'].apply(lambda x: unorm(x))
+data['yieldBE'] = data['yieldBE'].apply(lambda x: unorm(x))
+data['yieldEE'] = data['yieldEE'].apply(lambda x: unorm(x))
+
+data['ZBBeff'] = data['ZBBeff'].apply(lambda x: unc.ufloat_fromstr(x))
+data['ZBEeff'] = data['ZBEeff'].apply(lambda x: unc.ufloat_fromstr(x))
+data['ZEEeff'] = data['ZEEeff'].apply(lambda x: unc.ufloat_fromstr(x))
+
+data['ZBBeff_mc'] = data['ZBBeff_mc'].apply(lambda x: unc.ufloat_fromstr(x))
+data['ZBEeff_mc'] = data['ZBEeff_mc'].apply(lambda x: unc.ufloat_fromstr(x))
+data['ZEEeff_mc'] = data['ZEEeff_mc'].apply(lambda x: unc.ufloat_fromstr(x))
+
+data['zYieldBB_purity'] = data['zYieldBB_purity'].apply(lambda x: unc.ufloat_fromstr(x))
+data['zYieldBE_purity'] = data['zYieldBE_purity'].apply(lambda x: unc.ufloat_fromstr(x))
+data['zYieldEE_purity'] = data['zYieldEE_purity'].apply(lambda x: unc.ufloat_fromstr(x))
+
+data['zYieldBB_purity'] = data['zYieldBB_purity'].apply(lambda x: unc.ufloat(1,0.) if x.n == 1.0 else x)
+data['zYieldBE_purity'] = data['zYieldBE_purity'].apply(lambda x: unc.ufloat(1,0.) if x.n == 1.0 else x)
+data['zYieldEE_purity'] = data['zYieldEE_purity'].apply(lambda x: unc.ufloat(1,0.) if x.n == 1.0 else x)
+
+# delivered Z rate with applying purity
+data['zDelBB'] = data['yieldBB'] / data['ZBBeff'] * data['zYieldBB_purity']
+data['zDelBE'] = data['yieldBE'] / data['ZBEeff'] * data['zYieldBE_purity']
+data['zDelEE'] = data['yieldEE'] / data['ZEEeff'] * data['zYieldEE_purity']
+
+data['zDelBB_mc'] = data['yieldBB'] / data['ZBBeff_mc'] * data['zYieldBB_purity']
+data['zDelBE_mc'] = data['yieldBE'] / data['ZBEeff_mc'] * data['zYieldBE_purity']
+data['zDelEE_mc'] = data['yieldEE'] / data['ZEEeff_mc'] * data['zYieldEE_purity']
+
+# data['zDelBB'] = data['zDelBB'].apply(lambda x: unc.ufloat_fromstr(x))
+# data['zDelBE'] = data['zDelBE'].apply(lambda x: unc.ufloat_fromstr(x))
+# data['zDelEE'] = data['zDelEE'].apply(lambda x: unc.ufloat_fromstr(x))
+
+# --- get Z xsec
+if args.xsec:
+    data_xsec = pd.read_csv(str(args.xsec), sep=',',low_memory=False)#, skiprows=[1,2,3,4,5])
+
+    data_xsec['zDelBB_mc'] = data_xsec['zDelBB_mc'].apply(lambda x: unc.ufloat_fromstr(x))
+    data_xsec['zDelBE_mc'] = data_xsec['zDelBE_mc'].apply(lambda x: unc.ufloat_fromstr(x))
+    data_xsec['zDelEE_mc'] = data_xsec['zDelEE_mc'].apply(lambda x: unc.ufloat_fromstr(x))
+
+    xsecBB = sum(data_xsec['zDelBB_mc']) / sum(data_xsec['lumiRec'])
+    xsecBE = sum(data_xsec['zDelBE_mc']) / sum(data_xsec['lumiRec'])
+    xsecEE = sum(data_xsec['zDelEE_mc']) / sum(data_xsec['lumiRec'])
+
+else:
+    xsecBB = 1.
+    xsecBE = 1.
+    xsecEE = 1.
+
 
 data['zLumi'] = (data['zDelBB'] + data['zDelBE'] + data['zDelEE']) / (xsecBB+xsecBE+xsecEE)
 data['zLumiBB'] = data['zDelBB'] / xsecBB
 data['zLumiBE'] = data['zDelBE'] / xsecBE
 data['zLumiEE'] = data['zDelEE'] / xsecEE
 
-data['zLumiInst'] = (data['zDelBB'] + data['zDelBE'] + data['zDelEE'])/(data['timewindow'] * (xsecBB+xsecBE+xsecEE))
-data['zLumiInstBB'] = data['zDelBB'] / (data['timewindow'] * xsecBB)
-data['zLumiInstBE'] = data['zDelBE'] / (data['timewindow'] * xsecBE)
-data['zLumiInstEE'] = data['zDelEE'] / (data['timewindow'] * xsecEE)
-
-if args.mcCorrections:
-    print("Get MC corrections from file: "+args.mcCorrections)
-    corr = getMCCorrection(args.mcCorrections)
-    data['zDelBB_mc'] = corr['effBB'](data['pileUp']) * data['zDelBB']
-    data['zDelBE_mc'] = corr['effBE'](data['pileUp']) * data['zDelBE']
-    data['zDelEE_mc'] = corr['effEE'](data['pileUp']) * data['zDelEE']
-else:
-    data['zDelBB_mc'] = data['zDelBB_mc'].apply(lambda x: unc.ufloat_fromstr(x))
-    data['zDelBE_mc'] = data['zDelBE_mc'].apply(lambda x: unc.ufloat_fromstr(x))
-    data['zDelEE_mc'] = data['zDelEE_mc'].apply(lambda x: unc.ufloat_fromstr(x))
-
+data['zLumi_mc'] = (data['zDelBB_mc'] + data['zDelBE_mc'] + data['zDelEE_mc']) / (xsecBB+xsecBE+xsecEE)
 data['zLumiBB_mc'] = data['zDelBB_mc'] / xsecBB
 data['zLumiBE_mc'] = data['zDelBE_mc'] / xsecBE
 data['zLumiEE_mc'] = data['zDelEE_mc'] / xsecEE
-data['zLumi_mc'] = (data['zDelBB_mc'] + data['zDelBE_mc'] + data['zDelEE_mc']) / (xsecBB+xsecBE+xsecEE)
+
+data['zLumiInst'] = data['zLumi'] / data['timewindow']
+data['zLumiInstBB'] = data['zLumiBB'] / data['timewindow']
+data['zLumiInstBE'] = data['zLumiBE'] / data['timewindow']
+data['zLumiInstEE'] = data['zLumiEE'] / data['timewindow']
 
 data['zLumiInst_mc'] = data['zLumi_mc'] / data['timewindow']
 data['zLumiInstBB_mc'] = data['zLumiBB_mc'] / data['timewindow']
 data['zLumiInstBE_mc'] = data['zLumiBE_mc'] / data['timewindow']
 data['zLumiInstEE_mc'] = data['zLumiEE_mc'] / data['timewindow']
+
+
+# if args.mcCorrections:
+#     print("Get MC corrections from file: "+args.mcCorrections)
+#     corr = getMCCorrection(args.mcCorrections)
+#     data['zDelBB_mc'] = corr['effBB'](data['pileUp']) * data['zDelBB']
+#     data['zDelBE_mc'] = corr['effBE'](data['pileUp']) * data['zDelBE']
+#     data['zDelEE_mc'] = corr['effEE'](data['pileUp']) * data['zDelEE']
+# else:
+#     data['zDelBB_mc'] = data['zDelBB_mc'].apply(lambda x: unc.ufloat_fromstr(x))
+#     data['zDelBE_mc'] = data['zDelBE_mc'].apply(lambda x: unc.ufloat_fromstr(x))
+#     data['zDelEE_mc'] = data['zDelEE_mc'].apply(lambda x: unc.ufloat_fromstr(x))
+
 
 # seconds to hours
 data['time'] = data['time'] / 3600.
@@ -161,7 +203,7 @@ def moving_average(x, w):
 ########## Plot ##########
 
 for suffix, zLumi, others in (
-    ("inclusive", 'zLumiInst_mc',   [("zLumiInst",   24, 2, "w/o MC"),] ),
+    ("inclusive", 'zLumiInst_mc',   [], ), #[("zLumiInst",   24, 2, "w/o MC"),] ),
     # ("BB",        'zLumiInstBB_mc', [("zLumiInstBB", 24, 2, "w/o MC"),] ),
     # ("BE",        'zLumiInstBE_mc', [("zLumiInstBE", 24, 2, "w/o MC"),] ),
     # ("EE",        'zLumiInstEE_mc', [("zLumiInstEE", 24, 2, "w/o MC"),] ),
@@ -265,6 +307,7 @@ for suffix, zLumi, others in (
             graph_ZLumi.SetMarkerStyle(20)
             graph_ZLumi.SetMarkerColor(2)
             graph_ZLumi.SetFillStyle(0)
+            graph_ZLumi.SetFillColor(0)
             graph_ZLumi.SetMarkerSize(1.5)
 
 

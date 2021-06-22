@@ -19,7 +19,7 @@ massLo=56
 massHi=116
 ptCut=30
 
-def zMCEff1D(df, bins, obs, region='inclusive', sel='',
+def zMCEff1D(dfGen, dfReco, bins, obs, region='inclusive', selGen='', selReco='',
              cutsPtEta='p_\mathrm{T}(\mu) > '+str(ptCut)+'\ \mathrm{GeV} \qquad |\eta(\mu)| < 2.4'):
     """
     compute Z efficiency from MC and Z->mumu efficiency from tag and probe
@@ -32,8 +32,10 @@ def zMCEff1D(df, bins, obs, region='inclusive', sel='',
     """
     print(">>> make differential efficiencies for " + obs + " in " + region + " region")
 
-    if sel != '':
-        df = df.query(sel)
+    if selGen != '':
+        dfGen = dfGen.query(selGen)
+    if selReco != '':
+        dfReco = dfReco.query(selReco)
 
     Efficiency.Set(bins, obs, region)
 
@@ -42,7 +44,7 @@ def zMCEff1D(df, bins, obs, region='inclusive', sel='',
         bin_high = bins[i + 1]
         sel = '{0}>{1} & {0}<{2}'.format(obs, bin_low, bin_high)
 
-        Efficiency.Calculate(df.query(sel), i)
+        Efficiency.Calculate(dfGen.query(sel), dfReco.query(sel), i)
 
     Efficiency.Plot(cutsPtEta)
 
@@ -56,9 +58,9 @@ class Efficiency:
             eff.set(bins, obs, region)
 
     @classmethod
-    def Calculate(cls, df, ibin):
+    def Calculate(cls, dfGen, dfReco, ibin):
         for eff in cls.collection:
-            eff.calculate(df, ibin)
+            eff.calculate(dfGen, dfReco, ibin)
 
     @classmethod
     def Plot(cls, cutsPtEta):
@@ -100,80 +102,97 @@ class Efficiency:
         self.eff_tnp = []
         self.eff_tnpZ = []
 
-    def calculate(self, dataframe, ibin):
+    def calculate(self, dataGen, dataReco, ibin):
 
         # >>> acceptance selection
-        var0 = [True,]*len(dataframe)
-        if self.delR:
-            var0 = var0 & (dataframe['delR'] > self.delR)
-        if self.delDxy:
-            var0 = var0 & (dataframe['delDxy'] < self.delDxy)
-        if self.delDz:
-            var0 = var0 & (dataframe['delDz'] < self.delDz)
+        # var0 = [True,]*len(dataframeReco)
+        # if self.delR:
+        #     var0 = var0 & (dataframe['delR'] > self.delR)
+        # if self.delDxy:
+        #     var0 = var0 & (dataframe['delDxy'] < self.delDxy)
+        # if self.delDz:
+        #     var0 = var0 & (dataframe['delDz'] < self.delDz)
 
-        if all(var0):
-            df = dataframe.copy()
-        else:
-            df = dataframe.loc[var0].copy()
+        # if all(var0):
+        #     dfGen = dataframeReco.copy()
+        # else:
+        #     dfGen = dataframeReco.loc[var0].copy()
         # <<< acceptance selection
 
         # >>> columns for tnp efficiency
-        df['pass_muon'] = df['muon_ID'] >= self.ID
-        df['pass_antiMuon'] = df['antiMuon_ID'] >= self.ID
+        dfReco = dataReco.copy()
+        dfReco['pass_muon'] = dfReco['muon_ID'] >= self.ID
+        dfReco['pass_antiMuon'] = dfReco['antiMuon_ID'] >= self.ID
         if self.pfIso:
-            df['pass_muon'] = df['pass_muon'] & (df['muon_pfIso'] < self.pfIso)
-            df['pass_antiMuon'] = df['pass_antiMuon'] & (df['antiMuon_pfIso'] < self.pfIso)
+            dfReco['pass_muon'] = dfReco['pass_muon'] & (dfReco['muon_pfIso'] < self.pfIso)
+            dfReco['pass_antiMuon'] = dfReco['pass_antiMuon'] & (dfReco['antiMuon_pfIso'] < self.pfIso)
 
         if self.tkIso:
-            df['pass_muon'] = df['pass_muon'] & (df['muon_tkIso'] < self.tkIso)
-            df['pass_antiMuon'] = df['pass_antiMuon'] & (df['antiMuon_tkIso'] < self.tkIso)
+            dfReco['pass_muon'] = dfReco['pass_muon'] & (dfReco['muon_tkIso'] < self.tkIso)
+            dfReco['pass_antiMuon'] = dfReco['pass_antiMuon'] & (dfReco['antiMuon_tkIso'] < self.tkIso)
 
-        df['pass_muon_antiMuon'] = df['pass_muon'] & df['pass_antiMuon']
+        dfReco['pass_muon_antiMuon'] = dfReco['pass_muon'] & dfReco['pass_antiMuon']
 
-        nMinus = df['pass_muon'].sum()
-        nPlus = df['pass_antiMuon'].sum()
-        nPlusMinus = df['pass_muon_antiMuon'].sum()
+        nMinus = dfReco['pass_muon'].sum()
+        nPlus = dfReco['pass_antiMuon'].sum()
+        nPlusMinus = dfReco['pass_muon_antiMuon'].sum()
 
         if self.HLT:
-            df['pass_muon_HLT'] = df['pass_muon_antiMuon'] & df['muon_hlt_{0}'.format(self.HLT)]
-            df['pass_antiMuon_HLT'] = df['pass_muon_antiMuon'] & df['antiMuon_hlt_{0}'.format(self.HLT)]
-            df['pass_muon_antiMuon_HLT'] = df['pass_muon_HLT'] & df['pass_antiMuon_HLT']
+            dfReco['pass_muon_HLT'] = dfReco['pass_muon_antiMuon'] & dfReco['muon_hlt_{0}'.format(self.HLT)]
+            dfReco['pass_antiMuon_HLT'] = dfReco['pass_muon_antiMuon'] & dfReco['antiMuon_hlt_{0}'.format(self.HLT)]
+            dfReco['pass_muon_antiMuon_HLT'] = dfReco['pass_muon_HLT'] & dfReco['pass_antiMuon_HLT']
 
-            nMinus_HLT = df['pass_muon_HLT'].sum()
-            nPlus_HLT = df['pass_antiMuon_HLT'].sum()
-            nPlusMinus_HLT = df['pass_muon_antiMuon_HLT'].sum()
+            nMinus_HLT = dfReco['pass_muon_HLT'].sum()
+            nPlus_HLT = dfReco['pass_antiMuon_HLT'].sum()
+            nPlusMinus_HLT = dfReco['pass_muon_antiMuon_HLT'].sum()
         # <<< columns for tnp efficiency
 
         # >>> columns for true efficiency
+        dfGen = dataGen.copy()
+        dfGen['pass_muon'] = dfGen['muon_ID'] >= self.ID
+        dfGen['pass_antiMuon'] = dfGen['antiMuon_ID'] >= self.ID
+        if self.pfIso:
+            dfGen['pass_muon'] = dfGen['pass_muon'] & (dfGen['muon_pfIso'] < self.pfIso)
+            dfGen['pass_antiMuon'] = dfGen['pass_antiMuon'] & (dfGen['antiMuon_pfIso'] < self.pfIso)
+
+        if self.tkIso:
+            dfGen['pass_muon'] = dfGen['pass_muon'] & (dfGen['muon_tkIso'] < self.tkIso)
+            dfGen['pass_antiMuon'] = dfGen['pass_antiMuon'] & (dfGen['antiMuon_tkIso'] < self.tkIso)
+
+        dfGen['pass_muon_antiMuon'] = dfGen['pass_muon'] & dfGen['pass_antiMuon']
+
         if self.HLT:
-            df['reco'] = df['pass_muon_antiMuon'] & (df['pass_muon_HLT'] | df['pass_antiMuon_HLT'])
+            dfGen['pass_muon_HLT'] = dfGen['pass_muon_antiMuon'] & dfGen['muon_hlt_{0}'.format(self.HLT)]
+            dfGen['pass_antiMuon_HLT'] = dfGen['pass_muon_antiMuon'] & dfGen['antiMuon_hlt_{0}'.format(self.HLT)]
+
+            dfGen['reco'] = dfGen['pass_muon_antiMuon'] & (dfGen['pass_muon_HLT'] | dfGen['pass_antiMuon_HLT'])
         else:
-            df['reco'] = df['pass_muon_antiMuon']
+            dfGen['reco'] = dfGen['pass_muon_antiMuon']
 
-        df['not_reco'] = ~df['reco']
+        dfGen['not_reco'] = ~dfGen['reco']
 
-        nZReco = df['reco'].sum()
-        nZNotReco = df['not_reco'].sum()
+        nZReco = dfGen['reco'].sum()
+        nZNotReco = dfGen['not_reco'].sum()
         # <<< columns for true efficiency
 
-        # >>> construct full covariance matrix
-        if self.HLT:
-            corr_matrix = df[['reco','not_reco','pass_muon_antiMuon','pass_muon','pass_antiMuon','pass_muon_antiMuon_HLT','pass_muon_HLT','pass_antiMuon_HLT']].corr()
-
-            nZReco, nZNotReco, nPlusMinus, nMinus, nPlus, nPlusMinus_HLT, nMinus_HLT, nPlus_HLT = unc.correlated_values_norm(
-                [(nZReco, np.sqrt(nZReco)), (nZNotReco, np.sqrt(nZNotReco)),
-                (nPlusMinus, np.sqrt(nPlusMinus)), (nMinus, np.sqrt(nMinus)), (nPlus, np.sqrt(nPlus)),
-                (nPlusMinus_HLT, np.sqrt(nPlusMinus_HLT)), (nMinus_HLT, np.sqrt(nMinus_HLT)), (nPlus_HLT, np.sqrt(nPlus_HLT))],
-                corr_matrix)
-
-        else:
-            corr_matrix = df[['reco','not_reco','pass_muon_antiMuon','pass_muon','pass_antiMuon']].corr()
-
-            nZReco, nZNotReco, nPlusMinus, nMinus, nPlus = unc.correlated_values_norm(
-                [(nZReco, np.sqrt(nZReco)), (nZNotReco, np.sqrt(nZNotReco)),
-                (nPlusMinus, np.sqrt(nPlusMinus)), (nMinus, np.sqrt(nMinus)), (nPlus, np.sqrt(nPlus))],
-                corr_matrix)
-        # <<< construct full covariance matrix
+        # # >>> construct full covariance matrix
+        # if self.HLT:
+        #     corr_matrix = dfReco[['reco','not_reco','pass_muon_antiMuon','pass_muon','pass_antiMuon','pass_muon_antiMuon_HLT','pass_muon_HLT','pass_antiMuon_HLT']].corr()
+        #
+        #     nZReco, nZNotReco, nPlusMinus, nMinus, nPlus, nPlusMinus_HLT, nMinus_HLT, nPlus_HLT = unc.correlated_values_norm(
+        #         [(nZReco, np.sqrt(nZReco)), (nZNotReco, np.sqrt(nZNotReco)),
+        #         (nPlusMinus, np.sqrt(nPlusMinus)), (nMinus, np.sqrt(nMinus)), (nPlus, np.sqrt(nPlus)),
+        #         (nPlusMinus_HLT, np.sqrt(nPlusMinus_HLT)), (nMinus_HLT, np.sqrt(nMinus_HLT)), (nPlus_HLT, np.sqrt(nPlus_HLT))],
+        #         corr_matrix)
+        #
+        # else:
+        #     corr_matrix = dfReco[['reco','not_reco','pass_muon_antiMuon','pass_muon','pass_antiMuon']].corr()
+        #
+        #     nZReco, nZNotReco, nPlusMinus, nMinus, nPlus = unc.correlated_values_norm(
+        #         [(nZReco, np.sqrt(nZReco)), (nZNotReco, np.sqrt(nZNotReco)),
+        #         (nPlusMinus, np.sqrt(nPlusMinus)), (nMinus, np.sqrt(nMinus)), (nPlus, np.sqrt(nPlus))],
+        #         corr_matrix)
+        # # <<< construct full covariance matrix
 
         # >>> compute true and tnp efficiency
         eff_true = nZReco / (nZNotReco + nZReco)
@@ -193,7 +212,7 @@ class Efficiency:
             eff_tnpZ = eff_tnp
 
         # >>> store
-        self.eff_corr.append(unc.covariance_matrix([eff_tnpZ, eff_true]))
+        # self.eff_corr.append(unc.covariance_matrix([eff_tnpZ, eff_true]))
         self.eff_tnp.append(eff_tnp)
         self.eff_tnpZ.append(eff_tnpZ)
         self.eff_true.append(eff_true)
@@ -201,11 +220,11 @@ class Efficiency:
 
 
     def plot(self, cutsPtEta):
-        eff_tnp = np.array([x.nominal_value for x in self.eff_tnp])
-        eff_tnpZ = np.array([x.nominal_value for x in self.eff_tnpZ])
-        eff_tnpZ_err = np.array([x.std_dev for x in self.eff_tnpZ])
-        eff_true = np.array([x.nominal_value for x in self.eff_true])
-        eff_true_err = np.array([x.std_dev for x in self.eff_true])
+        eff_tnp = self.eff_tnp # np.array([x.nominal_value for x in self.eff_tnp])
+        eff_tnpZ = self.eff_tnpZ # np.array([x.nominal_value for x in self.eff_tnpZ])
+        # eff_tnpZ_err = np.array([x.std_dev for x in self.eff_tnpZ])
+        eff_true = self.eff_true # np.array([x.nominal_value for x in self.eff_true])
+        # eff_true_err = np.array([x.std_dev for x in self.eff_true])
 
         plt.clf()
         fig, ax = plt.subplots(2, 1, sharex=True, gridspec_kw={'height_ratios': [2, 1]})
@@ -265,14 +284,14 @@ class Efficiency:
         #ax[0].set_title("Z efficiency at {0} muon level".format(self.name))
 
         pulls = [x - y for (x,y) in zip(self.eff_tnpZ, self.eff_true)]
-        pulls_val = [x.nominal_value for x in pulls]
-        pulls_err = [x.std_dev for x in pulls]
+        pulls_val = pulls#[x.nominal_value for x in pulls]
+        #pulls_err = [x.std_dev for x in pulls]
 
         # do fit
         def linear(x, a, b):
             return a * x + b
 
-        popt, pcov = curve_fit(linear, self.x, pulls_val, sigma=pulls_err)
+        popt, pcov = curve_fit(linear, self.x, pulls_val)#, sigma=pulls_err)
         perr = np.sqrt(np.diag(pcov))
         self.fitResults[self.region + "_a"] = popt[0]
         self.fitResults[self.region + "_b"] = popt[1]
@@ -288,7 +307,7 @@ class Efficiency:
         else:
             ax[1].text(0.04, 0.05, r'fit: $(%5.1e\ \pm\ %5.1e) \cdot x - %5.1e\ \pm\ %5.1e $' % (popt[0],perr[0], abs(popt[1]),perr[1]), color='black', transform=ax[1].transAxes)
 
-        ax[1].errorbar(self.x, pulls_val, xerr=np.zeros(len(self.x)), yerr=pulls_err,
+        ax[1].errorbar(self.x, pulls_val, xerr=np.zeros(len(self.x)), # yerr=pulls_err,
                        fmt='ko')  # , label='factorized - true')
         ax[1].set_ylim(-0.03, 0.03)
         ax[1].set_ylabel(r'$\epsilon^\mathrm{tnp}_\mathrm{Z} - \epsilon^\mathrm{true}_\mathrm{Z}$')
@@ -304,33 +323,41 @@ class Efficiency:
 
 
 # acceptance selection
-selection = 'z_genMass > {0} ' \
-            '& z_genMass < {1} ' \
-            '& muon_genPt > {2} ' \
-            '& antiMuon_genPt > {2} ' \
-            '& abs(muon_genEta) < 2.4 ' \
-            '& abs(antiMuon_genEta) < 2.4 ' \
+selectionGen = 'decayMode == 13 ' \
+
+#             '& z_genMass > {0} ' \
+#             '& z_genMass < {1} ' \
+#             '& muon_genPt > {2} ' \
+#             '& antiMuon_genPt > {2} ' \
+#             '& abs(muon_genEta) < 2.4 ' \
+#             '& abs(antiMuon_genEta) < 2.4 ' \
+#             '& muon_genRecoMatches == 1' \
+#             '& antiMuon_genRecoMatches == 1'.format(massLo, massHi, ptCut)
+
+selectionReco = 'z_recoMass > {0} ' \
+            '& z_recoMass < {1} ' \
             '& muon_genRecoMatches == 1' \
             '& antiMuon_genRecoMatches == 1' \
-            '& decayMode == 13'.format(massLo, massHi, ptCut)
+            '& decayMode == 13'.format(massLo, massHi)
 
 # specify which branches to load
-branches = ['nPV', 'nPU', 'z_genMass',
+branches = ['nPV', 'nPU',
+            # 'z_genMass',
+            'z_genMass',
             'muon_genEta', 'antiMuon_genEta',
             'muon_genPhi', 'antiMuon_genPhi',
-            # 'muon_genPt', 'antiMuon_genPt',
+            'muon_genPt', 'antiMuon_genPt',
             # 'muon_genRecoMatches',  'antiMuon_genRecoMatches',
             # 'muon_genRecoObj',      'antiMuon_genRecoObj',
-            'Muon_dxy[muon_genRecoObj]',            'Muon_dxy[antiMuon_genRecoObj]',
-            'Muon_dz[muon_genRecoObj]',             'Muon_dz[antiMuon_genRecoObj]',
-            'Muon_pt[muon_genRecoObj]',             'Muon_pt[antiMuon_genRecoObj]',
-            'Muon_eta[muon_genRecoObj]',            'Muon_eta[antiMuon_genRecoObj]',
-            'Muon_phi[muon_genRecoObj]',            'Muon_phi[antiMuon_genRecoObj]',
-            'Muon_ID[muon_genRecoObj]',             'Muon_ID[antiMuon_genRecoObj]',
-            'Muon_triggerBits[muon_genRecoObj]',    'Muon_triggerBits[antiMuon_genRecoObj]',
-            'Muon_tkRelIso[muon_genRecoObj]',       'Muon_tkRelIso[antiMuon_genRecoObj]',
-            'Muon_pfRelIso04_all[muon_genRecoObj]', 'Muon_pfRelIso04_all[antiMuon_genRecoObj]',
-            'z_recoMass'
+            # 'Muon_dxy[muon_genRecoObj]',            'Muon_dxy[antiMuon_genRecoObj]',
+            # 'Muon_dz[muon_genRecoObj]',             'Muon_dz[antiMuon_genRecoObj]',
+            # 'Muon_pt[muon_genRecoObj]',             'Muon_pt[antiMuon_genRecoObj]',
+            # 'Muon_eta[muon_genRecoObj]',            'Muon_eta[antiMuon_genRecoObj]',
+            # 'Muon_phi[muon_genRecoObj]',            'Muon_phi[antiMuon_genRecoObj]',
+            # 'Muon_ID[muon_genRecoObj]',             'Muon_ID[antiMuon_genRecoObj]',
+            # 'Muon_triggerBits[muon_genRecoObj]',    'Muon_triggerBits[antiMuon_genRecoObj]',
+            # 'Muon_tkRelIso[muon_genRecoObj]',       'Muon_tkRelIso[antiMuon_genRecoObj]',
+            # 'Muon_pfRelIso04_all[muon_genRecoObj]', 'Muon_pfRelIso04_all[antiMuon_genRecoObj]',
             ]
 
 
@@ -352,10 +379,12 @@ args = parser.parse_args()
 inputs = args.input
 output = args.output[0]
 
-if os.path.isfile(output+"/dfGen.h5"):
+if os.path.isfile(output+"/dfGen.h5") and os.path.isfile(output+"/dfReco.h5"):
     print(">>> load dataframe")
     store = pd.HDFStore(output+'/dfGen.h5')
     dfGen = store['dfGen']  # load it
+    store = pd.HDFStore(output+'/dfReco.h5')
+    dfReco = store['dfReco']  # load it
 else:
     if not os.path.isdir(output):
         os.mkdir(output)
@@ -370,43 +399,46 @@ else:
         print("more then one tree in file ... specify, which tree to use")
         exit()
 
-
-
     print(">>> Load Events in gen acceptance")
-    dfGen = [tree_to_df(root2array(i, treeName[0], selection=selection, branches=branches), 1) for i in inputs]
+    # >>> in fiducial phase space of Gen info for true efficiency
+    dfGen = [tree_to_df(root2array(i, treeName[0], selection=selectionGen, branches=branches), 1) for i in inputs]
     dfGen = pd.concat(dfGen)
+
+    print(">>> store dataframe")
+    store = pd.HDFStore(output+'/dfGen.h5')
+    store['dfGen'] = dfGen  # save it
+    exit()
 
     dfGen = dfGen.rename(columns={
         'Muon_ID[muon_genRecoObj]_0': 'muon_ID',
         'Muon_ID[antiMuon_genRecoObj]_0': 'antiMuon_ID',
         'Muon_triggerBits[muon_genRecoObj]_0': 'muon_triggerBits',
         'Muon_triggerBits[antiMuon_genRecoObj]_0': 'antiMuon_triggerBits',
-        'Muon_tkRelIso[muon_genRecoObj]_0': 'muon_tkIso',
-        'Muon_tkRelIso[antiMuon_genRecoObj]_0': 'antiMuon_tkIso',
-        'Muon_pfRelIso04_all[muon_genRecoObj]_0': 'muon_pfIso',
-        'Muon_pfRelIso04_all[antiMuon_genRecoObj]_0': 'antiMuon_pfIso',
+        # 'Muon_tkRelIso[muon_genRecoObj]_0': 'muon_tkIso',
+        # 'Muon_tkRelIso[antiMuon_genRecoObj]_0': 'antiMuon_tkIso',
+        # 'Muon_pfRelIso04_all[muon_genRecoObj]_0': 'muon_pfIso',
+        # 'Muon_pfRelIso04_all[antiMuon_genRecoObj]_0': 'antiMuon_pfIso',
         'Muon_eta[muon_genRecoObj]_0': 'muon_eta',
         'Muon_eta[antiMuon_genRecoObj]_0': 'antiMuon_eta',
-        'Muon_pt[muon_genRecoObj]_0': 'muon_pt',
-        'Muon_pt[antiMuon_genRecoObj]_0': 'antiMuon_pt',
-        'Muon_phi[muon_genRecoObj]_0': 'muon_phi',
-        'Muon_phi[antiMuon_genRecoObj]_0': 'antiMuon_phi',
-        'Muon_dxy[muon_genRecoObj]_0': 'muon_dxy',
-        'Muon_dxy[antiMuon_genRecoObj]_0': 'antiMuon_dxy',
-        'Muon_dz[muon_genRecoObj]_0': 'muon_dz',
-        'Muon_dz[antiMuon_genRecoObj]_0': 'antiMuon_dz'
-        'z_recoMass':'mass'
+        # 'Muon_pt[muon_genRecoObj]_0': 'muon_pt',
+        # 'Muon_pt[antiMuon_genRecoObj]_0': 'antiMuon_pt',
+        # 'Muon_phi[muon_genRecoObj]_0': 'muon_phi',
+        # 'Muon_phi[antiMuon_genRecoObj]_0': 'antiMuon_phi',
+        # 'Muon_dxy[muon_genRecoObj]_0': 'muon_dxy',
+        # 'Muon_dxy[antiMuon_genRecoObj]_0': 'antiMuon_dxy',
+        # 'Muon_dz[muon_genRecoObj]_0': 'muon_dz',
+        # 'Muon_dz[antiMuon_genRecoObj]_0': 'antiMuon_dz'
         })
 
-    print(">>> add new columns")
+    # print(">>> add new columns")
     #dfGen['delPhiLL'] = abs(
     #    abs(dfGen['muon_genPhi'] - dfGen['antiMuon_genPhi']).apply(lambda x: x - 2 * math.pi if x > math.pi else x))
     #dfGen['delEtaLL'] = abs(dfGen['muon_genEta'] - dfGen['antiMuon_genEta'])
-    dfGen['delR'] = np.sqrt(
-       (dfGen['muon_eta'] - dfGen['antiMuon_eta']) ** 2 + (dfGen['muon_phi'] - dfGen['antiMuon_phi']) ** 2)
-
-    dfGen['delDz'] = abs(dfGen['muon_dz'] - dfGen['antiMuon_dz'])
-    dfGen['delDxy'] = abs(dfGen['muon_dxy'] - dfGen['antiMuon_dxy'])
+    # dfGen['delR'] = np.sqrt(
+    #    (dfGen['muon_eta'] - dfGen['antiMuon_eta']) ** 2 + (dfGen['muon_phi'] - dfGen['antiMuon_phi']) ** 2)
+    #
+    # dfGen['delDz'] = abs(dfGen['muon_dz'] - dfGen['antiMuon_dz'])
+    # dfGen['delDxy'] = abs(dfGen['muon_dxy'] - dfGen['antiMuon_dxy'])
 
     #dfGen['delPtLL'] = abs(dfGen['muon_genPt'] - dfGen['antiMuon_genPt'])
     #dfGen['relPtLL'] = abs(dfGen['muon_genPt'] - dfGen['antiMuon_genPt']) / abs(
@@ -427,16 +459,82 @@ else:
 
     for iBit in range(0, 10):
         nBit = 2 ** iBit
-        iBit += 1
-        dfGen['muon_hlt_{0}'.format(iBit)] = dfGen['muon_triggerBits'].apply(
+        dfGen['muon_hlt_{0}'.format(iBit+1)] = dfGen['muon_triggerBits'].apply(
             lambda x: 1 if x % (nBit * 2) >= nBit else 0)
-        dfGen['antiMuon_hlt_{0}'.format(iBit)] = dfGen['antiMuon_triggerBits'].apply(
+        dfGen['antiMuon_hlt_{0}'.format(iBit+1)] = dfGen['antiMuon_triggerBits'].apply(
             lambda x: 1 if x % (nBit * 2) >= nBit else 0)
 
 
     print(">>> store dataframe")
     store = pd.HDFStore(output+'/dfGen.h5')
     store['dfGen'] = dfGen  # save it
+
+    # >>> in fiducial phase space of Reco info for true efficiency
+    print(">>> Load Events in reco acceptance")
+    dfReco = [tree_to_df(root2array(i, treeName[0], selection=selectionReco, branches=branches), 1) for i in inputs]
+    dfReco = pd.concat(dfReco)
+
+    dfReco = dfReco.rename(columns={
+        'Muon_ID[muon_genRecoObj]_0': 'muon_ID',
+        'Muon_ID[antiMuon_genRecoObj]_0': 'antiMuon_ID',
+        'Muon_triggerBits[muon_genRecoObj]_0': 'muon_triggerBits',
+        'Muon_triggerBits[antiMuon_genRecoObj]_0': 'antiMuon_triggerBits',
+        # 'Muon_tkRelIso[muon_genRecoObj]_0': 'muon_tkIso',
+        # 'Muon_tkRelIso[antiMuon_genRecoObj]_0': 'antiMuon_tkIso',
+        # 'Muon_pfRelIso04_all[muon_genRecoObj]_0': 'muon_pfIso',
+        # 'Muon_pfRelIso04_all[antiMuon_genRecoObj]_0': 'antiMuon_pfIso',
+        'Muon_eta[muon_genRecoObj]_0': 'muon_eta',
+        'Muon_eta[antiMuon_genRecoObj]_0': 'antiMuon_eta',
+        'Muon_pt[muon_genRecoObj]_0': 'muon_pt',
+        'Muon_pt[antiMuon_genRecoObj]_0': 'antiMuon_pt',
+        # 'Muon_phi[muon_genRecoObj]_0': 'muon_phi',
+        # 'Muon_phi[antiMuon_genRecoObj]_0': 'antiMuon_phi',
+        # 'Muon_dxy[muon_genRecoObj]_0': 'muon_dxy',
+        # 'Muon_dxy[antiMuon_genRecoObj]_0': 'antiMuon_dxy',
+        # 'Muon_dz[muon_genRecoObj]_0': 'muon_dz',
+        # 'Muon_dz[antiMuon_genRecoObj]_0': 'antiMuon_dz'
+        })
+
+    dfReco = dfReco.query('muon_pt > {0} & antiMuon_pt > {0} & abs(muon_eta) < 2.4 & abs(antiMuon_eta) < 2.4 '.format(ptCut))
+
+    # print(">>> add new columns")
+    #dfReco['delPhiLL'] = abs(
+    #    abs(dfReco['muon_genPhi'] - dfReco['antiMuon_genPhi']).apply(lambda x: x - 2 * math.pi if x > math.pi else x))
+    #dfReco['delEtaLL'] = abs(dfReco['muon_genEta'] - dfReco['antiMuon_genEta'])
+    # dfReco['delR'] = np.sqrt(
+    #    (dfReco['muon_eta'] - dfReco['antiMuon_eta']) ** 2 + (dfReco['muon_phi'] - dfReco['antiMuon_phi']) ** 2)
+    #
+    # dfReco['delDz'] = abs(dfReco['muon_dz'] - dfReco['antiMuon_dz'])
+    # dfReco['delDxy'] = abs(dfReco['muon_dxy'] - dfReco['antiMuon_dxy'])
+
+    #dfReco['delPtLL'] = abs(dfReco['muon_genPt'] - dfReco['antiMuon_genPt'])
+    #dfReco['relPtLL'] = abs(dfReco['muon_genPt'] - dfReco['antiMuon_genPt']) / abs(
+    #    dfReco['muon_genPt'] + dfReco['antiMuon_genPt'])
+    #dfReco['sumPtLL'] = dfReco['muon_genPt'] + dfReco['antiMuon_genPt']
+
+    #dfReco = dfReco.query('delRLL > 0.4')
+
+    print(">>> convert bit code into bit map")
+    #   1: "HLT_L1SingleMu18_v*"
+    #   2: "HLT_L1SingleMu25_v*"
+    #   3: "HLT_IsoMu24_v*"
+    #   4: "HLT_IsoTkMu24_v*"
+    #   5: "HLT_IsoMu27_v*"
+    #   6: "HLT_IsoTkMu27_v*"
+    #   7: "HLT_IsoMu30_v*"
+    #   8: "HLT_IsoTkMu30_v*"
+
+    for iBit in range(0, 10):
+        nBit = 2 ** iBit
+        dfReco['muon_hlt_{0}'.format(iBit+1)] = dfReco['muon_triggerBits'].apply(
+            lambda x: 1 if x % (nBit * 2) >= nBit else 0)
+        dfReco['antiMuon_hlt_{0}'.format(iBit+1)] = dfReco['antiMuon_triggerBits'].apply(
+            lambda x: 1 if x % (nBit * 2) >= nBit else 0)
+
+
+    print(">>> store dataframe")
+    store = pd.HDFStore(output+'/dfReco.h5')
+    store['dfReco'] = dfReco  # save it
 
 # --- define Efficiencies
 print(">>> define efficiencies")
@@ -446,12 +544,15 @@ if args.year == 2016:
     steps = 15
 
     dfGen['muon_hlt_1'] = dfGen['muon_hlt_3'] | dfGen['muon_hlt_4']
+    dfGen['antiMuon_hlt_1'] = dfGen['antiMuon_hlt_3'] | dfGen['antiMuon_hlt_4']
+    dfReco['muon_hlt_1'] = dfReco['muon_hlt_3'] | dfReco['muon_hlt_4']
+    dfReco['antiMuon_hlt_1'] = dfReco['antiMuon_hlt_3'] | dfReco['antiMuon_hlt_4']
 
     eff_ZTightIDIsoMu24OrIsoTkMu24 = Efficiency(
         name="ZcTightID_IsoMu24OrIsoTkMu24",
         reqID=4, reqHLT=1,
         triggerName='$\mathrm{HLT\_Iso(TK)Mu24\_v^{*}}$',
-        range=(0.5,1.0))
+        range=(0.9,1.0))
 
 else:
     xLow = 0.5
@@ -471,16 +572,19 @@ else:
         )
 
 
-zMCEff1D(dfGen, np.linspace(xLow, xHigh, steps), 'nPU', 'inclusive')
-zMCEff1D(dfGen, np.linspace(xLow, xHigh, steps), 'nPU', 'BB',
-         sel='abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) < 0.9',
+zMCEff1D(dfGen, dfReco, np.linspace(xLow, xHigh, steps), 'nPU', 'inclusive')
+zMCEff1D(dfGen, dfReco, np.linspace(xLow, xHigh, steps), 'nPU', 'BB',
+         selGen='abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) < 0.9',
+         selReco='abs(muon_eta) < 0.9 & abs(antiMuon_eta) < 0.9',
          cutsPtEta='p_\mathrm{T}(\mu) > 30\ \mathrm{GeV} \qquad |\eta(\mu)| < 0.9')
 
-zMCEff1D(dfGen, np.linspace(xLow, xHigh, steps), 'nPU', 'BE',
-       sel='(abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) > 0.9) | (abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) < 0.9)')
+zMCEff1D(dfGen, dfReco, np.linspace(xLow, xHigh, steps), 'nPU', 'BE',
+         selGen='(abs(muon_genEta) < 0.9 & abs(antiMuon_genEta) > 0.9) | (abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) < 0.9)',
+         selReco='(abs(muon_eta) < 0.9 & abs(antiMuon_eta) > 0.9) | (abs(muon_eta) > 0.9 & abs(antiMuon_eta) < 0.9)')
 
-zMCEff1D(dfGen, np.linspace(xLow, xHigh, steps), 'nPU', 'EE',
-         sel='abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) > 0.9',
+zMCEff1D(dfGen, dfReco, np.linspace(xLow, xHigh, steps), 'nPU', 'EE',
+         selGen='abs(muon_genEta) > 0.9 & abs(antiMuon_genEta) > 0.9',
+         selReco='abs(muon_eta) > 0.9 & abs(antiMuon_eta) > 0.9',
          cutsPtEta='p_\mathrm{T}(\mu) > 30\ \mathrm{GeV} \qquad 0.9 < |\eta(\mu)| < 2.4')
 
 

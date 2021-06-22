@@ -111,14 +111,14 @@ inPVts = {
     #    +glob.glob(storage+"_V11_ULpostVFP2016F/210417_164957/0000/output_0_*"),
     # '16G': glob.glob(storage+"_V11_UL2016G_v3/210419_183936/0000/output_0_*"),
     # '16H': glob.glob(storage+"_V11_UL2016H/210417_165023/0000/output_0_*"),
-    #
-    # '17B': glob.glob(storage+"_V11_UL2017B/210420_072555/0000/output_0_*"),
-    # '17C': glob.glob(storage+"_V11_UL2017C/210420_072607/0000/output_0_*"),
-    # '17D': glob.glob(storage+"_V09_UL2017D/201214_134621/0000/output_0_*"),
-    # '17E': glob.glob(storage+"_V09_UL2017E/201214_134634/0000/output_0_*"),
-    # '17F': glob.glob(storage+"_V09_UL2017F/201214_141544/0000/output_0_*"),
-    '17H': glob.glob(storage+"_V11_UL2017H/210420_072656/0000/output_0_*"),
 
+    '17B': glob.glob(storage+"_V11_UL2017B/210420_072555/0000/output_0_*"),
+    '17C': glob.glob(storage+"_V11_UL2017C/210420_072607/0000/output_0_*"),
+    # '17D': glob.glob(storage+"_V09_UL2017D/201214_134621/0000/output_0_*"),
+    '17E': glob.glob(storage+"_V11_UL2017E/210526_151826/0000/output_0_*"),
+    '17F': glob.glob(storage+"_V11_UL2017F/210526_151850/0000/output_0_*"),
+    # '17H': glob.glob(storage+"_V11_UL2017H/210420_072656/0000/output_0_*"),
+    #
     # '18A': glob.glob(storage+"_V11_UL2018A/210420_072218/0000/output_0_*"),
     # '18B': glob.glob(storage+"_V11_UL2018B/210420_072153/0000/output_0_*"),
     # '18C': glob.glob(storage+"_V11_UL2018C/210420_072235/0000/output_0_*"),

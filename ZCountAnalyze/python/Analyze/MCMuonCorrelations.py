@@ -8,6 +8,7 @@ from root_numpy import root2array, list_trees
 from Utils import plot_scatter
 from scipy.stats import pearsonr
 import pdb
+import math
 
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
 from ZUtils.python.utils import tree_to_df
@@ -18,8 +19,8 @@ import argparse
 
 parser = argparse.ArgumentParser(prog='./Efficiencies')
 parser.add_argument(
-    '-i', '--input', nargs='+',
-    help='specify input root file'
+    '-i', '--input', type=str,
+    help='specify input hdf5 file'
 )
 parser.add_argument(
     '-o', '--output', default='./',
@@ -27,52 +28,23 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
-inputs = args.input
+input = args.input
 output = args.output
+
+print(">>> load dataframe")
+store = pd.HDFStore(input)
+df = store['dfGen']  # load it
 
 if not os.path.isdir(output):
     os.mkdir(output)
 
-if isinstance(inputs, (list,)):
-    treeName = list_trees(inputs[0])
-else:
-    treeName = list_trees(inputs)
-    inputs = [inputs, ]
-
-if (len(treeName) > 1):
-    print("more then one tree in file ... specify, which tree to use")
-    exit()
-
-# acceptance selection
-selection = 'z_genMass > 56 ' \
-            '& z_genMass < 116 ' \
-            '& muon_genPt > 30 ' \
-            '& antiMuon_genPt > 30 ' \
-            '& abs(muon_genEta) < 2.4 ' \
-            '& abs(antiMuon_genEta) < 2.4 ' \
-            '& muon_recoMatches == 1' \
-            '& antiMuon_recoMatches == 1' \
-            '& decayMode == 13'
-
-# specify which branches to load
-branches = ['nPU',
-            'muon_genEta', 'antiMuon_genEta',
-            'muon_genPhi', 'antiMuon_genPhi',
-            'muon_dxy', 'antiMuon_dxy',
-            'muon_dz', 'antiMuon_dz',
-            'muon_tkIso', 'antiMuon_tkIso',
-            'muon_pfIso', 'antiMuon_pfIso',
-            'muon_isFromPV', 'antiMuon_isFromPV'
-            ]
-
-print(">>> Load Events in gen acceptance")
-df = [tree_to_df(root2array(i, treeName[0], selection=selection, branches=branches), 5) for i in inputs]
-df = pd.concat(df)
-
 # print(">>> add new columns")
-# df['delRLL'] = np.sqrt(
-#     (df['muon_genEta'] - df['antiMuon_genEta']) ** 2 + (df['muon_genPhi'] - df['antiMuon_genPhi']) ** 2)
-#
+df['delPhiLL'] = abs(df['muon_genPhi'] - df['antiMuon_genPhi']).apply(lambda x: x - 2 * math.pi if x > math.pi else x)
+
+    # (df['muon_genEta'] - df['antiMuon_genEta']) ** 2 + (df['muon_genPhi'] - df['antiMuon_genPhi']) ** 2)
+df['delEtaLL'] = abs(df['muon_genEta'] - df['antiMuon_genEta'])
+
+df['delRLL'] = np.sqrt( df['delPhiLL']**2 + df['delEtaLL']**2)
 #
 # df = df.query('delRLL > 0.4')
 
@@ -94,22 +66,71 @@ df = pd.concat(df)
 #              saveas=output+'/MuMu_NotFromPV_dz.png')
 #
 # exit()
+# pfIso = 0.12
+# tkIso = 0.05
+#
+# df = df.loc[df['muon_ID'] >= 4]
+# df = df.loc[df['antiMuon_ID'] >= 4]
 
+# df = df.loc[df['muon_pfIso'] < pfIso]
+# df = df.loc[df['antiMuon_pfIso'] < pfIso]
+#
+# df = df.loc[df['muon_tkIso'] < tkIso]
+# df = df.loc[df['antiMuon_tkIso'] < tkIso]
+
+
+# plot_scatter(df['muon_tkIso'], df['antiMuon_tkIso'], r'$\mu^{-}$ Tracker isolation', '$\mu^{+}$ Tracker isolation',
+#              range=(0, 3.), #title='CMS Simulation',
+#              saveas=output+'/MuMu_inclusive_tkIso.png')
+# plot_scatter(df['muon_pfIso'], df['antiMuon_pfIso'], r'$\mu^{-}$ Particle flow isolation', '$\mu^{+}$ Particle flow isolation',
+#              range=(0, 3.), #title='CMS Simulation',
+#              saveas=output+'/MuMu_inclusive_pfIso.png')
+#
+# plot_scatter(df['muon_dxy'], df['antiMuon_dxy'], '$\mu^{-} d_\mathrm{XY}$ [cm]', '$\mu^{+} d_\mathrm{XY}$ [cm]',
+#              range=(0, 3.0), #title='CMS Simulation',
+#              saveas=output+'/MuMu_inclusive_dxy.png')
+# plot_scatter(df['muon_dz'], df['antiMuon_dz'], '$\mu^{-} d_\mathrm{Z}$ [cm]', '$\mu^{+} d_\mathrm{Z}$ [cm]',
+#              range=(0, 3.0), #title='CMS Simulation',
+#              saveas=output+'/MuMu_inclusive_dz.png')
+
+plot_scatter(df['muon_genPt'], df['antiMuon_genPt'], '$\mu^{-} p_\mathrm{T}$ [GeV]', '$\mu^{+} p_\mathrm{T}$ [GeV]',
+             range=(0, 80), #title='CMS Simulation',
+             saveas=output+'/MuMu_inclusive_pt.pdf')
+plot_scatter(df['muon_genPhi'], df['antiMuon_genPhi'], '$\mu^{-} \phi$', '$\mu^{+} \phi$',
+             range=(-math.pi, math.pi), #title='CMS Simulation',
+             saveas=output+'/MuMu_inclusive_phi.pdf')
+plot_scatter(df['muon_genEta'], df['antiMuon_genEta'], '$\mu^{-} \eta$', '$\mu^{+} \eta$',
+             range=(-2.4, 2.4), #title='CMS Simulation',
+             saveas=output+'/MuMu_inclusive_eta.pdf')
+plot_scatter(df['delPhiLL'], df['delEtaLL'], '$\Delta \phi (\mu^{-},\mu^{+})$', '$\Delta \eta (\mu^{-},\mu^{+})$',
+             range=(0, math.pi), #title='CMS Simulation',
+             rangey=(0,5.),
+             saveas=output+'/MuMu_inclusive_delPhiEta.pdf')
+plot_scatter(df['delRLL'], df['z_genMass'], '$m(\mu^{-},\mu^{+})$', '$\Delta R(\mu^{-},\mu^{+})$',
+             range=(86, 96), #title='CMS Simulation',
+             rangey=(0,5.),
+             saveas=output+'/MuMu_inclusive_delRMass.pdf')
+
+exit()
+# >>> now reqire HLT_IsoMu27 at one of the muons (mu^minus)
+
+df = df.loc[df['muon_hlt_4'] == 1]
 
 plot_scatter(df['muon_tkIso'], df['antiMuon_tkIso'], '$\mu^{-}\ Tracker\ Isolation$', '$\mu^{+}\ Tracker\ Isolation$',
-             range=(0, 1.), #title='CMS Simulation',
-             saveas='MuMu_inclusive_tkIso.png')
+             range=(0, 3.), #title='CMS Simulation',
+             saveas=output+'/MuMu_inclusive_tkIso_MuHLTIsoMu27.png')
 plot_scatter(df['muon_pfIso'], df['antiMuon_pfIso'], '$\mu^{-}\ PF\ Isolation$', '$\mu^{+}\ PF\ Isolation$',
-             range=(0, 1.), #title='CMS Simulation',
-             saveas='MuMu_inclusive_pfIso.png')
+             range=(0, 3.), #title='CMS Simulation',
+             saveas=output+'/MuMu_inclusive_pfIso_MuHLTIsoMu27.png')
 
 
 plot_scatter(df['muon_dxy'], df['antiMuon_dxy'], '$\mu^{-} d_{xy}$', '$\mu^{+} d_{xy}$',
-             range=(0, 0.5), #title='CMS Simulation',
-             saveas='MuMu_inclusive_dxy.png')
-plot_scatter(df['muon_dz'], df['antiMuon_dz'], '$\mu^{-} d_{z}$', '$\mu^{+} d_{z}$',
-             range=(0, 1.), #title='CMS Simulation',
-             saveas='MuMu_inclusive_dz.png')
+             range=(0, 3.0), #title='CMS Simulation',
+             saveas=output+'/MuMu_inclusive_dxy_MuHLTIsoMu27.png')
+plot_scatter(df['muon_dz'], df['antiMuon_dz'], '$\mu^{-} d_{z}$ [cm]', '$\mu^{+} d_{z}$ [cm]',
+             range=(0, 3.0), #title='CMS Simulation',
+             saveas=output+'/MuMu_inclusive_dz_MuHLTIsoMu27.png')
+
 
 exit()
 

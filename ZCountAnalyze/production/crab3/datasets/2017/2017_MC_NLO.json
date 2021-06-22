@@ -1,79 +1,92 @@
 {
-"DYJetsToLL_M_50_LO_Fall17_Part0": {
+"DYJetsToLL_0J_M_50_Fall17": {
     "OutputSplitFiles": 1,
     "crab3": {
-      "Data.inputDataset": "/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/RunIISummer20UL17MiniAOD-106X_mc2017_realistic_v6-v1/MINIAODSIM",
+      "Data.inputDataset": "/DYJetsToLL_0J_TuneCP5_13TeV-amcatnloFXFX-pythia8/RunIISummer20UL17MiniAOD-106X_mc2017_realistic_v6-v2/MINIAODSIM",
       "Data.splitting": "FileBased",
       "Data.unitsPerJob": 1,
       "JobType.maxMemoryMB": 2500,
       "JobType.pyCfgParams": [
         "samplename=dy",
-        "outputFile=DYJetsToLL_M_50_LO_Fall17_Part0"
+        "outputFile=DYJetsToLL_0J_M_50_Fall17"
       ]
     }
 },
-"WJetsToLNu_Fall17_Part0": {
+"DYJetsToLL_1J_M_50_Fall17": {
+    "OutputSplitFiles": 1,
+    "crab3": {
+      "Data.inputDataset": "/DYJetsToLL_1J_TuneCP5_13TeV-amcatnloFXFX-pythia8/RunIISummer20UL17MiniAOD-106X_mc2017_realistic_v6-v1/MINIAODSIM",
+      "Data.splitting": "FileBased",
+      "Data.unitsPerJob": 1,
+      "JobType.maxMemoryMB": 2500,
+      "JobType.pyCfgParams": [
+        "samplename=dy",
+        "outputFile=DYJetsToLL_1J_M_50_Fall17"
+      ]
+    }
+},
+"DYJetsToLL_2J_M_50_Fall17": {
+    "OutputSplitFiles": 1,
+    "crab3": {
+      "Data.inputDataset": "/DYJetsToLL_2J_TuneCP5_13TeV-amcatnloFXFX-pythia8/RunIISummer20UL17MiniAODv2-106X_mc2017_realistic_v9-v1/MINIAODSIM",
+      "Data.splitting": "FileBased",
+      "Data.unitsPerJob": 1,
+      "JobType.maxMemoryMB": 2500,
+      "JobType.pyCfgParams": [
+        "samplename=dy",
+        "outputFile=DYJetsToLL_2J_M_50_Fall17"
+      ]
+    }
+},
+"WJetsToLNu_0J_Fall17": {
   "OutputSplitFiles": 1,
   "crab3": {
-    "Data.inputDataset": "/WJetsToLNu_TuneCP5_13TeV-madgraphMLM-pythia8/RunIISummer19UL17MiniAOD-106X_mc2017_realistic_v6-v2/MINIAODSIM",
+    "Data.inputDataset": "/WJetsToLNu_0J_TuneCP5_13TeV-amcatnloFXFX-pythia8/RunIISummer20UL17MiniAODv2-106X_mc2017_realistic_v9-v1/MINIAODSIM",
     "Data.splitting": "FileBased",
     "Data.unitsPerJob": 1,
     "JobType.maxMemoryMB": 2500,
     "JobType.pyCfgParams": [
       "samplename=w",
-      "outputFile=WJetsToLNu_Fall17_Part0"
+      "outputFile=WJetsToLNu_0J_Fall17"
     ]
   }
 },
-"WJetsToLNu_Fall17_Part1": {
+"WJetsToLNu_1J_Fall17": {
   "OutputSplitFiles": 1,
   "crab3": {
-    "Data.inputDataset": "/WJetsToLNu_TuneCP5_13TeV-madgraphMLM-pythia8/RunIISummer20UL17MiniAOD-106X_mc2017_realistic_v6-v1/MINIAODSIM",
+    "Data.inputDataset": "/WJetsToLNu_1J_TuneCP5_13TeV-amcatnloFXFX-pythia8/RunIISummer20UL17MiniAOD-106X_mc2017_realistic_v6-v1/MINIAODSIM",
     "Data.splitting": "FileBased",
     "Data.unitsPerJob": 1,
     "JobType.maxMemoryMB": 2500,
     "JobType.pyCfgParams": [
       "samplename=w",
-      "outputFile=WJetsToLNu_Fall17_Part1"
+      "outputFile=WJetsToLNu_1J_Fall17"
     ]
   }
 },
-"TTTo2L2Nu_Fall17": {
+"WJetsToLNu_2J_Fall17": {
   "OutputSplitFiles": 1,
   "crab3": {
-    "Data.inputDataset": "/TTTo2L2Nu_TuneCP5_13TeV-powheg-pythia8/RunIISummer20UL17MiniAOD-106X_mc2017_realistic_v6-v2/MINIAODSIM",
+    "Data.inputDataset": "/WJetsToLNu_2J_TuneCP5_13TeV-amcatnloFXFX-pythia8/RunIISummer20UL17MiniAODv2-106X_mc2017_realistic_v9-v1/MINIAODSIM",
+    "Data.splitting": "FileBased",
+    "Data.unitsPerJob": 1,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "samplename=w",
+      "outputFile=WJetsToLNu_2J_Fall17"
+    ]
+  }
+},
+"TTJets_Fall17": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/TTJets_TuneCP5_13TeV-amcatnloFXFX-pythia8/RunIISummer20UL17MiniAODv2-106X_mc2017_realistic_v9-v2/MINIAODSIM",
     "Data.splitting": "FileBased",
     "Data.unitsPerJob": 1,
     "JobType.maxMemoryMB": 2500,
     "JobType.pyCfgParams": [
       "samplename=tt",
-      "outputFile=TTTo2L2Nu_Fall17"
-    ]
-  }
-},
-"TTToSemiLeptonic_Fall17": {
-  "OutputSplitFiles": 1,
-  "crab3": {
-    "Data.inputDataset": "/TTToSemiLeptonic_TuneCP5_13TeV-powheg-pythia8/RunIISummer20UL17MiniAOD-106X_mc2017_realistic_v6-v2/MINIAODSIM",
-    "Data.splitting": "FileBased",
-    "Data.unitsPerJob": 1,
-    "JobType.maxMemoryMB": 2500,
-    "JobType.pyCfgParams": [
-      "samplename=tt",
-      "outputFile=TTToSemiLeptonic_Fall17"
-    ]
-  }
-},
-"TTToHadronic_Fall17": {
-  "OutputSplitFiles": 1,
-  "crab3": {
-    "Data.inputDataset": "/TTToHadronic_TuneCP5_13TeV-powheg-pythia8/RunIISummer20UL17MiniAOD-106X_mc2017_realistic_v6-v2/MINIAODSIM",
-    "Data.splitting": "FileBased",
-    "Data.unitsPerJob": 1,
-    "JobType.maxMemoryMB": 2500,
-    "JobType.pyCfgParams": [
-      "samplename=tt",
-      "outputFile=TTToHadronic_Fall17"
+      "outputFile=TTJets_Fall17"
     ]
   }
 },
