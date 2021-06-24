@@ -8,6 +8,7 @@
       "JobType.maxMemoryMB": 2500,
       "JobType.pyCfgParams": [
         "samplename=dy",
+        "year=2017",
         "outputFile=DYJetsToLL_M_50_LO_FlatPU0to75_Fall17"
       ]
     }

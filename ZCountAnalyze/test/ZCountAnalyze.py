@@ -24,7 +24,7 @@ options.register('samplename', '',
     VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.string,
     "specify sample name (dy, tt) "
     )
-options.register('era', '2017',
+options.register('year', '2017',
     VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.string,
     "specify era (2016preVFP, 2016postVFP, 2017, 2018) "
     )
@@ -36,8 +36,8 @@ if options.samplename == '':
 elif options.samplename not in ('tt', 'dy', 'w', 'qcd', 'zz', 'wz', 'ww'):
     raise RuntimeError('ZCountAnalyze.py: unknown samplename '+options.samplename)
 
-if options.era not in ("2016preVFP", "2016postVFP", "2017", "2018"):
-    raise RuntimeError('ZCountAnalyze.py: unknown era '+options.era)
+if options.year not in ("2016preVFP", "2016postVFP", "2017", "2018"):
+    raise RuntimeError('ZCountAnalyze.py: unknown year '+options.year)
 
 print("processing {0} events".format(options.maxEvents))
 
@@ -102,16 +102,16 @@ process.load("ZCounting.ZCountAnalyze.CountEventAnalyzer_cfi")
 process.load("ZCounting.ZCountAnalyze.PileupMCTemplateMaker_cfi")
 
 from PhysicsTools.PatUtils.l1PrefiringWeightProducer_cfi import l1PrefiringWeightProducer
-if options.era == "2016preVFP":
+if options.year == "2016preVFP":
     l1PrefireECAL = "UL2016preVFP"
     l1PrefireMuon = "2016preVFP"
-elif options.era == "2016postVFP":
+elif options.year == "2016postVFP":
     l1PrefireECAL = "UL2016postVFP"
-    l1PrefireMuon = "2016H"
-elif options.era == "2017":
+    l1PrefireMuon = "2016BG"
+elif options.year == "2017":
     l1PrefireECAL = "UL2017BtoF"
     l1PrefireMuon = "20172018"
-elif options.era == "2018":
+elif options.year == "2018":
     l1PrefireECAL = "None"
     l1PrefireMuon = "20172018"
 
@@ -123,21 +123,21 @@ PrefiringRateSystematicUnctyECAL = cms.double(0.2),
 PrefiringRateSystematicUnctyMuon = cms.double(0.2)
 )
 
-if options.era == "2016postVFP":
+if options.year == "2016postVFP":
     process.prefiringweight2016H = l1PrefiringWeightProducer.clone(
     DataEraECAL = cms.string("None"),
-    DataEraMuon = cms.string("2016BG"),
+    DataEraMuon = cms.string("2016H"),
     UseJetEMPt = cms.bool(False),
     PrefiringRateSystematicUnctyECAL = cms.double(0.2),
     PrefiringRateSystematicUnctyMuon = cms.double(0.2)
     )
     process.prefireSequence = cms.Sequence(process.prefiringweight + process.prefiringweight2016H)
 else:
-    process.prefireSequence = cms.Sequence(prefiringweight)
+    process.prefireSequence = cms.Sequence(process.prefiringweight)
 
 tasks = cms.Task()
 
-process.zcounting.era = options.era
+process.zcounting.era = options.year
 
 # if no good Z candidate is found. E.g. if gamma is found instead
 if options.samplename in ('dy', 'zz', 'wz'):

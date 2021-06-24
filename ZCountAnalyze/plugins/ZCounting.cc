@@ -181,6 +181,7 @@ private:
     float prefiringweightECAL_;
     float prefiringweightECALup_;
     float prefiringweightECALdown_;
+    
     float prefiringweightMuon_;
     float prefiringweightMuonup_;
     float prefiringweightMuondown_;
@@ -367,10 +368,10 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     prefiringweightMuon_ =(*theprefweightMuon);
     prefiringweightMuonup_ =(*theprefweightupMuon);
     prefiringweightMuondown_ =(*theprefweightdownMuon);
-    prefiringweightMuonupSyst_ =(*theprefweightupMuon);
-    prefiringweightMuondownSyst_ =(*theprefweightdownMuon);
-    prefiringweightMuonupStat_ =(*theprefweightupMuon);
-    prefiringweightMuondownStat_ =(*theprefweightdownMuon);
+    prefiringweightMuonupSyst_ =(*theprefweightupsystMuon);
+    prefiringweightMuondownSyst_ =(*theprefweightdownsystMuon);
+    prefiringweightMuonupStat_ =(*theprefweightupstatMuon);
+    prefiringweightMuondownStat_ =(*theprefweightdownstatMuon);
 
     if(era_ == "2016postVFP"){
         edm::Handle< double > theprefweightMuon2016H;
