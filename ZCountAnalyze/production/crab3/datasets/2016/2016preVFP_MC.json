@@ -8,6 +8,7 @@
       "JobType.maxMemoryMB": 2500,
       "JobType.pyCfgParams": [
         "samplename=dy",
+        "year=2016preVFP",
         "outputFile=DYJetsToLL_M_50_LO_Summer16preVFP_Part0"
       ]
     }
@@ -21,6 +22,7 @@
     "JobType.maxMemoryMB": 2500,
     "JobType.pyCfgParams": [
       "samplename=w",
+      "year=2016preVFP",
       "outputFile=WJetsToLNu_Summer16preVFP_Part0"
     ]
   }
@@ -34,6 +36,7 @@
     "JobType.maxMemoryMB": 2500,
     "JobType.pyCfgParams": [
       "samplename=tt",
+      "year=2016preVFP",
       "outputFile=TTTo2L2Nu_Summer16preVFP"
     ]
   }
@@ -47,6 +50,7 @@
     "JobType.maxMemoryMB": 2500,
     "JobType.pyCfgParams": [
       "samplename=tt",
+      "year=2016preVFP",
       "outputFile=TTToSemiLeptonic_Summer16preVFP"
     ]
   }
@@ -60,6 +64,7 @@
     "JobType.maxMemoryMB": 2500,
     "JobType.pyCfgParams": [
       "samplename=tt",
+      "year=2016preVFP",
       "outputFile=TTToHadronic_Summer16preVFP"
     ]
   }
@@ -73,6 +78,7 @@
     "JobType.maxMemoryMB": 2500,
     "JobType.pyCfgParams": [
       "samplename=ww",
+      "year=2016preVFP",
       "outputFile=WW_Summer16preVFP"
     ]
   }
@@ -86,6 +92,7 @@
     "JobType.maxMemoryMB": 2500,
     "JobType.pyCfgParams": [
       "samplename=wz",
+      "year=2016preVFP",
       "outputFile=WZ_Summer16preVFP"
     ]
   }
@@ -99,6 +106,7 @@
     "JobType.maxMemoryMB": 2500,
     "JobType.pyCfgParams": [
       "samplename=zz",
+      "year=2016preVFP",
       "outputFile=ZZ_Summer16preVFP"
     ]
   }

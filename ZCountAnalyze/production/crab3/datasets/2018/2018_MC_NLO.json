@@ -8,6 +8,7 @@
       "JobType.maxMemoryMB": 2500,
       "JobType.pyCfgParams": [
         "samplename=dy",
+        "year=2018",
         "outputFile=DYJetsToLL_0J_M_50_Autumn18"
       ]
     }
@@ -21,6 +22,7 @@
       "JobType.maxMemoryMB": 2500,
       "JobType.pyCfgParams": [
         "samplename=dy",
+        "year=2018",
         "outputFile=DYJetsToLL_1J_M_50_Autumn18"
       ]
     }
@@ -34,7 +36,22 @@
       "JobType.maxMemoryMB": 2500,
       "JobType.pyCfgParams": [
         "samplename=dy",
+        "year=2018",
         "outputFile=DYJetsToLL_2J_M_50_Autumn18"
+      ]
+    }
+},
+"DYJetsToLL_M_50_Autumn18": {
+    "OutputSplitFiles": 1,
+    "crab3": {
+      "Data.inputDataset": "/DYJetsToLL_M-50_TuneCP5_13TeV-amcatnloFXFX-pythia8/RunIISummer19UL18MiniAODv2-106X_upgrade2018_realistic_v16_L1v1-v1/MINIAODSIM",
+      "Data.splitting": "FileBased",
+      "Data.unitsPerJob": 1,
+      "JobType.maxMemoryMB": 2500,
+      "JobType.pyCfgParams": [
+        "samplename=dy",
+        "year=2018",
+        "outputFile=DYJetsToLL_M_50_Autumn18"
       ]
     }
 },
@@ -47,6 +64,7 @@
     "JobType.maxMemoryMB": 2500,
     "JobType.pyCfgParams": [
       "samplename=w",
+      "year=2018",
       "outputFile=WJetsToLNu_0J_Autumn18"
     ]
   }
@@ -60,6 +78,7 @@
     "JobType.maxMemoryMB": 2500,
     "JobType.pyCfgParams": [
       "samplename=w",
+      "year=2018",
       "outputFile=WJetsToLNu_1J_Autumn18"
     ]
   }
@@ -73,6 +92,7 @@
     "JobType.maxMemoryMB": 2500,
     "JobType.pyCfgParams": [
       "samplename=w",
+      "year=2018",
       "outputFile=WJetsToLNu_2J_Autumn18"
     ]
   }
@@ -86,6 +106,7 @@
     "JobType.maxMemoryMB": 2500,
     "JobType.pyCfgParams": [
       "samplename=tt",
+      "year=2018",
       "outputFile=TTJets_Autumn18"
     ]
   }
@@ -99,6 +120,7 @@
     "JobType.maxMemoryMB": 2500,
     "JobType.pyCfgParams": [
       "samplename=ww",
+      "year=2018",
       "outputFile=WW_Autumn18"
     ]
   }
@@ -112,6 +134,7 @@
     "JobType.maxMemoryMB": 2500,
     "JobType.pyCfgParams": [
       "samplename=wz",
+      "year=2018",
       "outputFile=WZ_Autumn18"
     ]
   }
@@ -125,6 +148,7 @@
     "JobType.maxMemoryMB": 2500,
     "JobType.pyCfgParams": [
       "samplename=zz",
+      "year=2018",
       "outputFile=ZZ_Autumn18"
     ]
   }

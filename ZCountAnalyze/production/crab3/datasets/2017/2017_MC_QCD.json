@@ -8,6 +8,7 @@
     "JobType.maxMemoryMB": 2500,
     "JobType.pyCfgParams": [
       "samplename=qcd",
+      "year=2017",
       "outputFile=QCD_Pt_15to20_MuEnrichedPt5_Fall17"
     ]
   }
@@ -21,6 +22,7 @@
     "JobType.maxMemoryMB": 2500,
     "JobType.pyCfgParams": [
       "samplename=qcd",
+      "year=2017",
       "outputFile=QCD_Pt_20to30_MuEnrichedPt5_Fall17"
     ]
   }
@@ -34,6 +36,7 @@
     "JobType.maxMemoryMB": 2500,
     "JobType.pyCfgParams": [
       "samplename=qcd",
+      "year=2017",
       "outputFile=QCD_Pt_30to50_MuEnrichedPt5_Fall17"
     ]
   }
@@ -47,6 +50,7 @@
   "JobType.maxMemoryMB": 2500,
   "JobType.pyCfgParams": [
     "samplename=qcd",
+    "year=2017",
     "outputFile=QCD_Pt_50to80_MuEnrichedPt5_Fall17"
   ]
 }
@@ -60,6 +64,7 @@
     "JobType.maxMemoryMB": 2500,
     "JobType.pyCfgParams": [
       "samplename=qcd",
+      "year=2017",
       "outputFile=QCD_Pt_80to120_MuEnrichedPt5_Fall17"
     ]
   }
@@ -73,6 +78,7 @@
     "JobType.maxMemoryMB": 2500,
     "JobType.pyCfgParams": [
       "samplename=qcd",
+      "year=2017",
       "outputFile=QCD_Pt_120to170_MuEnrichedPt5_Fall17"
     ]
   }
@@ -86,6 +92,7 @@
     "JobType.maxMemoryMB": 2500,
     "JobType.pyCfgParams": [
       "samplename=qcd",
+      "year=2017",
       "outputFile=QCD_Pt_170to300_MuEnrichedPt5_Fall17"
     ]
   }
@@ -99,6 +106,7 @@
     "JobType.maxMemoryMB": 2500,
     "JobType.pyCfgParams": [
       "samplename=qcd",
+      "year=2017",
       "outputFile=QCD_Pt_300to470_MuEnrichedPt5_Fall17"
     ]
   }
@@ -112,6 +120,7 @@
     "JobType.maxMemoryMB": 2500,
     "JobType.pyCfgParams": [
       "samplename=qcd",
+      "year=2017",
       "outputFile=QCD_Pt_470to600_MuEnrichedPt5_Fall17"
     ]
   }
@@ -125,6 +134,7 @@
     "JobType.maxMemoryMB": 2500,
     "JobType.pyCfgParams": [
       "samplename=qcd",
+      "year=2017",
       "outputFile=QCD_Pt_600to800_MuEnrichedPt5_Fall17"
     ]
   }
@@ -138,6 +148,7 @@
     "JobType.maxMemoryMB": 2500,
     "JobType.pyCfgParams": [
       "samplename=qcd",
+      "year=2017",
       "outputFile=QCD_Pt_800to1000_MuEnrichedPt5_Fall17"
     ]
   }
@@ -151,6 +162,7 @@
     "JobType.maxMemoryMB": 2500,
     "JobType.pyCfgParams": [
       "samplename=qcd",
+      "year=2017",
       "outputFile=QCD_Pt_1000toInf_MuEnrichedPt5_Fall17"
     ]
   }
