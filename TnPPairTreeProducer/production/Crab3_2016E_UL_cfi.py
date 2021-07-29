@@ -1,7 +1,7 @@
 from CRABClient.UserUtilities import config
 config = config()
 
-config.General.requestName = 'TnPPairTrees_UL_2016E_V11'
+config.General.requestName = 'TnPPairTrees_UL_2016E_V13'
 config.General.workArea = 'crab_projects'
 config.General.transferOutputs = True
 config.General.transferLogs = False
@@ -16,9 +16,10 @@ config.Data.inputDataset = '/SingleMuon/Run2016E-21Feb2020_UL2016_HIPM-v1/AOD'
 config.Data.inputDBS = 'global'
 config.Data.splitting = 'LumiBased'
 config.Data.unitsPerJob = 100
-config.Data.runRange = '276831-277420'
+# config.Data.runRange = '276831-277420'
+config.Data.lumiMask = '/nfs/dust/cms/user/dwalter/ZCounting/CMSSW_10_6_26/src/ZCounting/TnPPairTreeProducer/production/res/Cert_271036-284044_13TeV_Legacy2016_Collisions16_JSON_MuonPhys.txt'
 config.Data.publication = False
-config.Data.outputDatasetTag = 'TnPPairTrees_V11_UL2016E'
+config.Data.outputDatasetTag = 'TnPPairTrees_V13_UL2016E'
 
 config.Site.storageSite = 'T2_DE_DESY'
 #config.Site.blacklist = ['T3_US_Baylor','T2_US_Vanderbilt','T2_US_UCSD','T2_US_Florida' ]
