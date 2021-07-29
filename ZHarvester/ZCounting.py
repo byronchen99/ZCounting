@@ -10,7 +10,7 @@ from uncertainties import ufloat
 import threading, time
 
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
-from ZUtils.python.utils import to_RootTime, getMCCorrection, unorm
+from ZUtils.python.utils import to_RootTime, getMCCorrection, unorm, pquad
 
 # disable panda warnings when assigning a new column in the dataframe
 pd.options.mode.chained_assignment = None
@@ -20,113 +20,38 @@ ROOT.gROOT.SetBatch(True)
 ### Helper functions ###
 # ---------------------->>>
 
+def get_correlationfactors(data):
 
-# compute Z yield by counting
-def count_bkg(histPos, histNeg):
-    mm = unorm(histNeg.Integral())
-    pp = unorm(histPos.Integral())
+    with open("res/correlationfactors.json") as file:
+        res = json.load(file)
 
-    # background are transfered via this formula to opposite sign region
-    return 2 * (mm * pp)**0.5
+    retvals = []
+    for region in ("BB","BE","EE"):
+        factor = pquad(data['avgpu'], *res[era][region]["nominal"])
+        factor = sum(factor * data['recorded(/pb)'].values) / sum(data['recorded(/pb)'].values)
 
-def count_signal(histOS, histPos, histNeg):
-    os = unorm(histOS.Integral())
+        retvals.append(factor)
 
-    # transfer same sign events to opposite sign
-    return os - count_bkg(histPos, histNeg)
+    return retvals
 
-# old implementation
-# def count_signal(hist):
-#     os = unorm(hist.Integral())
-#
-#     # transfer same sign events to opposite sign
-#     return os - count_bkg(hist)
-#
-# def count_efficiency(hPass, hFail):
-#     osPass = unorm(hPass.Integral(2,2))
-#     ssPass = count_bkg(hPass)
-#     osFail = unorm(hFail.Integral(2,2))
-#     ssFail = count_bkg(hFail)
 
-def count_purity(histOS, histPos, histNeg):
-    os = unorm(histOS.Integral())       # opposite sign events -> signal + backrgound
-    ss = count_bkg(histPos, histNeg)    # same sign events -> background
-    if os.n > 0. and ss.n > 0.:
-        return (os - ss) / os
-    else:
-        return ufloat(1,0, 0.0)
 # <<<------------------------
-
-
 def measurement(m,
-    h1RecoBB, h1RecoBE, h1RecoEE,
-    h1RecoBB_neg, h1RecoBE_neg, h1RecoEE_neg,
-    h1RecoBB_pos, h1RecoBE_pos, h1RecoEE_pos,
-    h1HLTBPass, h1HLTBFail, h1HLTEPass, h1HLTEFail,
+    h2HLTBB_, h2HLTBE_, h2HLTEE_,
+    h1HLTBB_, h1HLTBE_, h1HLTEE_,
+    cBB_, cBE_, cEE_,
     h1SITBPass, h1SITBFail, h1SITEPass, h1SITEFail,
     h1TrkBPass, h1TrkBFail, h1TrkEPass, h1TrkEFail,
     h1StaBPass, h1StaBFail, h1StaEPass, h1StaEFail,
     sigmod_yield=1, bkgmod_yield=6,
-    sigtempl_yield="", bkghist_yield=0,
-    sigmod_hlt=[1,1,1,1], bkgmod_hlt=[6,6,6,6],
-    sigtempl_hlt="", bkgshape_hlt="",
+    sigtempl_yield="", bkgtempl_yield="",
     sigmod_sel=[1,1,1,1], bkgmod_sel=[6,6,6,6],
     sigtempl_sel="", bkgshape_sel="",
     sigmod_trk=[1,1,1,1], bkgmod_trk=[6,6,6,6],
     sigtempl_trk="", bkgshape_trk="",
     sigmod_sta=[1,1,1,1], bkgmod_sta=[6,6,6,6],
     sigtempl_sta="", bkgshape_sta="",
-    ):
-
-    # # compute Z yield from fits
-    # # --->>>
-    # ZyieldresBB_m = ROOT.getZyield(h1RecoBB, m, sigmod_yield, bkgmod_yield,
-    #     "BB", sigtempl_yield, bkghist_yield)
-    #
-    # ZyieldresBE_m = ROOT.getZyield(h1RecoBE, m, sigmod_yield, bkgmod_yield,
-    #     "BE", sigtempl_yield, bkghist_yield)
-    #
-    # ZyieldresEE_m = ROOT.getZyield(h1RecoEE, m, sigmod_yield, bkgmod_yield,
-    #     "EE", sigtempl_yield, bkghist_yield)
-    #
-    # # check if there is was enough statistics
-    # if np.isnan(ZyieldresBB_m[0]) or np.isnan(ZyieldresBE_m[0]) or np.isnan(ZyieldresEE_m[0]) or ZyieldresBB_m[0] * ZyieldresBE_m[0] * ZyieldresEE_m[0] == 0:
-    #     return None
-    #
-    # ZyieldBB_m = ufloat(ZyieldresBB_m[0], (ZyieldresBB_m[1]+ZyieldresBB_m[2])/2.)
-    # ZyieldBE_m = ufloat(ZyieldresBE_m[0], (ZyieldresBE_m[1]+ZyieldresBE_m[2])/2.)
-    # ZyieldEE_m = ufloat(ZyieldresEE_m[0], (ZyieldresEE_m[1]+ZyieldresEE_m[2])/2.)
-    #
-    # ZpurityBB_m = ufloat(ZyieldresBB_m[4], (ZyieldresBB_m[5]+ZyieldresBB_m[6])/2.)
-    # ZpurityBE_m = ufloat(ZyieldresBE_m[4], (ZyieldresBE_m[5]+ZyieldresBE_m[6])/2.)
-    # ZpurityEE_m = ufloat(ZyieldresEE_m[4], (ZyieldresEE_m[5]+ZyieldresEE_m[6])/2.)
-    # # <<<---
-
-    # compute Z yield from counting events and subtract same sign events
-    # --->>>
-    ZyieldBB_m = count_signal(h1RecoBB, h1RecoBB_pos, h1RecoBB_neg)
-    ZyieldBE_m = count_signal(h1RecoBE, h1RecoBE_pos, h1RecoBE_neg)
-    ZyieldEE_m = count_signal(h1RecoEE, h1RecoEE_pos, h1RecoEE_neg)
-
-    ZpurityBB_m = count_purity(h1RecoBB, h1RecoBB_pos, h1RecoBB_neg)
-    ZpurityBE_m = count_purity(h1RecoBE, h1RecoBE_pos, h1RecoBE_neg)
-    ZpurityEE_m = count_purity(h1RecoEE, h1RecoEE_pos, h1RecoEE_neg)
-    # <<<---
-
-    ### compute muon efficiencies
-    HLTeffresB_m = ROOT.calculateDataEfficiency(h1HLTBPass, h1HLTBFail,
-                                                m, "HLT", 0, sigmod_hlt[0], bkgmod_hlt[0], sigmod_hlt[1], bkgmod_hlt[1],
-                                                0, sigtempl_hlt, bkgshape_hlt)
-    HLTeffresE_m = ROOT.calculateDataEfficiency(h1HLTEPass, h1HLTEFail,
-                                                m, "HLT", 1, sigmod_hlt[2], bkgmod_hlt[2], sigmod_hlt[3], bkgmod_hlt[3],
-                                                0, sigtempl_hlt, bkgshape_hlt)
-
-    SeleffresB_m = ROOT.calculateDataEfficiency(h1SITBPass, h1SITBFail,
-                                                m, "Sel", 0, sigmod_sel[0], bkgmod_sel[0], sigmod_sel[1], bkgmod_sel[1],
-                                                0, sigtempl_sel, bkgshape_sel)
-    SeleffresE_m = ROOT.calculateDataEfficiency(h1SITEPass, h1SITEFail,
-                                                m, "Sel", 1, sigmod_sel[2], bkgmod_sel[2], sigmod_sel[3], bkgmod_sel[3],
-                                                0, sigtempl_sel, bkgshape_sel)
+):
 
     TrkeffresB_m = ROOT.calculateDataEfficiency(h1TrkBPass, h1TrkBFail,
                                                 m, "Trk", 0, sigmod_trk[0], bkgmod_trk[0], sigmod_trk[1], bkgmod_trk[1],
@@ -142,47 +67,32 @@ def measurement(m,
                                                 m, "Sta", 1, sigmod_sta[2], bkgmod_sta[2], sigmod_sta[3], bkgmod_sta[3],
                                                 0, sigtempl_sta, bkgshape_sta)
 
+    SeleffresB_m = ROOT.calculateDataEfficiency(h1SITBPass, h1SITBFail,
+                                                m, "Sel", 0, sigmod_sel[0], bkgmod_sel[0], sigmod_sel[1], bkgmod_sel[1],
+                                                0, sigtempl_sel, bkgshape_sel)
+    SeleffresE_m = ROOT.calculateDataEfficiency(h1SITEPass, h1SITEFail,
+                                                m, "Sel", 1, sigmod_sel[2], bkgmod_sel[2], sigmod_sel[3], bkgmod_sel[3],
+                                                0, sigtempl_sel, bkgshape_sel)
 
-    HLTeffB_m = ufloat(HLTeffresB_m[0], (HLTeffresB_m[1]+HLTeffresB_m[2])/2.)
-    HLTeffE_m = ufloat(HLTeffresE_m[0], (HLTeffresE_m[1]+HLTeffresE_m[2])/2.)
-    SeleffB_m = ufloat(SeleffresB_m[0], (SeleffresB_m[1]+SeleffresB_m[2])/2.)
-    SeleffE_m = ufloat(SeleffresE_m[0], (SeleffresE_m[1]+SeleffresE_m[2])/2.)
     TrkeffB_m = ufloat(TrkeffresB_m[0], (TrkeffresB_m[1]+TrkeffresB_m[2])/2.)
     TrkeffE_m = ufloat(TrkeffresE_m[0], (TrkeffresE_m[1]+TrkeffresE_m[2])/2.)
     StaeffB_m = ufloat(StaeffresB_m[0], (StaeffresB_m[1]+StaeffresB_m[2])/2.)
     StaeffE_m = ufloat(StaeffresE_m[0], (StaeffresE_m[1]+StaeffresE_m[2])/2.)
+    SeleffB_m = ufloat(SeleffresB_m[0], (SeleffresB_m[1]+SeleffresB_m[2])/2.)
+    SeleffE_m = ufloat(SeleffresE_m[0], (SeleffresE_m[1]+SeleffresE_m[2])/2.)
 
     # ZtoMuMu efficiency purely from data
-    ZBBeff = (StaeffB_m * StaeffB_m * TrkeffB_m * TrkeffB_m * SeleffB_m * SeleffB_m * (1 - (1 - HLTeffB_m) * (1 - HLTeffB_m)))
-    ZBEeff = (StaeffB_m * StaeffE_m * TrkeffB_m * TrkeffE_m * SeleffB_m * SeleffE_m * (1 - (1 - HLTeffB_m) * (1 - HLTeffE_m)))
-    ZEEeff = (StaeffE_m * StaeffE_m * TrkeffE_m * TrkeffE_m * SeleffE_m * SeleffE_m * (1 - (1 - HLTeffE_m) * (1 - HLTeffE_m)))
-
-    ZBB_m = ZyieldBB_m/ZBBeff
-    ZBE_m = ZyieldBE_m/ZBEeff
-    ZEE_m = ZyieldEE_m/ZEEeff
+    ZBBeff = StaeffB_m * StaeffB_m * TrkeffB_m * TrkeffB_m * SeleffB_m * SeleffB_m
+    ZBEeff = StaeffB_m * StaeffE_m * TrkeffB_m * TrkeffE_m * SeleffB_m * SeleffE_m
+    ZEEeff = StaeffE_m * StaeffE_m * TrkeffE_m * TrkeffE_m * SeleffE_m * SeleffE_m
 
     res = {
-        "zYieldBB": ZyieldBB_m,
-        # "zYieldBB_chi2": ZyieldresBB_m[3],
-        "zYieldBB_purity": ZpurityBB_m,
-        "zYieldBE": ZyieldBE_m,
-        # "zYieldBE_chi2": ZyieldresBE_m[3],
-        "zYieldBE_purity": ZpurityBE_m,
-        "zYieldEE": ZyieldEE_m,
-        # "zYieldEE_chi2": ZyieldresEE_m[3],
-        "zYieldEE_purity": ZpurityEE_m,
-        "HLTeffB": HLTeffB_m,
-        "HLTeffE": HLTeffE_m,
         "SeleffB": SeleffB_m,
         "SeleffE": SeleffE_m,
         "TrkeffB": TrkeffB_m,
         "TrkeffE": TrkeffE_m,
         "StaeffB": StaeffB_m,
         "StaeffE": StaeffE_m,
-        "HLTeffB_chi2pass": HLTeffresB_m[3],
-        "HLTeffB_chi2fail": HLTeffresB_m[4],
-        "HLTeffE_chi2pass": HLTeffresE_m[3],
-        "HLTeffE_chi2fail": HLTeffresE_m[4],
         "SeleffB_chi2pass": SeleffresB_m[3],
         "SeleffB_chi2fail": SeleffresB_m[4],
         "SeleffE_chi2pass": SeleffresE_m[3],
@@ -198,33 +108,96 @@ def measurement(m,
         "ZBBeff": ZBBeff,
         "ZBEeff": ZBEeff,
         "ZEEeff": ZEEeff,
-        # "ZBBeff_stat": ZBBeff.s,
-        # "ZBEeff_stat": ZBEeff.s,
-        # "ZEEeff_stat": ZEEeff.s,
-        "zBB": ZBB_m,
-        "zBE": ZBB_m,
-        "zEE": ZBB_m,
-        # "zBB_stat": ZBB_m.s,
-        # "zBE_stat": ZBB_m.s,
-        # "zEE_stat": ZBB_m.s,
     }
+
+    if True:
+        # combined fit of BB, BE and EE in 1HLT and 2HLT category
+        yields_m = ROOT.calculateHLTEfficiencyAndYield(
+            h2HLTBB_, h1HLTBB_,
+            h2HLTEE_, h1HLTEE_,
+            h2HLTBE_, h1HLTBE_,
+            m, sigmod_yield, bkgmod_yield, sigmod_yield, bkgmod_yield,
+            cBB_, cBE_, cEE_,
+            0, sigtempl_yield, bkgtempl_yield)
+
+        res["HLTeffB"] = ufloat(yields_m[0], (yields_m[1]+yields_m[2])/2.)
+        res["HLTeffE"] = ufloat(yields_m[3], (yields_m[4]+yields_m[5])/2.)
+
+        res["zYieldBB"] = ufloat(yields_m[6], (yields_m[7] + yields_m[8])/2.)
+        res["zYieldBE"] = ufloat(yields_m[9], (yields_m[10] + yields_m[11])/2.)
+        res["zYieldEE"] = ufloat(yields_m[12], (yields_m[13] + yields_m[14])/2.)
+
+        res["zYieldBB_chi2pass"] = yields_m[15]
+        res["zYieldBB_chi2fail"] = yields_m[16]
+        res["zYieldBE_chi2pass"] = yields_m[17]
+        res["zYieldBE_chi2fail"] = yields_m[18]
+        res["zYieldEE_chi2pass"] = yields_m[19]
+        res["zYieldEE_chi2fail"] = yields_m[20]
+
+    else:
+        # Fit each region independently
+        Hlt1BB_m = ROOT.getZyield(h1HLTBB_, m, sigmod_yield, bkgmod_yield, "BB", 0, sigtempl_yield)
+        Hlt1BE_m = ROOT.getZyield(h1HLTBE_, m, sigmod_yield, bkgmod_yield, "BE", 0, sigtempl_yield)
+        Hlt1EE_m = ROOT.getZyield(h1HLTEE_, m, sigmod_yield, bkgmod_yield, "EE", 0, sigtempl_yield)
+        Hlt2BB_m = ROOT.getZyield(h2HLTBB_, m, sigmod_yield, bkgmod_yield, "BB", 1, sigtempl_yield)
+        Hlt2BE_m = ROOT.getZyield(h2HLTBE_, m, sigmod_yield, bkgmod_yield, "BE", 1, sigtempl_yield)
+        Hlt2EE_m = ROOT.getZyield(h2HLTEE_, m, sigmod_yield, bkgmod_yield, "EE", 1, sigtempl_yield)
+
+        n1BB = ufloat(Hlt1BB_m[0], (Hlt1BB_m[1] + Hlt1BB_m[2])/2.)
+        n1BE = ufloat(Hlt1BE_m[0], (Hlt1BE_m[1] + Hlt1BE_m[2])/2.)
+        n1EE = ufloat(Hlt1EE_m[0], (Hlt1EE_m[1] + Hlt1EE_m[2])/2.)
+        n2BB = ufloat(Hlt2BB_m[0], (Hlt2BB_m[1] + Hlt2BB_m[2])/2.)
+        n2BE = ufloat(Hlt2BE_m[0], (Hlt2BE_m[1] + Hlt2BE_m[2])/2.)
+        n2EE = ufloat(Hlt2EE_m[0], (Hlt2EE_m[1] + Hlt2EE_m[2])/2.)
+
+        effHLT = lambda n1, n2, c: 1./c*(1./(1.+n1/n2))
+        yieldZ = lambda n1, n2, c: n2*c*(1.+n1/(2.*n2))**2
+
+        res["n1BB"] = n1BB
+        res["n2BB"] = n2BB
+        res["n1BE"] = n1BE
+        res["n2BE"] = n2BE
+        res["n1EE"] = n1EE
+        res["n2EE"] = n2EE
+        res["cBB"] = cBB_
+        res["cBE"] = cBE_
+        res["cEE"] = cEE_
+
+        res["HLTeffB"] = effHLT(n1BB, n2BB, cBB_)
+        res["HLTeffE"] = effHLT(n1EE, n2EE, cEE_)
+
+        res["zYieldBB"] = yieldZ(n1BB, n2BB, cBB_)
+        res["zYieldBE"] = yieldZ(n1BE, n2BE, cBE_)
+        res["zYieldEE"] = yieldZ(n1EE, n2EE, cEE_)
+
+        res["zYieldBB_chi2pass"] = Hlt2BB_m[3]
+        res["zYieldBB_chi2fail"] = Hlt1BB_m[3]
+        res["zYieldBE_chi2pass"] = Hlt2BE_m[3]
+        res["zYieldBE_chi2fail"] = Hlt1BE_m[3]
+        res["zYieldEE_chi2pass"] = Hlt2EE_m[3]
+        res["zYieldEE_chi2fail"] = Hlt1EE_m[3]
+
+    res["zDelBB"] = res["zYieldBB"]/res["ZBBeff"]
+    res["zDelBE"] = res["zYieldBE"]/res["ZBEeff"]
+    res["zDelEE"] = res["zYieldEE"]/res["ZEEeff"]
 
     return res
 
 def ls_corrections(data_m, result_m, m, h2ZyieldBB, h2ZyieldBE, h2ZyieldEE):
     # --- per ls dataframe, one per measurement
-    for eta, hist in (("BB",h2ZyieldBB), ("BE",h2ZyieldBE), ("EE",h2ZyieldEE)):
+    # for eta, hist in (("BB",h2ZyieldBB), ("BE",h2ZyieldBE), ("EE",h2ZyieldEE)):
+        # if corr:
+        #     # apply corrections
+        #     data_m["eff{0}_mc".format(eta)] = result_m["Z{0}eff".format(eta)]#FIXME / corr['eff'+eta](data_m['avgpu'])
+        # else:
+        #     data_m["eff{0}_mc".format(eta)] = result_m["Z{0}eff".format(eta)]
+        #
+        # data_m['yield{0}'.format(eta)] = data_m['ls'].apply(lambda ls: hist.ProjectionY("", ls, ls, "e").Integral())
+        #
+        # data_m['zYield{0}'.format(eta)]  = data_m['yield{0}'.format(eta)] * result_m["zYield{0}_purity".format(eta)]
+        # data_m['zDel{0}'.format(eta)]    = data_m['zYield{0}'.format(eta)] / result_m["Z{0}eff".format(eta)]
+        # data_m['zDel{0}_mc'.format(eta)] = data_m['zYield{0}'.format(eta)] / data_m['eff{0}_mc'.format(eta)]
 
-        if corr:
-            data_m["eff{0}_mc".format(eta)] = result_m["Z{0}eff".format(eta)] / corr['eff'+eta](data_m['avgpu'])
-        else:
-            data_m["eff{0}_mc".format(eta)] = result_m["Z{0}eff".format(eta)]
-
-        data_m['yield{0}'.format(eta)] = data_m['ls'].apply(lambda ls: hist.ProjectionY("", ls, ls, "e").Integral())
-
-        data_m['zYield{0}'.format(eta)]  = data_m['yield{0}'.format(eta)] * result_m["zYield{0}_purity".format(eta)]
-        data_m['zDel{0}'.format(eta)]    = data_m['zYield{0}'.format(eta)] / result_m["Z{0}eff".format(eta)]
-        data_m['zDel{0}_mc'.format(eta)] = data_m['zYield{0}'.format(eta)] / data_m['eff{0}_mc'.format(eta)]
 
     data_m['time'] = data_m['time'].apply(lambda x: to_RootTime(x,currentYear))
     data_m['run'] = np.ones(len(data_m),dtype='int') * run
@@ -242,34 +215,35 @@ def ls_corrections(data_m, result_m, m, h2ZyieldBB, h2ZyieldBE, h2ZyieldEE):
     res = {
         "fill": fill,
         "run": run,
+        "measurement": m,
         "tdate_begin": min(data_m['time']),
         "tdate_end": max(data_m['time']),
-        "yieldBB": data_m['yieldBB'].sum(),
-        "yieldBE": data_m['yieldBE'].sum(),
-        "yieldEE": data_m['yieldEE'].sum(),
-        "zYieldBB": data_m['zYieldBB'].sum(),
-        "zYieldBE": data_m['zYieldBE'].sum(),
-        "zYieldEE": data_m['zYieldEE'].sum(),
-        "zDelBB": data_m['zDelBB'].sum(),
-        "zDelBE": data_m['zDelBE'].sum(),
-        "zDelEE": data_m['zDelEE'].sum(),
-        "zDelBB_mc": data_m['zDelBB_mc'].sum(),
-        "zDelBE_mc": data_m['zDelBE_mc'].sum(),
-        "zDelEE_mc": data_m['zDelEE_mc'].sum(),
-        "xsecBB": data_m['zDelBB'].sum() / recLumi_m,
-        "xsecBE": data_m['zDelBE'].sum() / recLumi_m,
-        "xsecEE": data_m['zDelEE'].sum() / recLumi_m,
-        "xsecBB_mc": data_m['zDelBB_mc'].sum() / recLumi_m,
-        "xsecBE_mc": data_m['zDelBE_mc'].sum() / recLumi_m,
-        "xsecEE_mc": data_m['zDelEE_mc'].sum() / recLumi_m,
+        # "yieldBB": data_m['yieldBB'].sum(),
+        # "yieldBE": data_m['yieldBE'].sum(),
+        # "yieldEE": data_m['yieldEE'].sum(),
+        # "zYieldBB": data_m['zYieldBB'].sum(),
+        # "zYieldBE": data_m['zYieldBE'].sum(),
+        # "zYieldEE": data_m['zYieldEE'].sum(),
+        # "zDelBB": data_m['zDelBB'].sum(),
+        # "zDelBE": data_m['zDelBE'].sum(),
+        # "zDelEE": data_m['zDelEE'].sum(),
+        # "zDelBB_mc": data_m['zDelBB_mc'].sum(),
+        # "zDelBE_mc": data_m['zDelBE_mc'].sum(),
+        # "zDelEE_mc": data_m['zDelEE_mc'].sum(),
+        # "xsecBB": data_m['zDelBB'].sum() / recLumi_m,
+        # "xsecBE": data_m['zDelBE'].sum() / recLumi_m,
+        # "xsecEE": data_m['zDelEE'].sum() / recLumi_m,
+        # "xsecBB_mc": data_m['zDelBB_mc'].sum() / recLumi_m,
+        # "xsecBE_mc": data_m['zDelBE_mc'].sum() / recLumi_m,
+        # "xsecEE_mc": data_m['zDelEE_mc'].sum() / recLumi_m,
         "lumiDel": delLumi_m,
         "lumiRec": recLumi_m,
         "timewindow": timeWindow_m,
         "deadtime": deadtime_m,
         "pileUp": data_m['avgpu'].mean(),
-        "ZBBeff_mc": data_m['effBB_mc'].values.mean(),
-        "ZBEeff_mc": data_m['effBE_mc'].values.mean(),
-        "ZEEeff_mc": data_m['effEE_mc'].values.mean(),
+        # "ZBBeff_mc": data_m['effBB_mc'].values.mean(),
+        # "ZBEeff_mc": data_m['effBE_mc'].values.mean(),
+        # "ZEEeff_mc": data_m['effEE_mc'].values.mean(),
     }
     return res
 
@@ -283,7 +257,9 @@ def load_histo(name_, fileName_, lumisections_=[0,], prefix_="", run_=0, suffix_
         h_X.Add(h_X_ls.ProjectionY("h_tmp_{0}_{1}_{2}_{3}".format(name_, run_, ls, suffix_), ls, ls, "e"))
 
     # create new histogram in correct bin range
-    hNew = ROOT.TH1D("h_mass_{0}_{1}_{2}_{3}".format(name_, run_, ls, suffix_),"",MassBin_, MassMin_, MassMax_)
+    hNew = ROOT.TH1D("h_mass_{0}_{1}_{2}_{3}".format(
+        name_, run_, lumisections_[0], suffix_),
+        "",MassBin_, MassMin_, MassMax_)
 
     for ibin in range(h_X.GetNbinsX()):
         binCenter = h_X.GetBinCenter(ibin)
@@ -303,6 +279,7 @@ def load_histo(name_, fileName_, lumisections_=[0,], prefix_="", run_=0, suffix_
 
 ## Write big per measurement csv file
 def writeSummaryCSV(outCSVDir):
+
     log.info("===Writing overall CSV file")
     rateFileList = sorted(glob.glob(outCSVDir + '/csvfile??????.csv'))
     df_merged = pd.concat([pd.read_csv(m) for m in rateFileList], ignore_index=True)
@@ -310,11 +287,21 @@ def writeSummaryCSV(outCSVDir):
     with open(outCSVDir + '/Mergedcsvfile_perMeasurement.csv', 'w') as file:
         df_merged.to_csv(file, index=False)
 
-    rateFileList = sorted(glob.glob(outCSVDir + '/csvfile*_*.csv'))
-    df_merged = pd.concat([pd.read_csv(m) for m in rateFileList], ignore_index=True)
-
-    with open(outCSVDir + '/Mergedcsvfile_perLS.csv', 'w') as file:
-        df_merged.to_csv(file, index=False)
+    # log.info("===Writing overall CSV file per LS")
+    # rateFileList = sorted(glob.glob(outCSVDir + '/csvfile*_*.csv'))
+    # # csvList = []
+    # # for m in rateFileList:
+    # #     csv = pd.read_csv(m)
+    # #     measurement = int(m.split("_")[-1][:-4])
+    # #     fill = int(m.split("_")[-2].split("csvfile")[-1])
+    # #     csv["measurement"] = measurement
+    # #     csvList.append(csv)
+    # # df_merged = pd.concat(csvList, ignore_index=True)
+    #
+    # df_merged = pd.concat([pd.read_csv(m) for m in rateFileList], ignore_index=True)
+    #
+    # with open(outCSVDir + '/Mergedcsvfile_perLS.csv', 'w') as file:
+    #     df_merged.to_csv(file, index=False)
 
 ## Get root file with histograms
 def getFileName(directory, run):
@@ -349,13 +336,13 @@ if __name__ == '__main__':
                         default="default")
     parser.add_argument("--byLsCSV", help="ByLs csv input generated by testBril.sh",
                         default="default")
-    parser.add_argument("--sigTemplates", help="Directory to root file for Z mass template",
+    parser.add_argument("--sigTemplates", help="Directory to root file for Z mass template ('None': take analytic function) ",
                         default="default", type=str)
-    parser.add_argument("--bkgTemplates", help="Directory to root file for bkg template",
+    parser.add_argument("--bkgTemplates", help="Directory to root file for bkg template ('None': take analytic function) ",
                         default="None", type=str)
     parser.add_argument('--ptCut', type=float, default=30.,
                         help='specify lower pt cut on tag and probe muons')
-    parser.add_argument('--mass', nargs=2, metavar=('LOW', 'HIGH'), default=(70,250), type=int,
+    parser.add_argument('--mass', nargs=3, metavar=('LOW', 'HIGH', 'NUMBER'), default=(70,250,180), type=int,
                         help='specify mass range for tag and probe muon pairs')
     parser.add_argument('--LumiPerMeasurement', default=20, type=float,
                         help='specify amount of luminosity per measurement in pb-1')
@@ -374,35 +361,40 @@ if __name__ == '__main__':
     # link to resouces
     prefix_dqm="" #"DQMData/Run {0}/ZCounting/Run summary/Histograms/".format(run)
     resPath = cmsswbase + "/src/ZCounting/ZHarvester/res/"
-    if args.beginRun > 272007 and args.beginRun < 278769:      # 2016 pre VFP
+    if args.beginRun >= 272007 and args.beginRun < 278769:      # 2016 pre VFP
         byLsCSV         = resPath+"/FillByLs_RunII.csv"
         mcFile          = resPath+"/mcCorrections/corrections_nPU_2016preVFP.p"
-        sigTemplates    = resPath+"/sigTemplates/DYJetsToLL_M-50_2016preVFP"
+        sigTemplates    = resPath+"/sigTemplates_V14_02/DYJetsToLL_M-50_2016preVFP"
         bkgTemplates    = resPath+"/qcdTemplates/Run2016preVFP.root"
-        eosDir          = "/nfs/dust/cms/user/dwalter/data/Lumi/V11/Histograms_UL_RunII"
+        eosDir          = "/nfs/dust/cms/user/dwalter/data/Lumi/V11_02/Histograms_UL_RunII"
+        era = "2016preVFP"
     elif args.beginRun < 294645:    # 2016 post VFP
         byLsCSV         = resPath+"/FillByLs_RunII.csv"
         mcFile          = resPath+"/mcCorrections/corrections_nPU_2016postVFP.p"
-        sigTemplates    = resPath+"/sigTemplates/DYJetsToLL_M-50_2016postVFP"
+        sigTemplates    = resPath+"/sigTemplates_V14_02/DYJetsToLL_M-50_2016postVFP"
         bkgTemplates    = resPath+"/qcdTemplates/Run2016postVFP.root"
-        eosDir          = "/nfs/dust/cms/user/dwalter/data/Lumi/V11/Histograms_UL_RunII"
+        eosDir          = "/nfs/dust/cms/user/dwalter/data/Lumi/V11_02/Histograms_UL_RunII"
+        era = "2016postVFP"
     elif args.beginRun > 297020 and args.beginRun < 306828:     # 2017
         byLsCSV         = resPath+"/FillByLs_RunII.csv"
         mcFile          = resPath+"/mcCorrections/corrections_nPU_2017.p"
-        sigTemplates    = resPath+"/sigTemplates/DYJetsToLL_M-50_2017"
+        sigTemplates    = resPath+"/sigTemplates_V14_02/DYJetsToLL_M-50_2017"
         bkgTemplates    = resPath+"/qcdTemplates/Run2017.root"
-        eosDir          = "/nfs/dust/cms/user/dwalter/data/Lumi/V11/Histograms_UL_RunII"
+        eosDir          = "/nfs/dust/cms/user/dwalter/data/Lumi/V11_02/Histograms_UL_RunII"
+        era = "2017"
     elif args.beginRun >= 306926 and args.beginRun < 307083:    # 2017 H
-        byLsCSV = resPath+"/FillByLs_2017_lowPU.csv"
-        mcFile          = None
-        sigTemplates    = resPath+"/sigTemplates/DYJetsToLL_M-50_2017H"
-        eosDir          = "/nfs/dust/cms/user/dwalter/data/Lumi/V11/Histograms_UL2017H_Pt30"
+        byLsCSV         = resPath+"/FillByLs_2017_lowPU.csv"
+        mcFile          = resPath+"/mcCorrections_SingleMu25/corrections_nPU_2017.p"
+        sigTemplates    = resPath+"/sigTemplates_V14_02/DYJetsToLL_M-50_2017H"
+        eosDir          = "/nfs/dust/cms/user/dwalter/data/Lumi/V11_02/Histograms_UL2017H_Pt30"
+        era = "2017H"
     elif args.beginRun >= 315252:                               # 2018
         byLsCSV         = resPath+"/FillByLs_RunII.csv"
         mcFile          = resPath+"/mcCorrections/corrections_nPU_2018.p"
-        sigTemplates    = resPath+"/sigTemplates/DYJetsToLL_M-50_2018"
+        sigTemplates    = resPath+"/sigTemplates_V14_02/DYJetsToLL_M-50_2018"
         bkgTemplates    = resPath+"/qcdTemplates/Run2018.root"
-        eosDir          = "/nfs/dust/cms/user/dwalter/data/Lumi/V11/Histograms_UL_RunII"
+        eosDir          = "/nfs/dust/cms/user/dwalter/data/Lumi/V11_02/Histograms_UL_RunII"
+        era = "2018"
     else:
         byLsCSV         = None
         mcFile          = None
@@ -438,8 +430,8 @@ if __name__ == '__main__':
         _optns = {
             'sigmod_yield':2,
             'sigtempl_yield':sigTemplates+"/template_ZYield.root",
-            'sigmod_hlt':[2,2,2,2],
-            'sigtempl_hlt':sigTemplates+"/template_HLT.root",
+            # 'sigmod_hlt':[2,2,2,2],
+            # 'sigtempl_hlt':sigTemplates+"/template_HLT.root",
             'sigmod_sel':[2,2,2,2],
             'sigtempl_sel':sigTemplates+"/template_Sel.root",
             'sigmod_trk':[2,2,2,2],
@@ -452,8 +444,8 @@ if __name__ == '__main__':
     if bkgTemplates and bkgTemplates != "None":
 
         _optns = {
-            "bkgmod_hlt": [7,7,7,7],
-            "bkgshape_hlt": bkgTemplates,
+            # "bkgmod_hlt": [7,7,7,7],
+            # "bkgshape_hlt": bkgTemplates,
             "bkgmod_sel": [7,7,7,7],
             "bkgshape_sel": bkgTemplates,
             "bkgmod_trk": [7,7,7,7],
@@ -474,12 +466,12 @@ if __name__ == '__main__':
         except OSError:
             log.warning("directory already exists ...")
 
-    if mcFile:
-        print("Use MC corrections from: ")
-        print("file: "+mcFile)
-        corr = getMCCorrection(mcFile)
-    else:
-        corr = None
+    # if mcFile:
+    #     print("Use MC corrections from: ")
+    #     print("file: "+mcFile)
+    #     corr = getMCCorrection(mcFile)
+    # else:
+    #     corr = None
 
     ########### Constant settings ##########
     secPerLS = float(23.3)
@@ -503,9 +495,9 @@ if __name__ == '__main__':
 
     MassMin_ = int(args.mass[0])
     MassMax_ = int(args.mass[1])
-    MassBin_ = int(MassMax_ - MassMin_)
+    MassBin_ = int(args.mass[2])
 
-    ROOT.set_massRange(MassMin_, MassMax_)
+    ROOT.set_massRange(MassMin_, MassMax_, MassBin_)
 
     ROOT.set_ptCut(args.ptCut)
 
@@ -539,22 +531,15 @@ if __name__ == '__main__':
     if args.inclusive:
         #perform one inclusive fit for the full data
         recLumi = 0
-        # for subtraction
-        hYieldBB_neg = ROOT.TH1D("h_mass_yieldBB_Z_Minus","",MassBin_, MassMin_, MassMax_)
-        hYieldBE_neg = ROOT.TH1D("h_mass_yieldBE_Z_Minus","",MassBin_, MassMin_, MassMax_)
-        hYieldEE_neg = ROOT.TH1D("h_mass_yieldEE_Z_Minus","",MassBin_, MassMin_, MassMax_)
-        hYieldBB_pos = ROOT.TH1D("h_mass_yieldBB_Z_Plus","",MassBin_, MassMin_, MassMax_)
-        hYieldBE_pos = ROOT.TH1D("h_mass_yieldBE_Z_Plus","",MassBin_, MassMin_, MassMax_)
-        hYieldEE_pos = ROOT.TH1D("h_mass_yieldEE_Z_Plus","",MassBin_, MassMin_, MassMax_)
 
         # For fitting
-        hYieldBB = ROOT.TH1D("h_mass_yieldBB_Z","",MassBin_, MassMin_, MassMax_)
-        hYieldBE = ROOT.TH1D("h_mass_yieldBE_Z","",MassBin_, MassMin_, MassMax_)
-        hYieldEE = ROOT.TH1D("h_mass_yieldEE_Z","",MassBin_, MassMin_, MassMax_)
-        hHLTpassB = ROOT.TH1D("h_mass_HLT_pass_central","",MassBin_, MassMin_, MassMax_)
-        hHLTfailB = ROOT.TH1D("h_mass_HLT_fail_central","",MassBin_, MassMin_, MassMax_)
-        hHLTpassE = ROOT.TH1D("h_mass_HLT_pass_forward","",MassBin_, MassMin_, MassMax_)
-        hHLTfailE = ROOT.TH1D("h_mass_HLT_fail_forward","",MassBin_, MassMin_, MassMax_)
+        h2HLTBB = ROOT.TH1D("h_mass_2HLTBB_Z","",MassBin_, MassMin_, MassMax_)
+        h2HLTBE = ROOT.TH1D("h_mass_2HLTBE_Z","",MassBin_, MassMin_, MassMax_)
+        h2HLTEE = ROOT.TH1D("h_mass_2HLTEE_Z","",MassBin_, MassMin_, MassMax_)
+        h1HLTBB = ROOT.TH1D("h_mass_1HLTBB_Z","",MassBin_, MassMin_, MassMax_)
+        h1HLTBE = ROOT.TH1D("h_mass_1HLTBE_Z","",MassBin_, MassMin_, MassMax_)
+        h1HLTEE = ROOT.TH1D("h_mass_1HLTEE_Z","",MassBin_, MassMin_, MassMax_)
+
         hSITpassB = ROOT.TH1D("h_mass_SIT_pass_central","",MassBin_, MassMin_, MassMax_)
         hSITfailB = ROOT.TH1D("h_mass_SIT_fail_central","",MassBin_, MassMin_, MassMax_)
         hSITpassE = ROOT.TH1D("h_mass_SIT_pass_forward","",MassBin_, MassMin_, MassMax_)
@@ -583,20 +568,13 @@ if __name__ == '__main__':
             def load(name_):
                 return load_histo(name_, eosFile, LSlist, prefix_dqm, run, "new")
 
-            hYieldBB_neg.Add(load("h_mass_yieldBB_Z_Minus"))
-            hYieldBE_neg.Add(load("h_mass_yieldBE_Z_Minus"))
-            hYieldEE_neg.Add(load("h_mass_yieldEE_Z_Minus"))
-            hYieldBB_pos.Add(load("h_mass_yieldBB_Z_Plus"))
-            hYieldBE_pos.Add(load("h_mass_yieldBE_Z_Plus"))
-            hYieldEE_pos.Add(load("h_mass_yieldEE_Z_Plus"))
+            h2HLTBB.Add(load("h_mass_2HLTBB_Z"))
+            h2HLTBE.Add(load("h_mass_2HLTBE_Z"))
+            h2HLTEE.Add(load("h_mass_2HLTEE_Z"))
+            h1HLTBB.Add(load("h_mass_1HLTBB_Z"))
+            h1HLTBE.Add(load("h_mass_1HLTBE_Z"))
+            h1HLTEE.Add(load("h_mass_1HLTEE_Z"))
 
-            hYieldBB.Add(load("h_mass_yieldBB_Z"))
-            hYieldBE.Add(load("h_mass_yieldBE_Z"))
-            hYieldEE.Add(load("h_mass_yieldEE_Z"))
-            hHLTpassB.Add(load("h_mass_HLT_pass_central"))
-            hHLTfailB.Add(load("h_mass_HLT_fail_central"))
-            hHLTpassE.Add(load("h_mass_HLT_pass_forward"))
-            hHLTfailE.Add(load("h_mass_HLT_fail_forward"))
             hSITpassB.Add(load("h_mass_SIT_pass_central"))
             hSITfailB.Add(load("h_mass_SIT_fail_central"))
             hSITpassE.Add(load("h_mass_SIT_pass_forward"))
@@ -616,27 +594,21 @@ if __name__ == '__main__':
         ROOT.set_output(outSubDir)
         ROOT.set_luminosity(recLumi)
 
-        # if args.bkgSubtract:
-        #     result = subtraction(
-        #         hYieldBB, hYieldBE, hYieldEE,
-        #         hHLTpassB,hHLTfailB,hHLTpassE,hHLTfailE,
-        #         hSITpassB,hSITfailB,hSITpassE,hSITfailE,
-        #         hTrkpassB,hTrkfailB,hTrkpassE,hTrkfailE,
-        #         hStapassB,hStafailB,hStapassE,hStafailE
-        #         )
-        # else:
+        df = data_run.loc[data_run['ls'].isin(LSlist)]
+        # get correlation factor for second muon
+        cBB, cBE, cEE = get_correlationfactors(df)
+
         result = measurement(0,
-            hYieldBB, hYieldBE, hYieldEE,
-            hYieldBB_neg, hYieldBE_neg, hYieldEE_neg,
-            hYieldBB_pos, hYieldBE_pos, hYieldEE_pos,
-            hHLTpassB, hHLTfailB, hHLTpassE, hHLTfailE,
+            h2HLTBB, h2HLTBE, h2HLTEE,
+            h1HLTBB, h1HLTBE, h1HLTEE,
+            cBB, cBE, cEE,
             hSITpassB, hSITfailB, hSITpassE, hSITfailE,
             hTrkpassB, hTrkfailB, hTrkpassE, hTrkfailE,
             hStapassB, hStafailB, hStapassE, hStafailE,
             **fit_options
             )
 
-    log.info("===Looping over runs...")
+    log.info("===Looping over runs... {0} to {1}".format(int(args.beginRun), int(args.endRun)))
     for run, data_run in byLS_data.groupby('run'):
         if run < int(args.beginRun) or run >= int(args.endRun):
             continue
@@ -681,6 +653,12 @@ if __name__ == '__main__':
                 if not mergeMeasurements and recLumi >= LumiPerMeasurement:# or len(goodLSlist) >= LSperMeasurement):
                     break
 
+
+            df = data_run.loc[data_run['ls'].isin(goodLSlist)]
+
+            # get correlation factor for second muon
+            cBB, cBE, cEE = get_correlationfactors(df)
+
             ### load histograms
             log.debug("Openning DQMIO.root file: %s", eosFile)
 
@@ -689,20 +667,13 @@ if __name__ == '__main__':
 
             if not args.inclusive:
 
-                hYieldBB_neg = load("h_mass_yieldBB_Z_Minus")
-                hYieldBE_neg = load("h_mass_yieldBE_Z_Minus")
-                hYieldEE_neg = load("h_mass_yieldEE_Z_Minus")
-                hYieldBB_pos = load("h_mass_yieldBB_Z_Plus")
-                hYieldBE_pos = load("h_mass_yieldBE_Z_Plus")
-                hYieldEE_pos = load("h_mass_yieldEE_Z_Plus")
+                h2HLTBB = load("h_mass_2HLTBB_Z")
+                h2HLTBE = load("h_mass_2HLTBE_Z")
+                h2HLTEE = load("h_mass_2HLTEE_Z")
+                h1HLTBB = load("h_mass_1HLTBB_Z")
+                h1HLTBE = load("h_mass_1HLTBE_Z")
+                h1HLTEE = load("h_mass_1HLTEE_Z")
 
-                hYieldBB = load("h_mass_yieldBB_Z")
-                hYieldBE = load("h_mass_yieldBE_Z")
-                hYieldEE = load("h_mass_yieldEE_Z")
-                hHLTpassB = load("h_mass_HLT_pass_central")
-                hHLTfailB = load("h_mass_HLT_fail_central")
-                hHLTpassE = load("h_mass_HLT_pass_forward")
-                hHLTfailE = load("h_mass_HLT_fail_forward")
                 hSITpassB = load("h_mass_SIT_pass_central")
                 hSITfailB = load("h_mass_SIT_fail_central")
                 hSITpassE = load("h_mass_SIT_pass_forward")
@@ -716,26 +687,14 @@ if __name__ == '__main__':
                 hStapassE = load("h_mass_Sta_pass_forward")
                 hStafailE = load("h_mass_Sta_fail_forward")
 
-                # if args.bkgSubtract:
-                #     # Do background subtraction from same sign events
-                #     result = subtraction(
-                #         hYieldBB, hYieldBE, hYieldEE,
-                #         hHLTpassB,hHLTfailB,hHLTpassE,hHLTfailE,
-                #         hSITpassB,hSITfailB,hSITpassE,hSITfailE,
-                #         hTrkpassB,hTrkfailB,hTrkpassE,hTrkfailE,
-                #         hStapassB,hStafailB,hStapassE,hStafailE
-                #         )
-                # else:
-                # Do fits
 
                 ROOT.set_output(outSubDir)
                 ROOT.set_luminosity(recLumi)
 
                 result = measurement(len(results),
-                    hYieldBB, hYieldBE, hYieldEE,
-                    hYieldBB_neg, hYieldBE_neg, hYieldEE_neg,
-                    hYieldBB_pos, hYieldBE_pos, hYieldEE_pos,
-                    hHLTpassB, hHLTfailB, hHLTpassE, hHLTfailE,
+                    h2HLTBB, h2HLTBE, h2HLTEE,
+                    h1HLTBB, h1HLTBE, h1HLTEE,
+                    cBB, cBE, cEE,
                     hSITpassB, hSITfailB, hSITpassE, hSITfailE,
                     hTrkpassB, hTrkfailB, hTrkpassE, hTrkfailE,
                     hStapassB, hStafailB, hStapassE, hStafailE,
@@ -745,15 +704,7 @@ if __name__ == '__main__':
             if result is None:
                 continue
 
-            df = data_run.loc[data_run['ls'].isin(goodLSlist)]
-
-            dqmfile = ROOT.TFile(eosFile)
-
-            hist_ZyieldBB = dqmfile.Get(prefix_dqm+"h_mass_yieldBB_Z")
-            hist_ZyieldBE = dqmfile.Get(prefix_dqm+"h_mass_yieldBE_Z")
-            hist_ZyieldEE = dqmfile.Get(prefix_dqm+"h_mass_yieldEE_Z")
-
-            result.update(ls_corrections(df, result, len(results), hist_ZyieldBB, hist_ZyieldBE, hist_ZyieldEE))
+            result.update(ls_corrections(df, result, len(results), None, None, None))#hist_ZyieldBB, hist_ZyieldBE, hist_ZyieldEE))
 
             results.append(result)
 

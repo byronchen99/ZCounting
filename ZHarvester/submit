@@ -49,7 +49,7 @@ def zmonitoring(
         if len(glob.glob(dirDQM+"/000*/*{0}*.root".format(run))) == 0:
             continue
         runs.append(run)
-        cs_file.write("arguments  = {0} {1} {2} {3} {4} {5} {6} {7} {8} {9} {10} {11}\n".format(
+        cs_file.write("arguments  = {0} {1} {2} {3} {4} {5} {6} {7} {8} {9} {10} {11} {12}\n".format(
             run,
             cmsswbase,
             dirDQM,
@@ -61,6 +61,7 @@ def zmonitoring(
             ptCut,
             mass[0],
             mass[1],
+            mass[2],
             LumiPerMeasurement
     	))
 
@@ -90,6 +91,7 @@ def zmonitoring(
         'bkgTemplates': bkgTemplates,
         'mass_lo': mass[0],
         'mass_hi': mass[1],
+        'mass_bins': mass[2],
         'luminosity': LumiPerMeasurement,
         'ptCut': ptCut,
         'runs': runs,
@@ -149,7 +151,7 @@ def check(projectdir, resubmit=False):
                         os.system("mv {0} {1}/csvFiles/".format(csvFile, faildir))
 
                 zmonitoring(ji['dirDQM'], ji['dirOut'], ji['byLsCSV'], ji['mcCorrections'], ji['sigTemplates'], ji['bkgTemplates'], ji['ptCut'],
-                    (ji['mass_lo'], ji['mass_hi']), ji['luminosity'], False,
+                    (ji['mass_lo'], ji['mass_hi'], ji['mass_bins']), ji['luminosity'], False,
                     runlist=[ji['runs'][i] for i in unfinished_jobs])
 
 
@@ -192,10 +194,12 @@ if __name__ == '__main__':
     )
     parserA.add_argument(
         '--LumiPerMeasurement', default=20, type=float,
-        help='specify amount of luminosity per measurement in pb-1')
+        help='specify amount of luminosity per measurement in pb-1'
+    )
     parser.add_argument(
-        '--mass', nargs=2, metavar=('LOW', 'HIGH'), default=(70,250),
-        help='specify mass range for tag and probe muon pairs')
+        '--mass', nargs=3, metavar=('LOW', 'HIGH', 'NBINS'), default=(70, 250, 180),
+        help='specify mass range for tag and probe muon pairs'
+    )
     parserA.add_argument(
         '--byLsCSV', default="default", type=str,
         help='specify byLsCSV to select specific lumi sections'
