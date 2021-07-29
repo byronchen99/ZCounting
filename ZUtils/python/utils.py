@@ -4,6 +4,48 @@ import numpy as np
 import pickle
 import pdb
 import uncertainties as unc
+from scipy.stats import poisson
+
+# first order polynomial
+def linear(x, a, b):
+    return a * x + b
+
+# two first order polynomial with step
+def linear_step(x, a1, b1, a2, b2, step=35):
+    return (a1 * x + b1) * (x <= step) + (a2 * x + b2) * (x > step)
+
+# second order polynomial
+def quad(x, a, b, c):
+    return a * x**2 + b * x + c
+# exponential
+def exp(x, a, b, c, d):
+    return a + b * 2**( c * x + d)
+
+# functions folded with poisson
+
+def pexp(l, a, b, c, d):
+    p = lambda x: poisson.pmf(x, l)
+    f = lambda x: a + b * 2**( c * x + d)
+
+    return sum([p(i) * f(i) for i in range(200)])
+
+def pquad(l, a, b, c):
+    p = lambda x: poisson.pmf(x, l)
+    f = lambda x: a * x**2 + b * x + c
+
+    return sum([p(i) * f(i) for i in range(200)])
+
+def plinear(l, a, b):
+    p = lambda x: poisson.pmf(x, l)
+    f = lambda x: a * x + b
+
+    return sum([p(i) * f(i) for i in range(200)])
+
+def plinear_step(l, a, b, c, step):
+    p = lambda x: poisson.pmf(x, l)
+    f = lambda x: a * x + b + c * (x-step) * (x > step)
+
+    return sum([p(i) * f(i) for i in range(200)])
 
 def tree_to_df(tree, arrSize=5):
     #if tree has arrays with variable length, split into 'arrSize' new columns and fill empty values with 'NaN'
@@ -34,15 +76,6 @@ def getMCCorrection(fIn):
     # input file has to be a picked dictionary with
     #   eta region, function name and parameters for the function
     #   supported functions are linear and linear_step
-
-    # first order polynomial
-    def linear(a, b):
-        return lambda x: a * x + b
-
-    # two first order polynomial with step
-    def linear_step(a1, b1, a2, b2, step=35):
-        return lambda x: (a1 * x + b1) * (x <= step) + (a2 * x + b2) * (x > step)
-
 
     functions = pickle.load(open(fIn,"r"))
     corrections = {}

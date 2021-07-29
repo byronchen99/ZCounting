@@ -8,6 +8,7 @@
 <use name="DataFormats/ParticleFlowCandidate"/>
 <use name="DataFormats/BTauReco"/>
 <use name="DataFormats/VertexReco"/>
+<use name="DataFormats/MuonReco"/>
 <library file="*.cc" name="ZUtilsPlugins">
   <use name="ZCounting/ZUtils"/>
   <flags EDM_PLUGIN="1"/>
