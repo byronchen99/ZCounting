@@ -220,23 +220,20 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
                     isSel_ = true;
             }
             else if (itMu2.isGlobalMuon()
-                || (itMu2.isStandAloneMuon()
-                    && (itMu2.innerTrack().isNonnull()
-                        && itMu2.innerTrack()->hitPattern().trackerLayersWithMeasurement() >= 6
-                        && itMu2.innerTrack()->hitPattern().numberOfValidPixelHits() >= 1)
-                )
-            ){
+            ){      // has valid global track
                 isGlo_ = true;
             }
-            else if (itMu2.isStandAloneMuon()){
+
+            if (itMu2.isStandAloneMuon()
+            ){      // has valid outer track
                 isSta_ = true;
             }
-            else if (itMu2.innerTrack()->hitPattern().trackerLayersWithMeasurement() >= 6
-                      && itMu2.innerTrack()->hitPattern().numberOfValidPixelHits() >= 1){
+            if (itMu2.innerTrack().isNonnull()
+            ){      // has valid inner track
+                nTrackerLayers2_ = itMu2.innerTrack()->hitPattern().trackerLayersWithMeasurement();
+                nValidPixelHits2_ = itMu2.innerTrack()->hitPattern().numberOfValidPixelHits();
                 isTrk_ = true;
             }
-            else
-                continue;
 
             pfIso2_ = getPFIso(itMu2);
             tkIso2_ = getTkIso(itMu2);
@@ -268,6 +265,7 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
             phi2_ = itTrk.phi();
             q2_ = itTrk.charge();
             // is2IsoMu27_ = triggers->passObj("HLT_IsoMu27_v*", eta2_, phi2_);
+            delR_ = vTag.DeltaR(vProbe);
 
             // Probe selection:  kinematic cuts and opposite charge requirement
             if (pt2_ < PtCutL2_)
@@ -283,11 +281,11 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
             if ((dilepMass_ < MassMin_) || (dilepMass_ > MassMax_))
                 continue;
 
-            if (itTrk.hitPattern().trackerLayersWithMeasurement() >= 6 && itTrk.hitPattern().numberOfValidPixelHits() >= 1) {
-                delR_ = vTag.DeltaR(vProbe);
-                isTrk_ = true;
-                tree_->Fill();
-            }
+            nTrackerLayers2_ = itTrk.hitPattern().trackerLayersWithMeasurement();
+            nValidPixelHits2_ = itTrk.hitPattern().numberOfValidPixelHits();
+            isTrk_ = true;
+
+            tree_->Fill();
 
         }    //End of probe loop over tracks
 
@@ -351,6 +349,8 @@ TnPPairTreeProducer::beginJob()
     tree_->Branch("tkIso2", &tkIso2_,"tkIso2_/f");
     tree_->Branch("dxy2", &dxy2_,"dxy2_/f");
     tree_->Branch("dz2", &dz2_,"dz2_/f");
+    tree_->Branch("nTrackerLayers2", &nTrackerLayers2_,"nTrackerLayers2_/f");
+    tree_->Branch("nValidPixelHits2", &nValidPixelHits2_,"nValidPixelHits2_/f");
     //tree_->Branch("is2IsoMu27", &is2IsoMu27_,"is2IsoMu27_/b");
 
     tree_->Branch("is2HLT", &is2HLT_,"is2HLT_/b");
@@ -418,6 +418,8 @@ void TnPPairTreeProducer::clearProbeVariables(){
     tkIso2_ = 0.;
     dxy2_ = 0.;
     dz2_ = 0.;
+    nTrackerLayers2_ = 0.;
+    nValidPixelHits2_ = 0.;
     //is2IsoMu27_ = false;
 
     is2HLT_ = false;
@@ -448,14 +450,14 @@ bool TnPPairTreeProducer::isMuonTriggerObj(const double eta, const double phi) {
 //--------------------------------------------------------------------------------------------------
 bool TnPPairTreeProducer::isCustomID(const reco::Muon& muon, const reco::Vertex& vtx){
     return muon.isGlobalMuon()
-                && muon.isPFMuon()
-                && muon.globalTrack()->normalizedChi2() < 10.
-                && muon.globalTrack()->hitPattern().numberOfValidMuonHits() > 0
-                && muon.numberOfMatchedStations() > 1
-                && (getDxy(muon, vtx) < DxyCut_ || DxyCut_ <=0.)
-                && (getDz(muon, vtx) < DzCut_ || DzCut_ <=0.)
-                && muon.innerTrack()->hitPattern().numberOfValidPixelHits() > 0
-                && muon.innerTrack()->hitPattern().trackerLayersWithMeasurement() > 5;
+        && muon.isPFMuon()
+        && muon.globalTrack()->normalizedChi2() < 10.
+        && muon.globalTrack()->hitPattern().numberOfValidMuonHits() > 0
+        && muon.numberOfMatchedStations() > 1
+        && (getDxy(muon, vtx) < DxyCut_ || DxyCut_ <=0.)
+        && (getDz(muon, vtx) < DzCut_ || DzCut_ <=0.)
+        && muon.innerTrack()->hitPattern().numberOfValidPixelHits() > 0
+        && muon.innerTrack()->hitPattern().trackerLayersWithMeasurement() > 5;
 }
 
 //--------------------------------------------------------------------------------------------------

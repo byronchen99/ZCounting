@@ -136,6 +136,8 @@ private:
     float tkIso2_;
     float dxy2_;
     float dz2_;
+    float nTrackerLayers2_;
+    float nValidPixelHits2_;
     bool is2IsoMu27_;
 
     bool is2HLT_;
