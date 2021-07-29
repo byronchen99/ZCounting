@@ -36,7 +36,7 @@ if options.samplename == '':
 elif options.samplename not in ('tt', 'dy', 'w', 'qcd', 'zz', 'wz', 'ww'):
     raise RuntimeError('ZCountAnalyze.py: unknown samplename '+options.samplename)
 
-if options.year not in ("2016preVFP", "2016postVFP", "2017", "2018"):
+if options.year not in ("2016preVFP", "2016postVFP", "2017", "2017H", "2018"):
     raise RuntimeError('ZCountAnalyze.py: unknown year '+options.year)
 
 print("processing {0} events".format(options.maxEvents))
@@ -64,7 +64,6 @@ process.MessageLogger.cerr.INFO = cms.untracked.PSet(
     limit=cms.untracked.int32(-1)
 )
 process.options = cms.untracked.PSet(wantSummary=cms.untracked.bool(True))
-
 process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(options.maxEvents))
 
 process.source = cms.Source("PoolSource",
@@ -82,17 +81,63 @@ process.source = cms.Source("PoolSource",
         # '/store/mc/RunIISummer20UL16MiniAODAPV/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/MINIAODSIM/FlatPU0to75_106X_mcRun2_asymptotic_preVFP_v8-v2/00000/0040C830-7251-BA46-BE12-86EE8CFD0907.root'
 
         # UL 2017
-        '/store/mc/RunIISummer20UL18MiniAODv2/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/MINIAODSIM/106X_upgrade2018_realistic_v16_L1v1-v2/120000/02FD7B88-3EDC-C64D-8E18-F9A8F9E7E7DF.root'
+        '/store/mc/RunIISummer20UL17MiniAODv2/WW_TuneCP5_13TeV-pythia8/MINIAODSIM/106X_mc2017_realistic_v9-v1/280000/8E5C41E3-0E1B-B54E-A18C-09C2244E6B5F.root'
+        # UL 2018
+        # '/store/mc/RunIISummer20UL18MiniAODv2/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/MINIAODSIM/106X_upgrade2018_realistic_v16_L1v1-v2/120000/02FD7B88-3EDC-C64D-8E18-F9A8F9E7E7DF.root'
         # '/store/mc/RunIISummer20UL18MiniAODv2/DYJetsToLL_0J_TuneCP5_13TeV-amcatnloFXFX-pythia8/MINIAODSIM/106X_upgrade2018_realistic_v16_L1v1-v1/230000/0271F29A-6EA5-054E-B733-EB5EC7A80F2C.root'
         # '/store/mc/RunIISummer20UL18MiniAODv2/ZZTo2L2Nu_TuneCP5_13TeV_powheg_pythia8/MINIAODSIM/106X_upgrade2018_realistic_v16_L1v1-v1/00000/E17A5D77-2DC3-F24A-A13D-C65191D2BDCC.root'
-        # UL 2018
         # '/store/mc/RunIISummer20UL18MiniAOD/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/MINIAODSIM/106X_upgrade2018_realistic_v11_L1v1-v1/260000/0071F930-6376-7A48-89F1-74E189BD3BFC.root'
     )
 )
 
+if options.year == "2016preVFP":
+    globalTag = '106X_mcRun2_asymptotic_preVPF_v8'
+    l1PrefireECAL = "UL2016preVFP"
+    l1PrefireMuon = "2016preVFP"
+    roccoFile = 'ZCounting/ZUtils/data/RoccoR2016aUL.txt'
+elif options.year == "2016postVFP":
+    globalTag = '106X_mcRun2_asymptotic_v13'
+    l1PrefireECAL = "UL2016postVFP"
+    l1PrefireMuon = "2016BG"
+    roccoFile = 'ZCounting/ZUtils/data/RoccoR2016bUL.txt'
+elif options.year == "2017":
+    globalTag = '106X_mc2017_realistic_v6'
+    l1PrefireECAL = "UL2017BtoF"
+    l1PrefireMuon = "20172018"
+    roccoFile = 'ZCounting/ZUtils/data/RoccoR2017UL.txt'
+elif options.year == "2018":
+    globalTag = '106X_upgrade2018_realistic_v11_L1v1'
+    l1PrefireECAL = "None"
+    l1PrefireMuon = "20172018"
+    roccoFile = 'ZCounting/ZUtils/data/RoccoR2018UL.txt'
+
+# ## Geometry and Detector Conditions
+# process.load("Configuration.Geometry.GeometryDB_cff")
+process.load('Configuration.StandardSequences.Services_cff')
+process.load("Configuration.StandardSequences.FrontierConditions_GlobalTag_condDBv2_cff")
+# process.load("Configuration.StandardSequences.MagneticField_cff")
+# process.load("TrackingTools.TransientTrack.TransientTrackBuilder_cfi")
+# process.load("Geometry.CaloEventSetup.CaloTowerConstituents_cfi")
+# process.load("Configuration.Geometry.GeometryRecoDB_cff")
+
+print("Using global tag: "+globalTag)
+process.GlobalTag.globaltag = globalTag
+
 outFileName = options.outputFile + '_' + str(options.job) + '.root'
 print('Using output file ' + outFileName)
 process.TFileService = cms.Service("TFileService", fileName=cms.string(outFileName))
+
+tasks = cms.Task()
+
+from PhysicsTools.PatAlgos.tools.jetTools import updateJetCollection
+updateJetCollection(process,
+    jetSource = cms.InputTag('slimmedJets'),
+    labelName = 'UpdatedJEC',
+    pvSource = cms.InputTag('offlineSlimmedPrimaryVertices'),
+    svSource = cms.InputTag('slimmedSecondaryVertices'),
+    jetCorrections = ('AK4PFchs', cms.vstring(['L1FastJet', 'L2Relative', 'L3Absolute']), 'None'),
+)
+process.jecSequence = cms.Sequence(process.patJetCorrFactorsUpdatedJEC * process.updatedPatJetsUpdatedJEC)
 
 # main analyzer
 process.load("ZCounting.ZCountAnalyze.ZCounting_cfi")
@@ -102,20 +147,10 @@ process.load("ZCounting.ZCountAnalyze.CountEventAnalyzer_cfi")
 process.load("ZCounting.ZCountAnalyze.PileupMCTemplateMaker_cfi")
 
 from PhysicsTools.PatUtils.l1PrefiringWeightProducer_cfi import l1PrefiringWeightProducer
-if options.year == "2016preVFP":
-    l1PrefireECAL = "UL2016preVFP"
-    l1PrefireMuon = "2016preVFP"
-elif options.year == "2016postVFP":
-    l1PrefireECAL = "UL2016postVFP"
-    l1PrefireMuon = "2016BG"
-elif options.year == "2017":
-    l1PrefireECAL = "UL2017BtoF"
-    l1PrefireMuon = "20172018"
-elif options.year == "2018":
-    l1PrefireECAL = "None"
-    l1PrefireMuon = "20172018"
 
 process.prefiringweight = l1PrefiringWeightProducer.clone(
+TheJets = cms.InputTag("updatedPatJetsUpdatedJEC"),
+# L1Maps = cms.string("../../../ZCounting/ZCountAnalyze/data/All2017Gand2017HPrefiringMaps.root"),
 DataEraECAL = cms.string(l1PrefireECAL),
 DataEraMuon = cms.string(l1PrefireMuon),
 UseJetEMPt = cms.bool(False),
@@ -135,9 +170,18 @@ if options.year == "2016postVFP":
 else:
     process.prefireSequence = cms.Sequence(process.prefiringweight)
 
-tasks = cms.Task()
+### apply rochester corrections
+from ZCounting.ZUtils.muonPATUserDataRochesterCorrectionAdder_cfi import muonPATUserDataRochesterCorrectionAdder
+process.selectedMuonsWithEnCorrInfo = muonPATUserDataRochesterCorrectionAdder.clone(
+    src = 'slimmedMuons',
+    path = roccoFile,
+    applyEnergyCorrections = False,
+    debug = False,
+)
+tasks.add(process.selectedMuonsWithEnCorrInfo)
 
 process.zcounting.era = options.year
+process.zcounting.pat_muons = cms.InputTag('selectedMuonsWithEnCorrInfo')
 
 # if no good Z candidate is found. E.g. if gamma is found instead
 if options.samplename in ('dy', 'zz', 'wz'):
@@ -163,6 +207,7 @@ elif options.samplename == 'tt':
 process.p = cms.Path(
     process.countEvents *
     process.pileupMCTemplateMaker *
+    process.jecSequence *
     process.prefireSequence *
     process.zcounting,
     tasks)

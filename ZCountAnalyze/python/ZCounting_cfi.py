@@ -52,8 +52,14 @@ zcounting = cms.EDAnalyzer('ZCounting',
     hasGenZ = cms.untracked.bool(False),
     hasGenTt = cms.untracked.bool(False),
 
+    genParticles         = cms.InputTag("prunedGenParticles"),
     genEventInfo         = cms.InputTag('generator'),
+    lheEventInfo         = cms.InputTag('externalLHEProducer'),
     genZLeptonCollection = cms.InputTag(''),
     genTtCollection = cms.InputTag(''),
+
+    # settings of UL aMC@NLO 
+    genWeights = cms.vint32(1005, 1009, 1004, 1007, 1002, 1003),
+    pdfWeights = cms.vint32(1214, 1316)
 
 )
