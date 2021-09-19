@@ -97,6 +97,7 @@ void set_luminosity(Float_t lumi_){
 // generate template for extraction of muon efficiency in barrel or endcap region
 void generateTemplate(
     const TString mcfilename,
+    const TString effType,
     TH1D *hPV=0
 );
 
@@ -105,62 +106,6 @@ void generateTemplate(
 void generateTemplate_ZYield(
 	const TString mcfilename,
 	TH1D          *hPV
-);
-
-//--------------------------------------------------------------------------------------------------
-// count events in pass and fail region to measure the efficiency
-void performCount(
-    Double_t &resEff, Double_t &resErrl, Double_t &resErrh, TH1D *passHist, TH1D *failHist,
-    const TString effType, const Bool_t etaRegion, const Int_t iBin, const TString format
-);
-
-//--------------------------------------------------------------------------------------------------
-// perform fit in 1 region to extract the number of signal events
-void performFit(
-	Double_t &resNsig, Double_t &resErrl, Double_t &resErrh,
-    Double_t &resChi2, Double_t &resPurity, Double_t &resPurityErrl, Double_t &resPurityErrh,
-    TH1D *h, const Int_t sigMod, const Int_t bkgMod,
-	const TString etaRegion, const Bool_t passRegion,
-    const Int_t iBin, const TString format, const Int_t fitStrategy=0
-);
-
-//--------------------------------------------------------------------------------------------------
-// perform fit in 2 region (pass and fail) to extract the efficiency
-void performFit(
-    Double_t &resEff, Double_t &resErrl, Double_t &resErrh,
-    Double_t &resChi2Pass, Double_t &resChi2Fail,
-    TH1D *passHist, TH1D *failHist,
-    const Int_t sigpass, const Int_t bkgpass, const Int_t sigfail, const Int_t bkgfail,
-    const TString bkgQCDTemplate, const TString bkgTTTemplate,
-    const TString effType, const Bool_t etaRegion, const Int_t iBin, const TString format, const Int_t fitStrategy=0
-);
-
-//--------------------------------------------------------------------------------------------------
-// perform fit in all regions together to extract the HLT efficiency and the number of signal events
-// BB: both muons are in barrel
-// BE: one muon is in barrel, one in endcap
-// EE: both muons are in endcap
-// passHist{BB,BE,EE}:  dimuon events where both muons pass the HLT
-// failHist{BB,BE,EE}:  dimuon events where only one muon passes the HLT
-// c{BB,BE,EE}:         correlation coefficient for the second muon passing the HLT, if the first has already passed the HLT
-void performCombinedFit(
-    Double_t &resEffB, Double_t &resErrBl, Double_t &resErrBh,
-    Double_t &resEffE, Double_t &resErrEl, Double_t &resErrEh,
-    Double_t &resYieldBB, Double_t &resYieldBBl, Double_t &resYieldBBh,
-    Double_t &resYieldEE, Double_t &resYieldEEl, Double_t &resYieldEEh,
-    Double_t &resYieldBE, Double_t &resYieldBEl, Double_t &resYieldBEh,
-    Double_t &resChi2PassBB, Double_t &resChi2FailBB,
-    Double_t &resChi2PassEE, Double_t &resChi2FailEE,
-    Double_t &resChi2PassBE, Double_t &resChi2FailBE,
-    TH1D *passHistBB, TH1D *failHistBB,
-    TH1D *passHistEE, TH1D *failHistEE,
-    TH1D *passHistBE, TH1D *failHistBE,
-    Double_t cBB, Double_t cBE, Double_t cEE,
-    const Int_t sigpass, const Int_t bkgpass, const Int_t sigfail, const Int_t bkgfail,
-    const TString bkgQCDTemplate, const TString bkgTTTemplate,
-    const Int_t iBin,
-    const TString format,
-    const Int_t fitStrategy=0
 );
 
 std::vector<double> preFit(TH1D *failHist);
@@ -244,70 +189,92 @@ Int_t set_background_model(
 //--------------------------------------------------------------------------------------------------
 void generateTemplate(
 	const TString mcfilename,
+    const TString effType,
 	TH1D          *hPV
 ){
-  cout << "Creating histogram templates... "; cout.flush();
 
-  TFile *infile    = new TFile(mcfilename);
-  TTree *eventTree = (TTree*)infile->Get("tree");
-  TH1D *hPVtemplate = (TH1D*)infile->Get("hPV");
-
-  if(hPV)
-    hPV->Divide(hPVtemplate);
-
-  Double_t mass, ptTag, etaTag, ptProbe, etaProbe;
-  Double_t wgt;
-  UInt_t npv;
-  Bool_t pass;
-
-  eventTree->SetBranchAddress("mass",       &mass);
-  eventTree->SetBranchAddress("ptTag",      &ptTag);
-  eventTree->SetBranchAddress("ptProbe",    &ptProbe);
-  eventTree->SetBranchAddress("etaTag",     &etaTag);
-  eventTree->SetBranchAddress("etaProbe",   &etaProbe);
-  eventTree->SetBranchAddress("nPV",        &npv);
-  eventTree->SetBranchAddress("pass",       &pass);
-
-  TH1D *h_mass_pass_central = new TH1D("h_mass_pass_central", "", massBin, massLo, massHi);
-  TH1D *h_mass_fail_central = new TH1D("h_mass_fail_central", "", massBin, massLo, massHi);
-  TH1D *h_mass_pass_forward = new TH1D("h_mass_pass_forward", "", massBin, massLo, massHi);
-  TH1D *h_mass_fail_forward = new TH1D("h_mass_fail_forward", "", massBin, massLo, massHi);
-
-  for(UInt_t ientry=0; ientry<eventTree->GetEntries(); ientry++) {
-    eventTree->GetEntry(ientry);
-
-    if(mass < massLo)  continue;
-    if(mass > massHi)  continue;
-    if(ptTag   < ptCutTag)   continue;
-    if(ptProbe   < ptCutProbe)   continue;
-    if(fabs(etaTag) > etaCutTag) continue;
-    if(fabs(etaProbe) > etaCutProbe) continue;
-
-    wgt = 1.0;
-    if(hPV)
-      wgt *= hPV->GetBinContent(hPV->FindBin(npv));
-
-    if(fabs(etaProbe) < etaBound){
-      if(pass) h_mass_pass_central->Fill(mass, wgt);
-      else     h_mass_fail_central->Fill(mass, wgt);
-    }else{
-      if(pass) h_mass_pass_forward->Fill(mass, wgt);
-      else     h_mass_fail_forward->Fill(mass, wgt);
+    TFile *outfile = TFile::Open(outputDir+"/histTemplates_"+effType+".root","CREATE");
+    if(!outfile){
+        cout << "Use existing template "<< endl;
+        return;
     }
-  }
+    cout << "Creating histogram templates... "; cout.flush();
 
-  TFile outfile = TFile(outputDir+"/histTemplates.root", "RECREATE");
-  h_mass_pass_central->Write();
-  h_mass_fail_central->Write();
-  h_mass_pass_forward->Write();
-  h_mass_fail_forward->Write();
-  outfile.Write();
-  outfile.Close();
+    TFile *infile    = new TFile(mcfilename);
+    TTree *eventTree = (TTree*)infile->Get(effType);
+    TH1D *hPVtemplate = (TH1D*)infile->Get("hPV");
 
-  infile->Close();
-  delete infile;
+    if(hPV)
+        hPV->Divide(hPVtemplate);
 
-  cout << "Done!" << endl;
+    Double_t mass, ptTag, etaTag, ptProbe, etaProbe;
+    Double_t wgt;
+    Int_t npv;
+    Bool_t pass;
+
+    eventTree->SetBranchAddress("mass",           &mass);
+    eventTree->SetBranchAddress("ptTag",          &ptTag);
+    eventTree->SetBranchAddress("ptProbe",        &ptProbe);
+    eventTree->SetBranchAddress("etaTag",         &etaTag);
+    eventTree->SetBranchAddress("etaProbe",       &etaProbe);
+    eventTree->SetBranchAddress("nPV",            &npv);
+    eventTree->SetBranchAddress("pass",           &pass);
+    eventTree->SetBranchAddress("eventWeight",    &wgt);
+
+    TH1D *h_mass_pass_central = new TH1D("h_mass_pass_central", "", massBin, massLo, massHi);
+    TH1D *h_mass_fail_central = new TH1D("h_mass_fail_central", "", massBin, massLo, massHi);
+    TH1D *h_mass_pass_forward = new TH1D("h_mass_pass_forward", "", massBin, massLo, massHi);
+    TH1D *h_mass_fail_forward = new TH1D("h_mass_fail_forward", "", massBin, massLo, massHi);
+
+    for(UInt_t ientry=0; ientry<eventTree->GetEntries(); ientry++) {
+        eventTree->GetEntry(ientry);
+
+        if(mass < massLo)  continue;
+        if(mass > massHi)  continue;
+        if(ptTag   < ptCutTag)   continue;
+        if(ptProbe   < ptCutProbe)   continue;
+        if(fabs(etaTag) > etaCutTag) continue;
+        if(fabs(etaProbe) > etaCutProbe) continue;
+
+        if(hPV)
+            wgt *= hPV->GetBinContent(hPV->FindBin(npv));
+
+        if(fabs(etaProbe) < etaBound){
+            if(pass) h_mass_pass_central->Fill(mass, wgt);
+            else     h_mass_fail_central->Fill(mass, wgt);
+        }else{
+            if(pass) h_mass_pass_forward->Fill(mass, wgt);
+            else     h_mass_fail_forward->Fill(mass, wgt);
+        }
+    }
+
+    // set negative bin entries to 0
+    for(int i=1; i <= massBin; i++){
+        if(h_mass_pass_central->GetBinContent(i) < 0.)
+            h_mass_pass_central->SetBinContent(i, 0.);
+
+        if(h_mass_fail_central->GetBinContent(i) < 0.)
+            h_mass_fail_central->SetBinContent(i, 0.);
+
+        if(h_mass_pass_forward->GetBinContent(i) < 0.)
+            h_mass_pass_forward->SetBinContent(i, 0.);
+
+        if(h_mass_fail_forward->GetBinContent(i) < 0.)
+            h_mass_fail_forward->SetBinContent(i, 0.);
+
+    }
+    outfile->cd();
+    h_mass_pass_central->Write();
+    h_mass_fail_central->Write();
+    h_mass_pass_forward->Write();
+    h_mass_fail_forward->Write();
+    outfile->Write();
+    outfile->Close();
+
+    infile->Close();
+    delete infile;
+
+    cout << "Done!" << endl;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -315,78 +282,103 @@ void generateTemplate_ZYield(
 	const TString mcfilename,
 	TH1D          *hPV
 ){
-  cout << "Creating histogram templates... "; cout.flush();
+    TFile *outfile = TFile::Open(outputDir+"/histTemplates_HLT.root","CREATE");
+    if(!outfile){
+        cout << "Use existing template "<< endl;
+        return;
+    }
+    cout << "Creating histogram templates... "; cout.flush();
 
-  TFile *infile    = new TFile(mcfilename);
-  TTree *eventTree = (TTree*)infile->Get("tree");
-  TH1D *hPVtemplate = (TH1D*)infile->Get("hPV");
+    TFile *infile    = new TFile(mcfilename);
+    TTree *eventTree = (TTree*)infile->Get("HLT");
+    TH1D *hPVtemplate = (TH1D*)infile->Get("hPV");
 
-  if(hPV)
-    hPV->Divide(hPVtemplate);
-
-  Double_t mass, ptTag, etaTag, ptProbe, etaProbe;
-  Double_t wgt;
-  UInt_t npv;
-  Bool_t pass;
-
-  eventTree->SetBranchAddress("mass",       &mass);
-  eventTree->SetBranchAddress("ptTag",      &ptTag);
-  eventTree->SetBranchAddress("ptProbe",    &ptProbe);
-  eventTree->SetBranchAddress("etaTag",     &etaTag);
-  eventTree->SetBranchAddress("etaProbe",   &etaProbe);
-  eventTree->SetBranchAddress("nPV",        &npv);
-  eventTree->SetBranchAddress("pass",       &pass);
-
-  TH1D *h_mass_2HLT_BB = new TH1D("h_mass_2HLT_BB", "", massBin, massLo, massHi);
-  TH1D *h_mass_2HLT_BE = new TH1D("h_mass_2HLT_BE", "", massBin, massLo, massHi);
-  TH1D *h_mass_2HLT_EE = new TH1D("h_mass_2HLT_EE", "", massBin, massLo, massHi);
-  TH1D *h_mass_1HLT_BB = new TH1D("h_mass_1HLT_BB", "", massBin, massLo, massHi);
-  TH1D *h_mass_1HLT_BE = new TH1D("h_mass_1HLT_BE", "", massBin, massLo, massHi);
-  TH1D *h_mass_1HLT_EE = new TH1D("h_mass_1HLT_EE", "", massBin, massLo, massHi);
-
-  for(UInt_t ientry=0; ientry<eventTree->GetEntries(); ientry++) {
-    eventTree->GetEntry(ientry);
-
-    if(mass < massLo)  continue;
-    if(mass > massHi)  continue;
-    if(ptTag   < ptCutTag)   continue;
-    if(ptProbe   < ptCutProbe)   continue;
-    if(fabs(etaTag) > etaCutTag) continue;
-    if(fabs(etaProbe) > etaCutProbe) continue;
-
-    wgt = 1.0;
     if(hPV)
-      wgt *= hPV->GetBinContent(hPV->FindBin(npv));
+        hPV->Divide(hPVtemplate);
 
-    if(fabs(etaProbe) < etaBound && fabs(etaTag) < etaBound){
-        if(pass) h_mass_2HLT_BB->Fill(mass, wgt);
-        else     h_mass_1HLT_BB->Fill(mass, wgt);
+    Double_t mass, ptTag, etaTag, ptProbe, etaProbe;
+    Double_t wgt;
+    Int_t npv;
+    Bool_t pass;
+
+    eventTree->SetBranchAddress("mass",           &mass);
+    eventTree->SetBranchAddress("ptTag",          &ptTag);
+    eventTree->SetBranchAddress("ptProbe",        &ptProbe);
+    eventTree->SetBranchAddress("etaTag",         &etaTag);
+    eventTree->SetBranchAddress("etaProbe",       &etaProbe);
+    eventTree->SetBranchAddress("nPV",            &npv);
+    eventTree->SetBranchAddress("pass",           &pass);
+    eventTree->SetBranchAddress("eventWeight",    &wgt);
+
+    TH1D *h_mass_pass_BB = new TH1D("h_mass_pass_BB", "", massBin, massLo, massHi);
+    TH1D *h_mass_pass_BE = new TH1D("h_mass_pass_BE", "", massBin, massLo, massHi);
+    TH1D *h_mass_pass_EE = new TH1D("h_mass_pass_EE", "", massBin, massLo, massHi);
+    TH1D *h_mass_fail_BB = new TH1D("h_mass_fail_BB", "", massBin, massLo, massHi);
+    TH1D *h_mass_fail_BE = new TH1D("h_mass_fail_BE", "", massBin, massLo, massHi);
+    TH1D *h_mass_fail_EE = new TH1D("h_mass_fail_EE", "", massBin, massLo, massHi);
+
+    for(UInt_t ientry=0; ientry<eventTree->GetEntries(); ientry++) {
+        eventTree->GetEntry(ientry);
+
+        if(mass < massLo)  continue;
+        if(mass > massHi)  continue;
+        if(ptTag   < ptCutTag)   continue;
+        if(ptProbe   < ptCutProbe)   continue;
+        if(fabs(etaTag) > etaCutTag) continue;
+        if(fabs(etaProbe) > etaCutProbe) continue;
+
+        if(hPV)
+            wgt *= hPV->GetBinContent(hPV->FindBin(npv));
+
+        if(fabs(etaProbe) < etaBound && fabs(etaTag) < etaBound){
+            if(pass) h_mass_pass_BB->Fill(mass, wgt);
+            else     h_mass_fail_BB->Fill(mass, wgt);
+        }
+        else if(fabs(etaProbe) >= etaBound && fabs(etaTag) >= etaBound){
+            if(pass) h_mass_pass_EE->Fill(mass, wgt);
+            else     h_mass_fail_EE->Fill(mass, wgt);
+        }
+        else{
+            if(pass) h_mass_pass_BE->Fill(mass, wgt);
+            else     h_mass_fail_BE->Fill(mass, wgt);
+        }
     }
-    else if(fabs(etaProbe) >= etaBound && fabs(etaTag) >= etaBound){
-        if(pass) h_mass_2HLT_EE->Fill(mass, wgt);
-        else     h_mass_1HLT_EE->Fill(mass, wgt);
+
+    // set negative bin entries to 0
+    for(int i=1; i <= massBin+1; i++){
+        if(h_mass_pass_BB->GetBinContent(i) < 0.)
+            h_mass_pass_BB->SetBinContent(i, 0.);
+
+        if(h_mass_pass_BE->GetBinContent(i) < 0.)
+            h_mass_pass_BE->SetBinContent(i, 0.);
+
+        if(h_mass_pass_EE->GetBinContent(i) < 0.)
+            h_mass_pass_EE->SetBinContent(i, 0.);
+
+        if(h_mass_fail_BB->GetBinContent(i) < 0.)
+            h_mass_fail_BB->SetBinContent(i, 0.);
+
+        if(h_mass_fail_BE->GetBinContent(i) < 0.)
+            h_mass_fail_BE->SetBinContent(i, 0.);
+
+        if(h_mass_fail_EE->GetBinContent(i) < 0.)
+            h_mass_fail_EE->SetBinContent(i, 0.);
     }
-    else{
-        if(pass) h_mass_2HLT_BE->Fill(mass, wgt);
-        else     h_mass_1HLT_BE->Fill(mass, wgt);
-    }
 
-  }
+    outfile->cd();
+    h_mass_pass_BB->Write();
+    h_mass_pass_BE->Write();
+    h_mass_pass_EE->Write();
+    h_mass_fail_BB->Write();
+    h_mass_fail_BE->Write();
+    h_mass_fail_EE->Write();
+    outfile->Write();
+    outfile->Close();
 
-  TFile outfile = TFile(outputDir+"/histTemplates.root", "RECREATE");
-  h_mass_2HLT_BB->Write();
-  h_mass_2HLT_BE->Write();
-  h_mass_2HLT_EE->Write();
-  h_mass_1HLT_BB->Write();
-  h_mass_1HLT_BE->Write();
-  h_mass_1HLT_EE->Write();
-  outfile.Write();
-  outfile.Close();
+    infile->Close();
+    delete infile;
 
-  infile->Close();
-  delete infile;
-
-  cout << "Done!" << endl;
+    cout << "Done!" << endl;
 }
 
 
@@ -400,16 +392,15 @@ Double_t make_plot(
     CSignalModel *sigModel,
     CBackgroundModel *bkgModel,
     RooFitResult *fitResult,
+    RooWorkspace *w,
     T &Nsig,
     RooRealVar &Nbkg,
-    const char effstr[],
     const Int_t nEntries,
     const Int_t iBin,
     const TString effType="yield",
     const Bool_t etaRegion=kTRUE,
     const Bool_t passRegion=kTRUE,
-    const Double_t yMax=0.,
-    const TString format="png"
+    const Double_t yMax=0.
 ){
 
     char pname[50];
@@ -421,23 +412,51 @@ Double_t make_plot(
     char nsigstr[100];
     char nbkgstr[100];
     char chi2str[100];
+    char effstr[100] = "";
+
+    RooRealVar *eff = (RooRealVar*)w->var("eff");
 
     if(effType == "BB" || effType == "BE" || effType == "EE"){
         sprintf(pname,"yield_%s_%s_%d", effType.Data(), passRegion ? "2HLT" : "1HLT", iBin);
         sprintf(ctitle,"%s %s %d ", passRegion ? "2HLT" : "1HLT", effType.Data(), iBin);
-        if(effType == "BB")
+        if(effType == "BB"){
             sprintf(binlabelx, "|#eta| < %.1f",etaBound);
-        if(effType == "BE")
+            if(eff==0)
+                eff = (RooRealVar*)w->var("effB");
+        }
+        if(effType == "BE"){
             sprintf(binlabelx, "|#eta| < 2.4");
-        if(effType == "EE")
+        }
+        if(effType == "EE"){
             sprintf(binlabelx, "%.1f < |#eta| < 2.4",etaBound);
+            if(eff==0)
+                eff = (RooRealVar*)w->var("effE");
+        }
     }
     else{
+        // try to find efficiency in fitResult
+        if(effType=="Sta"){
+            eff = (RooRealVar*)w->var("effSta");
+        }
+        else if(effType=="Trk"){
+            eff = (RooRealVar*)w->var("effTrk");
+        }
+        else if(effType=="Glo"){
+            RooFormulaVar *effGlo = (RooFormulaVar*)w->arg("effGlo");
+            if(effGlo!=0){
+                eff = new RooRealVar("eff","eff",effGlo->getVal());
+                eff->setError(effGlo->getPropagatedError(*fitResult));
+            }
+        }
+
         sprintf(pname,"%s_%s_%s_%d", effType.Data(), etaRegion ? "forward" : "central", passRegion ? "pass" : "fail", iBin);
         sprintf(ctitle,"%s %s (%d) ", effType.Data(), passRegion ? "pass" : "fail", iBin);
 
         if(!etaRegion) sprintf(binlabelx, "|#eta| < 0.9");
         else           sprintf(binlabelx, "0.9 < |#eta| < 2.4");
+    }
+    if(eff != 0){
+        sprintf(effstr,"#varepsilon = %.4f_{ -%.4f}^{ +%.4f}",eff->getVal(),std::abs(eff->getErrorLo()),eff->getErrorHi());
     }
 
     const double margin_left = 0.15;
@@ -604,391 +623,92 @@ Double_t make_plot(
 }
 
 //--------------------------------------------------------------------------------------------------
-std::vector<float> getZyield(
-                TH1D *h_yield,
-                const Int_t    iBin,         // Label of measurement in currect run
-                const Int_t    sigMod,
-                const Int_t    bkgMod,
-                const TString  etaRegion="",    // {BB, BE or EE}
-                const Bool_t   passRegion=true,
-                const TString  mcfilename="",
-                TH1D*          _hQCD=0,
-                TH1D*          hPV=0,
-                const TString format="png"          // plot format
-){
-
-  CPlot::sOutDir = outputDir;
-
-  if(sigMod == 0){      // perform count - expect 1% fakes
-    const Double_t NsigMax = h_yield->Integral();
-    std::vector<float> resultEff = {};
-    resultEff.push_back(NsigMax*0.99);
-    resultEff.push_back(std::sqrt(NsigMax)*0.99);
-    resultEff.push_back(std::sqrt(NsigMax)*0.99);
-    resultEff.push_back(0.);
-    resultEff.push_back(0.01);
-    return resultEff;
-  }
-
-
-  TH1D *h=0;
-  if(sigMod==2) {
-    TFile *histfile = 0;
-    generateTemplate_ZYield(mcfilename, hPV);
-  }
-
-  Double_t resNsig;
-  Double_t resErrl;
-  Double_t resErrh;
-  Double_t resChi2;
-  Double_t resPurity;
-  Double_t resPurityErrl;
-  Double_t resPurityErrh;
-
-  int i = 0;
-
-  Double_t best_Chi2 = -1.;
-  int best_strategy = 0;
-
-  do{
-      performFit(resNsig, resErrl, resErrh, resChi2, resPurity, resPurityErrl, resPurityErrh, h_yield,
-        sigMod, bkgMod, etaRegion, passRegion, iBin, format, i);
-
-      std::cout<<"---------------------------------------"<<std::endl;
-      std::cout<<"------ Fit ("<<i<<") ------------------"<<std::endl;
-      std::cout<<"------ chi2 = " << resChi2 <<std::endl;
-      std::cout<<"---------------------------------------"<<std::endl;
-
-      if(best_Chi2 < 0 || best_Chi2 > resChi2){
-        best_Chi2 = resChi2;
-        best_strategy = i;
-      }
-
-      i++;
-
-  } while(i < 3 && (best_Chi2 > 5. || best_Chi2 < 0.));
-
-  if(best_strategy != i-1){
-      // make sure the strategy that gives the best chi2 is taken
-      performFit(resNsig, resErrl, resErrh, resChi2, resPurity, resPurityErrl, resPurityErrh, h_yield,
-        sigMod, bkgMod, etaRegion, passRegion, iBin, format, best_strategy);
-  }
-
-  std::vector<float> resultEff = {};
-
-  resultEff.push_back(resNsig);
-  resultEff.push_back(resErrl);
-  resultEff.push_back(resErrh);
-  resultEff.push_back(resChi2);
-  resultEff.push_back(resPurity);
-  resultEff.push_back(resPurityErrl);
-  resultEff.push_back(resPurityErrh);
-
-  return resultEff;
-}
-
-//--------------------------------------------------------------------------------------------------
-std::vector<float> calculateDataEfficiency(
-        TH1D          *h_mass_pass,
-        TH1D          *h_mass_fail,
-		const Int_t   iBin,                 // Label of measurement in currect run
-		const TString effType,              // "HLT" or "SIT" or "Glo" or "Sta" or "Trk"
-        const Bool_t  etaRegion,
-		const Int_t   sigModPass,           // signal extraction method for PASS sample
-		const Int_t   bkgModPass,           // background model for PASS sample
-		const Int_t   sigModFail,           // signal extraction method for FAIL sample
-		const Int_t   bkgModFail,           // background model for FAIL sample
-        TH1D          *hPV=0,
-        const TString mcfilename="",        // ROOT file containing MC events to generate templates from
-        const TString bkgQCDFilename="",    // ROOT file containing bkg template
-        const TString bkgTTFilename="",
-		const TString format="png"          // plot format
-){
-
-  // CPlot::sOutDir = outputDir;
-
-  if(etaRegion)
-    std::cout<<">>> Do fit in B for "<<effType<<std::endl;
-  else
-    std::cout<<">>> Do fit in E for "<<effType<<std::endl;
-
-  Double_t eff  = 0.;
-  Double_t errl = 0.;
-  Double_t errh = 0.;
-  Double_t chi2pass = 999.;
-  Double_t chi2fail = 999.;
-
-  if(sigModPass == 0){
-    performCount(eff, errl, errh, h_mass_pass, h_mass_fail,
-      effType, etaRegion, iBin, format);
-  }else{
-    // Generate histogram templates from MC if necessary
-    if(sigModPass==2 || sigModFail==2) {
-        generateTemplate(mcfilename, hPV);
-    }
-    int i = 0;
-    int best_strategy = 0;
-    double best_Chi2 = -1;
-    double resChi2 = -1;
-    do {
-        performFit(eff, errl, errh, chi2pass, chi2fail, h_mass_pass, h_mass_fail,
-            sigModPass, bkgModPass, sigModFail, bkgModFail,
-            bkgQCDFilename, bkgTTFilename,
-            effType, etaRegion, iBin, format, i);
-
-        std::cout<<"---------------------------------------"<<std::endl;
-        std::cout<<"------ Fit ("<<i<<") ------------------"<<std::endl;
-        std::cout<<"------ chi2pass = " << chi2pass <<std::endl;
-        std::cout<<"------ chi2fail = " << chi2fail <<std::endl;
-        std::cout<<"---------------------------------------"<<std::endl;
-
-        resChi2 = std::max(chi2pass, chi2fail);
-        if(best_Chi2 < 0 || (chi2pass > 0 && chi2fail > 0 && best_Chi2 > resChi2)){
-          best_Chi2 = resChi2;
-          best_strategy = i;
-        }
-
-        i++;
-
-    } while(i < 3 && (resChi2 > 5. || chi2fail < 0. || chi2pass < 0.));
-
-    if(best_strategy != i-1){
-        // make sure the strategy that gives the best chi2 is taken
-        performFit(eff, errl, errh, chi2pass, chi2fail, h_mass_pass, h_mass_fail,
-            sigModPass, bkgModPass, sigModFail, bkgModFail,
-            bkgQCDFilename, bkgTTFilename,
-            effType, etaRegion, iBin, format, best_strategy);
-    }
-  }
-
-
-
-  std::vector<float> resultEff = {};
-
-  resultEff.push_back(eff);
-  resultEff.push_back(errl);
-  resultEff.push_back(errh);
-  resultEff.push_back(chi2pass);
-  resultEff.push_back(chi2fail);
-
-  return resultEff;
-}
-
-//--------------------------------------------------------------------------------------------------
-std::vector<float> calculateHLTEfficiencyAndYield(
-    TH1D          *h_mass_BB_pass,
-    TH1D          *h_mass_BB_fail,
-    TH1D          *h_mass_EE_pass,
-    TH1D          *h_mass_EE_fail,
-    TH1D          *h_mass_BE_pass,
-    TH1D          *h_mass_BE_fail,
-	const Int_t   iBin,                 // Label of measurement in currect run
-	const Int_t   sigModPass,           // signal extraction method for PASS sample
-	const Int_t   bkgModPass,           // background model for PASS sample
-	const Int_t   sigModFail,           // signal extraction method for FAIL sample
-	const Int_t   bkgModFail,           // background model for FAIL sample
-    const Double_t cBB = 1.,            // correlation factors for second muon
-    const Double_t cBE = 1.,            // correlation factors for second muon
-    const Double_t cEE = 1.,            // correlation factors for second muon
-    TH1D          *hPV=0,
-    const TString mcfilename="",        // ROOT file containing MC events to generate templates from
-    const TString bkgQCDFilename="",    // ROOT file containing bkg template
-    const TString bkgTTFilename="",
-	const TString format="png"          // plot format
-){
-
-
-    Double_t effB  = 0.;
-    Double_t errBl = 0.;
-    Double_t errBh = 0.;
-    Double_t effE  = 0.;
-    Double_t errEl = 0.;
-    Double_t errEh = 0.;
-    Double_t yieldBB  = 0.;
-    Double_t yieldBBl = 0.;
-    Double_t yieldBBh = 0.;
-    Double_t yieldEE  = 0.;
-    Double_t yieldEEl = 0.;
-    Double_t yieldEEh = 0.;
-    Double_t yieldBE  = 0.;
-    Double_t yieldBEl = 0.;
-    Double_t yieldBEh = 0.;
-    Double_t chi2passBB = 999.;
-    Double_t chi2failBB = 999.;
-    Double_t chi2passEE = 999.;
-    Double_t chi2failEE = 999.;
-    Double_t chi2passBE = 999.;
-    Double_t chi2failBE = 999.;
-
-    // Generate histogram templates from MC if necessary
-    if(sigModPass==2 || sigModFail==2) {
-        generateTemplate_ZYield(mcfilename, hPV);
-    }
-    int i = 0;
-    int best_strategy = 0;
-    double best_Chi2 = -1;
-    double resChi2 = -1;
-
-    std::cout<<"---------------------------------------"<<std::endl;
-    std::cout<<"------ Fit ("<<i<<") ------------------"<<std::endl;
-    std::cout<<"------ c(BB) = " << cBB <<" ---------"<<std::endl;
-    std::cout<<"------ c(BE) = " << cBE <<" ---------"<<std::endl;
-    std::cout<<"------ c(EE) = " << cEE <<" ---------"<<std::endl;
-    std::cout<<"---------------------------------------"<<std::endl;
-
-    // do {
-        performCombinedFit(
-            effB, errBl, errBh,
-            effE, errEl, errEh,
-            yieldBB, yieldBBl, yieldBBh,
-            yieldEE, yieldEEl, yieldEEh,
-            yieldBE, yieldBEl, yieldBEh,
-            chi2passBB, chi2failBB,
-            chi2passEE, chi2failEE,
-            chi2passBE, chi2failBE,
-            h_mass_BB_pass, h_mass_BB_fail,
-            h_mass_EE_pass, h_mass_EE_fail,
-            h_mass_BE_pass, h_mass_BE_fail,
-            cBB, cBE, cEE,
-            sigModPass, bkgModPass, sigModFail, bkgModFail,
-            bkgQCDFilename, bkgTTFilename,
-            iBin,
-            format,
-            i                                   // strategy
-        );
-
-        std::cout<<"---------------------------------------"<<std::endl;
-        std::cout<<"------ Fit ("<<i<<") ------------------"<<std::endl;
-        std::cout<<"------ eff(B) = "   << effB   << " -"<<errBl   <<" +"<< errBh   << std::endl;
-        std::cout<<"------ eff(E) = "   << effE   << " -"<<errEl   <<" +"<< errEh   << std::endl;
-        std::cout<<"------ yield(BB) = " << yieldBB << " -"<<yieldBBl <<" +"<< yieldBBh << std::endl;
-        std::cout<<"------ yield(EE) = " << yieldEE << " -"<<yieldEEl <<" +"<< yieldEEh << std::endl;
-        std::cout<<"------ yield(BE) = " << yieldBE << " -"<<yieldBEl <<" +"<< yieldBEh << std::endl;
-        std::cout<<"------ chi2pass(BB) = " << chi2passBB <<std::endl;
-        std::cout<<"------ chi2fail(BB) = " << chi2failBB <<std::endl;
-        std::cout<<"------ chi2pass(EE) = " << chi2passEE <<std::endl;
-        std::cout<<"------ chi2fail(EE) = " << chi2failEE <<std::endl;
-        std::cout<<"------ chi2pass(BE) = " << chi2passBE <<std::endl;
-        std::cout<<"------ chi2fail(BE) = " << chi2failBE <<std::endl;
-        std::cout<<"---------------------------------------"<<std::endl;
-
-    //     resChi2 = std::max(chi2pass, chi2fail);
-    //     if(best_Chi2 < 0 || (chi2pass > 0 && chi2fail > 0 && best_Chi2 > resChi2)){
-    //       best_Chi2 = resChi2;
-    //       best_strategy = i;
-    //     }
-    //
-    //     i++;
-    //
-    // } while(i < 3 && (resChi2 > 5. || chi2fail < 0. || chi2pass < 0.));
-
-    // if(best_strategy != i-1){
-    //     // make sure the strategy that gives the best chi2 is taken
-    //     performFit(eff, errl, errh, chi2pass, chi2fail, h_mass_pass, h_mass_fail,
-    //         sigModPass, bkgModPass, sigModFail, bkgModFail,
-    //         bkgQCDFilename, bkgTTFilename,
-    //         effType, etaRegion, iBin, format, best_strategy);
-    // }
-  // }
-
-
-  std::vector<float> resultEff = {};
-
-  resultEff.push_back(effB);
-  resultEff.push_back(errBl);
-  resultEff.push_back(errBh);
-  resultEff.push_back(effE);
-  resultEff.push_back(errEl);
-  resultEff.push_back(errEh);
-  resultEff.push_back(yieldBB);
-  resultEff.push_back(yieldBBl);
-  resultEff.push_back(yieldBBh);
-  resultEff.push_back(yieldEE);
-  resultEff.push_back(yieldEEl);
-  resultEff.push_back(yieldEEh);
-  resultEff.push_back(yieldBE);
-  resultEff.push_back(yieldBEl);
-  resultEff.push_back(yieldBEh);
-  resultEff.push_back(chi2passBB);
-  resultEff.push_back(chi2failBB);
-  resultEff.push_back(chi2passEE);
-  resultEff.push_back(chi2failEE);
-  resultEff.push_back(chi2passBE);
-  resultEff.push_back(chi2failBE);
-  return resultEff;
-}
-
-//--------------------------------------------------------------------------------------------------
 // perform count for tag and probe efficiency
-void performCount(
-	Double_t &resEff, Double_t &resErrl, Double_t &resErrh, TH1D *passHist, TH1D *failHist,
-	const TString effType, const Bool_t etaRegion, const Int_t iBin, const TString format
+std::vector<float> performCount(
+	TH1D *passHist,
+    TH1D *failHist,
+	const TString effType,
+    const Bool_t etaRegion,
+    const Int_t iBin
 ){
-  Double_t npass=0, ntotal=0;
-  npass  = passHist->Integral();
-  ntotal = failHist->Integral() + npass;
-  resEff  = (ntotal>0) ? npass/ntotal : 0;
 
-  // Calculate the boundaries for the frequentist Clopper-Pearson interval
-  resErrl = resEff - TEfficiency::ClopperPearson((UInt_t)ntotal, (UInt_t)npass, 0.68269, kFALSE);
-  resErrh = TEfficiency::ClopperPearson((UInt_t)ntotal, (UInt_t)npass, 0.68269, kTRUE) - resEff;
+    const Double_t npass  = passHist->Integral();
+    const Double_t ntotal = failHist->Integral() + npass;
+    const Double_t resEff  = (ntotal>0) ? npass/ntotal : 0;
 
-  // Plot tag and passing- and failing- probe mass distribution
-  char binlabelx[100];
-  char binlabely[100];
-  char effstr[100];
-  char ylabel[50];
-  char pname[50];
-  char yield[50];
+    // Calculate the boundaries for the frequentist Clopper-Pearson interval
+    const Double_t resErrl = resEff - TEfficiency::ClopperPearson((UInt_t)ntotal, (UInt_t)npass, 0.68269, kFALSE);
+    const Double_t resErrh = TEfficiency::ClopperPearson((UInt_t)ntotal, (UInt_t)npass, 0.68269, kTRUE) - resEff;
 
-  if(!etaRegion) sprintf(binlabelx, "0.0 < |#eta| < 0.9");
-  else           sprintf(binlabelx, "0.9 < |#eta| < 2.4");
+    // Plot tag and passing- and failing- probe mass distribution
+    char binlabelx[100];
+    char binlabely[100];
+    char effstr[100];
+    char ylabel[50];
+    char pname[50];
+    char yield[50];
 
-  sprintf(binlabely, "p_{T} > %i GeV/c",(Int_t)ptCutProbe);
-  sprintf(effstr,"#varepsilon = %.4f_{ -%.4f}^{ +%.4f}",resEff,resErrl,resErrh);
-  sprintf(ylabel,"Events / 1 GeV/c^{2}");
+    if(!etaRegion) sprintf(binlabelx, "0.0 < |#eta| < 0.9");
+    else           sprintf(binlabelx, "0.9 < |#eta| < 2.4");
 
-  TCanvas *cpass = MakeCanvas("cpass","cpass",720,540);
-  cpass->SetWindowPosition(cpass->GetWindowTopX()+cpass->GetBorderSize()+800,0);
+    sprintf(binlabely, "p_{T} > %i GeV/c",(Int_t)ptCutProbe);
+    sprintf(effstr,"#varepsilon = %.4f_{ -%.4f}^{ +%.4f}",resEff,resErrl,resErrh);
+    sprintf(ylabel,"Events / 1 GeV/c^{2}");
 
-  sprintf(pname,"%s_%s_pass_%d", effType.Data(), etaRegion ? "forward" : "central", iBin);
-  sprintf(yield,"%i Events",(UInt_t)npass);
-  CPlot plotPass(pname,"Passing probes","tag-probe mass [GeV/c^{2}]",ylabel);
-  plotPass.AddHist1D(passHist,"E");
-  plotPass.AddTextBox(binlabelx,0.21,0.78,0.51,0.83,0,kBlack,-1);
-  plotPass.AddTextBox(binlabely,0.21,0.73,0.51,0.78,0,kBlack,-1);
-  plotPass.AddTextBox(yield,0.21,0.69,0.51,0.73,0,kBlack,-1);
-  plotPass.AddTextBox(effstr,0.70,0.85,0.95,0.90,0,kBlack,-1);
-  plotPass.AddTextBox("#bf{CMS} Work in progress",0.19,0.83,0.54,0.89,0);
-  plotPass.AddTextBox(lumitext,0.62,0.92,0.94,0.99,0,kBlack,-1);
-  plotPass.Draw(cpass,kTRUE,format);
+    TCanvas *cpass = MakeCanvas("cpass","cpass",720,540);
+    cpass->SetWindowPosition(cpass->GetWindowTopX()+cpass->GetBorderSize()+800,0);
 
-  TCanvas *cfail = MakeCanvas("cfail","cfail",720,540);
-  cfail->SetWindowPosition(cfail->GetWindowTopX()+cfail->GetBorderSize()+800,0);
+    sprintf(pname,"%s_%s_pass_%d", effType.Data(), etaRegion ? "forward" : "central", iBin);
+    sprintf(yield,"%i Events",(UInt_t)npass);
+    CPlot plotPass(pname,"Passing probes","tag-probe mass [GeV/c^{2}]",ylabel);
+    plotPass.AddHist1D(passHist,"E");
+    plotPass.AddTextBox(binlabelx,0.21,0.78,0.51,0.83,0,kBlack,-1);
+    plotPass.AddTextBox(binlabely,0.21,0.73,0.51,0.78,0,kBlack,-1);
+    plotPass.AddTextBox(yield,0.21,0.69,0.51,0.73,0,kBlack,-1);
+    plotPass.AddTextBox(effstr,0.70,0.85,0.95,0.90,0,kBlack,-1);
+    plotPass.AddTextBox("#bf{CMS} Work in progress",0.19,0.83,0.54,0.89,0);
+    plotPass.AddTextBox(lumitext,0.62,0.92,0.94,0.99,0,kBlack,-1);
+    plotPass.Draw(cpass,kTRUE,"png");
 
-  sprintf(pname,"%s_%s_fail_%d", effType.Data(), etaRegion ? "forward" : "central", iBin);
-  sprintf(yield,"%i Events",(UInt_t)(ntotal-npass));
-  CPlot plotFail(pname,"Failing probes","tag-probe mass [GeV/c^{2}]",ylabel);
-  plotFail.AddHist1D(failHist,"E");
-  plotFail.AddTextBox(binlabelx,0.21,0.78,0.51,0.83,0,kBlack,-1);
-  plotFail.AddTextBox(binlabely,0.21,0.73,0.51,0.78,0,kBlack,-1);
-  plotFail.AddTextBox(yield,0.21,0.69,0.51,0.73,0,kBlack,-1);
-  plotFail.AddTextBox(effstr,0.70,0.85,0.95,0.90,0,kBlack,-1);
-  plotFail.AddTextBox("#bf{CMS} Work in progress",0.19,0.83,0.54,0.89,0);
-  plotFail.AddTextBox(lumitext,0.62,0.92,0.94,0.99,0,kBlack,-1);
+    TCanvas *cfail = MakeCanvas("cfail","cfail",720,540);
+    cfail->SetWindowPosition(cfail->GetWindowTopX()+cfail->GetBorderSize()+800,0);
 
-  plotFail.Draw(cfail,kTRUE,format);
+    sprintf(pname,"%s_%s_fail_%d", effType.Data(), etaRegion ? "forward" : "central", iBin);
+    sprintf(yield,"%i Events",(UInt_t)(ntotal-npass));
+    CPlot plotFail(pname,"Failing probes","tag-probe mass [GeV/c^{2}]",ylabel);
+    plotFail.AddHist1D(failHist,"E");
+    plotFail.AddTextBox(binlabelx,0.21,0.78,0.51,0.83,0,kBlack,-1);
+    plotFail.AddTextBox(binlabely,0.21,0.73,0.51,0.78,0,kBlack,-1);
+    plotFail.AddTextBox(yield,0.21,0.69,0.51,0.73,0,kBlack,-1);
+    plotFail.AddTextBox(effstr,0.70,0.85,0.95,0.90,0,kBlack,-1);
+    plotFail.AddTextBox("#bf{CMS} Work in progress",0.19,0.83,0.54,0.89,0);
+    plotFail.AddTextBox(lumitext,0.62,0.92,0.94,0.99,0,kBlack,-1);
+
+    plotFail.Draw(cfail,kTRUE,"png");
+
+    std::vector<float> resultEff = {};
+
+    resultEff.push_back(resEff);
+    resultEff.push_back(resErrl);
+    resultEff.push_back(resErrh);
+
+    return resultEff;
 }
 
 //--------------------------------------------------------------------------------------------------
 // perform fit on one histogram for yield extraxtion
-void performFit(
-	Double_t &resNsig, Double_t &resErrl, Double_t &resErrh, Double_t &resChi2,
-    Double_t &resPurity, Double_t &resPurityErrl, Double_t &resPurityErrh,
-    TH1D *h_yield, const Int_t sigMod, const Int_t bkgMod,
-	const TString etaRegion, const Bool_t passRegion,
-    const Int_t iBin, const TString format, const Int_t fitStrategy
+void getZyield(
+    TH1D *h_yield,
+    const Int_t    iBin,         // Label of measurement in currect run
+    const Int_t    sigMod,
+    const Int_t    bkgMod,
+    const TString  etaRegion="",    // {BB, BE or EE}
+    const Bool_t   passRegion=true,
+    const TString  mcfilename="",
+    TH1D*          _hQCD=0,
+    TH1D*          hPV=0
 ){
+    std::cout<<">>> Do fit in "<< etaRegion <<" for Z yield extraction"<<std::endl;
 
     RooRealVar m("m", "mass", massLo, massHi);
     m.setBins(10000);
@@ -1001,11 +721,12 @@ void performFit(
     TFile *histfile = 0;
     TH1D *h=0;
     if(sigMod==2) {
-        histfile = new TFile(outputDir+"/histTemplates.root");
+        generateTemplate_ZYield(mcfilename, hPV);
+        histfile = new TFile(outputDir+"/histTemplates_HLT.root");
         if(passRegion)
-            h = (TH1D*)histfile->Get("h_mass_2HLT_"+etaRegion);
+            h = (TH1D*)histfile->Get("h_mass_pass_"+etaRegion);
         else
-            h = (TH1D*)histfile->Get("h_mass_1HLT_"+etaRegion);
+            h = (TH1D*)histfile->Get("h_mass_fail_"+etaRegion);
 
       assert(h);
     }
@@ -1022,70 +743,104 @@ void performFit(
     RooAddPdf modelPdf("modelTot","Z sig+bkg",RooArgList(*(sigModel->model),*(bkgModel->model)),RooArgList(Nsig,Nbkg));
 
     RooFitResult *fitResult=0;
+    RooFitResult *best_fitResult=0;
+    Int_t best_status = 0;
+    Double_t best_minNll = 0;
+    int i = 0;
+    do {
+        std::cout<<">>> Fit with strategy "<<i<<std::endl;
+        // different fit strategies:
+        // Strategy 0: just fit fail and pass region simultaneously in full range
+        // Strategy 1: first fit fail pdf in sideband range,
+        //    then in complete fail range, then fit fail and pass region simultaneously in full range
+        // Strategy 2: Same as 1 but with wider central region instead of sideband regions
 
-    if(fitStrategy == 1){
-        // fit bkg shape to sideband region only
-        m.setRange("backgroundLow", massLo, 76);
-        m.setRange("backgroundHigh", 106, massHi);
+        if(i == 1){
+            // fit bkg shape to sideband region only
+            m.setRange("backgroundLow", massLo, 76);
+            m.setRange("backgroundHigh", 106, massHi);
 
-        fitResult = bkgModel->model->fitTo(*data,
-            RooFit::Range("backgroundLow,backgroundHigh"),
+            fitResult = bkgModel->model->fitTo(*data,
+                RooFit::Range("backgroundLow,backgroundHigh"),
+                RooFit::PrintEvalErrors(-1),
+                RooFit::PrintLevel(-1),
+                RooFit::Warnings(0),
+                RooFit::Strategy(1), // MINOS STRATEGY
+                RooFit::Save());
+        }
+        if(i == 2){
+            // fit signal shape to central region only
+            m.setRange("signalCenter", 81, 101);
+
+            fitResult = sigModel->model->fitTo(*data,
+                RooFit::Range("signalCenter"),
+                RooFit::PrintEvalErrors(-1),
+                RooFit::PrintLevel(-1),
+                RooFit::Warnings(0),
+                RooFit::Strategy(1), // MINOS STRATEGY
+                RooFit::Save());
+        }
+
+        fitResult = modelPdf.fitTo(*data,
             RooFit::PrintEvalErrors(-1),
             RooFit::PrintLevel(-1),
             RooFit::Warnings(0),
+            RooFit::Extended(),
             RooFit::Strategy(1), // MINOS STRATEGY
+            //RooFit::Minos(RooArgSet()),
             RooFit::Save());
-    }
-    if(fitStrategy == 2){
-        // fit bkg shape to sideband region only
-        m.setRange("signalCenter", 81, 101);
 
-        fitResult = sigModel->model->fitTo(*data,
-            RooFit::Range("signalCenter"),
+        fitResult = modelPdf.fitTo(*data,
             RooFit::PrintEvalErrors(-1),
             RooFit::PrintLevel(-1),
             RooFit::Warnings(0),
+            RooFit::Extended(),
             RooFit::Strategy(1), // MINOS STRATEGY
+            //RooFit::Minos(RooArgSet()),
             RooFit::Save());
-    }
 
-    fitResult = modelPdf.fitTo(*data,
-        RooFit::PrintEvalErrors(-1),
-        RooFit::PrintLevel(-1),
-        RooFit::Warnings(0),
-        RooFit::Extended(),
-        RooFit::Strategy(1), // MINOS STRATEGY
-        //RooFit::Minos(RooArgSet()),
-        RooFit::Save());
+        if(fitResult->minNll() < best_minNll && fitResult->status() >= 2){
+            best_minNll = fitResult->minNll();
+            best_fitResult = fitResult;
+            best_status = fitResult->status();
+        }
 
-    // bkgModel->Print();
+        std::cout<<"---------------------------------------" <<std::endl;
+        std::cout<<"------ strategy = " << i << std::endl;
+        std::cout<<"------ -log(L)  = " << fitResult->minNll() <<std::endl;
+        std::cout<<"------ status   = " << fitResult->status() <<std::endl;
+        std::cout<<"---------------------------------------" <<std::endl;
 
-    fitResult = modelPdf.fitTo(*data,
-        RooFit::PrintEvalErrors(-1),
-        RooFit::PrintLevel(-1),
-        RooFit::Warnings(0),
-        RooFit::Extended(),
-        RooFit::Strategy(1), // MINOS STRATEGY
-        //RooFit::Minos(RooArgSet()),
-        RooFit::Save());
+        i++;
 
-    bkgModel->Print();
+    } while(i < 3 && best_status != 4);
 
-    const Int_t nEntries = (Int_t)h_yield->Integral();
+    RooFormulaVar purity("purity","Nsig/(Nsig+Nbkg)",RooArgList(Nsig,Nbkg));
 
-    resNsig  = Nsig.getVal();
-    resErrl = fabs(Nsig.getErrorLo());
-    resErrh = Nsig.getErrorHi();
-    resChi2 = 0.;
-    resPurity = resNsig/nEntries;
-    resPurityErrl = resErrh/resNsig;
-    resPurityErrh = resErrl/resNsig;
+    TFile *fFit = new TFile(
+        outputDir+"/workspace_yield_"+etaRegion+"_"+iBin+".root",
+        "RECREATE");
 
-    char pname[50];
-    char strPurity[100];
-    sprintf(strPurity,"purity = %.4f_{ -%.4f}^{ +%.4f}",resPurity,resPurityErrl,resPurityErrh);
-    resChi2 = make_plot(nfl, m, data, modelPdf, sigModel, bkgModel, fitResult,
-        Nsig, Nbkg, strPurity, nEntries, iBin, etaRegion, 0, passRegion);
+    // save all information in RooWorkspace
+    RooWorkspace* w = new RooWorkspace("workspace","Workspace");
+    w->import(purity);
+    w->import(*data);
+    w->import(modelPdf);
+    w->Write();
+
+    best_fitResult->Write("fitResult");
+
+    fFit->Write();
+    fFit->Close();
+
+    const Double_t chi2 = make_plot(nfl, m, data, modelPdf, sigModel, bkgModel,
+        best_fitResult, w, Nsig, Nbkg, h_yield->Integral(), iBin, etaRegion, 0, passRegion);
+
+    w->factory(Form("chi2pass[%f]",chi2));
+
+    std::cout<<"---------------------------------------"<<std::endl;
+    std::cout<<"------ chi2pass = " << chi2 <<std::endl;
+    std::cout<<"---------------------------------------"<<std::endl;
 
     delete sigModel;
     delete bkgModel;
@@ -1094,526 +849,691 @@ void performFit(
 
 //--------------------------------------------------------------------------------------------------
 // perform fit on two histograms for tag and probe efficiency
-void performFit(
-	Double_t &resEff, Double_t &resErrl, Double_t &resErrh, Double_t &resChi2Pass, Double_t &resChi2Fail, TH1D *passHist, TH1D *failHist,
-	const Int_t sigpass, const Int_t bkgpass, const Int_t sigfail, const Int_t bkgfail,
-	const TString bkgQCDTemplate, const TString bkgTTTemplate,
-	const TString effType, const Bool_t etaRegion, const Int_t iBin, const TString format, const Int_t fitStrategy
+void calculateDataEfficiency(
+        TH1D          *passHist,            // histogram with passing probes
+        TH1D          *failHist,            // histogram with failing probes
+		const Int_t   iBin,                 // Label of measurement number in currect run
+		const TString effType,              // "HLT" or "Sel" or "Glo" or "Sta" or "Trk"
+        const Bool_t  etaRegion,            // Barrel (0) or Endcap (1)
+		const Int_t   sigpass,              // signal model for PASS sample
+		const Int_t   bkgpass,              // background model for PASS sample
+		const Int_t   sigfail,              // signal model for FAIL sample
+		const Int_t   bkgfail,              // background model for FAIL sample
+        TH1D          *hPV=0,
+        const TString mcfilename="",        // ROOT file containing MC events to generate templates from
+        const TString bkgQCDFilename="",    // ROOT file containing bkg template
+        const TString bkgTTFilename=""
 ){
 
-  RooRealVar m("m","mass",massLo,massHi);
-  m.setBins(10000);
+    std::cout<<">>> Do fit in "<< (etaRegion ? "B" : "E") <<" for "<<effType<<std::endl;
 
-  RooCategory sample("sample","");
-  sample.defineType("Pass",1);
-  sample.defineType("Fail",2);
+    RooRealVar m("m","mass",massLo,massHi);
+    m.setBins(10000);
 
-  RooAbsData *dataPass=0;
-  RooAbsData *dataFail=0;
-  RooAbsData *dataCombined=0;
+    RooCategory sample("sample","");
+    sample.defineType("Pass",1);
+    sample.defineType("Fail",2);
 
-  dataPass     = new RooDataHist("dataPass","dataPass",RooArgSet(m),passHist);
-  dataFail     = new RooDataHist("dataFail","dataFail",RooArgSet(m),failHist);
-  dataCombined = new RooDataHist("dataCombined","dataCombined",RooArgList(m),
-                                   RooFit::Index(sample),
-                                   RooFit::Import("Pass",*((RooDataHist*)dataPass)),
-                                   RooFit::Import("Fail",*((RooDataHist*)dataFail)));
+    RooAbsData* dataPass=0;
+    RooAbsData* dataFail=0;
+    RooAbsData* dataCombined=0;
 
+    dataPass     = new RooDataHist("dataPass","dataPass",RooArgSet(m),passHist);
+    dataFail     = new RooDataHist("dataFail","dataFail",RooArgSet(m),failHist);
+    dataCombined = new RooDataHist("dataCombined","dataCombined",RooArgList(m),
+        RooFit::Index(sample),
+        RooFit::Import("Pass",*((RooDataHist*)dataPass)),
+        RooFit::Import("Fail",*((RooDataHist*)dataFail)));
 
-
-  TFile *histfile = 0;
-  if(sigpass==2 || sigfail==2) {
-    histfile = new TFile(outputDir+"/histTemplates.root");
-    assert(histfile);
-  }
-  std::vector<double> vBkgPars;
-  if(bkgfail== 2 or bkgfail==3){
-    vBkgPars = preFit(failHist);
-  }
-  TFile *histbkgQCDfile = 0;
-  // TFile *histbkgTTfile = 0;
-  if(bkgfail== 7 or bkgpass==7){
-    histbkgQCDfile = new TFile(bkgQCDTemplate);
-    assert(histbkgQCDfile);
-    // if(bkgfail== 7 or bkgpass==7){
-    //   histbkgTTfile =  new TFile(bkgTTTemplate);
-    //   assert(histbkgTTfile);
-    // }
-  }
-  TH1D *hbkgQCDPass = 0;
-  TH1D *hbkgQCDFail = 0;
-  // TH1D *hbkgTTPass = 0;
-  // TH1D *hbkgTTFail = 0;
-  if(bkgpass == 7){
-    TH2D* hbkg = (TH2D*)histbkgQCDfile->Get(Form("h_mass_%s_pass_%s", effType.Data(), etaRegion ? "forward" : "central"));
-    hbkgQCDPass = hbkg->ProjectionY();
-    // smoothening - careful: can introduce bias
-    // hbkgQCDPass->GetXaxis()->SetRangeUser(massLo,massHi);
-    // hbkgQCDPass->Smooth(10000,"R");
-    assert(hbkgQCDPass);
-    // if(bkgpass == 7){
-    //   hbkgTTPass = (TH1D*)histbkgTTfile->Get(Form("bkg_template_%s%s", effType.Data(), "Pass"));
-    //   assert(hbkgTTPass);
-    // }
-  }
-  if(bkgfail == 7){
-    TH2D* hbkg = (TH2D*)histbkgQCDfile->Get(Form("h_mass_%s_fail_%s", effType.Data(), etaRegion ? "forward" : "central"));
-    hbkgQCDFail = hbkg->ProjectionY();
-    // smoothening - careful: can introduce bias
-    // hbkgQCDFail->GetXaxis()->SetRangeUser(massLo,massHi);
-    // hbkgQCDFail->Smooth(10000,"R");
-    assert(hbkgQCDFail);
-    // if(bkgfail == 7){
-    //   hbkgTTFail = (TH1D*)histbkgTTfile->Get(Form("bkg_template_%s%s", effType.Data(), "Fail"));
-    //   assert(hbkgTTFail);
-    // }
-  }
-
-  CSignalModel     *sigPass = 0;
-  CBackgroundModel *bkgPass = 0;
-  CSignalModel     *sigFail = 0;
-  CBackgroundModel *bkgFail = 0;
-
-  Int_t nflpass=0, nflfail=0;
-
-  TH1D *h=0;
-  if(sigpass==2) {
-    h = (TH1D*)histfile->Get(Form("h_mass_pass_%s", etaRegion ? "forward" : "central"));
-    h->SetDirectory(0);
-  }
-
-  nflpass += set_signal_model(sigpass, sigPass, m, kTRUE, 0, h);
-  nflpass += set_background_model(bkgpass, bkgPass, m, kTRUE, 0, hbkgQCDPass);
-
-  if(sigfail==2) {
-    TH1D *h = (TH1D*)histfile->Get(Form("h_mass_fail_%s", etaRegion ? "forward" : "central"));
-    h->SetDirectory(0);
-  }
-
-  nflfail += set_signal_model(sigfail, sigFail, m, kFALSE, 0, h);
-  nflfail += set_background_model(bkgfail, bkgFail, m, kFALSE, 0, hbkgQCDFail, &vBkgPars);
-
-
-  Double_t NsigMax     = passHist->Integral()+failHist->Integral();
-  Double_t NbkgFailMax = failHist->Integral();
-  Double_t NbkgPassMax = passHist->Integral();
-  RooRealVar Nsig("Nsig","Signal Yield",NsigMax,0,1.5*NsigMax);
-  RooRealVar eff("eff","Efficiency",0.98,0.,1.0);
-  RooRealVar NbkgPass("NbkgPass","Background count in PASS sample",0.01*NbkgPassMax, 0.0, NbkgPassMax);
-  if(bkgpass==0) NbkgPass.setVal(0);
-  RooRealVar NbkgFail("NbkgFail","Background count in FAIL sample",0.1*NbkgFailMax, 0.0, NbkgFailMax);
-
-  RooFormulaVar NsigPass("NsigPass","eff*Nsig",RooArgList(eff,Nsig));
-  RooFormulaVar NsigFail("NsigFail","(1.0-eff)*Nsig",RooArgList(eff,Nsig));
-
-  RooAddPdf modelPass("modelPass","Model for PASS sample",
-                              (bkgpass>0) ? RooArgList(*(sigPass->model),*(bkgPass->model)) :  RooArgList(*(sigPass->model)),
-                              (bkgpass>0) ? RooArgList(NsigPass,NbkgPass) : RooArgList(NsigPass));
-  RooAddPdf modelFail("modelFail","Model for FAIL sample",RooArgList(*(sigFail->model),*(bkgFail->model)),RooArgList(NsigFail,NbkgFail));
-
-  RooSimultaneous totalPdf("totalPdf","totalPdf",sample);
-  totalPdf.addPdf(modelPass,"Pass");
-  totalPdf.addPdf(modelFail,"Fail");
-
-  RooFitResult *fitResult=0;
-  Int_t strategy = 2;
-  if(effType == "Sel" or effType == "HLT") {
-    Nsig.setRange(0,2.0*NsigMax);
-    strategy=1;
-  }
-
-  RooMsgService::instance().setSilentMode(kTRUE);
-  // fit bkg shape in failing probes to sideband region only
-
-  // different fit strategies:
-  // Strategy 0: just fit fail and pass region simultaneously in full range
-  // Strategy 1: first fit fail pdf in sideband range,
-  //    then in complete fail range, then fit fail and pass region simultaneously in full range
-  // Strategy 2: Same as 1 but with wider sideband regions
-
-  std::cout<<">>> Fit with strategy "<<fitStrategy<<std::endl;
-
-    if(fitStrategy > 0) {
-
-        if(fitStrategy==1) {
-            m.setRange("rangeLow", massLo, 81);
-            m.setRange("rangeHigh", 101, massHi);
-        }
-        else{
-            m.setRange("rangeLow", massLo, 76);
-            m.setRange("rangeHigh", 106, massHi);
-        }
-
-        std::cout<<">>> Fit sideband regions in fail"<<std::endl;
-
-        fitResult = bkgFail->model->fitTo(*dataFail,
-                                 RooFit::Range("rangeLow,rangeHigh"),
-                                 RooFit::PrintEvalErrors(-1),
-                                 RooFit::PrintLevel(-1),
-                                 RooFit::Warnings(0),
-                                 RooFit::Strategy(strategy), // MINUIT STRATEGY
-                                 RooFit::Save());
-
-        std::cout<<">>> Fit full range pdf in fail "<<std::endl;
-        // fit total pdf in Fail
-        fitResult = modelFail.fitTo(*dataFail,
-                                RooFit::PrintEvalErrors(-1),
-                                RooFit::PrintLevel(-1),
-                                RooFit::Warnings(0),
-                                RooFit::Extended(1),
-                                RooFit::Strategy(strategy), // MINUIT STRATEGY
-                                RooFit::Save());
+    TFile *histfile = 0;
+    if(sigpass==2 || sigfail==2) {
+        generateTemplate(mcfilename, effType, hPV);
+        histfile = new TFile(outputDir+"/histTemplates_"+effType+".root");
+        assert(histfile);
+    }
+    std::vector<double> vBkgPars;
+    if(bkgfail== 2 or bkgfail==3){
+        vBkgPars = preFit(failHist);
+    }
+    TFile *histbkgQCDfile = 0;
+    // TFile *histbkgTTfile = 0;
+    if(bkgfail== 7 or bkgpass==7){
+        histbkgQCDfile = new TFile(bkgQCDFilename);
+        assert(histbkgQCDfile);
+        // if(bkgfail== 7 or bkgpass==7){
+        //   histbkgTTfile =  new TFile(bkgTTTemplate);
+        //   assert(histbkgTTfile);
+        // }
+    }
+    TH1D *hbkgQCDPass = 0;
+    TH1D *hbkgQCDFail = 0;
+    // TH1D *hbkgTTPass = 0;
+    // TH1D *hbkgTTFail = 0;
+    if(bkgpass == 7){
+        TH2D* hbkg = (TH2D*)histbkgQCDfile->Get(
+            Form("h_mass_%s_pass_%s", effType.Data(), etaRegion ? "forward" : "central"));
+        hbkgQCDPass = hbkg->ProjectionY();
+        // smoothening - careful: can introduce bias
+        // hbkgQCDPass->GetXaxis()->SetRangeUser(massLo,massHi);
+        // hbkgQCDPass->Smooth(10000,"R");
+        assert(hbkgQCDPass);
+        // if(bkgpass == 7){
+        //   hbkgTTPass = (TH1D*)histbkgTTfile->Get(Form("bkg_template_%s%s", effType.Data(), "Pass"));
+        //   assert(hbkgTTPass);
+        // }
+    }
+    if(bkgfail == 7){
+        TH2D* hbkg = (TH2D*)histbkgQCDfile->Get(
+            Form("h_mass_%s_fail_%s", effType.Data(), etaRegion ? "forward" : "central"));
+        hbkgQCDFail = hbkg->ProjectionY();
+        // smoothening - careful: can introduce bias
+        // hbkgQCDFail->GetXaxis()->SetRangeUser(massLo,massHi);
+        // hbkgQCDFail->Smooth(10000,"R");
+        assert(hbkgQCDFail);
+        // if(bkgfail == 7){
+        //   hbkgTTFail = (TH1D*)histbkgTTfile->Get(Form("bkg_template_%s%s", effType.Data(), "Fail"));
+        //   assert(hbkgTTFail);
+        // }
     }
 
-    fitResult = totalPdf.fitTo(*dataCombined,
-                           RooFit::PrintEvalErrors(-1),
-                           RooFit::PrintLevel(-1),
-                           RooFit::Warnings(0),
-                           RooFit::Extended(1),
-                           RooFit::Strategy(strategy), // MINUIT STRATEGY
-                           RooFit::Minos(RooArgSet(eff)),
-                           RooFit::Save());
+    CSignalModel     *sigPass = 0;
+    CBackgroundModel *bkgPass = 0;
+    CSignalModel     *sigFail = 0;
+    CBackgroundModel *bkgFail = 0;
 
-    fitResult = totalPdf.fitTo(*dataCombined,
-                           RooFit::PrintEvalErrors(-1),
-                           RooFit::PrintLevel(-1),
-                           RooFit::Warnings(0),
-                           RooFit::Extended(1),
-                           RooFit::Strategy(strategy), // MINUIT STRATEGY
-                           RooFit::Minos(RooArgSet(eff)),
-                           RooFit::Save());
+    Int_t nflpass=0, nflfail=0;
 
-  bkgFail->Print();
-  bkgPass->Print();
+    TH1D *hPass=0;
+    if(sigpass==2) {
+        hPass = (TH1D*)histfile->Get(Form("h_mass_pass_%s", etaRegion ? "forward" : "central"));
+        hPass->SetDirectory(0);
+    }
 
-  resEff  = eff.getVal();
-  resErrl = fabs(eff.getErrorLo());
-  resErrh = eff.getErrorHi();
+    nflpass += set_signal_model(sigpass, sigPass, m, kTRUE, 0, hPass);
+    nflpass += set_background_model(bkgpass, bkgPass, m, kTRUE, 0, hbkgQCDPass);
 
-  char effstr[100];
-  sprintf(effstr,"#varepsilon = %.4f_{ -%.4f}^{ +%.4f}",resEff,resErrl,resErrh);
+    TH1D *hFail=0;
+    if(sigfail==2) {
+        hFail = (TH1D*)histfile->Get(Form("h_mass_fail_%s", etaRegion ? "forward" : "central"));
+        hFail->SetDirectory(0);
+    }
 
-  resChi2Pass = make_plot(nflpass, m, dataPass, modelPass,
-      sigPass, bkgPass, fitResult, NsigPass, NbkgPass, effstr, passHist->Integral(), iBin, effType.Data(), etaRegion, kTRUE);
+    nflfail += set_signal_model(sigfail, sigFail, m, kFALSE, 0, hFail);
+    nflfail += set_background_model(bkgfail, bkgFail, m, kFALSE, 0, hbkgQCDFail, &vBkgPars);
 
-  Double_t yMax = 0.;
-  if(effType == "Glo")
-    yMax = 1.5*failHist->GetMaximum();
+    Double_t NsigMax     = passHist->Integral()+failHist->Integral();
+    Double_t NbkgFailMax = failHist->Integral();
+    Double_t NbkgPassMax = passHist->Integral();
+    RooRealVar Nsig("Nsig","Signal Yield",NsigMax,0,1.5*NsigMax);
+    RooRealVar eff("eff","Efficiency",0.98,0.,1.0);
+    RooRealVar NbkgPass("NbkgPass","Background count in PASS sample",0.01*NbkgPassMax, 0.0, NbkgPassMax);
+    if(bkgpass==0)
+        NbkgPass.setVal(0);
+    RooRealVar NbkgFail("NbkgFail","Background count in FAIL sample",0.1*NbkgFailMax, 0.0, NbkgFailMax);
 
-  resChi2Fail = make_plot(nflfail, m, dataFail, modelFail,
-      sigFail, bkgFail, fitResult, NsigFail, NbkgFail, effstr, failHist->Integral(), iBin, effType.Data(), etaRegion, kFALSE, yMax);
+    RooFormulaVar NsigPass("NsigPass","eff*Nsig",RooArgList(eff,Nsig));
+    RooFormulaVar NsigFail("NsigFail","(1.0-eff)*Nsig",RooArgList(eff,Nsig));
 
+    RooAddPdf modelPass("modelPass","Model for PASS sample",
+        (bkgpass>0) ? RooArgList(*(sigPass->model),*(bkgPass->model)) :  RooArgList(*(sigPass->model)),
+        (bkgpass>0) ? RooArgList(NsigPass,NbkgPass) : RooArgList(NsigPass));
+    RooAddPdf modelFail("modelFail","Model for FAIL sample",
+        RooArgList(*(sigFail->model),*(bkgFail->model)),RooArgList(NsigFail,NbkgFail));
 
-  delete dataCombined;
-  delete dataPass;
-  delete dataFail;
-  delete sigPass;
-  delete bkgPass;
-  delete sigFail;
-  delete bkgFail;
-  delete histfile;
-  delete histbkgQCDfile;
-  // delete histbkgTTfile;
+    RooSimultaneous totalPdf("totalPdf","totalPdf",sample);
+    totalPdf.addPdf(modelPass,"Pass");
+    totalPdf.addPdf(modelFail,"Fail");
+
+    Int_t strategy = 2;
+    if(effType == "Sel" or effType == "HLT") {
+        Nsig.setRange(0,2.0*NsigMax);
+        strategy=1;
+    }
+
+    RooMsgService::instance().setSilentMode(kTRUE);
+
+    RooFitResult *fitResult=0;
+    RooFitResult *best_fitResult=0;
+    Int_t best_status = 0;
+    Double_t best_minNll = 0;
+    int i = 0;
+    do {
+        std::cout<<">>> Fit with strategy "<<i<<std::endl;
+        // different fit strategies:
+        // Strategy 0: just fit fail and pass region simultaneously in full range
+        // Strategy 1: first fit fail pdf in sideband range,
+        //    then in complete fail range, then fit fail and pass region simultaneously in full range
+        // Strategy 2: Same as 1 but with wider sideband regions
+
+        if(i > 0) {
+
+            if(i==1) {
+                m.setRange("rangeLow", massLo, 81);
+                m.setRange("rangeHigh", 101, massHi);
+            }
+            else{
+                m.setRange("rangeLow", massLo, 76);
+                m.setRange("rangeHigh", 106, massHi);
+            }
+
+            std::cout<<">>> Fit sideband regions in fail"<<std::endl;
+
+            fitResult = bkgFail->model->fitTo(*dataFail,
+                RooFit::Range("rangeLow,rangeHigh"),
+                RooFit::PrintEvalErrors(-1),
+                RooFit::PrintLevel(-1),
+                RooFit::Warnings(0),
+                RooFit::Strategy(strategy), // MINUIT STRATEGY
+                RooFit::Save());
+
+            std::cout<<">>> Fit full range pdf in fail "<<std::endl;
+            // fit total pdf in Fail
+            fitResult = modelFail.fitTo(*dataFail,
+                RooFit::PrintEvalErrors(-1),
+                RooFit::PrintLevel(-1),
+                RooFit::Warnings(0),
+                RooFit::Extended(1),
+                RooFit::Strategy(strategy), // MINUIT STRATEGY
+                RooFit::Save());
+        }
+
+        fitResult = totalPdf.fitTo(*dataCombined,
+            RooFit::PrintEvalErrors(-1),
+            RooFit::PrintLevel(-1),
+            RooFit::Warnings(0),
+            RooFit::Extended(1),
+            RooFit::Strategy(strategy), // MINUIT STRATEGY
+            RooFit::Minos(RooArgSet(eff)),
+            RooFit::Save());
+
+        fitResult = totalPdf.fitTo(*dataCombined,
+            RooFit::PrintEvalErrors(-1),
+            RooFit::PrintLevel(-1),
+            RooFit::Warnings(0),
+            RooFit::Extended(1),
+            RooFit::Strategy(strategy), // MINUIT STRATEGY
+            RooFit::Minos(RooArgSet(eff)),
+            RooFit::Save());
+
+        if(fitResult->minNll() < best_minNll && fitResult->status() >= 2){
+            best_minNll = fitResult->minNll();
+            best_fitResult = fitResult;
+            best_status = fitResult->status();
+        }
+
+        std::cout<<"---------------------------------------" <<std::endl;
+        std::cout<<"------ strategy = " << i << std::endl;
+        std::cout<<"------ -log(L)  = " << fitResult->minNll() <<std::endl;
+        std::cout<<"------ status   = " << fitResult->status() <<std::endl;
+        std::cout<<"---------------------------------------" <<std::endl;
+
+        i++;
+
+    } while(i < 3 && best_status != 4);
+
+    TFile *fFit = new TFile(
+        Form(outputDir+"/workspace_%s_%s_%i.root", effType.Data(), etaRegion ? "E" : "B", iBin),
+        "RECREATE");
+
+    // save all information in RooWorkspace
+    RooWorkspace* w = new RooWorkspace("workspace","Workspace");
+    w->import(*dataCombined);
+    w->import(totalPdf);
+    w->Write();
+
+    best_fitResult->Write("fitResult");
+
+    fFit->Write();
+    fFit->Close();
+
+    bkgFail->Print();
+    bkgPass->Print();
+
+    const Double_t chi2pass = make_plot(nflpass, m, dataPass, modelPass,
+        sigPass, bkgPass, best_fitResult, w, NsigPass, NbkgPass, passHist->Integral(), iBin,
+        effType.Data(), etaRegion, kTRUE);
+
+    Double_t yMax = 0.;
+    if(effType == "Glo")
+        yMax = 1.5*failHist->GetMaximum();
+
+    const Double_t chi2fail = make_plot(nflfail, m, dataFail, modelFail,
+        sigFail, bkgFail, best_fitResult, w, NsigFail, NbkgFail, failHist->Integral(), iBin,
+        effType.Data(), etaRegion, kFALSE, yMax);
+
+    w->factory(Form("chi2pass[%f]",chi2pass));
+    w->factory(Form("chi2fail[%f]",chi2fail));
+
+    std::cout<<"---------------------------------------"<<std::endl;
+    std::cout<<"------ chi2pass = " << chi2pass <<std::endl;
+    std::cout<<"------ chi2fail = " << chi2fail <<std::endl;
+    std::cout<<"---------------------------------------"<<std::endl;
+
+    delete dataCombined;
+    delete dataPass;
+    delete dataFail;
+    delete sigPass;
+    delete bkgPass;
+    delete sigFail;
+    delete bkgFail;
+    delete histfile;
+    delete histbkgQCDfile;
+    // delete histbkgTTfile;
 }
 
 //--------------------------------------------------------------------------------------------------
-// perform fit on multiple histograms for simultaneous HLT efficiency and signal yield extraction
-// The extraction is based on the following:
-//   The number of Z->mumu events where 1 HLT has fired is:
-//     N_1 = 2 * epsilon_HLT * (1 - epsilon_HLT) * N_Z + N_Bkg_1
-//   The number of Z->mumu events where 2 HLT have fired is:
-//     N_2 = epsilon_HLT^2 * N_Z + N_Bkg_1
-void performCombinedFit(
-	Double_t &resEffB, Double_t &resErrBl, Double_t &resErrBh,
-    Double_t &resEffE, Double_t &resErrEl, Double_t &resErrEh,
-    Double_t &resYieldBB, Double_t &resYieldBBl, Double_t &resYieldBBh,
-    Double_t &resYieldEE, Double_t &resYieldEEl, Double_t &resYieldEEh,
-    Double_t &resYieldBE, Double_t &resYieldBEl, Double_t &resYieldBEh,
-    Double_t &resChi2PassBB, Double_t &resChi2FailBB,
-    Double_t &resChi2PassEE, Double_t &resChi2FailEE,
-    Double_t &resChi2PassBE, Double_t &resChi2FailBE,
-    TH1D *passHistBB, TH1D *failHistBB,
-    TH1D *passHistEE, TH1D *failHistEE,
-    TH1D *passHistBE, TH1D *failHistBE,
-    Double_t cBB_, Double_t cBE_, Double_t cEE_,
-	const Int_t sigpass, const Int_t bkgpass, const Int_t sigfail, const Int_t bkgfail,
-	const TString bkgQCDTemplate, const TString bkgTTTemplate,
-    const Int_t iBin,
-    const TString format,
-    const Int_t fitStrategy
+// perform simultaneous fit in three histograms for global muon efficiency
+void calculateGloEfficiency(
+        TH1D          *passHist,            // hist with global muon passing probes
+        TH1D          *failHistTrk,         // hist with inner track failing probes
+        TH1D          *failHistSta,         // hist with outer track failing probes
+		const Int_t   iBin,                 // Label of measurement number in currect run
+        const Bool_t  etaRegion,            // Barrel (1) or Endcap (0)
+		const Int_t   sigpass,              // signal extraction method for PASS sample
+		const Int_t   bkgpass,              // background model for PASS sample
+		const Int_t   sigfail,              // signal extraction method for FAIL sample
+		const Int_t   bkgfail,              // background model for FAIL sample
+        TH1D          *hPV=0,
+        const TString mcfilename="",        // ROOT file containing DY MC events to generate templates from
+        const TString bkgQCDFilename="",    // ROOT file containing bkg template
+        const TString bkgTTFilename=""
+){
+
+    std::cout<<">>> Do fit in "<< (etaRegion ? "B" : "E") <<" for "<<std::endl;
+
+    RooRealVar m("m","mass",massLo,massHi);
+    m.setBins(10000);
+
+    RooCategory sample("sample","");
+    sample.defineType("Pass",1);
+    sample.defineType("FailTrk",2);
+    sample.defineType("FailSta",3);
+
+    RooAbsData *dataPass=0;
+    RooAbsData *dataFailTrk=0;
+    RooAbsData *dataFailSta=0;
+    RooAbsData *dataCombined=0;
+
+    dataPass     = new RooDataHist("dataPass","dataPass",RooArgSet(m),passHist);
+    dataFailTrk  = new RooDataHist("dataFailTrk","dataFailTrk",RooArgSet(m),failHistTrk);
+    dataFailSta  = new RooDataHist("dataFailSta","dataFailSta",RooArgSet(m),failHistSta);
+    dataCombined = new RooDataHist("dataCombined","dataCombined",RooArgList(m),
+        RooFit::Index(sample),
+        RooFit::Import("Pass",*((RooDataHist*)dataPass)),
+        RooFit::Import("FailTrk",*((RooDataHist*)dataFailTrk)),
+        RooFit::Import("FailSta",*((RooDataHist*)dataFailSta))
+        );
+
+    TFile *histfileTrk = 0;
+    TFile *histfileSta = 0;
+    if(sigpass==2 || sigfail==2) {
+        // Generate histogram templates from MC (if necessary)
+        generateTemplate(mcfilename, "Sta", hPV);
+        generateTemplate(mcfilename, "Trk", hPV);
+        histfileTrk = new TFile(outputDir+"/histTemplates_Trk.root");
+        histfileSta = new TFile(outputDir+"/histTemplates_Sta.root");
+        assert(histfileTrk);
+        assert(histfileSta);
+    }
+
+    CSignalModel     *sigPass = 0;
+    CBackgroundModel *bkgPass = 0;
+    CSignalModel     *sigFailTrk = 0;
+    CBackgroundModel *bkgFailTrk = 0;
+    CSignalModel     *sigFailSta = 0;
+    CBackgroundModel *bkgFailSta = 0;
+
+    Int_t nflpass=0, nflfailTrk=0, nflfailSta=0;
+
+    TH1D *h=0;
+    if(sigpass==2) {
+        // Sta pass == Trk pass =: Glo
+        h = (TH1D*)histfileSta->Get(Form("h_mass_pass_%s", etaRegion ? "forward" : "central"));
+        h->SetDirectory(0);
+    }
+
+    nflpass += set_signal_model(sigpass, sigPass, m, kTRUE, 0, h);
+    nflpass += set_background_model(bkgpass, bkgPass, m, kTRUE, 0);
+
+    TH1D *hSta = 0;
+    TH1D *hTrk = 0;
+    if(sigfail==2) {
+        hTrk = (TH1D*)histfileTrk->Get(Form("h_mass_fail_%s", etaRegion ? "forward" : "central"));
+        hSta = (TH1D*)histfileSta->Get(Form("h_mass_fail_%s", etaRegion ? "forward" : "central"));
+        hTrk->SetDirectory(0);
+        hSta->SetDirectory(0);
+    }
+
+    nflfailTrk += set_signal_model(sigfail, sigFailTrk, m, kFALSE, 0, hTrk);
+    nflfailTrk += set_background_model(bkgfail, bkgFailTrk, m, kFALSE, 0);
+    nflfailSta += set_signal_model(sigfail, sigFailSta, m, kFALSE, 1, hSta);
+    nflfailSta += set_background_model(bkgfail, bkgFailSta, m, kFALSE, 1);
+
+    Double_t NsigMax = passHist->Integral() + failHistTrk->Integral() + failHistSta->Integral();
+    Double_t NbkgFailTrkMax = failHistTrk->Integral();
+    Double_t NbkgFailStaMax = failHistSta->Integral();
+    Double_t NbkgPassMax = passHist->Integral();
+
+    RooRealVar Nsig("Nsig","Signal Yield",NsigMax,0,1.5*NsigMax);
+    RooRealVar effTrk("effTrk","Tracking Efficiency",0.98,0.,1.0);
+    RooRealVar effSta("effSta","Standalone Efficiency",0.98,0.,1.0);
+
+    RooRealVar NbkgPass("NbkgPass","Background count in PASS sample",0.01*NbkgPassMax, 0.0, NbkgPassMax);
+
+    if(bkgpass==0)
+        NbkgPass.setVal(0);
+    RooRealVar NbkgFailTrk("NbkgFailTrk", "Background count in Trk FAIL sample",
+        0.8*NbkgFailTrkMax, 0.0, NbkgFailTrkMax);
+    RooRealVar NbkgFailSta("NbkgFailSta", "Background count in Sta FAIL sample",
+        0.9*NbkgFailStaMax, 0.0, NbkgFailStaMax);
+
+    RooFormulaVar NsigPass("NsigPass","effTrk*effSta*Nsig",RooArgList(effTrk, effSta, Nsig));
+    RooFormulaVar NsigFailTrk("NsigFailTrk","effSta*(1.0-effTrk)*Nsig",RooArgList(effSta,effTrk,Nsig));
+    RooFormulaVar NsigFailSta("NsigFailSta","effTrk*(1.0-effSta)*Nsig",RooArgList(effTrk,effSta,Nsig));
+
+    RooAddPdf modelPass("modelPass","Model for PASS sample",
+        (bkgpass>0) ? RooArgList(*(sigPass->model),*(bkgPass->model)) :  RooArgList(*(sigPass->model)),
+        (bkgpass>0) ? RooArgList(NsigPass,NbkgPass) : RooArgList(NsigPass));
+    RooAddPdf modelFailTrk("modelFailTrk","Model for Trk FAIL sample",
+        RooArgList(*(sigFailTrk->model),*(bkgFailTrk->model)),RooArgList(NsigFailTrk, NbkgFailTrk));
+    RooAddPdf modelFailSta("modelFailSta","Model for Sta FAIL sample",
+        RooArgList(*(sigFailSta->model),*(bkgFailSta->model)),RooArgList(NsigFailSta, NbkgFailSta));
+
+    RooSimultaneous totalPdf("totalPdf","totalPdf",sample);
+    totalPdf.addPdf(modelPass,"Pass");
+    totalPdf.addPdf(modelFailTrk,"FailTrk");
+    totalPdf.addPdf(modelFailSta,"FailSta");
+
+    RooMsgService::instance().setSilentMode(kTRUE);
+
+    Int_t strategy = 2;
+    RooFitResult *fitResult=0;
+    RooFitResult *best_fitResult=0;
+    Int_t best_status = 0;
+    Double_t best_minNll = 0;
+    int i = 0;
+    do {
+        std::cout<<">>> Fit with strategy "<<i<<std::endl;
+        // different fit strategies:
+        // Strategy 0: just fit fail and pass region simultaneously in full range
+        // Strategy 1: first fit fail pdf in sideband range,
+        //    then in complete fail range, then fit fail and pass region simultaneously in full range
+        // Strategy 2: Same as 1 but with wider sideband regions
+
+        if(i > 0) {
+
+            if(i==1) {
+                m.setRange("rangeLow", massLo, 81);
+                m.setRange("rangeHigh", 101, massHi);
+            }
+            else{
+                m.setRange("rangeLow", massLo, 76);
+                m.setRange("rangeHigh", 106, massHi);
+            }
+
+            std::cout<<">>> Prefit Trk"<<std::endl;
+            // Tracking
+            effSta.setConstant(kTRUE);
+            // fit background pdf in Fail sideband region
+            fitResult = bkgFailTrk->model->fitTo(*dataFailTrk,
+                RooFit::Range("rangeLow,rangeHigh"),
+                RooFit::PrintEvalErrors(-1),
+                RooFit::PrintLevel(-1),
+                RooFit::Warnings(0),
+                RooFit::Strategy(strategy), // MINUIT STRATEGY
+                RooFit::Minos(RooArgSet(effTrk)),
+                RooFit::Save());
+
+            // fit total pdf in Fail
+            fitResult = modelFailTrk.fitTo(*dataFailTrk,
+                RooFit::PrintEvalErrors(-1),
+                RooFit::PrintLevel(-1),
+                RooFit::Warnings(0),
+                RooFit::Extended(1),
+                RooFit::Strategy(strategy), // MINUIT STRATEGY
+                RooFit::Minos(RooArgSet(effTrk)),
+                RooFit::Save());
+
+            effSta.setConstant(kFALSE);
+
+            std::cout<<">>> Prefit Sta"<<std::endl;
+
+            effTrk.setConstant(kTRUE);
+
+            fitResult = bkgFailSta->model->fitTo(*dataFailSta,
+                RooFit::Range("rangeLow,rangeHigh"),
+                RooFit::PrintEvalErrors(-1),
+                RooFit::PrintLevel(-1),
+                RooFit::Warnings(0),
+                RooFit::Strategy(strategy), // MINUIT STRATEGY
+                RooFit::Minos(RooArgSet(effSta)),
+                RooFit::Save());
+
+            fitResult = modelFailSta.fitTo(*dataFailSta,
+                RooFit::PrintEvalErrors(-1),
+                RooFit::PrintLevel(-1),
+                RooFit::Warnings(0),
+                RooFit::Extended(1),
+                RooFit::Strategy(strategy), // MINUIT STRATEGY
+                RooFit::Minos(RooArgSet(effSta)),
+                RooFit::Save());
+
+            effTrk.setConstant(kFALSE);
+        }
+
+        fitResult = totalPdf.fitTo(*dataCombined,
+            RooFit::PrintEvalErrors(-1),
+            RooFit::PrintLevel(-1),
+            RooFit::Warnings(0),
+            RooFit::Extended(1),
+            RooFit::Strategy(strategy), // MINUIT STRATEGY
+            RooFit::Minos(RooArgSet(effTrk, effSta)),
+            RooFit::Save());
+
+        fitResult = totalPdf.fitTo(*dataCombined,
+            RooFit::PrintEvalErrors(-1),
+            RooFit::PrintLevel(-1),
+            RooFit::Warnings(0),
+            RooFit::Extended(1),
+            RooFit::Strategy(strategy), // MINUIT STRATEGY
+            RooFit::Minos(RooArgSet(effTrk, effSta)),
+            RooFit::Save());
+
+        if(fitResult->minNll() < best_minNll && fitResult->status() >= 2){
+            best_minNll = fitResult->minNll();
+            best_fitResult = fitResult;
+            best_status = fitResult->status();
+        }
+
+        std::cout<<"---------------------------------------"<<std::endl;
+        std::cout<<"------ strategy = " << i <<std::endl;
+        std::cout<<"------ -log(L)  = " << fitResult->minNll() <<std::endl;
+        std::cout<<"------ status   = " << fitResult->status() <<std::endl;
+        std::cout<<"---------------------------------------"<<std::endl;
+
+        i++;
+
+    } while(i < 3 && best_status != 4);
+
+    TFile *fFit = new TFile(
+        Form(outputDir+"/workspace_Glo_%s_%i.root", etaRegion ? "E" : "B", iBin),
+        "RECREATE");
+
+    // calculate global muon efficiency with error propagation
+    RooFormulaVar effGlo("effGlo","effTrk*effSta",RooArgList(effTrk, effSta));
+
+    // save all information in RooWorkspace
+    RooWorkspace* w = new RooWorkspace("workspace","Workspace");
+    w->import(effGlo);
+    w->import(*dataCombined);
+    w->import(totalPdf);
+    w->Write();
+
+    best_fitResult->Write("fitResult");
+
+    fFit->Write();
+    fFit->Close();
+
+    const Double_t chi2pass = make_plot(nflpass, m, dataPass, modelPass,
+        sigPass, bkgPass, best_fitResult, w, NsigPass, NbkgPass,
+        passHist->Integral(), iBin, "Glo", etaRegion, kTRUE);
+
+    Double_t yMax = 1.5*failHistTrk->GetMaximum();
+
+    const Double_t chi2failTrk = make_plot(nflfailTrk, m, dataFailTrk, modelFailTrk,
+        sigFailTrk, bkgFailTrk, best_fitResult, w, NsigFailTrk, NbkgFailTrk,
+        failHistTrk->Integral(), iBin, "Trk", etaRegion, kFALSE);
+
+    yMax = 1.5*failHistSta->GetMaximum();
+
+    const Double_t chi2failSta = make_plot(nflfailSta, m, dataFailSta, modelFailSta,
+        sigFailSta, bkgFailSta, best_fitResult, w, NsigFailSta, NbkgFailSta,
+        failHistSta->Integral(), iBin, "Sta", etaRegion, kFALSE);
+
+    w->factory(Form("chi2pass[%f]",chi2pass));
+    w->factory(Form("chi2failSta[%f]",chi2failSta));
+    w->factory(Form("chi2failTrk[%f]",chi2failTrk));
+
+    std::cout<<"---------------------------------------"<<std::endl;
+    std::cout<<"------ chi2pass = " << chi2pass <<std::endl;
+    std::cout<<"------ chi2failSta = " << chi2failSta <<std::endl;
+    std::cout<<"------ chi2failTrk = " << chi2failTrk <<std::endl;
+    std::cout<<"---------------------------------------"<<std::endl;
+
+    delete dataCombined;
+    delete dataPass;
+    delete dataFailTrk;
+    delete dataFailSta;
+    delete sigPass;
+    delete bkgPass;
+    delete sigFailTrk;
+    delete bkgFailTrk;
+    delete sigFailSta;
+    delete bkgFailSta;
+    delete histfileSta;
+    delete histfileTrk;
+    // delete histbkgTTfile;
+}
+
+//--------------------------------------------------------------------------------------------------
+// perform fit in 2 region (1HLT and 2HLT) to extract the Z yield and efficiency together
+void calculateHLTEfficiencyAndYield(
+    TH1D          *passHist,            // histogram with events where both muon pass HLT
+    TH1D          *failHist,            // histogram with events where one muon pass HLT
+	const Int_t   iBin,                 // Label of measurement number in currect run
+    const TString etaRegion,            // {BB, BE, EE}
+	const Int_t   sigpass,              // signal model for PASS sample
+	const Int_t   bkgpass,              // background model for PASS sample
+	const Int_t   sigfail,              // signal model for FAIL sample
+	const Int_t   bkgfail,              // background model for FAIL sample
+    const Double_t corr = 1.,           // correlation factors for second muon
+    TH1D          *hPV=0,
+    const TString mcfilename="",        // ROOT file containing MC events to generate templates from
+    const TString bkgQCDFilename="",    // ROOT file containing bkg template
+    const TString bkgTTFilename=""
 ){
 
     RooRealVar m("m","mass",massLo,massHi);
     m.setBins(10000);
 
     RooCategory sample("sample","");
-    sample.defineType("PassBB",1);
-    sample.defineType("FailBB",2);
-    sample.defineType("PassEE",3);
-    sample.defineType("FailEE",4);
-    sample.defineType("PassBE",5);
-    sample.defineType("FailBE",6);
+    sample.defineType("Pass",1);
+    sample.defineType("Fail",2);
 
-    RooAbsData *dataPassBB = new RooDataHist("dataPassBB","dataPassBB",RooArgSet(m),passHistBB);
-    RooAbsData *dataFailBB = new RooDataHist("dataFailBB","dataFailBB",RooArgSet(m),failHistBB);
-    RooAbsData *dataPassEE = new RooDataHist("dataPassEE","dataPassEE",RooArgSet(m),passHistEE);
-    RooAbsData *dataFailEE = new RooDataHist("dataFailEE","dataFailEE",RooArgSet(m),failHistEE);
-    RooAbsData *dataPassBE = new RooDataHist("dataPassBE","dataPassBE",RooArgSet(m),passHistBE);
-    RooAbsData *dataFailBE = new RooDataHist("dataFailBE","dataFailBE",RooArgSet(m),failHistBE);
-
-    RooAbsData *dataCombinedBB = new RooDataHist(
-        "dataCombinedBB","dataCombinedBB",RooArgList(m),
-        RooFit::Index(sample),
-        RooFit::Import("PassBB",*((RooDataHist*)dataPassBB)),
-        RooFit::Import("FailBB",*((RooDataHist*)dataFailBB)));
-
-    RooAbsData *dataCombinedEE = new RooDataHist(
-        "dataCombinedEE","dataCombinedEE",RooArgList(m),
-        RooFit::Index(sample),
-        RooFit::Import("PassEE",*((RooDataHist*)dataPassEE)),
-        RooFit::Import("FailEE",*((RooDataHist*)dataFailEE)));
-
-    RooAbsData *dataCombinedBE = new RooDataHist(
-        "dataCombinedBE","dataCombinedBE",RooArgList(m),
-        RooFit::Index(sample),
-        RooFit::Import("PassBE",*((RooDataHist*)dataPassBE)),
-        RooFit::Import("FailBE",*((RooDataHist*)dataFailBE)));
+    RooAbsData *dataPass = new RooDataHist("dataPass","dataPass",RooArgSet(m),passHist);
+    RooAbsData *dataFail = new RooDataHist("dataFail","dataFail",RooArgSet(m),failHist);
 
     RooAbsData *dataCombined = new RooDataHist(
-        "dataCombined", "dataCombined", RooArgList(m),
+        "dataCombined","dataCombined",RooArgList(m),
         RooFit::Index(sample),
-        RooFit::Import("PassBB", *((RooDataHist*)dataPassBB)),
-        RooFit::Import("FailBB", *((RooDataHist*)dataFailBB)),
-        RooFit::Import("PassEE", *((RooDataHist*)dataPassEE)),
-        RooFit::Import("FailEE", *((RooDataHist*)dataFailEE)),
-        RooFit::Import("PassBE", *((RooDataHist*)dataPassBE)),
-        RooFit::Import("FailBE", *((RooDataHist*)dataFailBE))
-    );
+        RooFit::Import("Pass",*((RooDataHist*)dataPass)),
+        RooFit::Import("Fail",*((RooDataHist*)dataFail)));
 
     TFile *histfile = 0;
     if(sigpass==2 || sigfail==2) {
-        histfile = new TFile(outputDir+"/histTemplates.root");
+        generateTemplate_ZYield(mcfilename, hPV);
+        histfile = new TFile(outputDir+"/histTemplates_HLT.root");
         assert(histfile);
     }
-    // std::vector<double> vBkgPars;
-    // if(bkgfail== 2 or bkgfail==3){
-    //   vBkgPars = preFit(failHist);
-    // }
-    // TFile *histbkgQCDfile = 0;
-    // if(bkgfail== 7 or bkgpass==7){
-    //   histbkgQCDfile = new TFile(bkgQCDTemplate);
-    //   assert(histbkgQCDfile);
-    // }
+    std::vector<double> vBkgPars;
+    if(bkgfail== 2 or bkgfail==3){
+        vBkgPars = preFit(failHist);
+    }
+    TFile *histbkgQCDfile = 0;
+    if(bkgfail== 7 or bkgpass==7){
+        histbkgQCDfile = new TFile(bkgQCDFilename);
+        assert(histbkgQCDfile);
+    }
     TH1D *hbkgQCDPass = 0;
     TH1D *hbkgQCDFail = 0;
-    // if(bkgpass == 7){
-    //   TH2D* hbkg = (TH2D*)histbkgQCDfile->Get(Form("h_mass_%s_pass_%s", effType.Data(), etaRegion ? "forward" : "central"));
-    //   hbkgQCDPass = hbkg->ProjectionY();
-    //   assert(hbkgQCDPass);
-    // }
-    // if(bkgfail == 7){
-    //   TH2D* hbkg = (TH2D*)histbkgQCDfile->Get(Form("h_mass_%s_fail_%s", effType.Data(), etaRegion ? "forward" : "central"));
-    //   hbkgQCDFail = hbkg->ProjectionY();
-    //   assert(hbkgQCDFail);
-    // }
+    if(bkgpass == 7){
+        TH2D* hbkg = (TH2D*)histbkgQCDfile->Get("h_mass_HLT_pass_"+ etaRegion);
+        hbkgQCDPass = hbkg->ProjectionY();
+        assert(hbkgQCDPass);
+    }
+    if(bkgfail == 7){
+        TH2D* hbkg = (TH2D*)histbkgQCDfile->Get("h_mass_HLT_fail_"+ etaRegion);
+        hbkgQCDFail = hbkg->ProjectionY();
+        assert(hbkgQCDFail);
+    }
 
-    CSignalModel     *sigPassBB = 0;
-    CBackgroundModel *bkgPassBB = 0;
-    CSignalModel     *sigFailBB = 0;
-    CBackgroundModel *bkgFailBB = 0;
+    CSignalModel     *sigPass = 0;
+    CBackgroundModel *bkgPass = 0;
+    CSignalModel     *sigFail = 0;
+    CBackgroundModel *bkgFail = 0;
 
-    CSignalModel     *sigPassEE = 0;
-    CBackgroundModel *bkgPassEE = 0;
-    CSignalModel     *sigFailEE = 0;
-    CBackgroundModel *bkgFailEE = 0;
+    Int_t nflpass=0, nflfail=0;
 
-    CSignalModel     *sigPassBE = 0;
-    CBackgroundModel *bkgPassBE = 0;
-    CSignalModel     *sigFailBE = 0;
-    CBackgroundModel *bkgFailBE = 0;
-
-    Int_t nflpassBB=0, nflfailBB=0;
-    Int_t nflpassEE=0, nflfailEE=0;
-    Int_t nflpassBE=0, nflfailBE=0;
-
-    TH1D *hPassBB=0;
-    TH1D *hPassEE=0;
-    TH1D *hPassBE=0;
+    TH1D *hPass=0;
     if(sigpass==2) {
-        hPassBB = (TH1D*)histfile->Get("h_mass_pass_BB");
-        hPassEE = (TH1D*)histfile->Get("h_mass_pass_EE");
-        hPassBE = (TH1D*)histfile->Get("h_mass_pass_BE");
-        hPassBB->SetDirectory(0);
-        hPassEE->SetDirectory(0);
-        hPassBE->SetDirectory(0);
+        // set signal templates of fail histograms
+        hPass = (TH1D*)histfile->Get("h_mass_pass_"+ etaRegion);
+        hPass->SetDirectory(0);
     }
 
-    nflpassBB += set_signal_model(sigpass, sigPassBB, m, kTRUE, 0, hPassBB);
-    nflpassBB += set_background_model(bkgpass, bkgPassBB, m, kTRUE, 0, hbkgQCDPass);
-    nflpassEE += set_signal_model(sigpass, sigPassEE, m, kTRUE, 1, hPassEE);
-    nflpassEE += set_background_model(bkgpass, bkgPassEE, m, kTRUE, 1, hbkgQCDPass);
-    nflpassBE += set_signal_model(sigpass, sigPassBE, m, kTRUE, 2, hPassBE);
-    nflpassBE += set_background_model(bkgpass, bkgPassBE, m, kTRUE, 2, hbkgQCDPass);
+    nflpass += set_signal_model(sigpass, sigPass, m, kTRUE, 0, hPass);
+    nflpass += set_background_model(bkgpass, bkgPass, m, kTRUE, 0, hbkgQCDPass);
 
-    TH1D *hFailBB=0;
-    TH1D *hFailEE=0;
-    TH1D *hFailBE=0;
+    TH1D *hFail=0;
     if(sigfail==2) {
-        hFailBB = (TH1D*)histfile->Get("h_mass_fail_BB");
-        hFailEE = (TH1D*)histfile->Get("h_mass_fail_EE");
-        hFailBE = (TH1D*)histfile->Get("h_mass_fail_BE");
-        hFailBB->SetDirectory(0);
-        hFailEE->SetDirectory(0);
-        hFailBE->SetDirectory(0);
+        // set signal templates of pass histograms
+        hFail = (TH1D*)histfile->Get("h_mass_fail_"+ etaRegion);
+        hFail->SetDirectory(0);
     }
 
-    nflfailBB += set_signal_model(sigfail, sigFailBB, m, kFALSE, 0, hFailBB);
-    nflfailBB += set_background_model(bkgfail, bkgFailBB, m, kFALSE, 0, hbkgQCDFail);
-    nflfailEE += set_signal_model(sigfail, sigFailEE, m, kFALSE, 1, hFailEE);
-    nflfailEE += set_background_model(bkgfail, bkgFailEE, m, kFALSE, 1, hbkgQCDFail);
-    nflfailBE += set_signal_model(sigfail, sigFailBE, m, kFALSE, 2, hFailBE);
-    nflfailBE += set_background_model(bkgfail, bkgFailBE, m, kFALSE, 2, hbkgQCDFail);
+    nflfail += set_signal_model(sigfail, sigFail, m, kFALSE, 0, hFail);
+    nflfail += set_background_model(bkgfail, bkgFail, m, kFALSE, 0, hbkgQCDFail);
 
-    Double_t NsigMaxBB     = passHistBB->Integral() + failHistBB->Integral();
-    Double_t NbkgFailMaxBB = failHistBB->Integral();
-    Double_t NbkgPassMaxBB = passHistBB->Integral();
-    Double_t NsigMaxEE     = passHistEE->Integral() + failHistEE->Integral();
-    Double_t NbkgFailMaxEE = failHistEE->Integral();
-    Double_t NbkgPassMaxEE = passHistEE->Integral();
-    Double_t NsigMaxBE     = passHistBE->Integral() + failHistBE->Integral();
-    Double_t NbkgFailMaxBE = failHistBE->Integral();
-    Double_t NbkgPassMaxBE = passHistBE->Integral();
+    Double_t NsigMax     = passHist->Integral() + failHist->Integral();
+    Double_t NbkgFailMax = failHist->Integral();
+    Double_t NbkgPassMax = passHist->Integral();
 
-    RooRealVar effB("effB","Efficiency barrel",0.95,0.,1.0);
-    RooRealVar effE("effE","Efficiency endcap",0.95,0.,1.0);
+    RooRealVar eff("eff","Efficiency barrel",0.95,0.,1.0);
 
-    RooRealVar NsigBB("NsigBB","Signal Yield BB",NsigMaxBB,0,1.5*NsigMaxBB);
-    RooRealVar NsigEE("NsigEE","Signal Yield EE",NsigMaxEE,0,1.5*NsigMaxEE);
-    RooRealVar NsigBE("NsigBE","Signal Yield BE",NsigMaxBE,0,1.5*NsigMaxBE);
+    RooRealVar Nsig("Nsig","Signal Yield ",NsigMax,0,1.5*NsigMax);
+    RooRealVar c("c", "Correlation factor ", corr);
 
-    RooRealVar cBB("cBB", "Correlation factor BB", cBB_);
-    RooRealVar cBE("cBE", "Correlation factor BE", cBE_);
-    RooRealVar cEE("cEE", "Correlation factor EE", cEE_);
+    RooFormulaVar NsigPass("NsigPass","eff*eff*Nsig*c",RooArgList(eff,Nsig,c));
+    RooFormulaVar NsigFail("NsigFail","2*eff*(1.0-c*eff)*Nsig",RooArgList(eff,Nsig,c));
 
-    RooFormulaVar NsigPassBB("NsigPassBB","effB*effB*NsigBB*cBB",RooArgList(effB,NsigBB,cBB));
-    RooFormulaVar NsigFailBB("NsigFailBB","2*effB*(1.0-cBB*effB)*NsigBB",RooArgList(effB,NsigBB,cBB));
-    RooFormulaVar NsigPassEE("NsigPassEE","effE*effE*NsigEE*cEE",RooArgList(effE,NsigEE,cEE));
-    RooFormulaVar NsigFailEE("NsigFailEE","2*effE*(1.0-cEE*effE)*NsigEE",RooArgList(effE,NsigEE,cEE));
-    RooFormulaVar NsigPassBE("NsigPassBE","effB*effE*NsigBE*cBE",RooArgList(effB,effE,NsigBE,cBE));
-    RooFormulaVar NsigFailBE("NsigFailBE","( effB + effE -2*effB*effE*cBE )*NsigBE",RooArgList(effB,effE,NsigBE,cBE));
+    RooRealVar NbkgPass("NbkgPass","Background count in  PASS sample",0.01*NbkgPassMax, 0.0, NbkgPassMax);
+    RooRealVar NbkgFail("NbkgFail","Background count in  FAIL sample",0.05*NbkgFailMax, 0.0, NbkgFailMax);
 
-    RooRealVar NbkgPassBB("NbkgPassBB","Background count in BB PASS sample",0.01*NbkgPassMaxBB, 0.0, NbkgPassMaxBB);
-    RooRealVar NbkgFailBB("NbkgFailBB","Background count in BB FAIL sample",0.05*NbkgFailMaxBB, 0.0, NbkgFailMaxBB);
-    RooRealVar NbkgPassEE("NbkgPassEE","Background count in EE PASS sample",0.01*NbkgPassMaxEE, 0.0, NbkgPassMaxEE);
-    RooRealVar NbkgFailEE("NbkgFailEE","Background count in EE FAIL sample",0.05*NbkgFailMaxEE, 0.0, NbkgFailMaxEE);
-    RooRealVar NbkgPassBE("NbkgPassBE","Background count in BE PASS sample",0.01*NbkgPassMaxBE, 0.0, NbkgPassMaxBE);
-    RooRealVar NbkgFailBE("NbkgFailBE","Background count in BE FAIL sample",0.05*NbkgFailMaxBE, 0.0, NbkgFailMaxBE);
-
-    RooAddPdf modelPassBB("modelPassBB ","Model for BB PASS sample",
-        RooArgList(*(sigPassBB->model),*(bkgPassBB->model)),
-        RooArgList(NsigPassBB, NbkgPassBB));
-    RooAddPdf modelFailBB("modelFailBB ","Model for BB FAIL sample",
-        RooArgList(*(sigFailBB->model),*(bkgFailBB->model)),
-        RooArgList(NsigFailBB, NbkgFailBB));
-
-    RooAddPdf modelPassEE("modelPassEE ","Model for EE PASS sample",
-        RooArgList(*(sigPassEE->model),*(bkgPassEE->model)),
-        RooArgList(NsigPassEE, NbkgPassEE));
-    RooAddPdf modelFailEE("modelFailEE ","Model for EE FAIL sample",
-        RooArgList(*(sigFailEE->model),*(bkgFailEE->model)),
-        RooArgList(NsigFailEE, NbkgFailEE));
-
-    RooAddPdf modelPassBE("modelPassBE ","Model for BE PASS sample",
-        RooArgList(*(sigPassBE->model),*(bkgPassBE->model)),
-        RooArgList(NsigPassBE, NbkgPassBE));
-    RooAddPdf modelFailBE("modelFailBE ","Model for BE FAIL sample",
-        RooArgList(*(sigFailBE->model),*(bkgFailBE->model)),
-        RooArgList(NsigFailBE, NbkgFailBE));
-
-    RooSimultaneous pdfBB("pdfBB","pdfBB",sample);
-    pdfBB.addPdf(modelPassBB,"PassBB");
-    pdfBB.addPdf(modelFailBB,"FailBB");
-
-    RooSimultaneous pdfEE("pdfEE","pdfEE",sample);
-    pdfEE.addPdf(modelPassEE,"PassEE");
-    pdfEE.addPdf(modelFailEE,"FailEE");
-
-    RooSimultaneous pdfBE("pdfBE","pdfBE",sample);
-    pdfBE.addPdf(modelPassBE,"PassBE");
-    pdfBE.addPdf(modelFailBE,"FailBE");
+    RooAddPdf modelPass("modelPass ","Model for  PASS sample",
+        RooArgList(*(sigPass->model),*(bkgPass->model)),
+        RooArgList(NsigPass, NbkgPass));
+    RooAddPdf modelFail("modelFail ","Model for  FAIL sample",
+        RooArgList(*(sigFail->model),*(bkgFail->model)),
+        RooArgList(NsigFail, NbkgFail));
 
     RooSimultaneous totalPdf("totalPdf","totalPdf",sample);
-    totalPdf.addPdf(modelPassBB,"PassBB");
-    totalPdf.addPdf(modelFailBB,"FailBB");
-    totalPdf.addPdf(modelPassEE,"PassEE");
-    totalPdf.addPdf(modelFailEE,"FailEE");
-    totalPdf.addPdf(modelPassBE,"PassBE");
-    totalPdf.addPdf(modelFailBE,"FailBE");
+    totalPdf.addPdf(modelPass,"Pass");
+    totalPdf.addPdf(modelFail,"Fail");
 
-    RooFitResult *fitResult=0, *fitResultBB=0, *fitResultEE=0, *fitResultBE=0;
+    RooFitResult *fitResult=0;
     Int_t strategy = 2;
 
     RooMsgService::instance().setSilentMode(kTRUE);
-
-    m.setRange("rangeLow", massLo, 76);
-    m.setRange("rangeHigh", 106, massHi);
-
-    // fit BB region only
-    std::cout<<"--- fit BB region only -- "<<std::endl;
-    // fitResult = bkgFailBB->model->fitTo(*dataFailBB,
-    //                          RooFit::Range("rangeLow,rangeHigh"),
-    //                          RooFit::PrintEvalErrors(-1),
-    //                          RooFit::PrintLevel(-1),
-    //                          RooFit::Warnings(0),
-    //                          RooFit::Strategy(strategy), // MINUIT STRATEGY
-    //                          RooFit::Save());
-
-    fitResultBB = pdfBB.fitTo(*dataCombinedBB,
-        RooFit::PrintEvalErrors(-1),
-        RooFit::PrintLevel(-1),
-        RooFit::Warnings(0),
-        RooFit::Extended(1),
-        RooFit::Strategy(strategy), // MINUIT STRATEGY
-        RooFit::Minos(RooArgSet(effB)),
-        RooFit::Save());
-
-    // fit EE region only
-    std::cout<<"--- fit EE region only -- "<<std::endl;
-    // fitResult = bkgFailEE->model->fitTo(*dataFailEE,
-    //                          RooFit::Range("rangeLow,rangeHigh"),
-    //                          RooFit::PrintEvalErrors(-1),
-    //                          RooFit::PrintLevel(-1),
-    //                          RooFit::Warnings(0),
-    //                          RooFit::Strategy(strategy), // MINUIT STRATEGY
-    //                          RooFit::Save());
-
-    fitResultEE = pdfEE.fitTo(*dataCombinedEE,
-        RooFit::PrintEvalErrors(-1),
-        RooFit::PrintLevel(-1),
-        RooFit::Warnings(0),
-        RooFit::Extended(1),
-        RooFit::Strategy(strategy), // MINUIT STRATEGY
-        RooFit::Minos(RooArgSet(effE)),
-        RooFit::Save());
-
-    // fit BE region only
-    std::cout<<"--- fit BE region only -- "<<std::endl;
-    // fitResult = bkgFailBE->model->fitTo(*dataFailBE,
-    //                          RooFit::Range("rangeLow,rangeHigh"),
-    //                          RooFit::PrintEvalErrors(-1),
-    //                          RooFit::PrintLevel(-1),
-    //                          RooFit::Warnings(0),
-    //                          RooFit::Strategy(strategy), // MINUIT STRATEGY
-    //                          RooFit::Save());
-
-    fitResultBE = pdfBE.fitTo(*dataCombinedBE,
-        RooFit::PrintEvalErrors(-1),
-        RooFit::PrintLevel(-1),
-        RooFit::Warnings(0),
-        RooFit::Extended(1),
-        RooFit::Strategy(strategy), // MINUIT STRATEGY
-        RooFit::Minos(RooArgSet(effE, effB)),
-        RooFit::Save());
 
     // fit all regions together
     std::cout<<"--- fit all regions together -- "<<std::endl;
@@ -1623,7 +1543,7 @@ void performCombinedFit(
         RooFit::Warnings(0),
         RooFit::Extended(1),
         RooFit::Strategy(strategy), // MINUIT STRATEGY
-        // RooFit::Minos(RooArgSet(effB, effE)),
+        // RooFit::Minos(RooArgSet(eff)),
         RooFit::Save());
 
     fitResult = totalPdf.fitTo(*dataCombined,
@@ -1632,116 +1552,93 @@ void performCombinedFit(
         RooFit::Warnings(0),
         RooFit::Extended(1),
         RooFit::Strategy(strategy), // MINUIT STRATEGY
-        RooFit::Minos(RooArgSet(NsigBB, NsigEE, NsigBE)),
+        RooFit::Minos(RooArgSet(Nsig)),
         RooFit::Save());
 
-    bkgFailBB->Print();
-    bkgPassBB->Print();
-    bkgFailEE->Print();
-    bkgPassEE->Print();
-    bkgFailBE->Print();
-    bkgPassBE->Print();
+    std::cout<<"---------------------------------------"<<std::endl;
+    std::cout<<"------ -log(L)  = " << fitResult->minNll() <<std::endl;
+    std::cout<<"------ status   = " << fitResult->status() <<std::endl;
+    std::cout<<"---------------------------------------"<<std::endl;
 
-    resEffB  = effB.getVal();
-    resErrBl = fabs(effB.getErrorLo());
-    resErrBh = effB.getErrorHi();
-    resEffE  = effE.getVal();
-    resErrEl = fabs(effE.getErrorLo());
-    resErrEh = effE.getErrorHi();
+    bkgFail->Print();
+    bkgPass->Print();
 
-    resYieldBB  = NsigBB.getVal();
-    resYieldBBl = fabs(NsigBB.getErrorLo());
-    resYieldBBh = NsigBB.getErrorHi();
-    resYieldEE  = NsigEE.getVal();
-    resYieldEEl = fabs(NsigEE.getErrorLo());
-    resYieldEEh = NsigEE.getErrorHi();
-    resYieldBE  = NsigBE.getVal();
-    resYieldBEl = fabs(NsigBE.getErrorLo());
-    resYieldBEh = NsigBE.getErrorHi();
+    TFile *fFit = new TFile(
+        outputDir+"/workspace_"+etaRegion+"_"+iBin+".root",
+        "RECREATE");
 
-    char effstr[100];
-    sprintf(effstr,"#varepsilon = %.4f_{ -%.4f}^{ +%.4f}",resEffB,resErrBl,resErrBh);
+    // save all information in RooWorkspace
+    RooWorkspace* w = new RooWorkspace("workspace","Workspace");
+    w->import(*dataCombined);
+    w->import(totalPdf);
+    w->Write();
 
-    resChi2PassBB = make_plot(nflpassBB, m, dataPassBB, modelPassBB,
-        sigPassBB, bkgPassBB, fitResult, NsigPassBB, NbkgPassBB, effstr, passHistBB->Integral(), iBin, "BB", 0, kTRUE);
+    fitResult->Write("fitResult");
 
-    resChi2FailBB = make_plot(nflfailBB, m, dataFailBB, modelFailBB,
-        sigFailBB, bkgFailBB, fitResult, NsigFailBB, NbkgFailBB, effstr, failHistBB->Integral(), iBin, "BB", 0, kFALSE);
+    fFit->Write();
+    fFit->Close();
 
-    sprintf(effstr,"#varepsilon = %.4f_{ -%.4f}^{ +%.4f}",resEffE,resErrEl,resErrEh);
+    const Double_t chi2pass = make_plot(nflpass, m, dataPass, modelPass,
+        sigPass, bkgPass, fitResult, w, NsigPass, NbkgPass, passHist->Integral(),
+        iBin, etaRegion, 0, kTRUE);
 
-    resChi2PassEE = make_plot(nflpassEE, m, dataPassEE, modelPassEE,
-        sigPassEE, bkgPassEE, fitResult, NsigPassEE, NbkgPassEE, effstr, passHistEE->Integral(), iBin, "EE", 1, kTRUE);
+    const Double_t chi2fail = make_plot(nflfail, m, dataFail, modelFail,
+        sigFail, bkgFail, fitResult, w, NsigFail, NbkgFail, failHist->Integral(),
+        iBin, etaRegion, 0, kFALSE);
 
-    resChi2FailEE = make_plot(nflfailEE, m, dataFailEE, modelFailEE,
-        sigFailEE, bkgFailEE, fitResult, NsigFailEE, NbkgFailEE, effstr, failHistEE->Integral(), iBin, "EE", 1, kFALSE);
+    w->factory(Form("chi2pass[%f]",chi2pass));
+    w->factory(Form("chi2fail[%f]",chi2fail));
 
-    sprintf(effstr,"#varepsilon_{B} = %.3f_{ -%.3f}^{ +%.3f} | #varepsilon_{E} = %.3f_{ -%.3f}^{ +%.3f}",
-        resEffB,resErrBl,resErrBh,resEffE,resErrEl,resErrEh);
-
-    resChi2PassBE = make_plot(nflpassBE, m, dataPassBE, modelPassBE,
-        sigPassBE, bkgPassBE, fitResult, NsigPassBE, NbkgPassBE, effstr, passHistBE->Integral(), iBin, "BE", 1, kTRUE);
-
-    resChi2FailBE = make_plot(nflfailBE, m, dataFailBE, modelFailBE,
-        sigFailBE, bkgFailBE, fitResult, NsigFailBE, NbkgFailBE, effstr, failHistBE->Integral(), iBin, "BE", 1, kFALSE);
-
+    std::cout<<"---------------------------------------"<<std::endl;
+    std::cout<<"------ chi2pass = " << chi2pass <<std::endl;
+    std::cout<<"------ chi2fail = " << chi2fail <<std::endl;
+    std::cout<<"---------------------------------------"<<std::endl;
 
     delete dataCombined;
-    delete dataPassBB;
-    delete dataFailBB;
-    delete dataPassEE;
-    delete dataFailEE;
-    delete dataPassBE;
-    delete dataFailBE;
-    delete sigPassBB;
-    delete bkgPassBB;
-    delete sigFailBB;
-    delete bkgFailBB;
-    delete sigPassEE;
-    delete bkgPassEE;
-    delete sigFailEE;
-    delete bkgFailEE;
-    delete sigPassBE;
-    delete bkgPassBE;
-    delete sigFailBE;
-    delete bkgFailBE;
+    delete dataPass;
+    delete dataFail;
+    delete sigPass;
+    delete bkgPass;
+    delete sigFail;
+    delete bkgFail;
     delete histfile;
-    // delete histbkgQCDfile;
 }
+
 
 //--------------------------------------------------------------------------------------------------
 std::vector<double> preFit(TH1D* failHist){
     std::cout<<"PREFIT"<<std::endl;
     // do not fit between 81 to 101 GeV
 
-//  std::vector<float> v = {1.,0.,1.,0.,1.,0.};return v;
-  TH1D *h = new TH1D("h", "", massBin, massLo, massHi);
-  TF1 *fq = new TF1("fq", "[0]+[1]*x+[2]*x*x", massLo, massHi);
-  TF1 *fl = new TF1("fl", "[0]+[1]*x", massLo, massHi);
+    //  std::vector<float> v = {1.,0.,1.,0.,1.,0.};return v;
+    TH1D *h = new TH1D("h", "", massBin, massLo, massHi);
+    TF1 *fq = new TF1("fq", "[0]+[1]*x+[2]*x*x", massLo, massHi);
+    TF1 *fl = new TF1("fl", "[0]+[1]*x", massLo, massHi);
 
-  const int binwidth = (massHi-massLo)/massBin;
+    const int binwidth = (massHi-massLo)/massBin;
 
-  for(int i = 0; i < (int)(81-massLo)/binwidth; i++){
-    h->SetBinContent(i+1, failHist->GetBinContent(i+1));
-    h->SetBinError(i+1, failHist->GetBinError(i+1));
-  }
-  for(int i = (int)(massHi-101)/binwidth; i < massBin; i++){
-    h->SetBinContent(i+1, failHist->GetBinContent(i+1));
-    h->SetBinError(i+1, failHist->GetBinError(i+1));
-  }
+    for(int i = 0; i < (int)(81-massLo)/binwidth; i++){
+        h->SetBinContent(i+1, failHist->GetBinContent(i+1));
+        h->SetBinError(i+1, failHist->GetBinError(i+1));
+    }
+    for(int i = (int)(massHi-101)/binwidth; i < massBin; i++){
+        h->SetBinContent(i+1, failHist->GetBinContent(i+1));
+        h->SetBinError(i+1, failHist->GetBinError(i+1));
+    }
 
-  h->Fit("fq");
-  std::cout<<fq->GetParameter(0)<<","<<fq->GetParError(0)<<" ,"<<fq->GetParameter(1)<<","<<fq->GetParError(1)<<","<<fq->GetParameter(2)<<","<<fq->GetParError(2)<<std::endl;
-  std::vector<double> v;
+    h->Fit("fq");
+    std::cout<<fq->GetParameter(0)<<","<<fq->GetParError(0)<<" ,"<<fq->GetParameter(1)<<","<<fq->GetParError(1)<<","<<fq->GetParameter(2)<<","<<fq->GetParError(2)<<std::endl;
+    std::vector<double> v;
 
-  if(fq->GetParameter(2) > 0.){
-    h->Fit("fl");
-    std::cout<<"SWITCH TO LINEAR!"<<std::endl;
-    std::cout<<fl->GetParameter(0)<<","<<fl->GetParError(0)<<" ,"<<fl->GetParameter(1)<<","<<fl->GetParError(1)<<std::endl;
-    v = {fl->GetParameter(0), fl->GetParError(0), fl->GetParameter(1), fl->GetParError(1), 0.,0.};
-  }else{
-    v = {fq->GetParameter(0), fq->GetParError(0), fq->GetParameter(1), fq->GetParError(1), fq->GetParameter(2), fq->GetParError(2)};
-  }
+    if(fq->GetParameter(2) > 0.){
+        h->Fit("fl");
+        std::cout<<"SWITCH TO LINEAR!"<<std::endl;
+        std::cout<<fl->GetParameter(0)<<","<<fl->GetParError(0)<<" ,"<<fl->GetParameter(1)<<","<<fl->GetParError(1)<<std::endl;
+        v = {fl->GetParameter(0), fl->GetParError(0), fl->GetParameter(1), fl->GetParError(1), 0.,0.};
+    }
+    else{
+        v = {fq->GetParameter(0), fq->GetParError(0), fq->GetParameter(1), fq->GetParError(1), fq->GetParameter(2), fq->GetParError(2)};
+    }
 
-  return v;
+    return v;
 }
