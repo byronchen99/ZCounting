@@ -1,7 +1,7 @@
 from CRABClient.UserUtilities import config
 config = config()
 
-config.General.requestName = 'TnPPairTrees_UL_2016H_V13_v4'
+config.General.requestName = 'TnPPairTrees_UL_2016H_V13_v5'
 config.General.workArea = 'crab_projects'
 config.General.transferOutputs = True
 config.General.transferLogs = False
@@ -23,4 +23,4 @@ config.Data.publication = False
 config.Data.outputDatasetTag = 'TnPPairTrees_V13_UL2016H'
 
 config.Site.storageSite = 'T2_DE_DESY'
-config.Site.blacklist = ['T1_IT_CNAF',]
+# config.Site.blacklist = ['T1_IT_CNAF',]

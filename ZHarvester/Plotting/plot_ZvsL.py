@@ -28,8 +28,8 @@ latex.SetNDC()
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--rates", required=True, type=str, help="csv file with z rates per Measurement")
-parser.add_argument("--xsec",  type=str, help="csv file where xsec should be taken from (e.g. from low pileup run)")
+parser.add_argument("-r","--rates", required=True, type=str, help="csv file with z rates per Measurement")
+parser.add_argument("-x","--xsec",  type=str, help="csv file where xsec should be taken from (e.g. from low pileup run)")
 parser.add_argument("-s","--saveDir",  default='./',  type=str, help="give output dir")
 
 args = parser.parse_args()
@@ -43,9 +43,9 @@ if args.xsec:
     plot_lowPU = True
     # --- get Z xsec
     data_xsec = pd.read_csv(str(args.xsec), sep=',',low_memory=False)#, skiprows=[1,2,3,4,5])
-    xsecBB = sum(data_xsec['zDelBB_mc'])/sum(data_xsec['lumiRec'])
-    xsecBE = sum(data_xsec['zDelBE_mc'])/sum(data_xsec['lumiRec'])
-    xsecEE = sum(data_xsec['zDelEE_mc'])/sum(data_xsec['lumiRec'])
+    xsecBB = sum(data_xsec['zDelBB'])/sum(data_xsec['lumiRec'])
+    xsecBE = sum(data_xsec['zDelBE'])/sum(data_xsec['lumiRec'])
+    xsecEE = sum(data_xsec['zDelEE'])/sum(data_xsec['lumiRec'])
 
 textsize = 0.03
 
@@ -53,7 +53,7 @@ textsize = 0.03
 def make_plots(df,
     yAxis,
     yLabel="sigma",
-    xAxis='pileUp',
+    xAxis='lumi',
     run_range=None,
     title="",
     year="2017",
@@ -77,8 +77,12 @@ def make_plots(df,
 
     data['y_Err'] = data[yAxis].apply(lambda x: x.s)
     data['y'] = data[yAxis].apply(lambda x: x.n)
-    data['y0_Err'] = data[yAxis.replace("_mc","")].apply(lambda x: x.s)
-    data['y0'] = data[yAxis.replace("_mc","")].apply(lambda x: x.n)
+    if yAxis.replace("_mc","") in data.keys():
+        data['y0_Err'] = data[yAxis.replace("_mc","")].apply(lambda x: x.s)
+        data['y0'] = data[yAxis.replace("_mc","")].apply(lambda x: x.n)
+    else:
+        data['y0_Err'] = data['y_Err']
+        data['y0'] = data['y']
 
     if sum(data['y'].isnull()) > 0:
         print(">>> sort out {0} points with nan".format(sum(data['y'].isnull())))
@@ -157,8 +161,13 @@ def make_plots(df,
 
     data['y_Err'] = data[yAxis].apply(lambda x: x.s)
     data['y'] = data[yAxis].apply(lambda x: x.n)
-    data['y0_Err'] = data[yAxis.replace("_mc","")].apply(lambda x: x.s)
-    data['y0'] = data[yAxis.replace("_mc","")].apply(lambda x: x.n)
+    if yAxis.replace("_mc","") in data.keys():
+        data['y0_Err'] = data[yAxis.replace("_mc","")].apply(lambda x: x.s)
+        data['y0'] = data[yAxis.replace("_mc","")].apply(lambda x: x.n)
+    else:
+        data['y0_Err'] = data['y_Err']
+        data['y0'] = data['y']
+
     data['relstat'] = data['y_Err'] / data['y']
 
 
@@ -500,20 +509,21 @@ def make_plots(df,
     entry.SetMarkerSize(0)
 
     if "sigma" in yLabel:
-        legend=ROOT.TLegend(0.16,0.85,0.4,0.97)
+        legend=ROOT.TLegend(0.72,0.82,0.97,0.97)
         legend.GetListOfPrimitives().Add(entry)
     else:
-        legend=ROOT.TLegend(0.16,0.80,0.4,0.97)
-        legend.AddEntry(gReco, "MC eff (T&P)", "pe")
-        legend.AddEntry(gTrue, "MC eff (true)", "pe")
+        # legend=ROOT.TLegend(0.16,0.80,0.4,0.97)
+        # legend.AddEntry(gReco, "MC eff (T&P)", "pe")
+        legend=ROOT.TLegend(0.72,0.82,0.97,0.97)
+        legend.AddEntry(gTrue, "MC", "pe")
 
     graphXsecL.Draw("AP")
 
     if '_mc' in yAxis:
         graphXsecL0.Draw("pe same")
-        legend.AddEntry(graphXsecL0, "Measurements w/o correction (#pm stat.) ", "pe")
+        legend.AddEntry(graphXsecL0, "Measurements w/o correction", "pe")
 
-    legend.AddEntry(graphXsecL, "Measurements (#pm stat.)", "pe")
+    legend.AddEntry(graphXsecL, "Measurements", "pe")
     legend.SetTextSize(textsize)
     legend.SetTextFont(42)
 
@@ -521,7 +531,7 @@ def make_plots(df,
     if "sigma" in yLabel:
         fit_line.Draw("3L same")
     else:
-        gReco.Draw("pe same")
+        # gReco.Draw("pe same")
         gTrue.Draw("pe same")
 
     legend.Draw("same")
@@ -544,11 +554,12 @@ def make_plots(df,
         str = "inclusive"
 
     latex.SetTextSize(textsize)
-    latex.DrawLatex(0.77, 0.93, year)
-    latex.DrawLatex(0.77, 0.875, str)
+    latex.DrawLatex(0.15, 0.23, year)
+    latex.DrawLatex(0.15, 0.18, str)
     # latex.DrawLatex(0.12, 0.95, title)
 
-    workinprogress(x=0.15, y=0.18, textsize=textsize)
+    cms(x=0.15, y=0.93, textsize=textsize)
+    workinprogress(x=0.23, y=0.93, textsize=textsize)
 
     outstring = "{0}/{1}_vs_{2}".format(outDir,yAxis,xAxis)
     outstring += year.replace(" ","_")
@@ -562,112 +573,70 @@ def make_plots(df,
 
 # ------------------------------------------------------------------------------
 print(">>> load csv file in dataframe")
+
 data_rates = pd.read_csv(args.rates, sep=',')[
     ['fill','run','lumiRec','timewindow','pileUp','tdate_begin','tdate_end',
-    # 'zDelBB_mc','zDelBE_mc','zDelEE_mc',
+    'zDelBB_mc','zDelBE_mc','zDelEE_mc',
     'zDelBB','zDelBE','zDelEE',
-    # 'yieldBB','yieldBE','yieldEE',
     'ZBBeff','ZBEeff','ZEEeff',
-    # 'HLTeffB', 'HLTeffE',
+    'HLTeffBB', 'HLTeffBE', 'HLTeffEE',
     'SeleffB', 'SeleffE',
+    'GloeffB', 'GloeffE',
     'TrkeffB', 'TrkeffE',
     'StaeffB', 'StaeffE',
     # 'ZBBeff_mc','ZBEeff_mc','ZEEeff_mc',
-    # 'zYieldBB_purity', 'zYieldBE_purity', 'zYieldEE_purity'
     ]]
 
-# data_rates['HLTeffB'] = data_rates['HLTeffB'].apply(lambda x: unc.ufloat_fromstr(x))
-# data_rates['HLTeffE'] = data_rates['HLTeffE'].apply(lambda x: unc.ufloat_fromstr(x))
+# convert to uncertainties
+data_rates['HLTeffBB'] = data_rates['HLTeffBB'].apply(lambda x: unc.ufloat_fromstr(x))
+data_rates['HLTeffBE'] = data_rates['HLTeffBE'].apply(lambda x: unc.ufloat_fromstr(x))
+data_rates['HLTeffEE'] = data_rates['HLTeffEE'].apply(lambda x: unc.ufloat_fromstr(x))
 data_rates['SeleffB'] = data_rates['SeleffB'].apply(lambda x: unc.ufloat_fromstr(x))
 data_rates['SeleffE'] = data_rates['SeleffE'].apply(lambda x: unc.ufloat_fromstr(x))
 data_rates['TrkeffB'] = data_rates['TrkeffB'].apply(lambda x: unc.ufloat_fromstr(x))
 data_rates['TrkeffE'] = data_rates['TrkeffE'].apply(lambda x: unc.ufloat_fromstr(x))
 data_rates['StaeffB'] = data_rates['StaeffB'].apply(lambda x: unc.ufloat_fromstr(x))
 data_rates['StaeffE'] = data_rates['StaeffE'].apply(lambda x: unc.ufloat_fromstr(x))
+data_rates['GloeffB'] = data_rates['GloeffB'].apply(lambda x: unc.ufloat_fromstr(x))
+data_rates['GloeffE'] = data_rates['GloeffE'].apply(lambda x: unc.ufloat_fromstr(x))
 
-# convert to uncertainties
-data_rates['zDelBB_mc'] = data_rates['zDelBB'].apply(lambda x: unc.ufloat_fromstr(x))
-data_rates['zDelBE_mc'] = data_rates['zDelBE'].apply(lambda x: unc.ufloat_fromstr(x))
-data_rates['zDelEE_mc'] = data_rates['zDelEE'].apply(lambda x: unc.ufloat_fromstr(x))
+data_rates['ZBBeff'] = data_rates['ZBBeff'].apply(lambda x: unc.ufloat_fromstr(x))
+data_rates['ZBEeff'] = data_rates['ZBEeff'].apply(lambda x: unc.ufloat_fromstr(x))
+data_rates['ZEEeff'] = data_rates['ZEEeff'].apply(lambda x: unc.ufloat_fromstr(x))
 
-# apply_pileup_correction(data_rates)
+# take uncertainties from uncorrected zDel
+data_rates['zDelBB_mc'] = data_rates['zDelBB'].apply(lambda x: unc.ufloat_fromstr(x)/unc.ufloat_fromstr(x).n) * data_rates['zDelBB_mc']
+data_rates['zDelBE_mc'] = data_rates['zDelBE'].apply(lambda x: unc.ufloat_fromstr(x)/unc.ufloat_fromstr(x).n) * data_rates['zDelBE_mc']
+data_rates['zDelEE_mc'] = data_rates['zDelEE'].apply(lambda x: unc.ufloat_fromstr(x)/unc.ufloat_fromstr(x).n) * data_rates['zDelEE_mc']
+
 apply_muon_prefire(data_rates)
 apply_ECAL_prefire(data_rates)
-apply_pileup_correction(data_rates)
+# apply_pileup_correction(data_rates)
 
-# data_rates['zDelBB_mc'] = data_rates['zDelBB_mc'].apply(lambda x: unc.ufloat_fromstr(x))
-# data_rates['zDelBE_mc'] = data_rates['zDelBE_mc'].apply(lambda x: unc.ufloat_fromstr(x))
-# data_rates['zDelEE_mc'] = data_rates['zDelEE_mc'].apply(lambda x: unc.ufloat_fromstr(x))
-
-# data_rates['yieldBB'] = data_rates['yieldBB'].apply(lambda x: unorm(x))
-# data_rates['yieldBE'] = data_rates['yieldBE'].apply(lambda x: unorm(x))
-# data_rates['yieldEE'] = data_rates['yieldEE'].apply(lambda x: unorm(x))
-
-# data_rates['ZBBeff'] = data_rates['ZBBeff'].apply(lambda x: unc.ufloat_fromstr(x))
-# data_rates['ZBEeff'] = data_rates['ZBEeff'].apply(lambda x: unc.ufloat_fromstr(x))
-# data_rates['ZEEeff'] = data_rates['ZEEeff'].apply(lambda x: unc.ufloat_fromstr(x))
-#
-# data_rates['ZBBeff_mc'] = data_rates['ZBBeff_mc'].apply(lambda x: unc.ufloat_fromstr(x))
-# data_rates['ZBEeff_mc'] = data_rates['ZBEeff_mc'].apply(lambda x: unc.ufloat_fromstr(x))
-# data_rates['ZEEeff_mc'] = data_rates['ZEEeff_mc'].apply(lambda x: unc.ufloat_fromstr(x))
-#
-# data_rates['zYieldBB_purity'] = data_rates['zYieldBB_purity'].apply(lambda x: unc.ufloat_fromstr(x))
-# data_rates['zYieldBE_purity'] = data_rates['zYieldBE_purity'].apply(lambda x: unc.ufloat_fromstr(x))
-# data_rates['zYieldEE_purity'] = data_rates['zYieldEE_purity'].apply(lambda x: unc.ufloat_fromstr(x))
-#
-# data_rates['zYieldBB_purity'] = data_rates['zYieldBB_purity'].apply(lambda x: unc.ufloat(1,0.) if x.n == 1.0 else x)
-# data_rates['zYieldBE_purity'] = data_rates['zYieldBE_purity'].apply(lambda x: unc.ufloat(1,0.) if x.n == 1.0 else x)
-# data_rates['zYieldEE_purity'] = data_rates['zYieldEE_purity'].apply(lambda x: unc.ufloat(1,0.) if x.n == 1.0 else x)
-#
-# # delivered Z rate without applying purity
-# data_rates['delBB_mc'] = data_rates['yieldBB'] / data_rates['ZBBeff_mc']
-# data_rates['delBE_mc'] = data_rates['yieldBE'] / data_rates['ZBEeff_mc']
-# data_rates['delEE_mc'] = data_rates['yieldEE'] / data_rates['ZEEeff_mc']
-#
-# data_rates['delBB'] = data_rates['yieldBB'] / data_rates['ZBBeff']
-# data_rates['delBE'] = data_rates['yieldBE'] / data_rates['ZBEeff']
-# data_rates['delEE'] = data_rates['yieldEE'] / data_rates['ZEEeff']
-#
-# data_rates['del_mc'] = data_rates['delBB_mc'] + data_rates['delBE_mc'] + data_rates['delEE_mc']
-# # data_rates['del'] = data_rates['delBB'] + data_rates['delBE'] + data_rates['delEE']
-#
-# # delivered Z rate with applying purity
-# data_rates['zDelBB'] = data_rates['yieldBB'] / data_rates['ZBBeff'] * data_rates['zYieldBB_purity']
-# data_rates['zDelBE'] = data_rates['yieldBE'] / data_rates['ZBEeff'] * data_rates['zYieldBE_purity']
-# data_rates['zDelEE'] = data_rates['yieldEE'] / data_rates['ZEEeff'] * data_rates['zYieldEE_purity']
-#
-# data_rates['zDelBB_mc'] = data_rates['yieldBB'] / data_rates['ZBBeff_mc'] * data_rates['zYieldBB_purity']
-# data_rates['zDelBE_mc'] = data_rates['yieldBE'] / data_rates['ZBEeff_mc'] * data_rates['zYieldBE_purity']
-# data_rates['zDelEE_mc'] = data_rates['yieldEE'] / data_rates['ZEEeff_mc'] * data_rates['zYieldEE_purity']
-#
-# data_rates['zDel_mc'] = data_rates['zDelBB_mc'] + data_rates['zDelBE_mc'] + data_rates['zDelEE_mc']
-# data_rates['zDel'] = data_rates['zDelBB'] + data_rates['zDelBE'] + data_rates['zDelEE']
-
-# data_rates['xsecBB_mc'] = data_rates['zDelBB_mc'] / data_rates['lumiRec']
-# data_rates['xsecBE_mc'] = data_rates['zDelBE_mc'] / data_rates['lumiRec']
-# data_rates['xsecEE_mc'] = data_rates['zDelEE_mc'] / data_rates['lumiRec']
-# data_rates['xsec_mc'] = data_rates['xsecBB_mc'] + data_rates['xsecBE_mc'] + data_rates['xsecEE_mc']
-
-data_rates['xsecEE'] = data_rates['zDelBB_mc'] / data_rates['lumiRec']
+data_rates['xsecBB'] = data_rates['zDelBB_mc'] / data_rates['lumiRec']
 data_rates['xsecBE'] = data_rates['zDelBE_mc'] / data_rates['lumiRec']
-data_rates['xsecBB'] = data_rates['zDelEE_mc'] / data_rates['lumiRec']
+data_rates['xsecEE'] = data_rates['zDelEE_mc'] / data_rates['lumiRec']
 data_rates['xsec'] = data_rates['xsecBB'] + data_rates['xsecBE'] + data_rates['xsecEE']
 
 for yy, ylabel, region, mcRes in (
     ("xsec", "sigma", "", ""),
-    ("xsecBB", "sigma", "BB", ""),
-    ("xsecBE", "sigma", "BE", ""),
-    ("xsecEE", "sigma", "EE", ""),
+    # ("xsecBB", "sigma", "BB", ""),
+    # ("xsecBE", "sigma", "BE", ""),
+    # ("xsecEE", "sigma", "EE", ""),
+    # ("xsec_mc", "sigma", "", ""),
     # ("xsecBB_mc", "sigma", "BB", ""),
     # ("xsecBE_mc", "sigma", "BE", ""),
     # ("xsecEE_mc", "sigma", "EE", ""),
-    # ("ZBBeff_mc", "Z efficiency","BB", "effBB"),
-    # ("ZBEeff_mc", "Z efficiency","BE", "effBE"),
-    # ("ZEEeff_mc", "Z efficiency","EE", "effEE"),
-    # ('HLTeffB' ,'Muon HLT efficiency', "B", "HLTB"),
-    # ('HLTeffE' ,'Muon HLT efficiency', "E", "HLTE"),
+    # ("ZBBeff", "Z efficiency","BB", "effBB"),
+    # ("ZBEeff", "Z efficiency","BE", "effBE"),
+    # ("ZEEeff", "Z efficiency","EE", "effEE"),
+    # ('HLTeffBB' ,'Muon HLT efficiency', "BB", "HLTB"),
+    # ('HLTeffBE' ,'Muon HLT efficiency', "BE", "HLTE"),
+    # ('HLTeffEE' ,'Muon HLT efficiency', "EE", "HLTE"),
     # ('SeleffB' ,'Muon selelction efficiency', "B", "SelB"),
     # ('SeleffE' ,'Muon selelction efficiency', "E", "SelE"),
+    # ('GloeffB' ,'Global muon efficiency', "B", "GloB"),
+    # ('GloeffE' ,'Global muon efficiency', "E", "GloE"),
     # ('TrkeffB' ,'Muon inner track efficiency', "B", "TrkB"),
     # ('TrkeffE' ,'Muon inner track efficiency', "E", "TrkE"),
     # ('StaeffB' ,'Muon standalone efficiency', "B", "StaB"),
@@ -680,29 +649,26 @@ for yy, ylabel, region, mcRes in (
     make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 E", run_range=(276831,277420), normalized=False)
     make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 F", run_range=(277772,278808), normalized=False)
     make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 G", run_range=(278820,280385), normalized=False)
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 H", run_range=(280919,284044), normalized=False)
+    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 H", run_range=(280919,284044), normalized=False)
 
-    # total 2016 pre VFP
-    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 pre VFP", run_range=(272007,278769), normalized=True)
+    # 2017
+    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 B", title="corrected", run_range=(297046,299329), normalized=False)
+    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 C", title="corrected", run_range=(299368,302029), normalized=False)
+    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 D", title="corrected", run_range=(302030,303434), normalized=False)
+    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 E", title="corrected", run_range=(303434,304797), normalized=False)
+    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 F", title="corrected", run_range=(305040,306462), normalized=False)
 
-    # total 2016 post VFP
+    # ## 2018
+    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 A", run_range=(315252,316995), normalized=False)
+    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 B", run_range=(317080,319310), normalized=False)
+    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 C", run_range=(319337,320065), normalized=False)
+    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 D", run_range=(320673,325175), normalized=False)
+
+    # # total 2016 pre VFP
+    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 pre VFP", run_range=(272007,278769), normalized=True)
+    # # total 2016 post VFP
     # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 post VFP", run_range=(278769,294645), normalized=True)
-
-    ## 2017
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 B", title="corrected", run_range=(297046,299329), normalized=False)
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 C", title="corrected", run_range=(299368,302029), normalized=False)
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 D", title="corrected", run_range=(302030,303434), normalized=False)
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 E", title="corrected", run_range=(303434,304797), normalized=False)
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 F", title="corrected", run_range=(305040,306462), normalized=False)
-    #
     # ## total 2017
     # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017", title="corrected", run_range=(297046,306462), normalized=True)
-    #
-    # ## 2018
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 A", run_range=(315252,316995), normalized=False)
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 B", run_range=(317080,319310), normalized=False)
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 C", run_range=(319337,320065), normalized=False)
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 D", run_range=(320673,325175), normalized=False)
-    #
     # ## total 2018
     # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018", run_range=(315252,325175), normalized=True)

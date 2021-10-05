@@ -13,17 +13,18 @@ public:
     virtual ~CBackgroundModel() { delete model; }
     RooAbsPdf *model;
     virtual void freeze_all_parameters() = 0;
-
+    virtual void Reset() = 0;
     virtual void Print() = 0;
 };
 
 class CExponential : public CBackgroundModel
 {
 public:
-    CExponential(RooRealVar &m, const Bool_t pass, const int ibin);
+    CExponential(RooRealVar &m, const Bool_t pass, const Int_t ibin);
     ~CExponential();
     RooRealVar *t1;
     void freeze_all_parameters();
+    void Reset(){};
     void Print(){};
 
 };
@@ -31,13 +32,14 @@ public:
 class CQuadratic : public CBackgroundModel
 {
 public:
-  CQuadratic(RooRealVar &m, const Bool_t pass, const int ibin,
+  CQuadratic(RooRealVar &m, const Bool_t pass, const Int_t ibin,
       const float p0=0, const float e0=0, const float p1=0, const float e1=0, const float p2=0, const float e2=0);
   ~CQuadratic();
   RooRealVar *a0;
   RooRealVar *a1;
   RooRealVar *a2;
   void freeze_all_parameters();
+  void Reset(){};
   void Print(){};
 
 };
@@ -45,12 +47,13 @@ public:
 class CQuadPlusExp : public CBackgroundModel
 {
 public:
-    CQuadPlusExp(RooRealVar &m, const Bool_t pass, const int ibin,
+    CQuadPlusExp(RooRealVar &m, const Bool_t pass, const Int_t ibin,
       const float p0=0, const float e0=0, const float p1=0, const float e1=0, const float p2=0, const float e2=0);
     RooRealVar *a0, *a1, *a2, *t1, *frac;
     RooAbsPdf *exp, *quad;
     ~CQuadPlusExp();
     void freeze_all_parameters();
+    void Reset(){};
     void Print(){};
 
 };
@@ -58,10 +61,11 @@ public:
 class CDas: public CBackgroundModel
 {
 public:
-    CDas(RooRealVar &m, const Bool_t pass, const int ibin);
+    CDas(RooRealVar &m, const Bool_t pass, const Int_t ibin);
     RooRealVar *mean,*sigma,*kLo,*kHi;
     ~CDas();
     void freeze_all_parameters();
+    void Reset(){};
     void Print(){};
 
 };
@@ -69,12 +73,13 @@ public:
 class CDasPlusExp: public CBackgroundModel
 {
 public:
-    CDasPlusExp(RooRealVar &m, const Bool_t pass, const int ibin);
+    CDasPlusExp(RooRealVar &m, const Bool_t pass, const Int_t ibin);
     RooRealVar *mean,*sigma,*kLo,*kHi,*t1, *frac;
     RooGaussDoubleSidedExp *dd;
     RooExponential *exp1;
     ~CDasPlusExp();
     void freeze_all_parameters();
+    void Reset(){};
     void Print(){};
 
 };
@@ -82,10 +87,11 @@ public:
 class CRooCMSShape: public CBackgroundModel
 {
 public:
-    CRooCMSShape(RooRealVar &m, const Bool_t pass, const int ibin);
+    CRooCMSShape(RooRealVar &m, const Bool_t pass, const Int_t ibin, const Double_t massLo, const Double_t massHi);
     RooRealVar *alpha,*beta,*gamma,*peak;
     ~CRooCMSShape();
     void freeze_all_parameters();
+    void Reset();
     void Print();
 
 };
@@ -93,12 +99,13 @@ public:
 class CQCD: public CBackgroundModel
 {
 public:
-    CQCD(RooRealVar &m, TH1D* hist, const Bool_t pass, const int ibin, int intOrder=1);
+    CQCD(RooRealVar &m, TH1D* hist, const Bool_t pass, const Int_t ibin, Int_t intOrder=1);
     TH1D        *inHist;
     RooDataHist *dataHist;
     RooHistPdf  *histPdf;
     ~CQCD();
     void freeze_all_parameters(){};
+    void Reset(){};
     void Print(){};
 
 };
@@ -106,7 +113,7 @@ public:
 class CQCDPlusTT: public CBackgroundModel
 {
 public:
-    CQCDPlusTT(RooRealVar &m, TH1D* histQCD, TH1D* histTT, const Bool_t pass, const int ibin, int intOrder=1);
+    CQCDPlusTT(RooRealVar &m, TH1D* histQCD, TH1D* histTT, const Bool_t pass, const Int_t ibin, Int_t intOrder=1);
     RooRealVar  *frac;
     TH1D        *inHistQCD;
     TH1D        *inHistTT;
@@ -116,12 +123,13 @@ public:
     RooHistPdf  *histPdfTT;
     ~CQCDPlusTT();
     void freeze_all_parameters();
+    void Reset(){};
     void Print(){};
 
 };
 
 //--------------------------------------------------------------------------------------------------
-CExponential::CExponential(RooRealVar &m, const Bool_t pass, const int ibin)
+CExponential::CExponential(RooRealVar &m, const Bool_t pass, const Int_t ibin)
 {
   char name[10];
   if(pass) sprintf(name,"%s_%d","Pass",ibin);
@@ -145,7 +153,7 @@ CExponential::~CExponential()
 }
 
 //--------------------------------------------------------------------------------------------------
-CQuadratic::CQuadratic(RooRealVar &m, const Bool_t pass, const int ibin, const float p0, const float e0, const float p1, const float e1, const float p2, const float e2)
+CQuadratic::CQuadratic(RooRealVar &m, const Bool_t pass, const Int_t ibin, const float p0, const float e0, const float p1, const float e1, const float p2, const float e2)
 {
   char name[10];
   if(pass) sprintf(name,"%s_%d","Pass",ibin);
@@ -182,7 +190,7 @@ CQuadratic::~CQuadratic()
 }
 
 //--------------------------------------------------------------------------------------------------
-CQuadPlusExp::CQuadPlusExp(RooRealVar &m, const Bool_t pass, const int ibin,
+CQuadPlusExp::CQuadPlusExp(RooRealVar &m, const Bool_t pass, const Int_t ibin,
     const float p0, const float e0, const float p1, const float e1, const float p2, const float e2)
 {
     char name[10];
@@ -231,7 +239,7 @@ CQuadPlusExp::~CQuadPlusExp()
 }
 
 //--------------------------------------------------------------------------------------------------
-CDas::CDas(RooRealVar &m, const Bool_t pass, const int ibin)
+CDas::CDas(RooRealVar &m, const Bool_t pass, const Int_t ibin)
 {
   char name[10];
   if(pass) sprintf(name,"%s_%d","Pass",ibin);
@@ -264,7 +272,7 @@ CDas::~CDas()
 }
 
 //--------------------------------------------------------------------------------------------------
-CDasPlusExp::CDasPlusExp(RooRealVar &m, const Bool_t pass, const int ibin)
+CDasPlusExp::CDasPlusExp(RooRealVar &m, const Bool_t pass, const Int_t ibin)
 {
   char name[10];
   if(pass) sprintf(name,"%s_%d","Pass",ibin);
@@ -307,14 +315,16 @@ CDasPlusExp::~CDasPlusExp()
 }
 
 //--------------------------------------------------------------------------------------------------
-CRooCMSShape::CRooCMSShape(RooRealVar &m, const Bool_t pass, const int ibin)
+CRooCMSShape::CRooCMSShape(RooRealVar &m,
+    const Bool_t pass, const Int_t ibin,
+    const Double_t massLo, const Double_t massHi)
 {
   char name[10];
   if(pass) sprintf(name,"%s_%d","Pass",ibin);
   else     sprintf(name,"%s_%d","Fail",ibin);
   char vname[50];
 
-  sprintf(vname,"bkg_alpha%s",name);   alpha = new RooRealVar(vname, "bkg_alpha", 91., 56., 116.);
+  sprintf(vname,"bkg_alpha%s",name);   alpha = new RooRealVar(vname, "bkg_alpha", 91., massLo, massHi);
   sprintf(vname,"bkg_beta%s",name);    beta  = new RooRealVar(vname, "bkg_beta",  0.001, 0.0, 0.1);
   sprintf(vname,"bkg_gamma%s",name);   gamma = new RooRealVar(vname, "bkg_gamma",   0.1, 0.0, 1.0);
   sprintf(vname,"bkg_peak%s",name);    peak  = new RooRealVar(vname, "bkg_peak"  ,  91.1876);
@@ -322,6 +332,13 @@ CRooCMSShape::CRooCMSShape(RooRealVar &m, const Bool_t pass, const int ibin)
 
   model  = new RooCMSShape(vname, "RooCMSShape", m, *alpha, *beta, *gamma, *peak);
 
+}
+
+void CRooCMSShape::Reset(){
+    std::cout<<"CRooCMSShape::Reset() --- "<<std::endl;
+    alpha->setVal(91.);
+    beta->setVal(0.001);
+    gamma->setVal(0.1);
 }
 
 void CRooCMSShape::Print(){
@@ -349,7 +366,7 @@ CRooCMSShape::~CRooCMSShape()
 }
 
 //--------------------------------------------------------------------------------------------------
-CQCD::CQCD(RooRealVar &m, TH1D* hist, const Bool_t pass, const int ibin, int intOrder)
+CQCD::CQCD(RooRealVar &m, TH1D* hist, const Bool_t pass, const Int_t ibin, Int_t intOrder)
 {
   char name[10];
   if(pass) sprintf(name,"%s_%i","Pass",ibin);
@@ -375,7 +392,7 @@ CQCD::~CQCD()
 }
 
 //--------------------------------------------------------------------------------------------------
-CQCDPlusTT::CQCDPlusTT(RooRealVar &m, TH1D* histQCD, TH1D* histTT, const Bool_t pass, const int ibin, int intOrder)
+CQCDPlusTT::CQCDPlusTT(RooRealVar &m, TH1D* histQCD, TH1D* histTT, const Bool_t pass, const Int_t ibin, Int_t intOrder)
 {
   char name[10];
   if(pass) sprintf(name,"%s_%d","Pass",ibin);

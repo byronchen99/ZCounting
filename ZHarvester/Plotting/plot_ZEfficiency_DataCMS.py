@@ -15,6 +15,7 @@ ROOT.gStyle.SetTitleX(.3)
 parser = argparse.ArgumentParser()
 
 parser.add_argument("-c", "--cms", nargs='+', help="give the CMS csv per Measurement as input", required=True)
+parser.add_argument("-f", "--fills", nargs='*', default=[], type=str, help="Specify fills to plot efficiencies")
 parser.add_argument("-s", "--saveDir", default='./', type=str, help="give output dir")
 args = parser.parse_args()
 
@@ -22,7 +23,6 @@ outDir = args.saveDir
 if not os.path.isdir(outDir):
     os.mkdir(outDir)
 
-plotsPerFill=False
 ########## Data Acquisition ##########
 
 data = pd.concat([pd.read_csv(csv, sep=',',low_memory=False) for csv in args.cms], ignore_index=True, sort=False)#, skiprows=[1,2,3,4,5])
@@ -33,18 +33,30 @@ data = data.sort_values(by=['fill','tdate_begin','tdate_end'])
 #data = data[data['z_relstat'] < 0.05]
 
 data['tdate'] = data['tdate_begin'] + (data['tdate_end'] - data['tdate_begin'])/2
+data['time'] = data['tdate_begin'] + (data['tdate_end'] - data['tdate_begin'])/2
+data['timeE'] = (data['tdate_end'] - data['tdate_begin'])/2
+# seconds to hours
+data['time'] = data['time'] / 3600.
+data['timeE'] = data['timeE'] / 3600.
+data['tdate_begin'] = data['tdate_begin'] / 3600.
+data['tdate_end'] = data['tdate_end'] / 3600.
 
 # data = data.loc[data['run'] > 303824]
 
 meta = dict()
 
 ########## Plot ##########
-fills = data.drop_duplicates('fill')['fill'].values
+if args.fills:
+    fills = args.fills
+    plotsPerFill=True
+else:
+    fills = data.drop_duplicates('fill')['fill'].values
+    plotsPerFill=False
 
 features = (
-    ('ZBBeff_mc','Z barrel-barrel (corr.) efficiency', 0.8, 1.0, 'ZBBeff_stat'),
-    ('ZBEeff_mc','Z barrel-endcap (corr.) efficiency', 0.8, 1.0, 'ZBEeff_stat'),
-    ('ZEEeff_mc','Z endcap-endcap (corr.) efficiency', 0.8, 1.0, 'ZEEeff_stat'),
+    # ('ZBBeff_mc','Z barrel-barrel (corr.) efficiency', 0.8, 1.0, 'ZBBeff_stat'),
+    # ('ZBEeff_mc','Z barrel-endcap (corr.) efficiency', 0.8, 1.0, 'ZBEeff_stat'),
+    # ('ZEEeff_mc','Z endcap-endcap (corr.) efficiency', 0.8, 1.0, 'ZEEeff_stat'),
     ('ZBBeff'  ,'Z barrel-barrel efficiency', 0.8, 1.0, 'ZBBeff_stat'),
     ('ZBEeff'  ,'Z barrel-endcap efficiency', 0.8, 1.0, 'ZBEeff_stat'),
     ('ZEEeff'  ,'Z endcap-endcap efficiency', 0.8, 1.0, 'ZEEeff_stat'),
@@ -56,19 +68,21 @@ features = (
     ('TrkeffE' ,'Muon endcap track efficiency',0.975, 1.01, "TrkeffE_stat"),
     ('StaeffB' ,'Muon barrel standalone efficiency',0.95, 1.01, "StaeffB_stat"),
     ('StaeffE' ,'Muon endcap standalone efficiency',0.95, 1.01, "StaeffE_stat"),
-    ('zYieldBB_purity'    ,'Z barrel-barrel Purity',0.975,1.01,'zYieldBB_purity_err'),
-    ('zYieldBE_purity'    ,'Z barrel-endcap Purity',0.975,1.01,'zYieldBE_purity_err'),
-    ('zYieldEE_purity'    ,'Z endcap-endcap Purity',0.975,1.01,'zYieldEE_purity_err'),
     )
 
 ##### loop over Fills and produce fill specific plots
 for fill in fills:
+    fill = int(fill)
     dFill = data.loc[data['fill'] == fill]
 
     subDir = outDir+"/PlotsFill_"+str(fill)
     if plotsPerFill:
         if not os.path.isdir(subDir):
             os.mkdir(subDir)
+
+    starttime = dFill['time'].values[0]
+    dFill_time = dFill['time'].values - starttime
+    dFill_time_err = dFill['timeE'].values
 
     ### Efficiency ###
     for eff, name, ymin, ymax, err in features:
@@ -77,33 +91,49 @@ for fill in fills:
 
         yyUnc = dFill[eff].apply(lambda x: unc.ufloat_fromstr(x))
 
-        yy = dFill[eff].apply(lambda x: unc.ufloat_fromstr(x).nominal_value).values
-        yyErr = dFill[eff].apply(lambda x: unc.ufloat_fromstr(x).std_dev).values
+        yy = dFill[eff].apply(lambda x: unc.ufloat_fromstr(x).n).values
+        yyErr = dFill[eff].apply(lambda x: unc.ufloat_fromstr(x).s).values
+
+
 
         if plotsPerFill:
-            graph_Zeff = ROOT.TGraphErrors(len(dFill), dFill['tdate'].values, yy, np.zeros(len(dFill['tdate'])), yyErr)
+            graph_Zeff = ROOT.TGraphErrors(
+                len(dFill), dFill_time, yy,
+                dFill_time_err, yyErr)
             graph_Zeff.SetName("graph_Zeff")
-            graph_Zeff.SetMarkerStyle(26)
+            graph_Zeff.SetMarkerStyle(20)
             graph_Zeff.SetMarkerColor(ROOT.kOrange+8)
+            graph_Zeff.SetMarkerColor(1)
             graph_Zeff.SetFillStyle(0)
             graph_Zeff.SetFillColor(0)
             graph_Zeff.SetMarkerSize(1.5)
-            graph_Zeff.GetXaxis().SetTimeDisplay(1)
+            # graph_Zeff.GetXaxis().SetTimeDisplay(1)
             graph_Zeff.SetTitle(name+", Fill "+str(fill))
             graph_Zeff.GetYaxis().SetTitle("Efficiency")
             if(eff == 'Zfpr'):
                 graph_Zeff.GetYaxis().SetTitle("b/(s + b)")
             graph_Zeff.GetYaxis().SetTitleSize(0.07)
             graph_Zeff.GetYaxis().SetTitleOffset(1.1)
-            graph_Zeff.GetXaxis().SetTitle("Time")
+            graph_Zeff.GetXaxis().SetTitle("LHC Runtime [h]")
             graph_Zeff.GetXaxis().SetTitleSize(0.06)
             graph_Zeff.GetXaxis().SetTitleOffset(0.75)
             graph_Zeff.GetXaxis().SetLabelSize(0.05)
             graph_Zeff.GetYaxis().SetLabelSize(0.05)
+
+            xmin = min((dFill_time - dFill_time_err))
+            xmax = max((dFill_time + dFill_time_err))
+            xWidth = xmax - xmin
+            xmin = xmin - (xWidth * 0.05)
+            xmax = xmax + (xWidth * 0.05)
+
             graph_Zeff.GetYaxis().SetRangeUser(ymin,ymax)
+
+            # graph_Zeff.SetTitle("")
 
             c1=ROOT.TCanvas("c1","c1",1000,600)
             c1.cd(1)
+            # c1.SetTopMargin(0.01)
+            c1.SetRightMargin(0.03)
             graph_Zeff.Draw("AP")
             legend=ROOT.TLegend(0.65,0.65,0.9,0.9)
             legend.AddEntry(graph_Zeff,"CMS","pe")
@@ -126,8 +156,10 @@ for fill in fills:
             meta[eff] = [mm.n]
             meta[err] = [mm.s]
 
-### Efficiency of all fills###
+if plotsPerFill:
+    exit()
 
+### Efficiency of all fills###
 for eff, name, ymin, ymax, err in features:
     xmin = min(fills)
     xmax = max(fills)
@@ -163,13 +195,14 @@ for eff, name, ymin, ymax, err in features:
     graph_meta.GetYaxis().SetRangeUser(ymin,ymax)
     graph_meta.GetXaxis().SetRangeUser(xmin,xmax)
 
-    legend=ROOT.TLegend(0.55,0.9,0.98,0.95)
-    if sum(meta[err]) != 0:
-        legend.AddEntry(graph_meta,"Measurement (#pm Stat.)","pe")
-    else:
-        legend.AddEntry(graph_meta,"Measurement","p")
+    legend=ROOT.TLegend(0.7,0.9,0.98,0.95)
+    # if sum(meta[err]) != 0:
+    #     legend.AddEntry(graph_meta,"Measurement (#pm Stat.)","pe")
+    # else:
+    legend.AddEntry(graph_meta,"Measurement","pe")
     legend.SetTextFont(42)
     legend.SetBorderSize(0)
+    legend.SetTextAlign(21)
     legend.SetTextSize(textsize)
 
     latex = ROOT.TLatex()
@@ -183,12 +216,12 @@ for eff, name, ymin, ymax, err in features:
     graph_meta.SetTitle("")
 
 
-    latex.DrawLatex(0.26, 0.91, "Work in progress")
-    latex.DrawLatex(0.18, 0.85, "138 fb^{-1} at 13 TeV")
+    latex.DrawLatex(0.27, 0.9, "Work in progress")
+    latex.DrawLatex(0.18, 0.83, "138 fb^{-1} at 13 TeV")
     # latex.DrawLatex(0.18, 0.81, " ".join(name.split(" ")[:-1]))
 
     latex.SetTextFont(62)
-    latex.DrawLatex(0.18, 0.91, 'CMS')
+    latex.DrawLatex(0.18, 0.9, 'CMS')
 
     legend.Draw()
 

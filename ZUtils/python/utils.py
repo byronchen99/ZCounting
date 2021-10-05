@@ -15,8 +15,13 @@ def linear_step(x, a1, b1, a2, b2, step=35):
     return (a1 * x + b1) * (x <= step) + (a2 * x + b2) * (x > step)
 
 # second order polynomial
-def quad(x, a, b, c):
+def pol2(x, a, b, c):
     return a * x**2 + b * x + c
+
+# quadratic function
+def quad(x, a, b):
+    return a * x**2 + b
+
 # exponential
 def exp(x, a, b, c, d):
     return a + b * 2**( c * x + d)
@@ -29,9 +34,15 @@ def pexp(l, a, b, c, d):
 
     return sum([p(i) * f(i) for i in range(200)])
 
-def pquad(l, a, b, c):
+def ppol2(l, a, b, c):
     p = lambda x: poisson.pmf(x, l)
     f = lambda x: a * x**2 + b * x + c
+
+    return sum([p(i) * f(i) for i in range(200)])
+
+def pquad(l, a, b):
+    p = lambda x: poisson.pmf(x, l)
+    f = lambda x: a * x**2 + b
 
     return sum([p(i) * f(i) for i in range(200)])
 
@@ -96,12 +107,11 @@ def unorm(x):
 
 latex = ROOT.TLatex()
 latex.SetNDC()
-def workinprogress(x=0.23, y=0.88, space=0.1, textsize=0.04, offset_x=0.13):
-    cms(x, y, textsize)
+def workinprogress(x=0.23, y=0.88, textsize=0.04, offset_x=0.13):
     latex.SetTextAlign(11)
     latex.SetTextFont(52)
     latex.SetTextSize(textsize)
-    latex.DrawLatex(x+space, y, 'Work in progress')
+    latex.DrawLatex(x, y, 'Work in progress')
 def cms(x=0.13, y=0.88, textsize=0.04):
     latex.SetTextAlign(11)
     latex.SetTextFont(61)

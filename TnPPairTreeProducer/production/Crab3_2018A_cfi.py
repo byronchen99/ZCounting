@@ -1,7 +1,7 @@
 from CRABClient.UserUtilities import config
 config = config()
 
-config.General.requestName = 'TnPPairTrees_UL_2018A_V13_v2'
+config.General.requestName = 'TnPPairTrees_UL_2018A_V13_v5'
 config.General.workArea = 'crab_projects'
 config.General.transferOutputs = True
 config.General.transferLogs = False

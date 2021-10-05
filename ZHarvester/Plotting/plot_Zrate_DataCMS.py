@@ -146,88 +146,87 @@ metazcountsoverlumi=[]
 ########## Plot ##########
 
 ### chi2 values of each category
-for c in ('HLTeffB_chi2pass', 'HLTeffB_chi2fail', 'HLTeffE_chi2pass', 'HLTeffE_chi2fail',
-          'SeleffB_chi2pass', 'SeleffB_chi2fail', 'SeleffE_chi2pass', 'SeleffE_chi2fail',
-          # 'GloeffB_chi2pass', 'GloeffB_chi2fail', 'GloeffE_chi2pass', 'GloeffE_chi2fail',
-          'TrkeffB_chi2pass', 'TrkeffB_chi2fail', 'TrkeffE_chi2pass', 'TrkeffE_chi2fail',
-          'StaeffB_chi2pass', 'StaeffB_chi2fail', 'StaeffE_chi2pass', 'StaeffE_chi2fail',
-          'zYieldBB_chi2', 'zYieldBE_chi2', 'zYieldEE_chi2'
-         ):
-
-    graph_chi2 = ROOT.TGraph(len(data), data['time'].values, data[c].values)
-    graph_chi2.SetName("graph_chi2")
-    graph_chi2.SetMarkerStyle(23)
-    graph_chi2.SetMarkerColor(ROOT.kAzure-4)
-    graph_chi2.SetMarkerSize(1.5)
-    graph_chi2.SetTitle(c)
-
-    graph_chi2.GetYaxis().SetTitle("#chi^{2}/ndf")
-    graph_chi2.GetXaxis().SetTitle("Time")
-    graph_chi2.GetXaxis().SetTimeDisplay(1)
-    graph_chi2.GetXaxis().SetTimeOffset(0,"gmt")
-    graph_chi2.GetXaxis().SetTitleSize(0.06)
-    graph_chi2.GetYaxis().SetTitleSize(0.06)
-    graph_chi2.GetXaxis().SetTitleOffset(0.72)
-    graph_chi2.GetYaxis().SetTitleOffset(1.1)
-    graph_chi2.GetXaxis().SetLabelSize(0.05)
-    graph_chi2.GetYaxis().SetLabelSize(0.05)
-    #graph_chi2.GetYaxis().SetRangeUser(-0.01,0.01)
-    c3=ROOT.TCanvas("c3_"+c,"c3 "+c,1000,600)
-    c3.SetGrid()
-
-    # mean, where outlier with sigma > 1 are rejected
-    avg_chi2 = np.mean(data[c][abs(data[c] - np.mean(data[c])) < np.std(data[c])])
-
-    graph_chi2.Draw("AP")
-
-    legend=ROOT.TLegend(0.2,0.6,0.4,0.7)
-    legend.AddEntry(graph_chi2,"Measurement","p")
-    legend.Draw("same")
-
-    #text=ROOT.TLatex(0.3,0.83,"CMS Automatic, produced: "+datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-    #text.SetNDC()
-    #text.Draw()
-    text2=ROOT.TLatex(0.2,0.23,"avg chi2: "+str(avg_chi2))
-    text2.SetNDC()
-    text2.Draw()
-
-    c3.SaveAs(outDir+"/"+c+".png")
-    c3.Close()
-
-    th1_chi2 = ROOT.TH1F("h1_"+c, "h1 title "+c, 20, 0., 2.0*avg_chi2)
-    th1_chi2.GetXaxis().SetTitle("#chi^{2}/ndf")
-    th1_chi2.GetYaxis().SetTitle("fits")
-    th1_chi2.GetXaxis().SetTitleSize(0.06)
-    th1_chi2.GetYaxis().SetTitleSize(0.06)
-    th1_chi2.GetXaxis().SetTitleOffset(0.72)
-    th1_chi2.GetYaxis().SetTitleOffset(1.1)
-    th1_chi2.GetXaxis().SetLabelSize(0.05)
-    th1_chi2.GetYaxis().SetLabelSize(0.05)
-    th1_chi2.SetTitle(c)
-    th1_chi2.SetLineColor(1)
-    th1_chi2.SetLineWidth(2)
-    th1_chi2.SetFillColor(0)
-
-    for v in data[c].values:
-        th1_chi2.Fill(v)
-
-    #f_chi2 = ROOT.TF1("fchi2","{0}*TMath::Prob(x,1)".format(th1_chi2.Integral()*(2.0*avg_chi2)/20.),0.0,2.0*avg_chi2)
-    #f_chi2.SetLineWidth(2)
-    #f_chi2.SetLineColor(2)
-
-    #legend=ROOT.TLegend(0.8,0.8,0.9,0.9)
-    #legend.AddEntry(f_chi2,"chi2(x,1)","l")
-    #legend.AddEntry(th1_chi2,"fits","f")
-
-    c4=ROOT.TCanvas("c4_"+c,"c4_"+c,1000,600)
-
-    th1_chi2.Draw('HIST')
-    #f_chi2.Draw("same")
-    #legend.Draw("same")
-
-
-    c4.SaveAs(outDir+"/hist_"+c+".png")
-    c4.Close()
+# for c in ('HLTeffB_chi2pass', 'HLTeffB_chi2fail', 'HLTeffE_chi2pass', 'HLTeffE_chi2fail',
+#           'SeleffB_chi2pass', 'SeleffB_chi2fail', 'SeleffE_chi2pass', 'SeleffE_chi2fail',
+#           # 'GloeffB_chi2pass', 'GloeffB_chi2fail', 'GloeffE_chi2pass', 'GloeffE_chi2fail',
+#           'TrkeffB_chi2pass', 'TrkeffB_chi2fail', 'TrkeffE_chi2pass', 'TrkeffE_chi2fail',
+#           'StaeffB_chi2pass', 'StaeffB_chi2fail', 'StaeffE_chi2pass', 'StaeffE_chi2fail',
+#          ):
+#
+#     graph_chi2 = ROOT.TGraph(len(data), data['time'].values, data[c].values)
+#     graph_chi2.SetName("graph_chi2")
+#     graph_chi2.SetMarkerStyle(23)
+#     graph_chi2.SetMarkerColor(ROOT.kAzure-4)
+#     graph_chi2.SetMarkerSize(1.5)
+#     graph_chi2.SetTitle(c)
+#
+#     graph_chi2.GetYaxis().SetTitle("#chi^{2}/ndf")
+#     graph_chi2.GetXaxis().SetTitle("Time")
+#     graph_chi2.GetXaxis().SetTimeDisplay(1)
+#     graph_chi2.GetXaxis().SetTimeOffset(0,"gmt")
+#     graph_chi2.GetXaxis().SetTitleSize(0.06)
+#     graph_chi2.GetYaxis().SetTitleSize(0.06)
+#     graph_chi2.GetXaxis().SetTitleOffset(0.72)
+#     graph_chi2.GetYaxis().SetTitleOffset(1.1)
+#     graph_chi2.GetXaxis().SetLabelSize(0.05)
+#     graph_chi2.GetYaxis().SetLabelSize(0.05)
+#     #graph_chi2.GetYaxis().SetRangeUser(-0.01,0.01)
+#     c3=ROOT.TCanvas("c3_"+c,"c3 "+c,1000,600)
+#     c3.SetGrid()
+#
+#     # mean, where outlier with sigma > 1 are rejected
+#     avg_chi2 = np.mean(data[c][abs(data[c] - np.mean(data[c])) < np.std(data[c])])
+#
+#     graph_chi2.Draw("AP")
+#
+#     legend=ROOT.TLegend(0.2,0.6,0.4,0.7)
+#     legend.AddEntry(graph_chi2,"Measurement","p")
+#     legend.Draw("same")
+#
+#     #text=ROOT.TLatex(0.3,0.83,"CMS Automatic, produced: "+datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+#     #text.SetNDC()
+#     #text.Draw()
+#     text2=ROOT.TLatex(0.2,0.23,"avg chi2: "+str(avg_chi2))
+#     text2.SetNDC()
+#     text2.Draw()
+#
+#     c3.SaveAs(outDir+"/"+c+".png")
+#     c3.Close()
+#
+#     th1_chi2 = ROOT.TH1F("h1_"+c, "h1 title "+c, 20, 0., 2.0*avg_chi2)
+#     th1_chi2.GetXaxis().SetTitle("#chi^{2}/ndf")
+#     th1_chi2.GetYaxis().SetTitle("fits")
+#     th1_chi2.GetXaxis().SetTitleSize(0.06)
+#     th1_chi2.GetYaxis().SetTitleSize(0.06)
+#     th1_chi2.GetXaxis().SetTitleOffset(0.72)
+#     th1_chi2.GetYaxis().SetTitleOffset(1.1)
+#     th1_chi2.GetXaxis().SetLabelSize(0.05)
+#     th1_chi2.GetYaxis().SetLabelSize(0.05)
+#     th1_chi2.SetTitle(c)
+#     th1_chi2.SetLineColor(1)
+#     th1_chi2.SetLineWidth(2)
+#     th1_chi2.SetFillColor(0)
+#
+#     for v in data[c].values:
+#         th1_chi2.Fill(v)
+#
+#     #f_chi2 = ROOT.TF1("fchi2","{0}*TMath::Prob(x,1)".format(th1_chi2.Integral()*(2.0*avg_chi2)/20.),0.0,2.0*avg_chi2)
+#     #f_chi2.SetLineWidth(2)
+#     #f_chi2.SetLineColor(2)
+#
+#     #legend=ROOT.TLegend(0.8,0.8,0.9,0.9)
+#     #legend.AddEntry(f_chi2,"chi2(x,1)","l")
+#     #legend.AddEntry(th1_chi2,"fits","f")
+#
+#     c4=ROOT.TCanvas("c4_"+c,"c4_"+c,1000,600)
+#
+#     th1_chi2.Draw('HIST')
+#     #f_chi2.Draw("same")
+#     #legend.Draw("same")
+#
+#
+#     c4.SaveAs(outDir+"/hist_"+c+".png")
+#     c4.Close()
 
 
 
@@ -249,9 +248,9 @@ for fill in data.drop_duplicates('fill')['fill'].values:
     ### Efficiency vs Pileup plots ###
 
     for eff, name in (
-        ('ZBBeff_mc','corrected Z-BB-Reconstruction efficitency'),
-        ('ZBEeff_mc','corrected Z-BE-Reconstruction efficitency'),
-        ('ZEEeff_mc','corrected Z-EE-Reconstruction efficitency'),
+        # ('ZBBeff_mc','corrected Z-BB-Reconstruction efficitency'),
+        # ('ZBEeff_mc','corrected Z-BE-Reconstruction efficitency'),
+        # ('ZEEeff_mc','corrected Z-EE-Reconstruction efficitency'),
         ('ZBBeff'  ,'Z-BB-Reconstruction efficitency'),
         ('ZBEeff'  ,'Z-BE-Reconstruction efficitency'),
         ('ZEEeff'  ,'Z-EE-Reconstruction efficitency'),
@@ -265,9 +264,6 @@ for fill in data.drop_duplicates('fill')['fill'].values:
         ('TrkeffE' ,'Muon Trk-E efficiency'),
         ('StaeffB' ,'Muon Sta-B efficiency'),
         ('StaeffE' ,'Muon Sta-E efficiency'),
-        ('zYieldBB_purity'    ,'Z BB purity'),
-        ('zYieldBE_purity'    ,'Z BE purity'),
-        ('zYieldEE_purity'    ,'Z EE purity'),
     ):
 
         yy = dFill[eff].apply(lambda x: unc.ufloat_fromstr(x).nominal_value).values

@@ -62,12 +62,15 @@ selection = 'muon_genRecoMatches == 1 ' \
 
 # specify which branches to load
 branches = ['nPV', 'nPU',
+            'eventweight',
             'Muon_eta[muon_genRecoObj]',
             'Muon_phi[muon_genRecoObj]',
             'Muon_pt[muon_genRecoObj]',
             'Muon_ID[muon_genRecoObj]',
             'Muon_isStandalone[muon_genRecoObj]',
-            'Muon_isTracker[muon_genRecoObj]',
+            'Muon_nPixelHits[muon_genRecoObj]',
+            'Muon_nTrackerLayers[muon_genRecoObj]',
+            # 'Muon_isTracker[muon_genRecoObj]',
             'Muon_isGlobal[muon_genRecoObj]',
             'Muon_triggerBits[muon_genRecoObj]',
             # 'Muon_tkRelIso[muon_genRecoObj]',
@@ -77,7 +80,9 @@ branches = ['nPV', 'nPU',
             'Muon_pt[antiMuon_genRecoObj]',
             'Muon_ID[antiMuon_genRecoObj]',
             'Muon_isStandalone[antiMuon_genRecoObj]',
-            'Muon_isTracker[antiMuon_genRecoObj]',
+            'Muon_nPixelHits[antiMuon_genRecoObj]',
+            'Muon_nTrackerLayers[antiMuon_genRecoObj]',
+            # 'Muon_isTracker[antiMuon_genRecoObj]',
             'Muon_isGlobal[antiMuon_genRecoObj]',
             'Muon_triggerBits[antiMuon_genRecoObj]',
             # 'Muon_tkRelIso[antiMuon_genRecoObj]',
@@ -107,6 +112,10 @@ df = df.rename(columns={
     'Muon_ID[antiMuon_genRecoObj]_0':           'antiMuon_ID',
     'Muon_triggerBits[muon_genRecoObj]_0':      'muon_triggerBits',
     'Muon_triggerBits[antiMuon_genRecoObj]_0':  'antiMuon_triggerBits',
+    'Muon_nPixelHits[muon_genRecoObj]_0':           'muon_nPixelHits',
+    'Muon_nPixelHits[antiMuon_genRecoObj]_0':       'antiMuon_nPixelHits',
+    'Muon_nTrackerLayers[muon_genRecoObj]_0':       'muon_nTrackerLayers',
+    'Muon_nTrackerLayers[antiMuon_genRecoObj]_0':   'antiMuon_nTrackerLayers',
     # 'Muon_tkRelIso[muon_genRecoObj]_0': 'muon_tkIso',
     # 'Muon_tkRelIso[antiMuon_genRecoObj]_0': 'antiMuon_tkIso',
     # 'Muon_pfRelIso04_all[muon_genRecoObj]_0': 'muon_pfIso',
@@ -116,12 +125,14 @@ df = df.rename(columns={
 
 df = df[abs(df['muon_recoEta']) < 2.4]
 df = df[abs(df['antiMuon_recoEta']) < 2.4]
+df = df[df['muon_recoPt'] > 27]
+df = df[df['antiMuon_recoPt'] > 27]
 
 df = df.astype({'mass': np.float64})
 
 print(">>> add new columns")
 df['delPhi'] = abs(
-   abs(df['muon_recoPhi'] - df['antiMuon_recoPhi']).apply(lambda x: x - 2 * math.pi if x > math.pi else x))
+   abs(df['muon_recoPhi'] - df['antiMuon_recoPhi']).apply(lambda x: x - 2 * math.pi if x >= math.pi else x))
 df['delR'] = np.sqrt(
    (df['muon_recoEta'] - df['antiMuon_recoEta']) ** 2 + df['delPhi'] ** 2)
 
@@ -150,6 +161,7 @@ elif args.year == "2018":
     triggerfilter = lambda x: 1 if x&4 != 0 else 0   # IsoMu24
 
 else:
+    print("ERROR: unknown year for triggerfilter")
     triggerfilter = lambda x: 0
 
 df['muon_hlt'] = df['muon_triggerBits'].apply(triggerfilter)
@@ -168,6 +180,9 @@ if pfIsoCut:
 df = df.query('( {0} ) | ( {1} )'.format(sel1, sel2))
 # <<<
 
+
+# Event weight manipulation
+
 print(">>> Muon selection")
 df['passSel'] = ((df['muon_ID'] >= muonID) & (df['antiMuon_ID'] >= muonID))
 
@@ -185,9 +200,52 @@ print(">>> HLT selection")
 df['passHLT'] = (df['passSel']
     & (df['muon_hlt'] == 1) & (df['antiMuon_hlt'] == 1))
 
-df['passGlo'] = ((df['muon_isGlobal'])     & (df['antiMuon_isGlobal']))
-df['isSta']   = ((df['muon_isStandalone']) & (df['antiMuon_isStandalone']))
-df['isTrk']   = ((df['muon_isTracker'])    & (df['antiMuon_isTracker']))
+df['isSta'] = ((df['muon_isStandalone']) & (df['antiMuon_isStandalone']))
+# df['isTrk']   = ((df['muon_isTracker'])    & (df['antiMuon_isTracker']))
+df['isTrk']   = ((df['muon_nPixelHits'] >= 1)    & (df['antiMuon_nPixelHits'] >= 1)
+    & (df['muon_nTrackerLayers'] >= 6)    & (df['antiMuon_nTrackerLayers'] >= 6))
+
+# df['isTrk'] = ((df['muon_nPixelHits'] >= 0) & (df['antiMuon_nPixelHits'] >= 0)
+#     & (df['muon_nTrackerLayers'] >= 0) & (df['antiMuon_nTrackerLayers'] >= 0))
+
+df['passGlo'] = ((df['isTrk']) & (df['muon_isGlobal']) & (df['antiMuon_isGlobal']))
+
+
+print(">>> Template for 2HLT and 1HLT")
+
+df2HLT = df.query('passHLT == 1')
+df2HLT = df2HLT.rename(columns={'muon_recoPt': 'ptTag',
+                                'antiMuon_recoPt': 'ptProbe',
+                                'muon_recoEta': 'etaTag',
+                                'antiMuon_recoEta': 'etaProbe'
+                                })
+df1HLT_1 = df.query('passHLT == 0 & passSel == 1 & muon_hlt == 0')
+df1HLT_1 = df1HLT_1.rename(columns={'muon_recoPt': 'ptProbe',
+                                        'antiMuon_recoPt': 'ptTag',
+                                        'muon_recoEta': 'etaProbe',
+                                        'antiMuon_recoEta': 'etaTag'
+                                        })
+df1HLT_2 = df.query('passHLT == 0 & passSel == 1 & antiMuon_hlt == 0')
+df1HLT_2 = df1HLT_2.rename(columns={'muon_recoPt': 'ptTag',
+                                        'antiMuon_recoPt': 'ptProbe',
+                                        'muon_recoEta': 'etaTag',
+                                        'antiMuon_recoEta': 'etaProbe'
+                                        })
+
+dfOut = pd.concat([df2HLT, df1HLT_1, df1HLT_2], sort=True)
+dfOut = dfOut.rename(columns={'z_recoMass': 'mass', 'passHLT': 'pass'})
+dfOut = dfOut.astype({'pass': np.bool})
+dfOut = dfOut[['nPV', 'nPU', 'ptTag', 'ptProbe', 'etaTag', 'etaProbe', 'mass', 'pass','eventweight']]
+
+tfile = ROOT.TFile.Open(output+"/template_ZYield.root", "RECREATE")
+
+ttree = array2tree(dfOut.to_records(index=False))
+ttree.Write()
+hPV.Write()
+
+ttree.Delete()
+
+tfile.Close()
 
 print(">>> Template for hlt step")
 dfPassHLT1 = df.query('passHLT == 1')
@@ -215,37 +273,6 @@ dfFailHLT2 = dfFailHLT2.rename(columns={'muon_recoPt': 'ptTag',
                                         'antiMuon_recoEta': 'etaProbe'
                                         })
 
-dfOut = pd.concat([dfPassHLT1, dfPassHLT2, dfFailHLT1, dfFailHLT2], sort=True)
-dfOut = dfOut.rename(columns={'z_recoMass': 'mass', 'passHLT': 'pass'})
-dfOut = dfOut.astype({'pass': np.bool})
-dfOut = dfOut[['nPV', 'nPU', 'ptTag', 'ptProbe', 'etaTag', 'etaProbe', 'mass', 'pass']]
-
-tfile = ROOT.TFile.Open(output+"/template_HLT.root", "RECREATE")
-
-ttree = array2tree(dfOut.to_records(index=False))
-ttree.Write()
-hPV.Write()
-
-ttree.Delete()
-
-tfile.Close()
-
-
-dfOut = pd.concat([dfPassHLT1, dfFailHLT1, dfFailHLT2], sort=True)
-dfOut = dfOut.rename(columns={'z_recoMass': 'mass', 'passSel': 'pass'})
-dfOut = dfOut.astype({'pass': np.bool})
-dfOut = dfOut[['nPV', 'nPU', 'ptTag', 'ptProbe', 'etaTag', 'etaProbe', 'mass', 'pass']]
-
-tfile = ROOT.TFile.Open(output+"/template_ZYield.root", "RECREATE")
-
-ttree = array2tree(dfOut.to_records(index=False))
-ttree.Write()
-hPV.Write()
-
-ttree.Delete()
-
-tfile.Close()
-
 
 print(">>> Template for selection step")
 dfFailSel1 = df.query('passSel == 0 & passGlo == 1 & muon_hlt == 0')
@@ -264,7 +291,7 @@ dfFailSel2 = dfFailSel2.rename(columns={'muon_recoPt': 'ptTag',
 dfOut = pd.concat([dfPassHLT1, dfPassHLT2, dfFailHLT1, dfFailHLT2, dfFailSel1, dfFailSel2], sort=True)
 dfOut = dfOut.rename(columns={'z_recoMass': 'mass', 'passSel': 'pass'})
 dfOut = dfOut.astype({'pass': np.bool})
-dfOut = dfOut[['nPV', 'nPU', 'ptTag', 'ptProbe', 'etaTag', 'etaProbe', 'mass', 'pass']]
+dfOut = dfOut[['nPV', 'nPU', 'ptTag', 'ptProbe', 'etaTag', 'etaProbe', 'mass', 'pass','eventweight']]
 
 tfile = ROOT.TFile.Open(output+"/template_Sel.root", "RECREATE")
 
@@ -293,7 +320,7 @@ dfFailSta2 = dfFailSta2.rename(columns={'muon_recoPt': 'ptTag',
 dfOut = pd.concat([dfPassHLT1, dfPassHLT2, dfFailHLT1, dfFailHLT2, dfFailSel1, dfFailSel2, dfFailSta1, dfFailSta2], sort=True)
 dfOut = dfOut.rename(columns={'z_recoMass': 'mass', 'passGlo': 'pass'})
 dfOut = dfOut.astype({'pass': np.bool})
-dfOut = dfOut[['nPV', 'nPU', 'ptTag', 'ptProbe', 'etaTag', 'etaProbe', 'mass', 'pass']]
+dfOut = dfOut[['nPV', 'nPU', 'ptTag', 'ptProbe', 'etaTag', 'etaProbe', 'mass', 'pass','eventweight']]
 
 tfile = ROOT.TFile.Open(output+"/template_Sta.root", "RECREATE")
 
@@ -322,7 +349,7 @@ dfFailTrk2 = dfFailTrk2.rename(columns={'muon_recoPt': 'ptTag',
 dfOut = pd.concat([dfPassHLT1, dfPassHLT2, dfFailHLT1, dfFailHLT2, dfFailSel1, dfFailSel2, dfFailTrk1, dfFailTrk2], sort=True)
 dfOut = dfOut.rename(columns={'z_recoMass': 'mass', 'passGlo': 'pass'})
 dfOut = dfOut.astype({'pass': np.bool})
-dfOut = dfOut[['nPV', 'nPU', 'ptTag', 'ptProbe', 'etaTag', 'etaProbe', 'mass', 'pass']]
+dfOut = dfOut[['nPV', 'nPU', 'ptTag', 'ptProbe', 'etaTag', 'etaProbe', 'mass', 'pass','eventweight']]
 
 tfile = ROOT.TFile.Open(output+"/template_Trk.root", "RECREATE")
 

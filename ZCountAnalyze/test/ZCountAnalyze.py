@@ -91,12 +91,12 @@ process.source = cms.Source("PoolSource",
 )
 
 if options.year == "2016preVFP":
-    globalTag = '106X_mcRun2_asymptotic_preVPF_v8'
+    globalTag = '106X_mcRun2_asymptotic_preVFP_v11'
     l1PrefireECAL = "UL2016preVFP"
     l1PrefireMuon = "2016preVFP"
     roccoFile = 'ZCounting/ZUtils/data/RoccoR2016aUL.txt'
 elif options.year == "2016postVFP":
-    globalTag = '106X_mcRun2_asymptotic_v13'
+    globalTag = '106X_mcRun2_asymptotic_v17'
     l1PrefireECAL = "UL2016postVFP"
     l1PrefireMuon = "2016BG"
     roccoFile = 'ZCounting/ZUtils/data/RoccoR2016bUL.txt'

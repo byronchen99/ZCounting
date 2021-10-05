@@ -1,46 +1,4 @@
 {
-"DYJetsToLL_0J_M_50_Fall17": {
-    "OutputSplitFiles": 1,
-    "crab3": {
-      "Data.inputDataset": "/DYJetsToLL_0J_TuneCP5_13TeV-amcatnloFXFX-pythia8/RunIISummer20UL17MiniAOD-106X_mc2017_realistic_v6-v2/MINIAODSIM",
-      "Data.splitting": "FileBased",
-      "Data.unitsPerJob": 1,
-      "JobType.maxMemoryMB": 2500,
-      "JobType.pyCfgParams": [
-        "samplename=dy",
-        "year=2017",
-        "outputFile=DYJetsToLL_0J_M_50_Fall17"
-      ]
-    }
-},
-"DYJetsToLL_1J_M_50_Fall17": {
-    "OutputSplitFiles": 1,
-    "crab3": {
-      "Data.inputDataset": "/DYJetsToLL_1J_TuneCP5_13TeV-amcatnloFXFX-pythia8/RunIISummer20UL17MiniAOD-106X_mc2017_realistic_v6-v1/MINIAODSIM",
-      "Data.splitting": "FileBased",
-      "Data.unitsPerJob": 1,
-      "JobType.maxMemoryMB": 2500,
-      "JobType.pyCfgParams": [
-        "samplename=dy",
-        "year=2017",
-        "outputFile=DYJetsToLL_1J_M_50_Fall17"
-      ]
-    }
-},
-"DYJetsToLL_2J_M_50_Fall17": {
-    "OutputSplitFiles": 1,
-    "crab3": {
-      "Data.inputDataset": "/DYJetsToLL_2J_TuneCP5_13TeV-amcatnloFXFX-pythia8/RunIISummer20UL17MiniAODv2-106X_mc2017_realistic_v9-v1/MINIAODSIM",
-      "Data.splitting": "FileBased",
-      "Data.unitsPerJob": 1,
-      "JobType.maxMemoryMB": 2500,
-      "JobType.pyCfgParams": [
-        "samplename=dy",
-        "year=2017",
-        "outputFile=DYJetsToLL_2J_M_50_Fall17"
-      ]
-    }
-},
 "WJetsToLNu_0J_Fall17": {
   "OutputSplitFiles": 1,
   "crab3": {

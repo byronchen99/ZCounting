@@ -1,3 +1,7 @@
+###################################################################
+# plot_chi2.py
+# histograms of chi2 values from the fits for the Z counting measurement
+###################################################################
 import os,sys
 import ROOT
 from array import array
@@ -24,9 +28,9 @@ ROOT.gStyle.SetTitleX(.3)
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--rates", required=True, type=str, help="csv file with z rates per measurement")
+parser.add_argument("-r","--rates", required=True, type=str, help="csv file with z rates per measurement")
 parser.add_argument("-s","--saveDir",  default='./',  type=str, help="give output dir")
-parser.add_argument("-y","--year",  default=2017,  type=int, help="give output dir")
+parser.add_argument("-y","--year",  default="Run-II",  type=str, help="give data taking era for labeling")
 args = parser.parse_args()
 
 year = args.year
@@ -40,7 +44,7 @@ if not os.path.isdir(outDir):
 
 # --- z luminosity
 data = pd.read_csv(str(args.rates), sep=',',low_memory=False)#, skiprows=[1,2,3,4,5])
-data = data.sort_values(['fill','tdate_begin','tdate_end'])
+data = data.sort_values(['fill','run','tdate_begin','tdate_end'])
 
 data['time'] = data['tdate_begin'] + (data['tdate_end'] - data['tdate_begin'])/2
 
@@ -54,6 +58,15 @@ data = data.replace([np.inf, -np.inf], np.nan).dropna().dropna()
 
 ### chi2 values of each category
 for category in filter(lambda x: "chi2" in x,data.keys()):
+    print("Now {0}".format(category))
+
+    # list of fits that might have failed, based on chi2_threshold
+    print("Runs that might have a failed fit:")
+    failed_fits = []
+    chi2_threshold = 5.0
+    for x, r, m, l in data[[category,"run","measurement", "lumiRec"]].values:
+        if x > 5.0 or x < 0.:
+            print(int(r),int(m),x, l)
 
     graph_chi2 = ROOT.TGraph(len(data),data['time'].values,data[category].values)
     graph_chi2.SetName("graph_chi2")
@@ -120,10 +133,13 @@ for category in filter(lambda x: "chi2" in x,data.keys()):
 
     # normalize to area of one
     th1_chi2.Scale(1./th1_chi2.Integral())
-
-    f_chi2 = ROOT.TF1("fchi2","ROOT::Math::chisquared_pdf(x*{0},{0})".format(ndf), xmin, xmax)
+    # create a chi2 function to plot on top of the histogram, let ndf as free parameter
+    f_chi2 = ROOT.TF1("fchi2","ROOT::Math::chisquared_pdf(x*{0},[0])".format(ndf), xmin, xmax)
+    f_chi2.SetParameter(0, ndf)
     f_chi2.SetLineWidth(2)
     f_chi2.SetLineColor(2)
+
+    # th1_chi2.Fit("fchi2")
 
     legend=ROOT.TLegend(0.8,0.8,0.9,0.9)
     legend.SetTextSize(0.04)
@@ -155,11 +171,11 @@ for category in filter(lambda x: "chi2" in x,data.keys()):
     latex.SetTextSize(textsize*1.2)
     latex.SetTextAlign(31)
 
-    latex.DrawLatex(0.97, 0.95, str(year))
+    latex.DrawLatex(0.97, 0.95, year)
 
     latex.SetTextAlign(11)
     latex.DrawLatex(0.1, 0.95, category.replace("_"," ").replace("chi2"," "))
-    latex.DrawLatex(0.20, 0.87, "Preliminary")
+    latex.DrawLatex(0.20, 0.87, "Work in progress")
 
     latex.SetTextFont(62)
     latex.DrawLatex(0.13, 0.87, 'CMS')

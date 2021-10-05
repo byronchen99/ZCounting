@@ -25,9 +25,17 @@ def zmonitoring(
         print("create runlist from byLsCSV file")
         with open(byLsCSV) as file:
             byLS_lines = file.readlines()
-        byLS_data = pd.read_csv(byLsCSV, sep=',', low_memory=False,
-                           skiprows=lambda x: byLS_lines[x].startswith('#') and not byLS_lines[x].startswith('#run'))
-        runlist = byLS_data['#run:fill'].str.split(':', expand=True)[0].drop_duplicates().tolist()
+        byLS_data = pd.read_csv(
+            byLsCSV, sep=',', low_memory=False,
+            skiprows=lambda x: byLS_lines[x].startswith('#') and not byLS_lines[x].startswith('#run'))
+
+        minLS = 5   # Consider only runs with more than least 5 LS
+        # number of lumisections per Run
+        nLS = byLS_data.pivot_table(columns=['#run:fill'], aggfunc='size')
+
+        print("sort out {0} runs with less than {1} LS".format(sum(nLS.values <= minLS), minLS))
+        runlist = byLS_data['#run:fill'].str.split(':', expand=True)[0].drop_duplicates()
+        runlist = runlist[nLS.values > minLS].tolist()
 
     cmsswbase = os.environ['CMSSW_BASE']
     if not cmsswbase:
@@ -40,7 +48,9 @@ def zmonitoring(
     cs_file.write("output      = condor/$(ClusterId).$(ProcId).out \n")
     cs_file.write("error       = condor/$(ClusterId).$(ProcId).err \n")
     cs_file.write("log         = condor/$(ClusterId).$(ProcId).log \n")
-    cs_file.write("+JobFlavour =\"tomorrow\" \n")
+    #cs_file.write("+JobFlavour =\"testmatch\" \n") # only works at lxplus
+    #cs_file.write("+RequestRuntime = 43200 \n")  # only works at naf(desy) 43200s = 12h
+    #cs_file.write("RequestMemory = 19999 \n")
 
     runs = []
     for run in runlist:
@@ -119,7 +129,7 @@ def check(projectdir, resubmit=False):
 
     unfinished_jobs = []
     for ijob in range(ji['njobs']):
-        outfilename = "condor/{0}.{1}.err".format(ji['clusterId'], ijob)
+        outfilename = "condor/{0}.{1}.out".format(ji['clusterId'], ijob)
         if not os.path.isfile(outfilename) or os.stat(outfilename).st_size == 0: #file does not exist or is empty?
             unfinished_jobs.append(ijob)
             continue

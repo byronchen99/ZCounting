@@ -67,7 +67,7 @@ dzDistCut = None#0.5
 
 
 # acceptance selection
-selection = 'pt1 >= {0} & pt2 >= {0} & dilepMass >= {1} & dilepMass <= {2} & delR > 0.8'.format(
+selection = "pt1 >= {0} & pt2 >= {0} & dilepMass >= {1} & dilepMass <= {2} & delR > 0.8 & q1 != q2".format(
     ptCut, MassMin_, MassMax_
     )
 
@@ -98,7 +98,7 @@ branches = ['dilepMass', 'nPV',
             'is2HLT', 'isSel', 'isGlo', 'isSta', 'isTrk',
             # 'tkIso1', 'tkIso2', 'pfIso1', 'pfIso2',
             # 'dxy1', 'dxy2', 'dz1', 'dz2',
-            'q1','q2',
+            # 'q1','q2',
             'nTrackerLayers2',
             'nValidPixelHits2'
             ]
@@ -114,19 +114,19 @@ inputs = {
     '16F': glob.glob(storage+"_V13_ULpreVFP2016F/210710_081713/0000/output_0_*")
        +glob.glob(storage+"_V13_ULpostVFP2016F/210710_081732/0000/output_0_*"),
     '16G': glob.glob(storage+"_V13_UL2016G/210711_084625/0000/output_0_*"),
-    # '16H': glob.glob(storage+"_V11_UL2016H/210417_165023/0000/output_0_*"),
-    #
-    # '17B': glob.glob(storage+"_V11_UL2017B/210420_072555/0000/output_0_*"),
-    # '17C': glob.glob(storage+"_V11_UL2017C/210420_072607/0000/output_0_*"),
-    # '17D': glob.glob(storage+"_V11_UL2017D/210707_113716/0000/output_0_*"),
-    # '17E': glob.glob(storage+"_V11_UL2017E/210526_151826/0000/output_0_*"),
-    # '17F': glob.glob(storage+"_V11_UL2017F/210526_151850/0000/output_0_*"),
-    # '17H': glob.glob(storage+"_V11_UL2017H/210420_072656/0000/output_0_*"),
-    #
-    # '18A': glob.glob(storage+"_V11_UL2018A/210420_072218/0000/output_0_*"),
-    # '18B': glob.glob(storage+"_V11_UL2018B/210420_072153/0000/output_0_*"),
-    # '18C': glob.glob(storage+"_V11_UL2018C/210420_072235/0000/output_0_*"),
-    # '18D': glob.glob(storage+"_V11_UL2018D/210420_072249/000?/output_0_*"),
+    '16H': glob.glob(storage+"_V13_UL2016H/210730_134940/0000/output_0_*"),
+
+    '17B': glob.glob(storage+"_V13_UL2017B/210712_141903/0000/output_0_*"),
+    '17C': glob.glob(storage+"_V13_UL2017C/210711_084818/0000/output_0_*"),
+    '17D': glob.glob(storage+"_V13_UL2017D/210711_084856/0000/output_0_*"),
+    '17E': glob.glob(storage+"_V13_UL2017E/210711_084911/0000/output_0_*"),
+    '17F': glob.glob(storage+"_V13_UL2017F/210711_084923/0000/output_0_*"),
+    '17H': glob.glob(storage+"_V13_UL2017H/210711_084944/0000/output_0_*"),
+
+    '18A': glob.glob(storage+"_V13_UL2018A/210822_193705/0000/output_0_*"),
+    '18B': glob.glob(storage+"_V13_UL2018B/210711_085040/0000/output_0_*"),
+    '18C': glob.glob(storage+"_V13_UL2018C/210711_085057/0000/output_0_*"),
+    '18D': glob.glob(storage+"_V13_UL2018D/210711_085109/000?/output_0_*"),
     # # Missing runs from 2018
     # '18D_2': glob.glob(storage+"_V11_UL2018D_v3/210506_184017/0000/output_0_*")
 }
@@ -149,148 +149,148 @@ for era, input in inputs.iteritems():
     print(">>> Concatenate")
     df = pd.concat(_df)
 
-    df['q'] = (df['q1'] + df['q2']) / 2.
+    # df['q'] = (df['q1'] + df['q2']) / 2.
 
     df['isTrk'] = df['isTrk'] * (df['nTrackerLayers2'] >= 6) * (df['nValidPixelHits2'] >= 1)
 
 
-    for q, data in df.groupby('q'):
+    # for q, data in df.groupby('q'):
+    #
+    #     if q == -1:
+    #         continue
+    #         suffix="_Minus"
+    #     elif q == 1:
+    #         continue
+    #         suffix="_Plus"
+    #     else:
+    #         suffix=""
+    suffix = ""
+    for run, data_run in df.groupby('run'):
+        print(">>> run {0}".format(run))
+        if max(data_run['ls']) > LumiMax_:
+            print("WARNING: this run has {0} lumisections, where the maximum bin is {1}".format(max(data_run['ls']), LumiMax_))
 
-        if q == -1:
-            continue
-            suffix="_Minus"
-        elif q == 1:
-            continue
-            suffix="_Plus"
-        else:
-            suffix=""
+        subdir = output+"/000"+str(run)[:-2]+"xx"
+        if not os.path.isdir(subdir):
+            os.mkdir(subdir)
 
-        for run, data_run in data.groupby('run'):
-            print(">>> run {0}".format(run))
-            if max(data_run['ls']) > LumiMax_:
-                print("WARNING: this run has {0} lumisections, where the maximum bin is {1}".format(max(data_run['ls']), LumiMax_))
+        tfile = ROOT.TFile.Open(subdir+"/DQM_V0001_R000{0}__SingleMuon__Run20{1}.root".format(run, era),"UPDATE")
 
-            subdir = output+"/000"+str(run)[:-2]+"xx"
-            if not os.path.isdir(subdir):
-                os.mkdir(subdir)
+        # Sel to Glo
+        h_mass_SEL_pass_central = ROOT.TH2D("h_mass_SIT_pass_central"+suffix, "Muon SIT passing probes central",
+            LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
+        h_mass_SEL_pass_forward = ROOT.TH2D("h_mass_SIT_pass_forward"+suffix, "Muon SIT passing probes forward",
+            LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
+        h_mass_SEL_fail_central = ROOT.TH2D("h_mass_SIT_fail_central"+suffix, "Muon SIT failing probes central",
+            LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
+        h_mass_SEL_fail_forward = ROOT.TH2D("h_mass_SIT_fail_forward"+suffix, "Muon SIT failing probes forward",
+            LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
 
-            tfile = ROOT.TFile.Open(subdir+"/DQM_V0001_R000{0}__SingleMuon__Run20{1}.root".format(run, era),"UPDATE")
+        # Trk to Sta
+        h_mass_TRK_pass_central = ROOT.TH2D("h_mass_Trk_pass_central"+suffix, "Muon track passing probes central",
+            LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
+        h_mass_TRK_pass_forward = ROOT.TH2D("h_mass_Trk_pass_forward"+suffix, "Muon track passing probes forward",
+            LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
+        h_mass_TRK_fail_central = ROOT.TH2D("h_mass_Trk_fail_central"+suffix, "Muon track failing probes central",
+            LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
+        h_mass_TRK_fail_forward = ROOT.TH2D("h_mass_Trk_fail_forward"+suffix, "Muon track failing probes forward",
+            LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
 
-            # Sel to Glo
-            h_mass_SEL_pass_central = ROOT.TH2D("h_mass_SIT_pass_central"+suffix, "Muon SIT passing probes central",
-                LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
-            h_mass_SEL_pass_forward = ROOT.TH2D("h_mass_SIT_pass_forward"+suffix, "Muon SIT passing probes forward",
-                LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
-            h_mass_SEL_fail_central = ROOT.TH2D("h_mass_SIT_fail_central"+suffix, "Muon SIT failing probes central",
-                LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
-            h_mass_SEL_fail_forward = ROOT.TH2D("h_mass_SIT_fail_forward"+suffix, "Muon SIT failing probes forward",
-                LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
-
-            # Trk to Sta
-            h_mass_TRK_pass_central = ROOT.TH2D("h_mass_Trk_pass_central"+suffix, "Muon track passing probes central",
-                LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
-            h_mass_TRK_pass_forward = ROOT.TH2D("h_mass_Trk_pass_forward"+suffix, "Muon track passing probes forward",
-                LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
-            h_mass_TRK_fail_central = ROOT.TH2D("h_mass_Trk_fail_central"+suffix, "Muon track failing probes central",
-                LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
-            h_mass_TRK_fail_forward = ROOT.TH2D("h_mass_Trk_fail_forward"+suffix, "Muon track failing probes forward",
-                LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
-
-            # Sta to Trk
-            h_mass_STA_pass_central = ROOT.TH2D("h_mass_Sta_pass_central"+suffix, "Muon standalone passing probes central",
-                LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
-            h_mass_STA_pass_forward = ROOT.TH2D("h_mass_Sta_pass_forward"+suffix, "Muon standalone passing probes forward",
-                LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
-            h_mass_STA_fail_central = ROOT.TH2D("h_mass_Sta_fail_central"+suffix, "Muon standalone failing probes central",
-                LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
-            h_mass_STA_fail_forward = ROOT.TH2D("h_mass_Sta_fail_forward"+suffix, "Muon standalone failing probes forward",
-                LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
-
-
-            h_mass_2HLTBB_Z = ROOT.TH2D("h_mass_2HLTBB_Z"+suffix, "Events where 2 muons pass HLT, both muons in barrel",       LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
-            h_mass_2HLTEE_Z = ROOT.TH2D("h_mass_2HLTEE_Z"+suffix, "Events where 2 muons pass HLT, both muons in endcap",       LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
-            h_mass_2HLTBE_Z = ROOT.TH2D("h_mass_2HLTBE_Z"+suffix, "Events where 2 muons pass HLT, one muon in barrel and one in endcap",       LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
-
-            h_mass_1HLTBB_Z = ROOT.TH2D("h_mass_1HLTBB_Z"+suffix, "Events where 1 muon pass HLT, both muons in barrel",       LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
-            h_mass_1HLTEE_Z = ROOT.TH2D("h_mass_1HLTEE_Z"+suffix, "Events where 1 muon pass HLT, both muons in endcap",       LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
-            h_mass_1HLTBE_Z = ROOT.TH2D("h_mass_1HLTBE_Z"+suffix, "Events where 1 muon pass HLT, one barrel one endcap",       LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
-
-            # fill tag and probe histograms
-            #--- barrel
-            # fill tags if both muons passed HLT (2HLT category)
-            for m,ls,eta2 in data_run.query("is2HLT==1 & abs(eta1) < 0.9")[['dilepMass','ls','eta2']].values:
-                h_mass_SEL_pass_central.Fill(ls,m)
-                h_mass_TRK_pass_central.Fill(ls,m)
-                h_mass_STA_pass_central.Fill(ls,m)
-                if(abs(eta2) < 0.9):
-                    h_mass_2HLTBB_Z.Fill(ls,m)
-                else:
-                    h_mass_2HLTBE_Z.Fill(ls,m)
-
-            # fill probes
-            for m,ls in data_run.query("is2HLT==1 & abs(eta2) < 0.9")[['dilepMass','ls']].values:
-                h_mass_SEL_pass_central.Fill(ls,m)
-                h_mass_TRK_pass_central.Fill(ls,m)
-                h_mass_STA_pass_central.Fill(ls,m)
+        # Sta to Trk
+        h_mass_STA_pass_central = ROOT.TH2D("h_mass_Sta_pass_central"+suffix, "Muon standalone passing probes central",
+            LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
+        h_mass_STA_pass_forward = ROOT.TH2D("h_mass_Sta_pass_forward"+suffix, "Muon standalone passing probes forward",
+            LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
+        h_mass_STA_fail_central = ROOT.TH2D("h_mass_Sta_fail_central"+suffix, "Muon standalone failing probes central",
+            LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
+        h_mass_STA_fail_forward = ROOT.TH2D("h_mass_Sta_fail_forward"+suffix, "Muon standalone failing probes forward",
+            LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
 
 
-            for m,ls,eta1 in data_run.query("isSel==1 & abs(eta2) < 0.9")[['dilepMass','ls','eta1']].values:
-                h_mass_SEL_pass_central.Fill(ls,m)
-                h_mass_TRK_pass_central.Fill(ls,m)
-                h_mass_STA_pass_central.Fill(ls,m)
-                if(abs(eta1) < 0.9):
-                    h_mass_1HLTBB_Z.Fill(ls,m)
-                else:
-                    h_mass_1HLTBE_Z.Fill(ls,m)
+        h_mass_2HLTBB_Z = ROOT.TH2D("h_mass_2HLTBB_Z"+suffix, "Events where 2 muons pass HLT, both muons in barrel",       LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
+        h_mass_2HLTEE_Z = ROOT.TH2D("h_mass_2HLTEE_Z"+suffix, "Events where 2 muons pass HLT, both muons in endcap",       LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
+        h_mass_2HLTBE_Z = ROOT.TH2D("h_mass_2HLTBE_Z"+suffix, "Events where 2 muons pass HLT, one muon in barrel and one in endcap",       LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
 
-            for m,ls in data_run.query("isGlo==1 & isTrk==1 & abs(eta2) < 0.9")[['dilepMass','ls']].values:
-                h_mass_SEL_fail_central.Fill(ls,m)
-                h_mass_STA_pass_central.Fill(ls,m)
-                h_mass_TRK_pass_central.Fill(ls,m)
+        h_mass_1HLTBB_Z = ROOT.TH2D("h_mass_1HLTBB_Z"+suffix, "Events where 1 muon pass HLT, both muons in barrel",       LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
+        h_mass_1HLTEE_Z = ROOT.TH2D("h_mass_1HLTEE_Z"+suffix, "Events where 1 muon pass HLT, both muons in endcap",       LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
+        h_mass_1HLTBE_Z = ROOT.TH2D("h_mass_1HLTBE_Z"+suffix, "Events where 1 muon pass HLT, one barrel one endcap",       LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
 
-            for m,ls in data_run.query("isTrk==1 & ((isGlo==0 & isSel==0 & is2HLT==0) | isSta==0) & abs(eta2)  < 0.9")[['dilepMass','ls']].values:
-                h_mass_STA_fail_central.Fill(ls,m)
+        # fill tag and probe histograms
+        #--- barrel
+        # fill tags if both muons passed HLT (2HLT category)
+        for m,ls,eta2 in data_run.query("is2HLT==1 & abs(eta1) < 0.9")[['dilepMass','ls','eta2']].values:
+            h_mass_SEL_pass_central.Fill(ls,m)
+            h_mass_TRK_pass_central.Fill(ls,m)
+            h_mass_STA_pass_central.Fill(ls,m)
+            if(abs(eta2) < 0.9):
+                h_mass_2HLTBB_Z.Fill(ls,m)
+            else:
+                h_mass_2HLTBE_Z.Fill(ls,m)
 
-            for m,ls in data_run.query("isSta==1 & ((isGlo==0 & isSel==0 & is2HLT==0) | isTrk==0)  & abs(eta2)  < 0.9")[['dilepMass','ls']].values:
-                h_mass_TRK_fail_central.Fill(ls,m)
+        # fill probes
+        for m,ls in data_run.query("is2HLT==1 & abs(eta2) < 0.9")[['dilepMass','ls']].values:
+            h_mass_SEL_pass_central.Fill(ls,m)
+            h_mass_TRK_pass_central.Fill(ls,m)
+            h_mass_STA_pass_central.Fill(ls,m)
 
-            #--- endcap
-            # fill tags if both muons passed HLT (2HLT category)
-            for m,ls,eta2 in data_run.query("is2HLT==1 & abs(eta1) >= 0.9")[['dilepMass','ls','eta2']].values:
-                h_mass_SEL_pass_forward.Fill(ls,m)
-                h_mass_TRK_pass_forward.Fill(ls,m)
-                h_mass_STA_pass_forward.Fill(ls,m)
-                if(abs(eta2) >= 0.9):
-                    h_mass_2HLTEE_Z.Fill(ls,m)
-                else:
-                    h_mass_2HLTBE_Z.Fill(ls,m)
 
-            # fill probes
-            for m,ls in data_run.query("is2HLT==1 & abs(eta2) >= 0.9")[['dilepMass','ls']].values:
-                h_mass_SEL_pass_forward.Fill(ls,m)
-                h_mass_TRK_pass_forward.Fill(ls,m)
-                h_mass_STA_pass_forward.Fill(ls,m)
+        for m,ls,eta1 in data_run.query("isSel==1 & abs(eta2) < 0.9")[['dilepMass','ls','eta1']].values:
+            h_mass_SEL_pass_central.Fill(ls,m)
+            h_mass_TRK_pass_central.Fill(ls,m)
+            h_mass_STA_pass_central.Fill(ls,m)
+            if(abs(eta1) < 0.9):
+                h_mass_1HLTBB_Z.Fill(ls,m)
+            else:
+                h_mass_1HLTBE_Z.Fill(ls,m)
 
-            for m,ls,eta1 in data_run.query("isSel==1 & abs(eta2) >= 0.9")[['dilepMass','ls','eta1']].values:
-                h_mass_SEL_pass_forward.Fill(ls,m)
-                h_mass_TRK_pass_forward.Fill(ls,m)
-                h_mass_STA_pass_forward.Fill(ls,m)
-                if(abs(eta1) >= 0.9):
-                    h_mass_1HLTEE_Z.Fill(ls,m)
-                else:
-                    h_mass_1HLTBE_Z.Fill(ls,m)
+        for m,ls in data_run.query("isGlo==1 & isTrk==1 & abs(eta2) < 0.9")[['dilepMass','ls']].values:
+            h_mass_SEL_fail_central.Fill(ls,m)
+            h_mass_STA_pass_central.Fill(ls,m)
+            h_mass_TRK_pass_central.Fill(ls,m)
 
-            for m,ls in data_run.query("isGlo==1 & isTrk==1 & abs(eta2) >= 0.9")[['dilepMass','ls']].values:
-                h_mass_SEL_fail_forward.Fill(ls,m)
-                h_mass_TRK_pass_forward.Fill(ls,m)
-                h_mass_STA_pass_forward.Fill(ls,m)
+        for m,ls in data_run.query("isTrk==1 & ((isGlo==0 & isSel==0 & is2HLT==0) | isSta==0) & abs(eta2)  < 0.9")[['dilepMass','ls']].values:
+            h_mass_STA_fail_central.Fill(ls,m)
 
-            for m,ls in data_run.query("isTrk==1 & ((isGlo==0 & isSel==0 & is2HLT==0) | isSta==0) & abs(eta2) >= 0.9")[['dilepMass','ls']].values:
-                h_mass_STA_fail_forward.Fill(ls,m)
+        for m,ls in data_run.query("isSta==1 & ((isGlo==0 & isSel==0 & is2HLT==0) | isTrk==0)  & abs(eta2)  < 0.9")[['dilepMass','ls']].values:
+            h_mass_TRK_fail_central.Fill(ls,m)
 
-            for m,ls in data_run.query("isSta==1 & ((isGlo==0 & isSel==0 & is2HLT==0) | isTrk==0) & abs(eta2) >= 0.9")[['dilepMass','ls']].values:
-                h_mass_TRK_fail_forward.Fill(ls,m)
+        #--- endcap
+        # fill tags if both muons passed HLT (2HLT category)
+        for m,ls,eta2 in data_run.query("is2HLT==1 & abs(eta1) >= 0.9")[['dilepMass','ls','eta2']].values:
+            h_mass_SEL_pass_forward.Fill(ls,m)
+            h_mass_TRK_pass_forward.Fill(ls,m)
+            h_mass_STA_pass_forward.Fill(ls,m)
+            if(abs(eta2) >= 0.9):
+                h_mass_2HLTEE_Z.Fill(ls,m)
+            else:
+                h_mass_2HLTBE_Z.Fill(ls,m)
 
-            tfile.Write()
-            tfile.Close()
-            tfile.Delete()
+        # fill probes
+        for m,ls in data_run.query("is2HLT==1 & abs(eta2) >= 0.9")[['dilepMass','ls']].values:
+            h_mass_SEL_pass_forward.Fill(ls,m)
+            h_mass_TRK_pass_forward.Fill(ls,m)
+            h_mass_STA_pass_forward.Fill(ls,m)
+
+        for m,ls,eta1 in data_run.query("isSel==1 & abs(eta2) >= 0.9")[['dilepMass','ls','eta1']].values:
+            h_mass_SEL_pass_forward.Fill(ls,m)
+            h_mass_TRK_pass_forward.Fill(ls,m)
+            h_mass_STA_pass_forward.Fill(ls,m)
+            if(abs(eta1) >= 0.9):
+                h_mass_1HLTEE_Z.Fill(ls,m)
+            else:
+                h_mass_1HLTBE_Z.Fill(ls,m)
+
+        for m,ls in data_run.query("isGlo==1 & isTrk==1 & abs(eta2) >= 0.9")[['dilepMass','ls']].values:
+            h_mass_SEL_fail_forward.Fill(ls,m)
+            h_mass_TRK_pass_forward.Fill(ls,m)
+            h_mass_STA_pass_forward.Fill(ls,m)
+
+        for m,ls in data_run.query("isTrk==1 & ((isGlo==0 & isSel==0 & is2HLT==0) | isSta==0) & abs(eta2) >= 0.9")[['dilepMass','ls']].values:
+            h_mass_STA_fail_forward.Fill(ls,m)
+
+        for m,ls in data_run.query("isSta==1 & ((isGlo==0 & isSel==0 & is2HLT==0) | isTrk==0) & abs(eta2) >= 0.9")[['dilepMass','ls']].values:
+            h_mass_TRK_fail_forward.Fill(ls,m)
+
+        tfile.Write()
+        tfile.Close()
+        tfile.Delete()

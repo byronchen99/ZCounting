@@ -1,60 +1,4 @@
 {
-"DYJetsToLL_0J_M_50_Summer16preVFP": {
-    "OutputSplitFiles": 1,
-    "crab3": {
-      "Data.inputDataset": "/DYJetsToLL_0J_TuneCP5_13TeV-amcatnloFXFX-pythia8/RunIISummer20UL16MiniAODAPV-106X_mcRun2_asymptotic_preVFP_v8-v2/MINIAODSIM",
-      "Data.splitting": "FileBased",
-      "Data.unitsPerJob": 1,
-      "JobType.maxMemoryMB": 2500,
-      "JobType.pyCfgParams": [
-        "samplename=dy",
-        "year=2016preVFP",
-        "outputFile=DYJetsToLL_0J_M_50_Summer16preVFP"
-      ]
-    }
-},
-"DYJetsToLL_1J_M_50_Summer16preVFP": {
-    "OutputSplitFiles": 1,
-    "crab3": {
-      "Data.inputDataset": "/DYJetsToLL_1J_TuneCP5_13TeV-amcatnloFXFX-pythia8/RunIISummer20UL16MiniAODAPV-106X_mcRun2_asymptotic_preVFP_v8-v1/MINIAODSIM",
-      "Data.splitting": "FileBased",
-      "Data.unitsPerJob": 1,
-      "JobType.maxMemoryMB": 2500,
-      "JobType.pyCfgParams": [
-        "samplename=dy",
-        "year=2016preVFP",
-        "outputFile=DYJetsToLL_1J_M_50_Summer16preVFP"
-      ]
-    }
-},
-"DYJetsToLL_2J_M_50_Summer16preVFP": {
-    "OutputSplitFiles": 1,
-    "crab3": {
-      "Data.inputDataset": "/DYJetsToLL_2J_TuneCP5_13TeV-amcatnloFXFX-pythia8/RunIISummer20UL16MiniAODAPV-106X_mcRun2_asymptotic_preVFP_v8-v1/MINIAODSIM",
-      "Data.splitting": "FileBased",
-      "Data.unitsPerJob": 1,
-      "JobType.maxMemoryMB": 2500,
-      "JobType.pyCfgParams": [
-        "samplename=dy",
-        "year=2016preVFP",
-        "outputFile=DYJetsToLL_2J_M_50_Summer16preVFP"
-      ]
-    }
-},
-"DYJetsToLL_M_50_Summer16preVFP": {
-    "OutputSplitFiles": 1,
-    "crab3": {
-      "Data.inputDataset": "/DYJetsToLL_M-50_TuneCP5_13TeV-amcatnloFXFX-pythia8/RunIISummer20UL16MiniAODAPV-106X_mcRun2_asymptotic_preVFP_v8-v1/MINIAODSIM",
-      "Data.splitting": "FileBased",
-      "Data.unitsPerJob": 1,
-      "JobType.maxMemoryMB": 2500,
-      "JobType.pyCfgParams": [
-        "samplename=dy",
-        "year=2016preVFP",
-        "outputFile=DYJetsToLL_M_50_Summer16preVFP"
-      ]
-    }
-},
 "WJetsToLNu_0J_Summer16preVFP": {
   "OutputSplitFiles": 1,
   "crab3": {
@@ -86,7 +30,7 @@
 "WJetsToLNu_2J_Summer16preVFP": {
   "OutputSplitFiles": 1,
   "crab3": {
-    "Data.inputDataset": "/WJetsToLNu_2J_TuneCP5_13TeV-amcatnloFXFX-pythia8/RunIISummer20UL16MiniAODAPV-106X_mcRun2_asymptotic_preVFP_v8-v1/MINIAODSIM",
+    "Data.inputDataset": "/WJetsToLNu_2J_TuneCP5_13TeV-amcatnloFXFX-pythia8/RunIISummer20UL16MiniAODAPVv2-106X_mcRun2_asymptotic_preVFP_v11-v1/MINIAODSIM",
     "Data.splitting": "FileBased",
     "Data.unitsPerJob": 1,
     "JobType.maxMemoryMB": 2500,
@@ -114,7 +58,7 @@
 "WW_Summer16preVFP": {
   "OutputSplitFiles": 1,
   "crab3": {
-    "Data.inputDataset": "/WW_TuneCP5_13TeV-pythia8/RunIISummer20UL17MiniAOD-106X_mc2017_realistic_v6-v2/MINIAODSIM",
+    "Data.inputDataset": "/WW_TuneCP5_13TeV-pythia8/RunIISummer20UL16MiniAODAPVv2-106X_mcRun2_asymptotic_preVFP_v11-v1/MINIAODSIM",
     "Data.splitting": "FileBased",
     "Data.unitsPerJob": 1,
     "JobType.maxMemoryMB": 2500,
@@ -128,7 +72,7 @@
 "WZ_Summer16preVFP": {
   "OutputSplitFiles": 1,
   "crab3": {
-    "Data.inputDataset": "/WZ_TuneCP5_13TeV-pythia8/RunIISummer20UL17MiniAOD-106X_mc2017_realistic_v6-v2/MINIAODSIM",
+    "Data.inputDataset": "/WZ_TuneCP5_13TeV-pythia8/RunIISummer20UL16MiniAODAPVv2-106X_mcRun2_asymptotic_preVFP_v11-v1/MINIAODSIM",
     "Data.splitting": "FileBased",
     "Data.unitsPerJob": 1,
     "JobType.maxMemoryMB": 2500,
@@ -142,7 +86,7 @@
 "ZZ_Summer16preVFP": {
   "OutputSplitFiles": 1,
   "crab3": {
-    "Data.inputDataset": "/ZZ_TuneCP5_13TeV-pythia8/RunIISummer20UL17MiniAOD-106X_mc2017_realistic_v6-v2/MINIAODSIM",
+    "Data.inputDataset": "/ZZ_TuneCP5_13TeV-pythia8/RunIISummer20UL16MiniAODAPVv2-106X_mcRun2_asymptotic_preVFP_v11-v1/MINIAODSIM",
     "Data.splitting": "FileBased",
     "Data.unitsPerJob": 1,
     "JobType.maxMemoryMB": 2500,

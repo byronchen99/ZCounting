@@ -2,7 +2,7 @@
 "DYJetsToLL_M_50_LO_FlatPU0to75_Summer16postVFP": {
     "OutputSplitFiles": 1,
     "crab3": {
-      "Data.inputDataset": "/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/RunIISummer20UL16MiniAOD-FlatPU0to75_106X_mcRun2_asymptotic_v13-v2/MINIAODSIM",
+      "Data.inputDataset": "/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/RunIISummer20UL16MiniAODv2-FlatPU0to75_106X_mcRun2_asymptotic_v17-v1/MINIAODSIM",
       "Data.splitting": "FileBased",
       "Data.unitsPerJob": 1,
       "JobType.maxMemoryMB": 2500,
@@ -16,7 +16,7 @@
 "DYJetsToLL_M_50_LO_FlatPU0to75_Summer16preVFP": {
     "OutputSplitFiles": 1,
     "crab3": {
-      "Data.inputDataset": "/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/RunIISummer20UL16MiniAODAPV-FlatPU0to75_106X_mcRun2_asymptotic_preVFP_v8-v2/MINIAODSIM",
+      "Data.inputDataset": "/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/RunIISummer20UL16MiniAODAPVv2-FlatPU0to75_106X_mcRun2_asymptotic_preVFP_v11-v1/MINIAODSIM",
       "Data.splitting": "FileBased",
       "Data.unitsPerJob": 1,
       "JobType.maxMemoryMB": 2500,

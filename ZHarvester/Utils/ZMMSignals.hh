@@ -20,6 +20,8 @@ class CSignalModel
 public:
   CSignalModel():model(0){}
   virtual ~CSignalModel(){ delete model; }
+  virtual void Reset() = 0;
+
   RooAbsPdf *model;
 };
 
@@ -28,6 +30,7 @@ class CBreitWignerConvCrystalBall : public CSignalModel
 public:
   CBreitWignerConvCrystalBall(RooRealVar &m, const Bool_t pass, const int ibin);
   ~CBreitWignerConvCrystalBall();
+  void Reset(){};
   RooRealVar     *mass, *width;
   RooBreitWigner *bw;
   RooRealVar     *mean, *sigma, *alpha, *n;
@@ -39,6 +42,7 @@ class CMCTemplateConvGaussian : public CSignalModel
 public:
   CMCTemplateConvGaussian(RooRealVar &m, TH1D* hist, const Bool_t pass, const int ibin, int intOrder=1);
   ~CMCTemplateConvGaussian();
+  void Reset();
   RooRealVar  *mean, *sigma;
   RooGaussian *gaus;
   TH1D        *inHist;
@@ -51,6 +55,7 @@ class CMCStackConvGaussian : public CSignalModel
 public:
     CMCStackConvGaussian(RooRealVar &m, TH1D* hist_dy, TH1D* hist_tt, const Bool_t pass, const int ibin, int intOrder=1);
     ~CMCStackConvGaussian();
+    void Reset(){};
     RooRealVar  *mean, *sigma, *frac;
     RooGaussian *gaus;
     TH1D        *inHist_dy, *inHist_tt;
@@ -133,6 +138,12 @@ CMCTemplateConvGaussian::CMCTemplateConvGaussian(RooRealVar &m, TH1D* hist, cons
 
   sprintf(vname,"signal%s",name);
   model = new RooFFTConvPdf(vname,"MC x Gaus",m,*histPdf,*gaus);
+}
+
+void CMCTemplateConvGaussian::Reset(){
+    std::cout<<"CMCTemplateConvGaussian::Reset() --- "<<std::endl;
+    mean->setVal(0);
+    sigma->setVal(2);
 }
 
 CMCTemplateConvGaussian::~CMCTemplateConvGaussian()
