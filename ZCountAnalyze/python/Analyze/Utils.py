@@ -7,6 +7,7 @@ def plot_scatter(x, y, xlabel, ylabel, range, zlabel="Density", rangey=None,
                  cutsAdditional=None,
                  title=None,
                  scatter=False,
+                 eventWeights=None,
                  saveas='./scat.png'):
     import matplotlib.colors as colors
     plt.clf()
@@ -16,10 +17,15 @@ def plot_scatter(x, y, xlabel, ylabel, range, zlabel="Density", rangey=None,
     if rangey is None:
         rangey = range
 
-    if scatter:
-        plt.scatter(x, y, marker='.', color='k')
+    if eventWeights is not None:
+        w = eventWeights
     else:
-        plt.hist2d(x, y, bins=50, range=(range, rangey), cmap=cmap, normed=True, norm=colors.LogNorm())
+        w = np.ones(x)
+
+    if scatter:
+        plt.scatter(x, y, weights=w, marker='.', color='k')
+    else:
+        plt.hist2d(x, y, weights=w, bins=50, range=(range, rangey), cmap=cmap, normed=True, norm=colors.LogNorm())
         plt.colorbar(label=zlabel)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)

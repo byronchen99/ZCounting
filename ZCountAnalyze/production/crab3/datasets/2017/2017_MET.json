@@ -1,0 +1,77 @@
+{
+"Met_Run2017B": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/MET/Run2017B-UL2017_MiniAODv2-v1/MINIAOD",
+    "Data.lumiMask": "/afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions17/13TeV/Legacy_2017/Cert_294927-306462_13TeV_UL2017_Collisions17_MuonJSON.txt",
+    "Data.splitting": "LumiBased",
+    "Data.unitsPerJob": 100,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "year=2017",
+      "samplename=met",
+      "outputFile=Met_Run2017B"
+    ]
+  }
+},
+"Met_Run2017C": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/MET/Run2017C-UL2017_MiniAODv2-v1/MINIAOD",
+    "Data.lumiMask": "/afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions17/13TeV/Legacy_2017/Cert_294927-306462_13TeV_UL2017_Collisions17_MuonJSON.txt",
+    "Data.splitting": "LumiBased",
+    "Data.unitsPerJob": 50,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "year=2017",
+      "samplename=met",
+      "outputFile=Met_Run2017C"
+    ]
+  }
+},
+"Met_Run2017D": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/MET/Run2017D-UL2017_MiniAODv2-v1/MINIAOD",
+    "Data.lumiMask": "/afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions17/13TeV/Legacy_2017/Cert_294927-306462_13TeV_UL2017_Collisions17_MuonJSON.txt",
+    "Data.splitting": "LumiBased",
+    "Data.unitsPerJob": 100,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "year=2017",
+      "samplename=met",
+      "outputFile=Met_Run2017D"
+    ]
+  }
+},
+"Met_Run2017E": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/MET/Run2017E-UL2017_MiniAODv2-v1/MINIAOD",
+    "Data.lumiMask": "/afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions17/13TeV/Legacy_2017/Cert_294927-306462_13TeV_UL2017_Collisions17_MuonJSON.txt",
+    "Data.splitting": "LumiBased",
+    "Data.unitsPerJob": 100,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "year=2017",
+      "samplename=met",
+      "outputFile=Met_Run2017E"
+    ]
+  }
+},
+"Met_Run2017F": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/MET/Run2017F-UL2017_MiniAODv2-v1/MINIAOD",
+    "Data.lumiMask": "/afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions17/13TeV/Legacy_2017/Cert_294927-306462_13TeV_UL2017_Collisions17_MuonJSON.txt",
+    "Data.splitting": "LumiBased",
+    "Data.unitsPerJob": 50,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "year=2017",
+      "samplename=met",
+      "outputFile=Met_Run2017F"
+    ]
+  }
+}
+}

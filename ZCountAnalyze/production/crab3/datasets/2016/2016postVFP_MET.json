@@ -1,0 +1,47 @@
+{
+  "Met_Run2016FpostVFP": {
+    "OutputSplitFiles": 1,
+    "crab3": {
+      "Data.inputDataset": "/MET/Run2016F-UL2016_MiniAODv2-v2/MINIAOD",
+      "Data.lumiMask": "/afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions16/13TeV/Legacy_2016/Cert_271036-284044_13TeV_Legacy2016_Collisions16_JSON_MuonPhys.txt",
+      "Data.splitting": "LumiBased",
+      "Data.unitsPerJob": 100,
+      "JobType.maxMemoryMB": 2500,
+      "JobType.pyCfgParams": [
+        "year=2016postVFP",
+        "samplename=met",
+        "outputFile=Met_Run2016FpostVFP"
+      ]
+    }
+  },
+  "Met_Run2016G": {
+    "OutputSplitFiles": 1,
+    "crab3": {
+      "Data.inputDataset": "/MET/Run2016G-UL2016_MiniAODv2-v2/MINIAOD",
+      "Data.lumiMask": "/afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions16/13TeV/Legacy_2016/Cert_271036-284044_13TeV_Legacy2016_Collisions16_JSON_MuonPhys.txt",
+      "Data.splitting": "LumiBased",
+      "Data.unitsPerJob": 100,
+      "JobType.maxMemoryMB": 2500,
+      "JobType.pyCfgParams": [
+        "year=2016postVFP",
+        "samplename=met",
+        "outputFile=Met_Run2016G"
+      ]
+    }
+  },
+  "Met_Run2016H": {
+    "OutputSplitFiles": 1,
+    "crab3": {
+      "Data.inputDataset": "/MET/Run2016H-UL2016_MiniAODv2-v2/MINIAOD",
+      "Data.lumiMask": "/afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions16/13TeV/Legacy_2016/Cert_271036-284044_13TeV_Legacy2016_Collisions16_JSON_MuonPhys.txt",
+      "Data.splitting": "LumiBased",
+      "Data.unitsPerJob": 100,
+      "JobType.maxMemoryMB": 2500,
+      "JobType.pyCfgParams": [
+        "year=2016postVFP",
+        "samplename=met",
+        "outputFile=Met_Run2016H"
+      ]
+    }
+  }
+}

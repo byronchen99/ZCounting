@@ -34,11 +34,12 @@
 // CMSSW includes
 #include "CommonTools/UtilAlgos/interface/TFileService.h"
 
-#include "DataFormats/Math/interface/deltaR.h"
 #include "DataFormats/Common/interface/TriggerResults.h"
-#include "DataFormats/PatCandidates/interface/TriggerObjectStandAlone.h"
-#include "DataFormats/PatCandidates/interface/Muon.h"
 #include "DataFormats/HepMCCandidate/interface/GenParticle.h"
+#include "DataFormats/Math/interface/deltaR.h"
+#include "DataFormats/PatCandidates/interface/TriggerObjectStandAlone.h"
+#include "DataFormats/PatCandidates/interface/MET.h"
+#include "DataFormats/PatCandidates/interface/Muon.h"
 #include "DataFormats/VertexReco/interface/Vertex.h"
 
 #include "FWCore/Common/interface/TriggerNames.h"
@@ -64,7 +65,6 @@
 #include "Math/Vector4D.h"
 #include <TLorentzVector.h>
 
-// typedef ROOT::Math::LorentzVector<ROOT::Math::PtEtaPhiM4D<double>> LV
 //
 // class declaration
 //
@@ -124,6 +124,8 @@ private:
     edm::EDGetTokenT<std::vector<pat::TriggerObjectStandAlone> > triggerObjects_;
     edm::EDGetTokenT<pat::MuonCollection> muonCollection_;
     edm::EDGetTokenT<std::vector<reco::Vertex> > pvCollection_;
+    edm::EDGetTokenT<std::vector<pat::MET> >  metPFCollection_;
+    edm::EDGetTokenT<std::vector<pat::MET> >  metPuppiCollection_;
     edm::EDGetTokenT<std::vector<GenZDecayProperties> > genZCollection_;
     edm::EDGetTokenT<TtGenEvent> genTtEvent_;
     edm::EDGetTokenT<std::vector<PileupSummaryInfo> > pileupInfoCollection_;
@@ -153,13 +155,21 @@ private:
 
     std::string era_;
 
+    // Muon trigger
     bool hltChanged_;
     std::vector<std::string> muonTriggerPatterns_;
     std::vector<std::string> muonTriggerPaths_;
+    // MET trigger
+    std::vector<std::string> metTriggerPatterns_;
+    std::vector<std::string> metTriggerPatternsExt_;
+    std::vector<std::string> metTriggerPaths_;
+    std::vector<std::string> metTriggerPathsExt_;
+
     // max dR matching between muon and hlt object
     double DRMAX;
 
     // flags
+    bool isData_;
     bool hasGenZ_;
     bool hasGenTt_;
 
@@ -175,6 +185,14 @@ private:
     unsigned int runNumber_;
     unsigned int lumiBlock_;
     unsigned int eventNumber_;
+
+    int met_triggerBits_;
+    int met_triggerBitsExt_;
+
+    float met_PF_pt_;
+    float met_PF_phi_;
+    float met_Puppi_pt_;
+    float met_Puppi_phi_;
 
     std::vector<int> v_genWeightIDs_;
     std::vector<int> v_pdfWeightIDs_;
@@ -270,6 +288,8 @@ ZCounting::ZCounting(const edm::ParameterSet& iConfig):
     triggerObjects_  (consumes<std::vector<pat::TriggerObjectStandAlone> >(iConfig.getParameter<edm::InputTag>("trigger_objects"))),
     muonCollection_  (consumes<pat::MuonCollection> (iConfig.getParameter<edm::InputTag>("pat_muons"))),
     pvCollection_    (consumes<std::vector<reco::Vertex> > (iConfig.getParameter<edm::InputTag>("edmPVName"))),
+    metPFCollection_   (consumes<std::vector<pat::MET> >  (iConfig.getParameter<edm::InputTag>("pat_met_PF"))),
+    metPuppiCollection_   (consumes<std::vector<pat::MET> >  (iConfig.getParameter<edm::InputTag>("pat_met_puppi"))),
     genZCollection_  (consumes<std::vector<GenZDecayProperties> > (iConfig.getParameter<edm::InputTag>("genZLeptonCollection"))),
     genTtEvent_  (consumes<TtGenEvent> (iConfig.getParameter<edm::InputTag>("genTtCollection"))),
     pileupInfoCollection_  (consumes<std::vector<PileupSummaryInfo> >(iConfig.getParameter<edm::InputTag>("pileupSummaryInfoCollection"))),
@@ -281,11 +301,15 @@ ZCounting::ZCounting(const edm::ParameterSet& iConfig):
 
     era_ = iConfig.getParameter<std::string>("era");
 
+    isData_ = iConfig.getUntrackedParameter<bool>("isData");
     hasGenZ_ = iConfig.getUntrackedParameter<bool>("hasGenZ");
     hasGenTt_ = iConfig.getUntrackedParameter<bool>("hasGenTt");
 
     v_genWeightIDs_ = iConfig.getParameter<std::vector<int>>("genWeights");
     v_pdfWeightIDs_ = iConfig.getParameter<std::vector<int>>("pdfWeights");
+
+    metTriggerPatterns_ = iConfig.getParameter<std::vector<std::string>>("met_trigger_patterns");
+    metTriggerPatternsExt_ = iConfig.getParameter<std::vector<std::string>>("met_trigger_patterns_ext");
 
     muonTriggerPatterns_ = iConfig.getParameter<std::vector<std::string>>("muon_trigger_patterns");
     DRMAX = iConfig.getUntrackedParameter<double>("muon_trigger_DRMAX");
@@ -344,19 +368,6 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     runNumber_ = iEvent.id().run();
     lumiBlock_ = iEvent.id().luminosityBlock();
     eventNumber_ = iEvent.id().event();
-
-
-    edm::Handle<edm::TriggerResults> triggerBits;
-    edm::Handle<std::vector<pat::TriggerObjectStandAlone> > triggerObjects;
-    edm::Handle<pat::MuonCollection> muonCollection;
-    edm::Handle<std::vector<reco::Vertex> > pvCollection;
-    edm::Handle<std::vector<PileupSummaryInfo> > pileupInfoCollection;
-
-    iEvent.getByToken(triggerBits_, triggerBits);
-    iEvent.getByToken(triggerObjects_, triggerObjects);
-    iEvent.getByToken(muonCollection_, muonCollection);
-    iEvent.getByToken(pvCollection_, pvCollection);
-    iEvent.getByToken(pileupInfoCollection_, pileupInfoCollection);
 
     // --- >>> prefiring
     edm::Handle< double > theprefweightECAL;
@@ -417,7 +428,6 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
         prefiringweightMuonupStat2016H_ =(*theprefweightupstatMuon2016H);
         prefiringweightMuondownStat2016H_ =(*theprefweightdownstatMuon2016H);
     }
-
     // <<< ---
 
     const reco::GenParticle* genLepton = 0;
@@ -463,7 +473,7 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
         	}
         }
 
-        // PS weights
+        // --- PS weights
         std::vector<double> psWeights;
         psWeights = evt_info->weights();
         if(psWeights.size()>0) {
@@ -518,18 +528,69 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
         }
     }
 
-    // --- get muon trigger names
+    // --- get trigger names
+    edm::Handle<edm::TriggerResults> triggerBits;
+    edm::Handle<std::vector<pat::TriggerObjectStandAlone> > triggerObjects;
+    iEvent.getByToken(triggerBits_, triggerBits);
+    iEvent.getByToken(triggerObjects_, triggerObjects);
     LogDebug("ZCounting") << "get trigger names";
     const edm::TriggerNames &triggerNames = iEvent.triggerNames(*triggerBits);
     if(hltChanged_ == true){
         muonTriggerPaths_.clear();
+        metTriggerPaths_.clear();
+        metTriggerPathsExt_.clear();
         for(const std::string pattern: muonTriggerPatterns_){
             muonTriggerPaths_.push_back(get_triggerPath(pattern, triggerNames));
+        }
+        for(const std::string pattern: metTriggerPatterns_){
+            metTriggerPaths_.push_back(get_triggerPath(pattern, triggerNames));
+        }
+        for(const std::string pattern: metTriggerPatternsExt_){
+            metTriggerPathsExt_.push_back(get_triggerPath(pattern, triggerNames));
         }
         hltChanged_=false;
     }
 
-    // PV selection
+    // --- check if met trigger has fired
+    const unsigned int nTrigger = triggerBits->size();
+    // loop over all trigger of the event
+    for(unsigned int iTrigger = 0; iTrigger < nTrigger; ++iTrigger){
+        // check if this trigger has fired
+        if(!(triggerBits.product()->accept(iTrigger))) continue;
+
+        const std::string& triggerName = triggerNames.triggerName(iTrigger);
+
+        auto it = std::find(metTriggerPaths_.begin(), metTriggerPaths_.end(), triggerName);
+        if(it != metTriggerPaths_.end()){
+            // found trigger
+            met_triggerBits_ += std::pow(2, std::distance(metTriggerPaths_.begin(), it));
+        }
+
+        it = std::find(metTriggerPathsExt_.begin(), metTriggerPathsExt_.end(), triggerName);
+        if(it != metTriggerPathsExt_.end()){
+            // found trigger
+            met_triggerBitsExt_ += std::pow(2, std::distance(metTriggerPathsExt_.begin(), it));
+        }
+
+    }
+
+    // --- PF MET
+    edm::Handle<std::vector<pat::MET> > metPFCollection;
+    iEvent.getByToken(metPFCollection_, metPFCollection);
+
+    met_PF_pt_ = metPFCollection->at(0).shiftedP4(pat::MET::NoShift, pat::MET::Type1).Pt();
+    met_PF_phi_= metPFCollection->at(0).shiftedP4(pat::MET::NoShift, pat::MET::Type1).Phi();
+
+    // --- Puppi MET
+    edm::Handle<std::vector<pat::MET> > metPuppiCollection;
+    iEvent.getByToken(metPuppiCollection_, metPuppiCollection);
+
+    met_Puppi_pt_ = metPuppiCollection->at(0).shiftedP4(pat::MET::NoShift, pat::MET::Type1).Pt();
+    met_Puppi_phi_= metPuppiCollection->at(0).shiftedP4(pat::MET::NoShift, pat::MET::Type1).Phi();
+
+    // --- PV selection
+    edm::Handle<std::vector<reco::Vertex> > pvCollection;
+    iEvent.getByToken(pvCollection_, pvCollection);
     const std::vector<reco::Vertex> *pvCol = pvCollection.product();
     reco::Vertex pv = *pvCol->begin();
     nPV_ = 0;
@@ -563,6 +624,8 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 
     // --- store all reco muons
     LogDebug("ZCounting") << "find reco muons";
+    edm::Handle<pat::MuonCollection> muonCollection;
+    iEvent.getByToken(muonCollection_, muonCollection);
     for (pat::Muon mu : *muonCollection){
         if(std::abs(mu.eta()) > 2.4) continue;
         if(mu.pt() < 15) continue;
@@ -656,16 +719,16 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
                     antiMuon_genRecoObj_ = nMuon_;
                 }
             }
-        }
 
-        // store muon Rochester corrections and uncertainties
-        v_muon_ScaleCorr_.push_back(mu.hasUserFloat("MuonEnergyCorr")                   ? mu.userFloat("MuonEnergyCorr")          : 1.0);
-        v_muon_ScaleCorr_stat_RMS_.push_back(mu.hasUserFloat("MuonEnergyCorr_stat_RMS") ? mu.userFloat("MuonEnergyCorr_stat_RMS") : 0.0);
-        v_muon_ScaleCorr_Zpt_.push_back(mu.hasUserFloat("MuonEnergyCorr_Zpt")           ? mu.userFloat("MuonEnergyCorr_Zpt")      : 0.0);
-        v_muon_ScaleCorr_Ewk_.push_back(mu.hasUserFloat("MuonEnergyCorr_Ewk")           ? mu.userFloat("MuonEnergyCorr_Ewk")      : 0.0);
-        v_muon_ScaleCorr_deltaM_.push_back(mu.hasUserFloat("MuonEnergyCorr_deltaM")     ? mu.userFloat("MuonEnergyCorr_deltaM")   : 0.0);
-        v_muon_ScaleCorr_Ewk2_.push_back(mu.hasUserFloat("MuonEnergyCorr_Ewk2")         ? mu.userFloat("MuonEnergyCorr_Ewk2")     : 0.0);
-        v_muon_ScaleCorr_Total_.push_back(mu.hasUserFloat("MuonEnergyCorr_Total")       ? mu.userFloat("MuonEnergyCorr_Total")    : 0.0);
+            // store muon Rochester corrections and uncertainties
+            v_muon_ScaleCorr_.push_back(mu.hasUserFloat("MuonEnergyCorr")                   ? mu.userFloat("MuonEnergyCorr")          : 1.0);
+            v_muon_ScaleCorr_stat_RMS_.push_back(mu.hasUserFloat("MuonEnergyCorr_stat_RMS") ? mu.userFloat("MuonEnergyCorr_stat_RMS") : 0.0);
+            v_muon_ScaleCorr_Zpt_.push_back(mu.hasUserFloat("MuonEnergyCorr_Zpt")           ? mu.userFloat("MuonEnergyCorr_Zpt")      : 0.0);
+            v_muon_ScaleCorr_Ewk_.push_back(mu.hasUserFloat("MuonEnergyCorr_Ewk")           ? mu.userFloat("MuonEnergyCorr_Ewk")      : 0.0);
+            v_muon_ScaleCorr_deltaM_.push_back(mu.hasUserFloat("MuonEnergyCorr_deltaM")     ? mu.userFloat("MuonEnergyCorr_deltaM")   : 0.0);
+            v_muon_ScaleCorr_Ewk2_.push_back(mu.hasUserFloat("MuonEnergyCorr_Ewk2")         ? mu.userFloat("MuonEnergyCorr_Ewk2")     : 0.0);
+            v_muon_ScaleCorr_Total_.push_back(mu.hasUserFloat("MuonEnergyCorr_Total")       ? mu.userFloat("MuonEnergyCorr_Total")    : 0.0);
+        }
 
         nMuon_++;
 
@@ -678,10 +741,15 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
         z_recoMass_ = (vMuon + vAntiMuon).M();
     }
 
-    for(std::vector<PileupSummaryInfo>::const_iterator puI = pileupInfoCollection->begin(); puI != pileupInfoCollection->end(); ++puI)
-    {
-        if(puI->getBunchCrossing() == 0){
-            nPU_ = puI->getTrueNumInteractions();
+    if(!iEvent.isRealData()){
+        edm::Handle<std::vector<PileupSummaryInfo> > pileupInfoCollection;
+        iEvent.getByToken(pileupInfoCollection_, pileupInfoCollection);
+
+        for(std::vector<PileupSummaryInfo>::const_iterator puI = pileupInfoCollection->begin(); puI != pileupInfoCollection->end(); ++puI)
+        {
+            if(puI->getBunchCrossing() == 0){
+                nPU_ = puI->getTrueNumInteractions();
+            }
         }
     }
 
@@ -714,18 +782,28 @@ ZCounting::beginJob()
     tree_->Branch("lumiBlock", &lumiBlock_,"lumiBlock/i");
     tree_->Branch("eventNumber", &eventNumber_, "eventNumber/i");
 
+    tree_->Branch("MET_triggerBits",    &met_triggerBits_,      "met_triggerBits_/i");
+    tree_->Branch("MET_triggerBitsExt", &met_triggerBitsExt_,   "met_triggerBitsExt_/i");
+    tree_->Branch("MET_PF_pt",    &met_PF_pt_,  "met_PF_pt_/f");
+    tree_->Branch("MET_PF_phi",   &met_PF_phi_, "met_PF_phi_/f");
+    tree_->Branch("MET_Puppi_pt",    &met_Puppi_pt_,  "met_Puppi_pt_/f");
+    tree_->Branch("MET_Puppi_phi",   &met_Puppi_phi_, "met_Puppi_phi_/f");
+
     tree_->Branch("nPV", &nPV_,"nPV_/i");
-    tree_->Branch("nPU", &nPU_,"nPU_/i");
+    if(!isData_){
+        tree_->Branch("nPU", &nPU_,"nPU_/i");
+    }
 
     // weights
     // ME weight
-    tree_->Branch("eventweight", &eventweight_, "eventweight_/f");
-    tree_->Branch("MEWeight",  &v_meWeight_);
-    tree_->Branch("PDFWeight", &v_pdfWeight_);
+    if(!isData_){
+        tree_->Branch("eventweight", &eventweight_, "eventweight_/f");
+        tree_->Branch("MEWeight",  &v_meWeight_);
+        tree_->Branch("PDFWeight", &v_pdfWeight_);
 
-    // PS weights
-    tree_->Branch("PSWeight", &v_psWeight_);
-
+        // PS weights
+        tree_->Branch("PSWeight", &v_psWeight_);
+    }
     // prefire weights
     tree_->Branch("prefiringweightECAL",         &prefiringweightECAL_,     "prefiringweightECAL_/f");
     tree_->Branch("prefiringweightECALup",       &prefiringweightECALup_,   "prefiringweightECALup_/f");
@@ -748,24 +826,26 @@ ZCounting::beginJob()
         tree_->Branch("prefiringweightMuondownStat2016H", &prefiringweightMuondownStat2016H_, "prefiringweightMuondownStat2016H_/f");
     }
 
-    // gen level info
-    tree_->Branch("decayMode", &decayMode_, "decayMode_/i");
-    tree_->Branch("z_genMass", &z_genMass_,"z_genMass_/f");
-    tree_->Branch("z_recoMass", &z_recoMass_,"z_recoMass_/f");
+    if(!isData_){
+        // gen level info
+        tree_->Branch("decayMode", &decayMode_, "decayMode_/i");
+        tree_->Branch("z_genMass", &z_genMass_,"z_genMass_/f");
+        tree_->Branch("z_recoMass", &z_recoMass_,"z_recoMass_/f");
 
-    tree_->Branch("muon_genVtxToPV", &muon_genVtxToPV_,"muon_genVtxToPV_/f");
-    tree_->Branch("muon_genRecoMatches", &muon_genRecoMatches_,"muon_genRecoMatches_/i");
-    tree_->Branch("muon_genRecoObj", &muon_genRecoObj_,"muon_genRecoObj_/I");
-    tree_->Branch("muon_genPt", &muon_genPt_,"muon_genPt_/f");
-    tree_->Branch("muon_genEta", &muon_genEta_,"muon_genEta_/f");
-    tree_->Branch("muon_genPhi", &muon_genPhi_,"muon_genPhi_/f");
+        tree_->Branch("muon_genVtxToPV", &muon_genVtxToPV_,"muon_genVtxToPV_/f");
+        tree_->Branch("muon_genRecoMatches", &muon_genRecoMatches_,"muon_genRecoMatches_/i");
+        tree_->Branch("muon_genRecoObj", &muon_genRecoObj_,"muon_genRecoObj_/I");
+        tree_->Branch("muon_genPt", &muon_genPt_,"muon_genPt_/f");
+        tree_->Branch("muon_genEta", &muon_genEta_,"muon_genEta_/f");
+        tree_->Branch("muon_genPhi", &muon_genPhi_,"muon_genPhi_/f");
 
-    tree_->Branch("antiMuon_genVtxToPV", &antiMuon_genVtxToPV_,"antiMuon_genVtxToPV_/f");
-    tree_->Branch("antiMuon_genRecoMatches", &antiMuon_genRecoMatches_,"antiMuon_genRecoMatches_/i");
-    tree_->Branch("antiMuon_genRecoObj", &antiMuon_genRecoObj_,"antiMuon_genRecoObj_/I");
-    tree_->Branch("antiMuon_genPt", &antiMuon_genPt_,"antiMuon_genPt_/f");
-    tree_->Branch("antiMuon_genEta", &antiMuon_genEta_,"antiMuon_genEta_/f");
-    tree_->Branch("antiMuon_genPhi", &antiMuon_genPhi_,"antiMuon_genPhi_/f");
+        tree_->Branch("antiMuon_genVtxToPV", &antiMuon_genVtxToPV_,"antiMuon_genVtxToPV_/f");
+        tree_->Branch("antiMuon_genRecoMatches", &antiMuon_genRecoMatches_,"antiMuon_genRecoMatches_/i");
+        tree_->Branch("antiMuon_genRecoObj", &antiMuon_genRecoObj_,"antiMuon_genRecoObj_/I");
+        tree_->Branch("antiMuon_genPt", &antiMuon_genPt_,"antiMuon_genPt_/f");
+        tree_->Branch("antiMuon_genEta", &antiMuon_genEta_,"antiMuon_genEta_/f");
+        tree_->Branch("antiMuon_genPhi", &antiMuon_genPhi_,"antiMuon_genPhi_/f");
+    }
 
     // reco level info
     tree_->Branch("nMuon", &nMuon_,"nMuon_/s");
@@ -798,14 +878,16 @@ ZCounting::beginJob()
     tree_->Branch("Muon_nPixelHits", &muon_nPixelHits_);
     tree_->Branch("Muon_nTrackerLayers", &muon_nTrackerLayers_);
 
-    tree_->Branch("Muon_ScaleCorr",          &v_muon_ScaleCorr_);
-    tree_->Branch("Muon_ScaleCorr_stat_RMS", &v_muon_ScaleCorr_stat_RMS_);
-    tree_->Branch("Muon_ScaleCorr_Zpt",      &v_muon_ScaleCorr_Zpt_);
-    tree_->Branch("Muon_ScaleCorr_Ewk",      &v_muon_ScaleCorr_Ewk_);
-    tree_->Branch("Muon_ScaleCorr_deltaM",   &v_muon_ScaleCorr_deltaM_);
-    tree_->Branch("Muon_ScaleCorr_Ewk2",     &v_muon_ScaleCorr_Ewk2_);
-    tree_->Branch("Muon_ScaleCorr_Total",    &v_muon_ScaleCorr_Total_);
-
+    if(!isData_){
+        //Roccester corrections
+        tree_->Branch("Muon_ScaleCorr",          &v_muon_ScaleCorr_);
+        tree_->Branch("Muon_ScaleCorr_stat_RMS", &v_muon_ScaleCorr_stat_RMS_);
+        tree_->Branch("Muon_ScaleCorr_Zpt",      &v_muon_ScaleCorr_Zpt_);
+        tree_->Branch("Muon_ScaleCorr_Ewk",      &v_muon_ScaleCorr_Ewk_);
+        tree_->Branch("Muon_ScaleCorr_deltaM",   &v_muon_ScaleCorr_deltaM_);
+        tree_->Branch("Muon_ScaleCorr_Ewk2",     &v_muon_ScaleCorr_Ewk2_);
+        tree_->Branch("Muon_ScaleCorr_Total",    &v_muon_ScaleCorr_Total_);
+    }
 }
 
 // ------------ method called once each job just after ending the event loop  ------------
@@ -832,6 +914,14 @@ void ZCounting::clearVariables(){
     runNumber_ = 0;
     lumiBlock_ = 0;
     eventNumber_ = 0;
+
+    met_triggerBits_ = 0;
+    met_triggerBitsExt_ = 0;
+
+    met_PF_pt_ = 0;
+    met_PF_phi_ = 0;
+    met_Puppi_pt_ = 0;
+    met_Puppi_phi_ = 0;
 
     eventweight_ = 0.;
     v_psWeight_.clear();

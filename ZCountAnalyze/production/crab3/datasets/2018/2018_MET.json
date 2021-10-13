@@ -1,0 +1,62 @@
+{
+"Met_Run2018A": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/MET/Run2018A-UL2018_MiniAODv2-v2/MINIAOD",
+    "Data.lumiMask": "/afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions18/13TeV/Legacy_2018/Cert_314472-325175_13TeV_Legacy2018_Collisions18_JSON_MuonPhys.txt",
+    "Data.splitting": "LumiBased",
+    "Data.unitsPerJob": 100,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "year=2018",
+      "samplename=met",
+      "outputFile=Met_Run2018A"
+    ]
+  }
+},
+"Met_Run2018B": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/MET/Run2018B-UL2018_MiniAODv2-v2/MINIAOD",
+    "Data.lumiMask": "/afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions18/13TeV/Legacy_2018/Cert_314472-325175_13TeV_Legacy2018_Collisions18_JSON_MuonPhys.txt",
+    "Data.splitting": "LumiBased",
+    "Data.unitsPerJob": 100,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "year=2018",
+      "samplename=met",
+      "outputFile=Met_Run2018B"
+    ]
+  }
+},
+"Met_Run2018C": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/MET/Run2018C-UL2018_MiniAODv2-v1/MINIAOD",
+    "Data.lumiMask": "/afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions18/13TeV/Legacy_2018/Cert_314472-325175_13TeV_Legacy2018_Collisions18_JSON_MuonPhys.txt",
+    "Data.splitting": "LumiBased",
+    "Data.unitsPerJob": 50,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "year=2018",
+      "samplename=met",
+      "outputFile=Met_Run2018C"
+    ]
+  }
+},
+"Met_Run2018D": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/MET/Run2018D-UL2018_MiniAODv2-v1/MINIAOD",
+    "Data.lumiMask": "/afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions18/13TeV/Legacy_2018/Cert_314472-325175_13TeV_Legacy2018_Collisions18_JSON_MuonPhys.txt",
+    "Data.splitting": "LumiBased",
+    "Data.unitsPerJob": 100,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "year=2018",
+      "samplename=met",
+      "outputFile=Met_Run2018D"
+    ]
+  }
+}
+}

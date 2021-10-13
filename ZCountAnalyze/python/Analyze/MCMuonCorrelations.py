@@ -39,12 +39,12 @@ if not os.path.isdir(output):
     os.mkdir(output)
 
 # print(">>> add new columns")
-df['delPhiLL'] = abs(df['muon_genPhi'] - df['antiMuon_genPhi']).apply(lambda x: x - 2 * math.pi if x > math.pi else x)
+# df['delPhiLL'] = abs(df['muon_genPhi'] - df['antiMuon_genPhi']).apply(lambda x: x - 2 * math.pi if x > math.pi else x)
 
     # (df['muon_genEta'] - df['antiMuon_genEta']) ** 2 + (df['muon_genPhi'] - df['antiMuon_genPhi']) ** 2)
-df['delEtaLL'] = abs(df['muon_genEta'] - df['antiMuon_genEta'])
+# df['delEtaLL'] = abs(df['muon_genEta'] - df['antiMuon_genEta'])
 
-df['delRLL'] = np.sqrt( df['delPhiLL']**2 + df['delEtaLL']**2)
+# df['delRLL'] = np.sqrt( df['delPhiLL']**2 + df['delEtaLL']**2)
 #
 # df = df.query('delRLL > 0.4')
 
@@ -93,23 +93,24 @@ df['delRLL'] = np.sqrt( df['delPhiLL']**2 + df['delEtaLL']**2)
 #              range=(0, 3.0), #title='CMS Simulation',
 #              saveas=output+'/MuMu_inclusive_dz.png')
 
-plot_scatter(df['muon_genPt'], df['antiMuon_genPt'], '$\mu^{-} p_\mathrm{T}$ [GeV]', '$\mu^{+} p_\mathrm{T}$ [GeV]',
-             range=(0, 80), #title='CMS Simulation',
+plot_scatter(df['muon_pt'], df['antiMuon_pt'], '$\mu^{-} p_\mathrm{T}$ [GeV]', '$\mu^{+} p_\mathrm{T}$ [GeV]',
+             range=(15, 80), eventWeights=df['eventweight'],
+             #title='CMS Simulation',
              saveas=output+'/MuMu_inclusive_pt.pdf')
-plot_scatter(df['muon_genPhi'], df['antiMuon_genPhi'], '$\mu^{-} \phi$', '$\mu^{+} \phi$',
-             range=(-math.pi, math.pi), #title='CMS Simulation',
+plot_scatter(df['muon_phi'], df['antiMuon_phi'], '$\mu^{-} \phi$', '$\mu^{+} \phi$',
+             range=(-math.pi, math.pi), eventWeights=df['eventweight'], #title='CMS Simulation',
              saveas=output+'/MuMu_inclusive_phi.pdf')
-plot_scatter(df['muon_genEta'], df['antiMuon_genEta'], '$\mu^{-} \eta$', '$\mu^{+} \eta$',
-             range=(-2.4, 2.4), #title='CMS Simulation',
+plot_scatter(df['muon_eta'], df['antiMuon_eta'], '$\mu^{-} \eta$', '$\mu^{+} \eta$',
+             range=(-2.4, 2.4), eventWeights=df['eventweight'], #title='CMS Simulation',
              saveas=output+'/MuMu_inclusive_eta.pdf')
-plot_scatter(df['delPhiLL'], df['delEtaLL'], '$\Delta \phi (\mu^{-},\mu^{+})$', '$\Delta \eta (\mu^{-},\mu^{+})$',
-             range=(0, math.pi), #title='CMS Simulation',
-             rangey=(0,5.),
-             saveas=output+'/MuMu_inclusive_delPhiEta.pdf')
-plot_scatter(df['delRLL'], df['z_genMass'], '$m(\mu^{-},\mu^{+})$', '$\Delta R(\mu^{-},\mu^{+})$',
-             range=(86, 96), #title='CMS Simulation',
-             rangey=(0,5.),
-             saveas=output+'/MuMu_inclusive_delRMass.pdf')
+# plot_scatter(df['delPhiLL'], df['delEtaLL'], '$\Delta \phi (\mu^{-},\mu^{+})$', '$\Delta \eta (\mu^{-},\mu^{+})$',
+#              range=(0, math.pi), #title='CMS Simulation',
+#              rangey=(0,5.),
+#              saveas=output+'/MuMu_inclusive_delPhiEta.pdf')
+# plot_scatter(df['delRLL'], df['z_genMass'], '$m(\mu^{-},\mu^{+})$', '$\Delta R(\mu^{-},\mu^{+})$',
+#              range=(86, 96), #title='CMS Simulation',
+#              rangey=(0,5.),
+#              saveas=output+'/MuMu_inclusive_delRMass.pdf')
 
 exit()
 # >>> now reqire HLT_IsoMu27 at one of the muons (mu^minus)

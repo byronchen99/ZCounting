@@ -53,7 +53,7 @@ textsize = 0.03
 def make_plots(df,
     yAxis,
     yLabel="sigma",
-    xAxis='lumi',
+    xAxis='pileUp',
     run_range=None,
     title="",
     year="2017",
@@ -133,8 +133,9 @@ def make_plots(df,
         else:
             suffix = year.split(" ")[0]
 
-        genInfoFile = 'res/GenInfo-V11_15_03-d20210611-t120445/infoMC_gen_{0}.json'.format(suffix)
-        recoInfoFile = 'res/RecoInfo-V11_15_03-d20210611-t120433/infoMC_reco_{0}.json'.format(suffix)
+        basepath = "/nfs/dust/cms/user/dwalter/CMSSW_10_2_20_UL/src/potato-zcount/plots/"
+        genInfoFile = basepath+'GenInfo-V13_02-d20211012-t180358/infoMC_gen_{0}.json'.format(suffix)
+        recoInfoFile = basepath+'RecoInfo-V13_02-d20211012-t180324/infoMC_reco_{0}.json'.format(suffix)
 
         infoReco = pd.read_json(recoInfoFile,orient="index")
         infoTrue = pd.read_json(genInfoFile,orient="index")
@@ -200,7 +201,6 @@ def make_plots(df,
             c3=ROOT.TCanvas("c3","c3",1000,600)
             c3.SetGrid()
             graphXsecL.Draw("AP")
-
 
             legend=ROOT.TLegend(0.2,0.8,0.4,0.9)
             legend.AddEntry(graphXsecL,"Measurement (#pm stat.)","pe")
@@ -359,11 +359,23 @@ def make_plots(df,
         if len(dyy)==0:
             continue
 
-        yy_avg = np.average(dyy['y'].values, weights=1./dyy['y_Err'].values)
-        yy_avg_err = np.sqrt(1./sum((1./dyy['y_Err'].values)**2))
+        u_y = np.array([unc.ufloat(y,y_err) for y,y_err in dyy[['y','y_Err']].values])
+        u_y0 = np.array([unc.ufloat(y,y_err) for y,y_err in dyy[['y0','y0_Err']].values])
 
-        yy0_avg = np.average(dyy['y0'].values, weights=1./dyy['y0_Err'].values)
-        yy0_avg_err = np.sqrt(1./sum((1./dyy['y0_Err'].values)**2))
+        # 1) simple mean
+        yy_avg = u_y.mean()
+        yy0_avg = u_y0.mean()
+
+        # # 2) or weighted average
+        # yy_w = np.array([1./(y.s)**2 for y in u_y])
+        # yy_avg = sum(u_y * yy_w) / sum(yy_w)
+        # yy0_w = np.array([1./(y.s)**2 for y in u_y0])
+        # yy0_avg = sum(u_y0 * yy0_w) / sum(yy0_w)
+
+        yy_avg_err = yy_avg.s
+        yy_avg = yy_avg.n
+        yy0_avg_err = yy0_avg.s
+        yy0_avg = yy0_avg.n
 
         if yy_avg_err/yy_avg > 0.05:
             continue
@@ -374,7 +386,8 @@ def make_plots(df,
         yy0.append(yy0_avg)
         yy0_err.append(yy0_avg_err)
 
-    graphXsecL=ROOT.TGraphErrors(len(xx_centers), np.array(xx_centers), np.array(yy), np.ones(len(xx_centers))*x_step/2, np.array(yy_err))
+    graphXsecL=ROOT.TGraphErrors(len(xx_centers), np.array(xx_centers), np.array(yy),
+        np.ones(len(xx_centers))*x_step/2, np.array(yy_err))
     graphXsecL.SetName("graph_metaXsecAtlas")
     graphXsecL.SetMarkerStyle(33)
     graphXsecL.SetMarkerColor(ROOT.kAzure-4)
@@ -512,10 +525,9 @@ def make_plots(df,
         legend=ROOT.TLegend(0.72,0.82,0.97,0.97)
         legend.GetListOfPrimitives().Add(entry)
     else:
-        # legend=ROOT.TLegend(0.16,0.80,0.4,0.97)
-        # legend.AddEntry(gReco, "MC eff (T&P)", "pe")
         legend=ROOT.TLegend(0.72,0.82,0.97,0.97)
-        legend.AddEntry(gTrue, "MC", "pe")
+        legend.AddEntry(gReco, "MC (T&P)", "pe")
+        legend.AddEntry(gTrue, "MC (true)", "pe")
 
     graphXsecL.Draw("AP")
 
@@ -531,7 +543,7 @@ def make_plots(df,
     if "sigma" in yLabel:
         fit_line.Draw("3L same")
     else:
-        # gReco.Draw("pe same")
+        gReco.Draw("pe same")
         gTrue.Draw("pe same")
 
     legend.Draw("same")
@@ -619,7 +631,7 @@ data_rates['xsecEE'] = data_rates['zDelEE_mc'] / data_rates['lumiRec']
 data_rates['xsec'] = data_rates['xsecBB'] + data_rates['xsecBE'] + data_rates['xsecEE']
 
 for yy, ylabel, region, mcRes in (
-    ("xsec", "sigma", "", ""),
+    # ("xsec", "sigma", "", ""),
     # ("xsecBB", "sigma", "BB", ""),
     # ("xsecBE", "sigma", "BE", ""),
     # ("xsecEE", "sigma", "EE", ""),
@@ -630,45 +642,45 @@ for yy, ylabel, region, mcRes in (
     # ("ZBBeff", "Z efficiency","BB", "effBB"),
     # ("ZBEeff", "Z efficiency","BE", "effBE"),
     # ("ZEEeff", "Z efficiency","EE", "effEE"),
-    # ('HLTeffBB' ,'Muon HLT efficiency', "BB", "HLTB"),
-    # ('HLTeffBE' ,'Muon HLT efficiency', "BE", "HLTE"),
-    # ('HLTeffEE' ,'Muon HLT efficiency', "EE", "HLTE"),
-    # ('SeleffB' ,'Muon selelction efficiency', "B", "SelB"),
-    # ('SeleffE' ,'Muon selelction efficiency', "E", "SelE"),
+    ('HLTeffBB' ,'Muon HLT efficiency', "BB", "HLTB"),
+    ('HLTeffBE' ,'Muon HLT efficiency', "BE", "HLTE"),
+    ('HLTeffEE' ,'Muon HLT efficiency', "EE", "HLTE"),
+    ('SeleffB' ,'Muon selelction efficiency', "B", "SelB"),
+    ('SeleffE' ,'Muon selelction efficiency', "E", "SelE"),
     # ('GloeffB' ,'Global muon efficiency', "B", "GloB"),
     # ('GloeffE' ,'Global muon efficiency', "E", "GloE"),
-    # ('TrkeffB' ,'Muon inner track efficiency', "B", "TrkB"),
-    # ('TrkeffE' ,'Muon inner track efficiency', "E", "TrkE"),
-    # ('StaeffB' ,'Muon standalone efficiency', "B", "StaB"),
-    # ('StaeffE' ,'Muon standalone efficiency', "E", "StaE"),
+    ('TrkeffB' ,'Muon inner track efficiency', "B", "TrkB"),
+    ('TrkeffE' ,'Muon inner track efficiency', "E", "TrkE"),
+    ('StaeffB' ,'Muon standalone efficiency', "B", "StaB"),
+    ('StaeffE' ,'Muon standalone efficiency', "E", "StaE"),
 ):
     # # single eras
-    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 B", run_range=(272007,275376), normalized=False)
-    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 C", run_range=(275657,276283), normalized=False)
-    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 D", run_range=(276315,276811), normalized=False)
-    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 E", run_range=(276831,277420), normalized=False)
-    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 F", run_range=(277772,278808), normalized=False)
-    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 G", run_range=(278820,280385), normalized=False)
-    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 H", run_range=(280919,284044), normalized=False)
+    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 B", run_range=(272007,275376), normalized=False)
+    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 C", run_range=(275657,276283), normalized=False)
+    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 D", run_range=(276315,276811), normalized=False)
+    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 E", run_range=(276831,277420), normalized=False)
+    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 F", run_range=(277772,278808), normalized=False)
+    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 G", run_range=(278820,280385), normalized=False)
+    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 H", run_range=(280919,284044), normalized=False)
+    #
+    # # 2017
+    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 B", title="corrected", run_range=(297046,299329), normalized=False)
+    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 C", title="corrected", run_range=(299368,302029), normalized=False)
+    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 D", title="corrected", run_range=(302030,303434), normalized=False)
+    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 E", title="corrected", run_range=(303434,304797), normalized=False)
+    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 F", title="corrected", run_range=(305040,306462), normalized=False)
+    #
+    # # ## 2018
+    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 A", run_range=(315252,316995), normalized=False)
+    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 B", run_range=(317080,319310), normalized=False)
+    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 C", run_range=(319337,320065), normalized=False)
+    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 D", run_range=(320673,325175), normalized=False)
 
-    # 2017
-    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 B", title="corrected", run_range=(297046,299329), normalized=False)
-    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 C", title="corrected", run_range=(299368,302029), normalized=False)
-    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 D", title="corrected", run_range=(302030,303434), normalized=False)
-    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 E", title="corrected", run_range=(303434,304797), normalized=False)
-    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 F", title="corrected", run_range=(305040,306462), normalized=False)
-
-    # ## 2018
-    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 A", run_range=(315252,316995), normalized=False)
-    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 B", run_range=(317080,319310), normalized=False)
-    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 C", run_range=(319337,320065), normalized=False)
-    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 D", run_range=(320673,325175), normalized=False)
-
-    # # total 2016 pre VFP
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 pre VFP", run_range=(272007,278769), normalized=True)
-    # # total 2016 post VFP
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 post VFP", run_range=(278769,294645), normalized=True)
-    # ## total 2017
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017", title="corrected", run_range=(297046,306462), normalized=True)
-    # ## total 2018
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018", run_range=(315252,325175), normalized=True)
+    # total 2016 pre VFP
+    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 pre VFP", run_range=(272007,278769), normalized=True)
+    # total 2016 post VFP
+    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 post VFP", run_range=(278769,294645), normalized=True)
+    ## total 2017
+    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2017", run_range=(297046,306462), normalized=True)
+    ## total 2018
+    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018", run_range=(315252,325175), normalized=True)

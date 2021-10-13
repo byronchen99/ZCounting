@@ -324,6 +324,8 @@ class Efficiency:
 
 # acceptance selection
 selectionGen = 'decayMode == 13 ' \
+            '& muon_genRecoMatches == 1' \
+            '& antiMuon_genRecoMatches == 1' \
 
 #             '& z_genMass > {0} ' \
 #             '& z_genMass < {1} ' \
@@ -341,19 +343,21 @@ selectionReco = 'z_recoMass > {0} ' \
             '& decayMode == 13'.format(massLo, massHi)
 
 # specify which branches to load
-branches = ['nPV', 'nPU',
+branches = [
+            # 'nPV', 'nPU',
+            'eventweight',
             # 'z_genMass',
-            'z_genMass',
-            'muon_genEta', 'antiMuon_genEta',
-            'muon_genPhi', 'antiMuon_genPhi',
-            'muon_genPt', 'antiMuon_genPt',
+            # 'z_recoMass',
+            # 'muon_genEta', 'antiMuon_genEta',
+            # 'muon_genPhi', 'antiMuon_genPhi',
+            # 'muon_genPt', 'antiMuon_genPt',
             # 'muon_genRecoMatches',  'antiMuon_genRecoMatches',
             # 'muon_genRecoObj',      'antiMuon_genRecoObj',
             # 'Muon_dxy[muon_genRecoObj]',            'Muon_dxy[antiMuon_genRecoObj]',
             # 'Muon_dz[muon_genRecoObj]',             'Muon_dz[antiMuon_genRecoObj]',
-            # 'Muon_pt[muon_genRecoObj]',             'Muon_pt[antiMuon_genRecoObj]',
-            # 'Muon_eta[muon_genRecoObj]',            'Muon_eta[antiMuon_genRecoObj]',
-            # 'Muon_phi[muon_genRecoObj]',            'Muon_phi[antiMuon_genRecoObj]',
+            'Muon_pt[muon_genRecoObj]',             'Muon_pt[antiMuon_genRecoObj]',
+            'Muon_eta[muon_genRecoObj]',            'Muon_eta[antiMuon_genRecoObj]',
+            'Muon_phi[muon_genRecoObj]',            'Muon_phi[antiMuon_genRecoObj]',
             # 'Muon_ID[muon_genRecoObj]',             'Muon_ID[antiMuon_genRecoObj]',
             # 'Muon_triggerBits[muon_genRecoObj]',    'Muon_triggerBits[antiMuon_genRecoObj]',
             # 'Muon_tkRelIso[muon_genRecoObj]',       'Muon_tkRelIso[antiMuon_genRecoObj]',
@@ -404,11 +408,6 @@ else:
     dfGen = [tree_to_df(root2array(i, treeName[0], selection=selectionGen, branches=branches), 1) for i in inputs]
     dfGen = pd.concat(dfGen)
 
-    print(">>> store dataframe")
-    store = pd.HDFStore(output+'/dfGen.h5')
-    store['dfGen'] = dfGen  # save it
-    exit()
-
     dfGen = dfGen.rename(columns={
         'Muon_ID[muon_genRecoObj]_0': 'muon_ID',
         'Muon_ID[antiMuon_genRecoObj]_0': 'antiMuon_ID',
@@ -420,15 +419,20 @@ else:
         # 'Muon_pfRelIso04_all[antiMuon_genRecoObj]_0': 'antiMuon_pfIso',
         'Muon_eta[muon_genRecoObj]_0': 'muon_eta',
         'Muon_eta[antiMuon_genRecoObj]_0': 'antiMuon_eta',
-        # 'Muon_pt[muon_genRecoObj]_0': 'muon_pt',
-        # 'Muon_pt[antiMuon_genRecoObj]_0': 'antiMuon_pt',
-        # 'Muon_phi[muon_genRecoObj]_0': 'muon_phi',
-        # 'Muon_phi[antiMuon_genRecoObj]_0': 'antiMuon_phi',
+        'Muon_pt[muon_genRecoObj]_0': 'muon_pt',
+        'Muon_pt[antiMuon_genRecoObj]_0': 'antiMuon_pt',
+        'Muon_phi[muon_genRecoObj]_0': 'muon_phi',
+        'Muon_phi[antiMuon_genRecoObj]_0': 'antiMuon_phi',
         # 'Muon_dxy[muon_genRecoObj]_0': 'muon_dxy',
         # 'Muon_dxy[antiMuon_genRecoObj]_0': 'antiMuon_dxy',
         # 'Muon_dz[muon_genRecoObj]_0': 'muon_dz',
         # 'Muon_dz[antiMuon_genRecoObj]_0': 'antiMuon_dz'
         })
+
+    print(">>> store dataframe")
+    store = pd.HDFStore(output+'/dfGen.h5')
+    store['dfGen'] = dfGen  # save it
+    exit()
 
     # print(">>> add new columns")
     #dfGen['delPhiLL'] = abs(

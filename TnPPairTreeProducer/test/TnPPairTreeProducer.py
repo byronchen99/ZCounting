@@ -1,3 +1,7 @@
+###
+# Execute for example with:
+#   cmsRun test/TnPPairTreeProducer.py nMax=1000 era=2016
+
 import FWCore.ParameterSet.Config as cms
 
 import FWCore.ParameterSet.VarParsing as VarParsing
@@ -38,8 +42,9 @@ process.source = cms.Source("PoolSource",
      # remote test
      #'/store/data/Run2017F/SingleMuon/AOD/09Aug2019_UL2017-v1/270004/90E36450-548B-BF41-BA70-438F46B99A7D.root'
      #'file:/afs/desy.de/user/d/dwalter/nfsHome/data/Lumi/AOD/FE9FE5BF-03BF-834D-8720-1E917906FDD0.root'
-     # Single Mu 2016 B UL-Reco -
-     '/store/data/Run2016B/SingleMuon/AOD/21Feb2020_ver2_UL2016_HIPM-v1/100000/0040B1E4-7F91-1D47-BC8E-4212B390A5B3.root'
+     # Single Mu 2016 UL-Reco -
+     # '/store/data/Run2016B/SingleMuon/AOD/21Feb2020_ver2_UL2016_HIPM-v1/100000/0040B1E4-7F91-1D47-BC8E-4212B390A5B3.root'
+     '/store/data/Run2016C/SingleMuon/AOD/21Feb2020_UL2016_HIPM-v1/20000/000B0CF4-2D3D-0442-9F7F-3D6FE3648F90.root'
      # '/store/data/Run2016C/SingleMuon/AOD/21Feb2020_UL2016_HIPM_WMass-v1/230000/00B4ED1A-EA56-514A-9CA0-B1A7373EBE44.root'
      # Single Mu 2016 Prompt-Reco -
      # '/store/data/Run2016B/SingleMuon/AOD/PromptReco-v2/000/273/158/00000/0470F84C-2B1A-E611-BC8B-02163E0139E0.root'
@@ -80,5 +85,9 @@ elif options.era == '2018':
     process.tnpPairTreeProducer.PtCutL1 = cms.untracked.double(27.0)
     process.tnpPairTreeProducer.PtCutL2 = cms.untracked.double(27.0)
 
+# pileup MC template maker
+process.load("ZCounting.TnPPairTreeProducer.beforeSelectionInfo_cfi")
 
-process.p = cms.Path(process.tnpPairTreeProducer)
+process.p = cms.Path(
+    process.beforeSelectionInfo *
+    process.tnpPairTreeProducer)
