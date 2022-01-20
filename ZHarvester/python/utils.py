@@ -1,6 +1,40 @@
-import json, os
 
+# ------------------------------------------------------------------------------
+## Collect "by LS" and "by measurement" csv files and write big csv file
+def writeSummaryCSV(outCSVDir, writeByLS=True):
+    import logging as log
+    import pandas as pd
+    import glob
+    
+    print(" ===Writing overall CSV file")
+    rateFileList = sorted(glob.glob(outCSVDir + '/csvfile??????.csv'))
+    df_merged = pd.concat([pd.read_csv(m) for m in rateFileList], ignore_index=True, sort=False)
+
+    with open(outCSVDir + '/Mergedcsvfile_perMeasurement.csv', 'w') as file:
+        df_merged.to_csv(file, index=False)
+
+    if writeByLS:
+        print(" ===Writing overall CSV file per LS")
+        rateFileList = sorted(glob.glob(outCSVDir + '/csvfile*_*.csv'))
+        csvList = []
+        # add measurement label to the csv list
+        for m in rateFileList:
+            csv = pd.read_csv(m)
+            measurement = int(m.split("_")[-1][:-4])
+            fill = int(m.split("_")[-2].split("csvfile")[-1])
+            csv["measurement"] = measurement
+            csvList.append(csv)
+        df_merged = pd.concat(csvList, ignore_index=True, sort=False)
+
+        # df_merged = pd.concat([pd.read_csv(m) for m in rateFileList], ignore_index=True)
+
+        with open(outCSVDir + '/Mergedcsvfile_perLS.csv', 'w') as file:
+            df_merged.to_csv(file, index=False)
+
+# ------------------------------------------------------------------------------
 def chart_to_js(_chart, _name, _data="data.csv"):
+    import json, os
+    
     chart_json = _chart.to_dict()
     # delete in line data
     del chart_json["datasets"]
