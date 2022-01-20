@@ -53,22 +53,27 @@ if not os.path.isdir(output):
     os.mkdir(output)
 
 MassMin_ = 30
-MassMax_ = 300
-MassBin_ = int(MassMax_ - MassMin_)
+MassMax_ = 301
+MassBin_ = 4*int(MassMax_ - MassMin_)
 
 LumiBin_ = 5000
 LumiMin_ = 0.5
 LumiMax_ = 5000.5
 
+nPVMin_ = -0.5
+nPVMax_ = 74.5
+nPVBin_ = int(nPVMax_ - nPVMin_)
+
 ptCut = args.pt if args.pt else 0.
+etaCut = 2.4
 
 dxyDistCut = None# 0.2
 dzDistCut = None#0.5
 
 
 # acceptance selection
-selection = "pt1 >= {0} & pt2 >= {0} & dilepMass >= {1} & dilepMass <= {2} & delR > 0.8 & q1 != q2".format(
-    ptCut, MassMin_, MassMax_
+selection = "pt1 >= {0} & pt2 >= {0} & eta1 < {1} & eta2 < {1} & dilepMass >= {2} & dilepMass <= {3} & delR > 0.8 & q1 != q2".format(
+    ptCut, etaCut, MassMin_, MassMax_
     )
 
 if dxyDistCut is not None:
@@ -91,7 +96,7 @@ dxyCut = args.dxy if args.dxy else 99999
 dzCut = args.dz if args.dz else 99999
 
 # specify which branches to load
-branches = ['dilepMass', 'nPV',
+branches = ['dilepMass', 'nPV', 'eventNumber',
             'run', 'ls',
             'eta1', 'eta2',
             'pt1', 'pt2',
@@ -115,20 +120,20 @@ inputs = {
        +glob.glob(storage+"_V13_ULpostVFP2016F/210710_081732/0000/output_0_*"),
     '16G': glob.glob(storage+"_V13_UL2016G/210711_084625/0000/output_0_*"),
     '16H': glob.glob(storage+"_V13_UL2016H/210730_134940/0000/output_0_*"),
-
+    
     '17B': glob.glob(storage+"_V13_UL2017B/210712_141903/0000/output_0_*"),
     '17C': glob.glob(storage+"_V13_UL2017C/210711_084818/0000/output_0_*"),
     '17D': glob.glob(storage+"_V13_UL2017D/210711_084856/0000/output_0_*"),
     '17E': glob.glob(storage+"_V13_UL2017E/210711_084911/0000/output_0_*"),
     '17F': glob.glob(storage+"_V13_UL2017F/210711_084923/0000/output_0_*"),
-    '17H': glob.glob(storage+"_V13_UL2017H/210711_084944/0000/output_0_*"),
+    '17H': glob.glob(storage+"_V14_UL2017H/211126_134142/0000/output_0_*"),
 
     '18A': glob.glob(storage+"_V13_UL2018A/210822_193705/0000/output_0_*"),
-    '18B': glob.glob(storage+"_V13_UL2018B/210711_085040/0000/output_0_*"),
+    '18B': glob.glob(storage+"_V13_UL2018B/211014_083356/0000/output_0_*"),
     '18C': glob.glob(storage+"_V13_UL2018C/210711_085057/0000/output_0_*"),
     '18D': glob.glob(storage+"_V13_UL2018D/210711_085109/000?/output_0_*"),
     # # Missing runs from 2018
-    # '18D_2': glob.glob(storage+"_V11_UL2018D_v3/210506_184017/0000/output_0_*")
+
 }
 
 
@@ -175,6 +180,10 @@ for era, input in inputs.iteritems():
             os.mkdir(subdir)
 
         tfile = ROOT.TFile.Open(subdir+"/DQM_V0001_R000{0}__SingleMuon__Run20{1}.root".format(run, era),"UPDATE")
+        
+        # histogram with number of PV
+        h_nPV = ROOT.TH2D("h_nPV", "number of PV",
+            LumiBin_, LumiMin_, LumiMax_, nPVBin_, nPVMin_, nPVMax_);
 
         # Sel to Glo
         h_mass_SEL_pass_central = ROOT.TH2D("h_mass_SIT_pass_central"+suffix, "Muon SIT passing probes central",
@@ -206,7 +215,6 @@ for era, input in inputs.iteritems():
         h_mass_STA_fail_forward = ROOT.TH2D("h_mass_Sta_fail_forward"+suffix, "Muon standalone failing probes forward",
             LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
 
-
         h_mass_2HLTBB_Z = ROOT.TH2D("h_mass_2HLTBB_Z"+suffix, "Events where 2 muons pass HLT, both muons in barrel",       LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
         h_mass_2HLTEE_Z = ROOT.TH2D("h_mass_2HLTEE_Z"+suffix, "Events where 2 muons pass HLT, both muons in endcap",       LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
         h_mass_2HLTBE_Z = ROOT.TH2D("h_mass_2HLTBE_Z"+suffix, "Events where 2 muons pass HLT, one muon in barrel and one in endcap",       LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
@@ -214,6 +222,17 @@ for era, input in inputs.iteritems():
         h_mass_1HLTBB_Z = ROOT.TH2D("h_mass_1HLTBB_Z"+suffix, "Events where 1 muon pass HLT, both muons in barrel",       LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
         h_mass_1HLTEE_Z = ROOT.TH2D("h_mass_1HLTEE_Z"+suffix, "Events where 1 muon pass HLT, both muons in endcap",       LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
         h_mass_1HLTBE_Z = ROOT.TH2D("h_mass_1HLTBE_Z"+suffix, "Events where 1 muon pass HLT, one barrel one endcap",       LumiBin_, LumiMin_, LumiMax_, MassBin_, MassMin_, MassMax_);
+        
+        data_run = data_run.sort_values(['ls', 'eventNumber'])
+
+        # fill PV histogram
+        last_evt = 0
+        for ls, pv, evt in data_run[['ls', 'nPV', 'eventNumber']].values:
+            # fill nPV one per event
+            if evt == last_evt: 
+                continue
+            h_nPV.Fill(ls, pv)
+            last_evt = evt
 
         # fill tag and probe histograms
         #--- barrel

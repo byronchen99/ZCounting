@@ -137,6 +137,10 @@ private:
     edm::EDGetTokenT< double > prefweightupECAL_token;
     edm::EDGetTokenT< double > prefweightdownECAL_token;
 
+    edm::EDGetTokenT< double > prefweightECAL2017H_token;
+    edm::EDGetTokenT< double > prefweightupECAL2017H_token;
+    edm::EDGetTokenT< double > prefweightdownECAL2017H_token;
+
     edm::EDGetTokenT< double > prefweightMuon_token;
     edm::EDGetTokenT< double > prefweightupMuon_token;
     edm::EDGetTokenT< double > prefweightdownMuon_token;
@@ -205,6 +209,10 @@ private:
     float prefiringweightECAL_;
     float prefiringweightECALup_;
     float prefiringweightECALdown_;
+
+    float prefiringweightECAL2017H_;
+    float prefiringweightECALup2017H_;
+    float prefiringweightECALdown2017H_;
 
     float prefiringweightMuon_;
     float prefiringweightMuonup_;
@@ -343,6 +351,14 @@ ZCounting::ZCounting(const edm::ParameterSet& iConfig):
         prefweightupStatMuon2016H_token = consumes< double >(edm::InputTag("prefiringweight2016H:nonPrefiringProbMuonStatUp"));
         prefweightdownStatMuon2016H_token = consumes< double >(edm::InputTag("prefiringweight2016H:nonPrefiringProbMuonStatDown"));
     }
+    else if(era_ == "2017"){
+        std::cout<<"2017 low PU"<<std::endl;
+
+        prefweightECAL2017H_token = consumes< double >(edm::InputTag("prefiringweight2017H:nonPrefiringProbECAL"));
+        prefweightupECAL2017H_token = consumes< double >(edm::InputTag("prefiringweight2017H:nonPrefiringProbECALUp"));
+        prefweightdownECAL2017H_token = consumes< double >(edm::InputTag("prefiringweight2017H:nonPrefiringProbECALDown"));
+    }
+
 
 }
 
@@ -427,6 +443,19 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
         prefiringweightMuondownSyst2016H_ =(*theprefweightdownsystMuon2016H);
         prefiringweightMuonupStat2016H_ =(*theprefweightupstatMuon2016H);
         prefiringweightMuondownStat2016H_ =(*theprefweightdownstatMuon2016H);
+    }
+    else if(era_ == "2017"){
+        edm::Handle< double > theprefweightECAL2017H;
+        edm::Handle< double > theprefweightupECAL2017H;
+        edm::Handle< double > theprefweightdownECAL2017H;
+
+        iEvent.getByToken(prefweightECAL2017H_token, theprefweightECAL2017H);
+        iEvent.getByToken(prefweightupECAL2017H_token, theprefweightupECAL2017H);
+        iEvent.getByToken(prefweightdownECAL2017H_token, theprefweightdownECAL2017H);
+
+        prefiringweightECAL2017H_ =(*theprefweightECAL2017H);
+        prefiringweightECALup2017H_ =(*theprefweightupECAL2017H);
+        prefiringweightECALdown2017H_ =(*theprefweightdownECAL2017H);
     }
     // <<< ---
 
@@ -824,6 +853,11 @@ ZCounting::beginJob()
         tree_->Branch("prefiringweightMuondownSyst2016H", &prefiringweightMuondownSyst2016H_, "prefiringweightMuondownSyst2016H_/f");
         tree_->Branch("prefiringweightMuonupStat2016H",   &prefiringweightMuonupStat2016H_,   "prefiringweightMuonupStat2016H_/f");
         tree_->Branch("prefiringweightMuondownStat2016H", &prefiringweightMuondownStat2016H_, "prefiringweightMuondownStat2016H_/f");
+    }
+    else if(era_ == "2017"){
+        tree_->Branch("prefiringweightECAL2017H",         &prefiringweightECAL2017H_,         "prefiringweightECAL2017H_/f");
+        tree_->Branch("prefiringweightECALup2017H",       &prefiringweightECALup2017H_,       "prefiringweightECALup2017H_/f");
+        tree_->Branch("prefiringweightECALdown2017H",     &prefiringweightECALdown2017H_,     "prefiringweightECALdown2017H_/f");
     }
 
     if(!isData_){

@@ -107,8 +107,15 @@ for category in filter(lambda x: "chi2" in x,data.keys()):
 
     c3.SaveAs(outDir+"/"+category+".png")
     c3.Close()
-
-    ndf = 8
+    
+    if "pass" in category or "fail" in category:
+        ndf = 360 - 8
+    elif "Glo" in category:
+        ndf = 1080 - 24
+    else:
+        ndf = 720 - 16
+        
+        
     nBins = 20
     xmin = 0.
     xmax = 2.0*avg_chi2
@@ -132,13 +139,14 @@ for category in filter(lambda x: "chi2" in x,data.keys()):
     th1_chi2.SetBinContent(nxbins, th1_chi2.GetBinContent(nxbins+1) + th1_chi2.GetBinContent(nxbins))
 
     # normalize to area of one
-    th1_chi2.Scale(1./th1_chi2.Integral())
+    norm = 1./th1_chi2.Integral() / th1_chi2.GetBinWidth(1)
+    th1_chi2.Scale(norm)
     # create a chi2 function to plot on top of the histogram, let ndf as free parameter
-    f_chi2 = ROOT.TF1("fchi2","ROOT::Math::chisquared_pdf(x*{0},[0])".format(ndf), xmin, xmax)
+    f_chi2 = ROOT.TF1("fchi2","{0}*ROOT::Math::chisquared_pdf(x*{0},[0])".format(ndf, ndf/(xmax-xmin)), xmin, xmax)
     f_chi2.SetParameter(0, ndf)
     f_chi2.SetLineWidth(2)
     f_chi2.SetLineColor(2)
-
+    
     # th1_chi2.Fit("fchi2")
 
     legend=ROOT.TLegend(0.8,0.8,0.9,0.9)
@@ -155,7 +163,9 @@ for category in filter(lambda x: "chi2" in x,data.keys()):
     canvas.SetBottomMargin(0.1)
 
     textsize = 24./(canvas.GetWh()*canvas.GetAbsHNDC())
-
+    
+    th1_chi2.SetMaximum(1.01*max(f_chi2.GetMaximum(), th1_chi2.GetMaximum()))
+    
     th1_chi2.GetXaxis().SetTitleSize(textsize*1.2)
     th1_chi2.GetYaxis().SetTitleSize(textsize*1.2)
     th1_chi2.GetXaxis().SetTitleOffset(1.)
@@ -181,4 +191,5 @@ for category in filter(lambda x: "chi2" in x,data.keys()):
     latex.DrawLatex(0.13, 0.87, 'CMS')
 
     canvas.SaveAs(outDir+"/hist_"+category+".png")
+    canvas.SaveAs(outDir+"/hist_"+category+".pdf")
     canvas.Close()

@@ -22,7 +22,7 @@ options.register('maxEvents', -1,
     )
 options.register('samplename', '',
     VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.string,
-    "specify sample name ('dy', 'tt', 'w', 'qcd', 'zz', 'wz', 'ww', 'met') "
+    "specify sample name ('dy', 'tt', 'w', 'qcd', 'zz', 'wz', 'ww', 't', 'ttz', 'ttw', 'met') "
     )
 options.register('year', '2017',
     VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.string,
@@ -33,7 +33,7 @@ options.parseArguments()
 
 if options.samplename == '':
     raise RuntimeError('ZCountAnalyze.py: cannot run without specifying a samplename')
-elif options.samplename not in ('tt', 'dy', 'w', 'qcd', 'zz', 'wz', 'ww', 'met'):
+elif options.samplename not in ('dy', 'tt', 'w', 'qcd', 'zz', 'wz', 'ww', 't', 'ttz', 'ttw', 'met'):
     raise RuntimeError('ZCountAnalyze.py: unknown samplename '+options.samplename)
 
 if options.year not in ("2016preVFP", "2016postVFP", "2017", "2017H", "2018"):
@@ -80,6 +80,8 @@ process.source = cms.Source("PoolSource",
         # '/store/mc/RunIISummer20UL16MiniAODAPV/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/MINIAODSIM/FlatPU0to75_106X_mcRun2_asymptotic_preVFP_v8-v2/00000/0040C830-7251-BA46-BE12-86EE8CFD0907.root'
         # UL 2017
         # '/store/mc/RunIISummer20UL17MiniAODv2/WW_TuneCP5_13TeV-pythia8/MINIAODSIM/106X_mc2017_realistic_v9-v1/280000/8E5C41E3-0E1B-B54E-A18C-09C2244E6B5F.root'
+        # UL2017 NNLO DY
+        '/store/mc/RunIISummer20UL17MiniAOD/DYJetsToMuMu_M-50_massWgtFix_TuneCP5_13TeV-powhegMiNNLO-pythia8-photos/MINIAODSIM/106X_mc2017_realistic_v6-v2/120000/042B22F1-092F-554D-9CA1-3A9F369EB08B.root'
         # UL 2018
         # '/store/mc/RunIISummer20UL18MiniAODv2/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/MINIAODSIM/106X_upgrade2018_realistic_v16_L1v1-v2/120000/02FD7B88-3EDC-C64D-8E18-F9A8F9E7E7DF.root'
         # '/store/mc/RunIISummer20UL18MiniAODv2/DYJetsToLL_0J_TuneCP5_13TeV-amcatnloFXFX-pythia8/MINIAODSIM/106X_upgrade2018_realistic_v16_L1v1-v1/230000/0271F29A-6EA5-054E-B733-EB5EC7A80F2C.root'
@@ -87,7 +89,7 @@ process.source = cms.Source("PoolSource",
         # '/store/mc/RunIISummer20UL18MiniAOD/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/MINIAODSIM/106X_upgrade2018_realistic_v11_L1v1-v1/260000/0071F930-6376-7A48-89F1-74E189BD3BFC.root'
         # Data
         # '/store/data/Run2018A/SingleMuon/MINIAOD/12Nov2019_UL2018-v3/120000/630B1D77-4D83-E84A-B2ED-DF711BD8097F.root'
-        '/store/data/Run2017E/MET/MINIAOD/UL2017_MiniAODv2-v1/40000/167938D2-F982-C443-AF74-1F2717B565E3.root'
+        # '/store/data/Run2017E/MET/MINIAOD/UL2017_MiniAODv2-v1/40000/167938D2-F982-C443-AF74-1F2717B565E3.root'
     )
 )
 
@@ -171,6 +173,17 @@ if options.year == "2016postVFP":
     PrefiringRateSystematicUnctyMuon = cms.double(0.2)
     )
     process.prefireSequence = cms.Sequence(process.prefiringweight + process.prefiringweight2016H)
+elif options.year == "2017":
+    # alternative ECAL prefiring for 2017H low PU run
+    process.prefiringweight2017H = l1PrefiringWeightProducer.clone(
+    DataEraECAL = cms.string("2017H"),
+    DataEraMuon = cms.string("None"),
+    UseJetEMPt = cms.bool(False),
+    DoMuons = cms.bool(False),
+    PrefiringRateSystematicUnctyECAL = cms.double(0.2),
+    PrefiringRateSystematicUnctyMuon = cms.double(0.2)
+    )
+    process.prefireSequence = cms.Sequence(process.prefiringweight + process.prefiringweight2017H)
 else:
     process.prefireSequence = cms.Sequence(process.prefiringweight)
 
@@ -188,7 +201,7 @@ process.zcounting.era = options.year
 process.zcounting.pat_muons = cms.InputTag('selectedMuonsWithEnCorrInfo')
 
 # if no good Z candidate is found. E.g. if gamma is found instead
-if options.samplename in ('dy', 'zz', 'wz'):
+if options.samplename in ('dy', 'zz', 'wz', 'ttz'):
     from ZCounting.ZUtils.GenZLeptonDecay_cfi import genZLeptonDecay
     process.genZLeptonDecay = genZLeptonDecay.clone(src="prunedGenParticles",)
     tasks.add(process.genZLeptonDecay)
@@ -196,7 +209,7 @@ if options.samplename in ('dy', 'zz', 'wz'):
     process.zcounting.hasGenZ = True
     process.zcounting.genZLeptonCollection = cms.InputTag("genZLeptonDecay")
 
-elif options.samplename == 'tt':
+elif options.samplename in ('tt','ttW','ttZ'):
     process.load('TopQuarkAnalysis.TopEventProducers.sequences.ttGenEvent_cff')
     process.initSubset.src = cms.InputTag("prunedGenParticles")
     process.decaySubset.src = cms.InputTag("prunedGenParticles")

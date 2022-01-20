@@ -114,9 +114,13 @@ def zmonitoring(
     with open(dirOut+'/jobinfo.json'.format(clusterId), 'w') as f:
         json.dump(ji, f, indent=4, separators=(',', ': '))
 
-def check(projectdir, resubmit=False):
+def check(projectdir, resubmit=False, collect=False):
     import os
     import json
+
+    if collect:
+        from python.utils import writeSummaryCSV     
+        writeSummaryCSV(projectdir+"/csvFiles/", writeByLS=True)
 
     with open(projectdir+'/jobinfo.json', 'r') as f:
         ji = json.load(f)
@@ -129,13 +133,13 @@ def check(projectdir, resubmit=False):
 
     unfinished_jobs = []
     for ijob in range(ji['njobs']):
-        outfilename = "condor/{0}.{1}.out".format(ji['clusterId'], ijob)
+        outfilename = "condor/{0}.{1}.err".format(ji['clusterId'], ijob)
         if not os.path.isfile(outfilename) or os.stat(outfilename).st_size == 0: #file does not exist or is empty?
             unfinished_jobs.append(ijob)
             continue
         with open(outfilename, "r") as f:
             lastline = f.readlines()[-1]
-        if lastline != "INFO: ===Done\n":
+        if lastline != "INFO:  ===Done\n":
             unfinished_jobs.append(ijob)
     if len(unfinished_jobs) == 0:
         print("all jobs done!")
@@ -163,7 +167,6 @@ def check(projectdir, resubmit=False):
                 zmonitoring(ji['dirDQM'], ji['dirOut'], ji['byLsCSV'], ji['mcCorrections'], ji['sigTemplates'], ji['bkgTemplates'], ji['ptCut'],
                     (ji['mass_lo'], ji['mass_hi'], ji['mass_bins']), ji['luminosity'], False,
                     runlist=[ji['runs'][i] for i in unfinished_jobs])
-
 
 # ------------------------------------------------------------------------------
 # parse command line arguments
@@ -206,8 +209,8 @@ if __name__ == '__main__':
         '--LumiPerMeasurement', default=20, type=float,
         help='specify amount of luminosity per measurement in pb-1'
     )
-    parser.add_argument(
-        '--mass', nargs=3, metavar=('LOW', 'HIGH', 'NBINS'), default=(70, 250, 180),
+    parserA.add_argument(
+        '--mass', nargs=3, metavar=('LOW', 'HIGH', 'NBINS'), default=(70, 250, 360),
         help='specify mass range for tag and probe muon pairs'
     )
     parserA.add_argument(
@@ -230,7 +233,7 @@ if __name__ == '__main__':
     # command line arguments: check
     parserC = subparsers.add_parser(
         'check',
-        help='submit ZMonitoring jobs to HTCondor'
+        help='check ZMonitoring jobs that have been submitted to HTCondor'
     )
     parserC.add_argument(
         '-i', '--project', type=str, required=True,
@@ -240,6 +243,11 @@ if __name__ == '__main__':
         '--resubmit', default=False, action="store_true",
         help='to resubmit failed jobs'
     )
+    parserC.add_argument(
+        '--collect', default=False, action="store_true",
+        help='Merge result csv files of finished jobs'
+    )
+
 
     # parse arguments and call subparser
     args = parser.parse_args()
@@ -258,4 +266,6 @@ if __name__ == '__main__':
             beginRun=args.beginRun,
             endRun=args.endRun)
     if args.subparser == 'check':
-        check(args.project, args.resubmit)
+        check(args.project, args.resubmit, args.collect)
+     
+    

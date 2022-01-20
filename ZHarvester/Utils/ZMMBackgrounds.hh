@@ -65,8 +65,8 @@ public:
     RooRealVar *mean,*sigma,*kLo,*kHi;
     ~CDas();
     void freeze_all_parameters();
-    void Reset(){};
-    void Print(){};
+    void Reset();
+    void Print();
 
 };
 
@@ -79,8 +79,8 @@ public:
     RooExponential *exp1;
     ~CDasPlusExp();
     void freeze_all_parameters();
-    void Reset(){};
-    void Print(){};
+    void Reset();
+    void Print();
 
 };
 
@@ -247,12 +247,28 @@ CDas::CDas(RooRealVar &m, const Bool_t pass, const Int_t ibin)
   char vname[50];
 
   sprintf(vname,"bkg_mean%s",name);    mean   = new RooRealVar(vname, "bkg_mean", 90, 30, 200);
-  sprintf(vname,"bkg_sigma%s",name);   sigma  = new RooRealVar(vname, "bkg_sigma", 12, 10, 60);
+  sprintf(vname,"bkg_sigma%s",name);   sigma  = new RooRealVar(vname, "bkg_sigma", 30, 10, 60);
   sprintf(vname,"bkg_kLo%s",name);     kLo    = new RooRealVar(vname, "bkg_kLo", 1.5, .02, 10);
   sprintf(vname,"bkg_kHi%s",name);     kHi    = new RooRealVar(vname, "bkg_kHi", 1.5, .02, 10);
 
   sprintf(vname,"background%s",name);
   model  = new RooGaussDoubleSidedExp(vname,"das",m,*mean,*sigma,*kLo,*kHi);
+}
+
+void CDas::Reset(){
+    std::cout<<"CDas::Reset() --- "<<std::endl;
+    mean->setVal(90.);
+    sigma->setVal(12);
+    kLo->setVal(1.5);
+    kHi->setVal(1.5);
+}
+
+void CDas::Print(){
+    std::cout<<"CDas::Print() --- "<<std::endl;
+    mean->Print();
+    sigma->Print();
+    kLo->Print();
+    kHi->Print();
 }
 
 void CDas::freeze_all_parameters(){
@@ -280,7 +296,7 @@ CDasPlusExp::CDasPlusExp(RooRealVar &m, const Bool_t pass, const Int_t ibin)
   char vname[50];
 
   sprintf(vname,"bkg_mean%s",name);     mean   = new RooRealVar(vname, "bkg_mean" ,   90,    30,200);
-  sprintf(vname,"bkg_sigma%s",name);    sigma  = new RooRealVar(vname, "bkg_sigma",   12,    10, 60);
+  sprintf(vname,"bkg_sigma%s",name);    sigma  = new RooRealVar(vname, "bkg_sigma",   30,    10, 60);
   sprintf(vname,"bkg_kLo%s",name);      kLo    = new RooRealVar(vname, "bkg_kLo"  ,  1.5,   .02, 10);
   sprintf(vname,"bkg_kHi%s",name);      kHi    = new RooRealVar(vname, "bkg_kHi"  ,  1.5,   .02, 10);
   sprintf(vname,"bkg_pdf1%s",name);     dd     = new RooGaussDoubleSidedExp(vname, "bkg_das",m,*mean,*sigma,*kLo,*kHi);
@@ -290,6 +306,26 @@ CDasPlusExp::CDasPlusExp(RooRealVar &m, const Bool_t pass, const Int_t ibin)
 
   sprintf(vname,"background%s",name);
   model = new RooAddPdf(vname, "das + exp", RooArgList(*dd,*exp1), RooArgList(*frac));
+}
+
+void CDasPlusExp::Reset(){
+    std::cout<<"CDasPlusExp::Reset() --- "<<std::endl;
+    mean->setVal(90.);
+    sigma->setVal(12);
+    kLo->setVal(1.5);
+    kHi->setVal(1.5);
+    t1->setVal(-0.1);
+    frac->setVal(0.95);
+}
+
+void CDasPlusExp::Print(){
+    std::cout<<"CDasPlusExp::Print() --- "<<std::endl;
+    mean->Print();
+    sigma->Print();
+    kLo->Print();
+    kHi->Print();
+    t1->Print();
+    frac->Print();
 }
 
 void CDasPlusExp::freeze_all_parameters(){
@@ -324,9 +360,9 @@ CRooCMSShape::CRooCMSShape(RooRealVar &m,
   else     sprintf(name,"%s_%d","Fail",ibin);
   char vname[50];
 
-  sprintf(vname,"bkg_alpha%s",name);   alpha = new RooRealVar(vname, "bkg_alpha", 91., massLo, massHi);
-  sprintf(vname,"bkg_beta%s",name);    beta  = new RooRealVar(vname, "bkg_beta",  0.001, 0.0, 0.1);
-  sprintf(vname,"bkg_gamma%s",name);   gamma = new RooRealVar(vname, "bkg_gamma",   0.1, 0.0, 1.0);
+  sprintf(vname,"bkg_alpha%s",name);   alpha = new RooRealVar(vname, "bkg_alpha", 90., massLo, massHi);
+  sprintf(vname,"bkg_beta%s",name);    beta  = new RooRealVar(vname, "bkg_beta",  0.02, 0.0, 0.1);
+  sprintf(vname,"bkg_gamma%s",name);   gamma = new RooRealVar(vname, "bkg_gamma",   0.02, 0.0, 1.0);
   sprintf(vname,"bkg_peak%s",name);    peak  = new RooRealVar(vname, "bkg_peak"  ,  91.1876);
   sprintf(vname,"background%s",name);
 

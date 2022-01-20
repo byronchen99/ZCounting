@@ -11,8 +11,17 @@ import uncertainties as unc
 import pdb
 import json
 
+import mplhep as hep
+hep.style.use("CMS") 
+
 from pandas.plotting import register_matplotlib_converters
 register_matplotlib_converters()
+
+# plt.rcParams.update({
+#     "text.usetex": True,
+#     "font.family": "palatino",
+#     # "font.serif": ["Palatino"],
+#     })
 
 sys.path.append(os.getcwd())
 print(os.getcwd())
@@ -66,29 +75,22 @@ if args.xsec:
     print("get Z cross section")
     data_xsec = pd.read_csv(str(args.xsec), sep=',',low_memory=False)#, skiprows=[1,2,3,4,5])
 
-    data_xsec['zDelBB_mc'] = data_xsec['zDelBB'].apply(lambda x: unc.ufloat_fromstr(x).n)
-    data_xsec['zDelBE_mc'] = data_xsec['zDelBE'].apply(lambda x: unc.ufloat_fromstr(x).n)
-    data_xsec['zDelEE_mc'] = data_xsec['zDelEE'].apply(lambda x: unc.ufloat_fromstr(x).n)
-
     apply_muon_prefire(data_xsec)
     apply_ECAL_prefire(data_xsec)
 
     print("apply prefire corrections - done")
 
-
     data_xsec['zDel_mc'] = data_xsec['zDelBB_mc'] + data_xsec['zDelBE_mc'] + data_xsec['zDelEE_mc']
-
-    xsecBB = data_xsec['zDelBB_mc'][0]/sum(data_xsec['lumiRec'])
-    xsecBE = data_xsec['zDelBE_mc'][0]/sum(data_xsec['lumiRec'])
-    xsecEE = data_xsec['zDelEE_mc'][0]/sum(data_xsec['lumiRec'])
-
+    
+    xsecBB = sum(data_xsec['zDelBB_mc'])/sum(data_xsec['lumiRec'])
+    xsecBE = sum(data_xsec['zDelBE_mc'])/sum(data_xsec['lumiRec'])
+    xsecEE = sum(data_xsec['zDelEE_mc'])/sum(data_xsec['lumiRec'])
+    xsecI = sum(data_xsec['zDelI_mc'])/sum(data_xsec['lumiRec'])
+            
+    
 # --- z luminosity
 print("get Z luminosity")
 data = pd.concat([pd.read_csv(csv, sep=',',low_memory=False) for csv in args.rates], ignore_index=True, sort=False)
-
-# data['zDelBB_mc'] = data['zDelBB'].apply(lambda x: unc.ufloat_fromstr(x))
-# data['zDelBE_mc'] = data['zDelBE'].apply(lambda x: unc.ufloat_fromstr(x))
-# data['zDelEE_mc'] = data['zDelEE'].apply(lambda x: unc.ufloat_fromstr(x))
 
 # --->>> prefire corrections
 apply_muon_prefire(data)
@@ -102,29 +104,25 @@ data['zDel_mc'] = data['zDelBB_mc'] + data['zDelBE_mc'] + data['zDelEE_mc']
 data['zLumiBB_mc'] = data['zDelBB_mc'] / xsecBB
 data['zLumiBE_mc'] = data['zDelBE_mc'] / xsecBE
 data['zLumiEE_mc'] = data['zDelEE_mc'] / xsecEE
+data['zLumiI_mc'] = data['zDelI_mc'] / xsecI
 data['zLumi_mc'] = data['zDel_mc'] / (xsecBB+xsecBE+xsecEE)
-
-# data['zDel_mc'] = data['zDel_mc'].apply(lambda x: x.n)
-# data['zLumi_mc'] = data['zLumi_mc'].apply(lambda x: x.n)
-# data['zLumiBB_mc'] = data['zLumiBB_mc'].apply(lambda x: x.n)
-# data['zLumiBE_mc'] = data['zLumiBE_mc'].apply(lambda x: x.n)
-# data['zLumiEE_mc'] = data['zLumiEE_mc'].apply(lambda x: x.n)
 
 data['time'] = (data['tdate_begin']+data['tdate_end'])//2
 
-# data = data[['run', 'fill','zLumi_mc','zLumiBB_mc','zLumiBE_mc','zLumiEE_mc','time','lumiRec']]
-
 data = data[data['lumiRec'] > 0.]
 data = data[data['zLumi_mc'] > 0.]
+data = data[data['zLumiI_mc'] > 0.]
 
-data['zLumi_mc_to_dLRec'] = data['zLumi_mc'] / data['lumiRec']
 data['zLumiBB_mc_to_dLRec'] = data['zLumiBB_mc'] / data['lumiRec']
 data['zLumiBE_mc_to_dLRec'] = data['zLumiBE_mc'] / data['lumiRec']
 data['zLumiEE_mc_to_dLRec'] = data['zLumiEE_mc'] / data['lumiRec']
+data['zLumiI_mc_to_dLRec'] = data['zLumiI_mc'] / data['lumiRec']
+data['zLumi_mc_to_dLRec'] = data['zLumi_mc'] / data['lumiRec']
 
 data['weightLumi'] = data['lumiRec']
 
 print("analyze {0} fb^-1 of data".format(data['weightLumi'].sum()/1000.))
+
 
 def make_hist(
     df,
@@ -134,7 +132,8 @@ def make_hist(
     label="ZCount / PHYSICS",
     saveas="zcount",
     title=None,
-    legend='lower right'
+    legend='lower right',
+    rangey=[0.8,1.1]
 ):
 
     # if sumN == 1:
@@ -173,8 +172,8 @@ def make_hist(
     mean = lumiratio[(lumiratio<2.0) & (lumiratio>0.5)].mean()
     std = lumiratio[(lumiratio<2.0) & (lumiratio>0.5)].std()
     range = (mean-2*std,mean+2*std)
-
-    for weighted in (True, False):
+    
+    for weighted in (False, True):
         plt.clf()
         fig = plt.figure()
         fig.subplots_adjust(left=0.15, right=0.99, top=0.99, bottom=0.125)
@@ -198,11 +197,12 @@ def make_hist(
         plt.xticks(fontsize = labelsize)
         plt.yticks(fontsize = labelsize)
 
-        plt.savefig(outDir+histname)
+        plt.savefig(outDir+histname+".png")
+        plt.savefig(outDir+histname+".pdf")
         plt.close()
 
     # --- make scatter
-    rangey = (mean-4*std,mean+4*std)
+    # rangey = (mean-4*std,mean+4*std)
     for xx, xlabel, suffix1 in (
         (run.values, "Run number", "run"),
         # (fill.values, "Fill number", "fill"),
@@ -216,12 +216,12 @@ def make_hist(
         ):
             mean = np.mean(yy)
             std = np.std(yy)
-            rangey = (mean-4*std,mean+4*std)
+            # rangey = (mean-4*std,mean+4*std)
 
             plt.clf()
             fig = plt.figure(figsize=(10.0,4.0))
             ax = fig.add_subplot(111)
-            fig.subplots_adjust(left=0.08, right=0.99, top=0.99, bottom=0.15)
+            fig.subplots_adjust(left=0.1, right=0.99, top=0.99, bottom=0.15)
 
             if suffix1 in ("time", ):
                 xx = np.array([ROOT.TDatime(x).AsSQLString() for x in xx])
@@ -266,7 +266,7 @@ def make_hist(
             ax.set_xlabel(xlabel, fontsize=textsize)
             ax.set_ylabel(ylabel, fontsize=textsize)
             # ax.set_ylim(rangey)
-            ax.set_ylim(0.8,1.1)
+            ax.set_ylim(rangey)
             ax.set_xlim(rangex)
             if suffix1 in ("lumi", "fill", "run"):
                 # plot horizontal line at 1
@@ -320,18 +320,22 @@ def make_hist(
             plt.savefig(outDir+"/scatter_"+suffix+"_"+suffix1+"_"+saveas+".pdf")
             plt.close()
 
-
-make_hist(data, lumi_name='zLumi_mc_to_dLRec', label="ZCount / PHYSICS", saveas="zcount", title="Run\ II")
-make_hist(data, lumi_name='zLumiBB_mc_to_dLRec', label="ZCount(BB) / PHYSICS", saveas="zcountBB")
-make_hist(data, lumi_name='zLumiBE_mc_to_dLRec', label="ZCount(BE) / PHYSICS", saveas="zcountBE")
-make_hist(data, lumi_name='zLumiEE_mc_to_dLRec', label="ZCount(EE) / PHYSICS", saveas="zcountEE")
-
-make_hist(data, run_range=(272007,294645), lumi_name='zLumi_mc_to_dLRec', label="ZCount / PHYSICS", saveas="2016_zcount", title="2016", legend="best")
-make_hist(data, run_range=(272007,278769), lumi_name='zLumi_mc_to_dLRec', label="ZCount / PHYSICS", saveas="2016preVFP_zcount", title="2016\ pre\ VFP", legend="lower left")
-make_hist(data, run_range=(278769,294645), lumi_name='zLumi_mc_to_dLRec', label="ZCount / PHYSICS", saveas="2016postVFP_zcount", title="2016\ post\ VFP")
-make_hist(data, run_range=(297046,306462), lumi_name='zLumi_mc_to_dLRec', label="ZCount / PHYSICS", saveas="2017_zcount", title="2017")
-make_hist(data, run_range=(315252,325175), lumi_name='zLumi_mc_to_dLRec', label="ZCount / PHYSICS", saveas="2018_zcount", title="2018")
-
-# make_hist(data, run_range=(297046,306462), lumi_name='zLumiBB_mc_to_dLRec', label="ZCount(BB) / PHYSICS", saveas="2017_zcountBB.pdf", title="2017")
-# make_hist(data, run_range=(297046,306462), lumi_name='zLumiBE_mc_to_dLRec', label="ZCount(BE) / PHYSICS", saveas="2017_zcountBE.pdf", title="2017")
-# make_hist(data, run_range=(297046,306462), lumi_name='zLumiEE_mc_to_dLRec', label="ZCount(EE) / PHYSICS", saveas="2017_zcountEE.pdf", title="2017")
+make_hist(data, run_range=(297046,306462), lumi_name='zLumiI_mc_to_dLRec', label="$\mathcal{L}_\mathrm{Z} / \mathcal{L}_\mathrm{C}$", saveas="2017_zcountI", title="2017",rangey=[0.89,1.11])
+# 
+# make_hist(data, lumi_name='zLumi_mc_to_dLRec', label="ZCount / PHYSICS", saveas="zcount", title="Run\ II")
+# make_hist(data, lumi_name='zLumiBB_mc_to_dLRec', label="ZCount(BB) / PHYSICS", saveas="zcountBB")
+# make_hist(data, lumi_name='zLumiBE_mc_to_dLRec', label="ZCount(BE) / PHYSICS", saveas="zcountBE")
+# make_hist(data, lumi_name='zLumiEE_mc_to_dLRec', label="ZCount(EE) / PHYSICS", saveas="zcountEE")
+# # make_hist(data, lumi_name='zLumiI_mc_to_dLRec', label="ZCount(I) / PHYSICS", saveas="zcountI")
+# 
+# make_hist(data, run_range=(272007,294645), lumi_name='zLumi_mc_to_dLRec', label="ZCount / PHYSICS", saveas="2016_zcount", title="2016", legend="best")
+# make_hist(data, run_range=(272007,278769), lumi_name='zLumi_mc_to_dLRec', label="ZCount / PHYSICS", saveas="2016preVFP_zcount", title="2016\ pre\ VFP", legend="lower left")
+# make_hist(data, run_range=(278769,294645), lumi_name='zLumi_mc_to_dLRec', label="ZCount / PHYSICS", saveas="2016postVFP_zcount", title="2016\ post\ VFP")
+# 
+# make_hist(data, run_range=(297046,306462), lumi_name='zLumi_mc_to_dLRec', label="ZCount / PHYSICS", saveas="2017_zcount", title="2017")#,rangey=[0.85,1.15])
+# make_hist(data, run_range=(297046,306462), lumi_name='zLumiI_mc_to_dLRec', label="ZCount(I) / PHYSICS", saveas="2017_zcountI", title="2017")#,rangey=[0.85,1.15])
+# make_hist(data, run_range=(297046,306462), lumi_name='zLumiBB_mc_to_dLRec', label="ZCount(BB) / PHYSICS", saveas="2017_zcountBB", title="2017")#,rangey=[0.85,1.15])
+# make_hist(data, run_range=(297046,306462), lumi_name='zLumiBE_mc_to_dLRec', label="ZCount(BE) / PHYSICS", saveas="2017_zcountBE", title="2017")#,rangey=[0.85,1.15])
+# make_hist(data, run_range=(297046,306462), lumi_name='zLumiEE_mc_to_dLRec', label="ZCount(EE) / PHYSICS", saveas="2017_zcountEE", title="2017")#,rangey=[0.85,1.15])
+# 
+# make_hist(data, run_range=(315252,325175), lumi_name='zLumi_mc_to_dLRec', label="ZCount / PHYSICS", saveas="2018_zcount", title="2018")

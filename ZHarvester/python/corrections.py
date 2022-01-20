@@ -4,7 +4,7 @@ import os
 import pickle
 
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
-from ZUtils.python.utils import exp, pexp, plinear, plinear_step
+from ZUtils.python.utils import exp, pexp, plinear, plinear_step, pquad
 
 def apply_muon_prefire(df):
 
@@ -24,7 +24,9 @@ def apply_muon_prefire(df):
 
         loc = (df['run'] >= lo) & (df['run'] < hi)
 
-        for region in ("BB","BE","EE"):
+        for region in ("BB","BE","EE","I"):
+            if 'zDel{0}_mc'.format(region) not in df.keys():
+                continue
             factor = float(res_prefire[era]["prefMuon"][region]['nominal'])
             df.loc[loc,'zDel{0}_mc'.format(region)] *= factor
 
@@ -49,7 +51,9 @@ def apply_pileup_correction(df):
         with open('res/mcCorrections/corrections_nPU_{0}.p'.format(era), "r") as file_pileup:
             functions = pickle.load(file_pileup)
 
-        for region in ("BB","BE","EE"):
+        for region in ("BB","BE","EE","I"):
+            if 'zDel{0}_mc'.format(region) not in df.keys():
+                continue
             function = functions["effReco"+region]
             params = function['params']
             name = function['name']
@@ -66,14 +70,18 @@ def apply_ECAL_prefire(df):
     with open('res/prefiring.json') as file_prefire:
         res_prefire = json.load(file_prefire)
 
-    for lo, hi, era in (
-        (272007, 278769, "2016preVFP"),
-        (278769, 284045, "2016postVFP"),
-        (297020, 307083, "2017")
+    for lo, hi, era, func in (
+        (272007, 278769, "2016preVFP", pexp),
+        (278769, 284045, "2016postVFP", pexp),
+        (297020, 306926, "2017", pexp),
+        (306926, 307083, "2017H", pquad),
         ):
+        
 
         loc = (df['run'] >= lo) & (df['run'] < hi)
 
-        for region in ("BB","BE","EE"):
+        for region in ("BB","BE","EE","I"):
+            if 'zDel{0}_mc'.format(region) not in df.keys():
+                continue
             params = res_prefire[era]["prefECAL"][region]['nominal']
-            df.loc[loc, 'zDel{0}_mc'.format(region)] *= pexp(df.loc[loc,'pileUp'], *params)
+            df.loc[loc, 'zDel{0}_mc'.format(region)] *= func(df.loc[loc,'pileUp'], *params)

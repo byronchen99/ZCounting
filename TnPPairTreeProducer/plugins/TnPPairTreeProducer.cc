@@ -4,6 +4,7 @@
 #include "FWCore/Common/interface/TriggerNames.h"
 #include "DataFormats/Common/interface/TriggerResults.h"
 #include "DataFormats/HLTReco/interface/TriggerEvent.h"
+#include "DataFormats/Math/interface/deltaR.h"
 
 #include "ZCounting/TnPPairTreeProducer/plugins/TnPPairTreeProducer.h"
 
@@ -106,8 +107,6 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
         return;
     }
 
-    run_ = iEvent.id().run();
-    ls_ = iEvent.id().luminosityBlock();
     eventNumber_ = iEvent.id().event();
 
     //-------------------------------
@@ -176,7 +175,10 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
             continue;
         if (!(passMuonID(itMu1, *pv) && passMuonIso(itMu1)))
             continue;
-        if (!isMuonTriggerObj(eta1_, phi1_))
+        // if (!isMuonTriggerObj(eta1_, phi1_))
+        //     continue;
+
+        if (!isMuonTriggerObjEmulated(eta1_, phi1_, eventNumber_))
             continue;
 
         pfIso1_ = getPFIso(itMu1);
@@ -210,7 +212,9 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
             if ((dilepMass_ < MassMin_) || (dilepMass_ > MassMax_))
                 continue;
             if (passMuonID(itMu2, *pv) && passMuonIso(itMu2)) {
-                if (isMuonTriggerObj(eta2_, phi2_)) {
+                if (isMuonTriggerObjEmulated(eta2_, phi2_, eventNumber_)){
+                //     continue;
+                // if (isMuonTriggerObj(eta2_, phi2_)) {
                     // category 2HLT: both muons passing trigger requirements
                     if (&itMu1 > &itMu2)
                         continue;  // make sure we don't double count MuMu2HLT category
@@ -293,11 +297,30 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
 
 }
 
+// ------------ method called once each new LS  ------------
+void
+TnPPairTreeProducer::beginLuminosityBlock(const edm::LuminosityBlock& iLumi, const edm::EventSetup& iSetup)
+{
+    ls_ = iLumi.id().luminosityBlock();
+
+    std::cout<<"TnPPairTreeProducer::beginLuminosityBlock --- now at LS "<< ls_ <<std::endl;
+
+    // find and open file with HLT information
+    const std::string fNameHLT = getFilname(run_, ls_);
+
+    if(_fileHLTEmulation != 0)
+        _fileHLTEmulation->Close();
+
+    _fileHLTEmulation = TFile::Open(("root://xrootd-cms.infn.it//"+fNameHLT).c_str());
+    
+    fs->cd();
+}
 
 // ------------ method called once each run just before starting event loop  ------------
 void TnPPairTreeProducer::beginRun(edm::Run const& iRun, edm::EventSetup const& iSetup)
 {
     edm::LogVerbatim("TnPPairTreeProducer") << "now at "<<iRun.id();
+    run_ = iRun.id().run();
 
     bool hltChanged(true);
     if (hltConfigProvider_.init(iRun, iSetup, triggerResultsInputTag_.process(), hltChanged)) {
@@ -329,7 +352,7 @@ TnPPairTreeProducer::beginJob()
     tree_->Branch("nPV", &nPV_,"nPV_/i");
     tree_->Branch("run", &run_,"run_/i");
     tree_->Branch("ls", &ls_,"ls_/i");
-    tree_->Branch("eventNumber", &eventNumber_, "eventNumber_/i");
+    tree_->Branch("eventNumber", &eventNumber_, "eventNumber_/l");
 
     tree_->Branch("pt1", &pt1_,"pt1_/f");
     tree_->Branch("eta1", &eta1_,"eta1_/f");
@@ -385,10 +408,6 @@ void TnPPairTreeProducer::clearVariables(){
     edm::LogVerbatim("TnPPairTreeProducer")<<"clearVariables()";
 
     nPV_ = 0;
-    run_ = 0;
-    ls_ = 0;
-    eventNumber_ = 0;
-
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -514,4 +533,44 @@ float TnPPairTreeProducer::getDxy(const reco::Muon& muon, const reco::Vertex& vt
 //--------------------------------------------------------------------------------------------------
 float TnPPairTreeProducer::getDz(const reco::Muon& muon, const reco::Vertex& vtx) {
     return fabs(muon.muonBestTrack()->dz(vtx.position()));
+}
+
+//--------------------------------------------------------------------------------------------------
+// For trigger emulation in the 2017H (low PU) dataset
+// We emulated the HLT_IsoMu24_v11 in separated samples and need to get the trigger objects from these separate samples
+
+bool TnPPairTreeProducer::isMuonTriggerObjEmulated(const double eta, const double phi, const long long unsigned eventNumber) {
+
+    // filter tag for HLT_IsoMu24_v11:
+    const edm::InputTag filterTag("hltL3crIsoL1sSingleMu22L1f0L2f10QL3f24QL3trkIsoFiltered0p07", "", "HLTX");
+    
+    TTreeReader myReader("Events", _fileHLTEmulation);
+    TTreeReaderValue<edm::EventAuxiliary> eventAuxiliary_(myReader, "EventAuxiliary");
+    TTreeReaderValue<trigger::TriggerEvent> triggerEvent_(myReader, "triggerTriggerEvent_hltTriggerSummaryAOD__HLTX.obj");
+
+    // std::cout<<"Look for event "<< eventNumber <<std::endl;
+
+    while(myReader.Next()){
+        // find event
+        if(eventNumber != eventAuxiliary_->event())
+            continue;
+
+        // std::cout<<"Found event!"<<std::endl;
+        // look for trigger objects
+        if(triggerEvent_->filterIndex(filterTag) < triggerEvent_->sizeFilters()){
+            const trigger::Keys& trigKeys = triggerEvent_->filterKeys(triggerEvent_->filterIndex(filterTag));
+            const trigger::TriggerObjectCollection & trigObjColl(triggerEvent_->getObjects());
+            //now loop of the trigger objects passing filter
+            for(trigger::Keys::const_iterator keyIt=trigKeys.begin();keyIt!=trigKeys.end();++keyIt){
+                const trigger::TriggerObject& obj = trigObjColl[*keyIt];
+                // std::cout<<"Trigger object(pt | eta) = "<<obj.pt()<< " | "<<obj.eta()<<std::endl;
+                if (reco::deltaR(eta, phi, obj.eta(), obj.phi()) < fMuonHLTDRMAX){
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    edm::LogWarning("isMuonTriggerObjEmulated")<<"Event was not found!"<<std::endl;
+    return false;
 }

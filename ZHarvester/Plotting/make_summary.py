@@ -15,7 +15,7 @@ print(os.getcwd())
 
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
 from ZUtils.python.utils import to_RootTime, unorm
-from ZUtils.python.utils import pexp
+from ZUtils.python.utils import pexp, pquad
 
 ROOT.gROOT.SetBatch(True)
 ROOT.gStyle.SetCanvasPreferGL(1)
@@ -43,39 +43,21 @@ with open('res/prefiring.json') as file_prefire:
 
 # --- get Z xsec
 print("get Z cross section")
-data_xsec = pd.read_csv(str(args.xsec), sep=',',low_memory=False)#, skiprows=[1,2,3,4,5])
-
+data_xsec = pd.read_csv(str(args.xsec), sep=',',low_memory=False)
 
 # --- z luminosity
 print("get Z luminosity")
 data = pd.concat([pd.read_csv(csv, sep=',',low_memory=False) for csv in args.rates] +[data_xsec,], ignore_index=True, sort=False)
 
-# data['zRecBB'] = data['zRecBB'].apply(lambda x: unc.ufloat_fromstr(x))
-# data['zRecBE'] = data['zRecBE'].apply(lambda x: unc.ufloat_fromstr(x))
-# data['zRecEE'] = data['zRecEE'].apply(lambda x: unc.ufloat_fromstr(x))
-
-# data['effBB_mc'] = data['effBB_mc'].apply(lambda x: unc.ufloat_fromstr(x))
-# data['effBE_mc'] = data['effBE_mc'].apply(lambda x: unc.ufloat_fromstr(x))
-# data['effEE_mc'] = data['effEE_mc'].apply(lambda x: unc.ufloat_fromstr(x))
-
-# data['zDelBB_mc'] = data['zDelBB_mc'].apply(lambda x: unc.ufloat_fromstr(x))
-# data['zDelBE_mc'] = data['zDelBE_mc'].apply(lambda x: unc.ufloat_fromstr(x))
-# data['zDelEE_mc'] = data['zDelEE_mc'].apply(lambda x: unc.ufloat_fromstr(x))
-
-# data['zDelBB'] = data['zDelBB'].apply(lambda x: unc.ufloat_fromstr(x))
-# data['zDelBE'] = data['zDelBE'].apply(lambda x: unc.ufloat_fromstr(x))
-# data['zDelEE'] = data['zDelEE'].apply(lambda x: unc.ufloat_fromstr(x))
-
 data['zRec_mc'] = data['zRecBB_mc'] + data['zRecBE_mc'] + data['zRecEE_mc']
-# data['zDel'] = data['zDelBB'] + data['zDelBE'] + data['zDelEE']
 data['zDel_mc'] = data['zDelBB_mc'] + data['zDelBE_mc'] + data['zDelEE_mc']
 data['zDel_mcUp'] = data['zDelBB_mcUp'] + data['zDelBE_mcUp'] + data['zDelEE_mcUp']
-data['zDel_mcDown'] = data['zDelBB_mcDown'] + data['zDelBE_mcDown'] + data['zDelEE_mcDown']
+# data['zDel_mcDown'] = data['zDelBB_mcDown'] + data['zDelBE_mcDown'] + data['zDelEE_mcDown']
 
 # --->>> prefire corrections
 print("apply muon prefire corrections")
 for var in prefire_variations_Muon:
-    for region in ("BB","BE","EE"):
+    for region in ("BB","BE","EE","I"):
 
         data['zDel{0}_mc_prefMuon_{1}'.format(region,var)] = data['zDel{0}_mc'.format(region)]
 
@@ -98,19 +80,19 @@ for var in prefire_variations_Muon:
 print("apply ECAL prefire corrections")
 
 for var in prefire_variations_ECAL:
-    for region in ("BB","BE","EE"):
+    for region in ("BB","BE","EE","I"):
 
         data['zDel{0}_mc_prefECAL_{1}'.format(region,var)] = data['zDel{0}_mc_prefMuon_nominal'.format(region)]
 
-        for lo, hi, era in (
-            (272007, 278769, "2016preVFP"),
-            (278769, 284045, "2016postVFP"),
-            (297020, 306463, "2017"),
-            (306828, 307083, "2017"),   # 2017H
+        for lo, hi, era, func in (
+            (272007, 278769, "2016preVFP", pexp),
+            (278769, 284045, "2016postVFP", pexp),
+            (297020, 306463, "2017", pexp),
+            (306828, 307083, "2017H", pquad),   # 2017H
         ):
             params = res_prefire[era]["prefECAL"][region][var]
             loc = (data['run'] >= lo) & (data['run'] < hi)
-            data.loc[loc, 'zDel{0}_mc_prefECAL_{1}'.format(region,var)] *= pexp(data.loc[loc,'pileUp'], *params)
+            data.loc[loc, 'zDel{0}_mc_prefECAL_{1}'.format(region,var)] *= func(data.loc[loc,'pileUp'], *params)
 
     data['zDel_mc_prefECAL_'+var] = data['zDelBB_mc_prefECAL_'+var] \
         + data['zDelBE_mc_prefECAL_'+var] \
@@ -119,7 +101,7 @@ for var in prefire_variations_ECAL:
 print("apply prefire corrections - done")
 # <<<---
 
-for region in ("","BB","BE","EE"):
+for region in ("","BB","BE","EE","I"):
     info = {}
 
     for lo, hi, era in (
@@ -135,7 +117,7 @@ for region in ("","BB","BE","EE"):
         # info[era]['raw'] = sum(data.loc[(data['run'] >= lo) & (data['run'] < hi),'zDel'])
         info[era]['mc'] = sum(data.loc[(data['run'] >= lo) & (data['run'] < hi),'zDel{0}_mc'.format(region)])
         info[era]['mcUp'] = sum(data.loc[(data['run'] >= lo) & (data['run'] < hi),'zDel{0}_mcUp'.format(region)])
-        info[era]['mcDown'] = sum(data.loc[(data['run'] >= lo) & (data['run'] < hi),'zDel{0}_mcDown'.format(region)])
+        # info[era]['mcDown'] = sum(data.loc[(data['run'] >= lo) & (data['run'] < hi),'zDel{0}_mcDown'.format(region)])
         for var in prefire_variations_Muon:
             info[era]["prefMuon_"+var] = sum(data.loc[(data['run'] >= lo) & (data['run'] < hi),'zDel{0}_mc_prefMuon_{1}'.format(region, var)])
         for var in prefire_variations_ECAL:
@@ -146,6 +128,8 @@ for region in ("","BB","BE","EE"):
 
 exit()
 
+# for prefire corrections
+
 # save corrected MergedCSVperLS
 print("store data - Muon prefiring")
 data = data[['zDelBB_mc_prefMuon_nominal','zDelBE_mc_prefMuon_nominal','zDelEE_mc_prefMuon_nominal',
@@ -155,6 +139,7 @@ data = data[['zDelBB_mc_prefMuon_nominal','zDelBE_mc_prefMuon_nominal','zDelEE_m
 data['zDelBB_mc'] = data['zDelBB_mc_prefMuon_nominal']
 data['zDelBE_mc'] = data['zDelBE_mc_prefMuon_nominal']
 data['zDelEE_mc'] = data['zDelEE_mc_prefMuon_nominal']
+# data['zDelI_mc'] = data['zDelI_mc_prefMuon_nominal']
 
 data_store = data[['ls', u'time', u'run', u'measurement', u'fill', u'pileUp',
        # u'delivered(/pb)',
@@ -164,7 +149,9 @@ data_store = data[['ls', u'time', u'run', u'measurement', u'fill', u'pileUp',
        # u'effBE_mc', u'RecBE', u'zRecBE', u'zDelBE',
        u'zDelBE_mc',
        # u'effEE_mc', u'RecEE', u'zRecEE', u'zDelEE',
-       u'zDelEE_mc']]
+       u'zDelEE_mc',
+       # u'zDelI_mc',
+       ]]
 
 with open(outDir + '/Mergedcsvfile_perLS_corrMuonPrefire.csv', 'w') as file:
     data.to_csv(file, index=False)
@@ -174,6 +161,7 @@ print("store data - ECAL prefiring")
 data['zDelBB_mc'] = data['zDelBB_mc_prefECAL_nominal']
 data['zDelBE_mc'] = data['zDelBE_mc_prefECAL_nominal']
 data['zDelEE_mc'] = data['zDelEE_mc_prefECAL_nominal']
+# data['zDelI_mc'] = data['zDelI_mc_prefECAL_nominal']
 
 data_store = data[['ls', u'time', u'run', u'measurement', u'fill', u'pileUp',
        # u'delivered(/pb)',
@@ -183,7 +171,9 @@ data_store = data[['ls', u'time', u'run', u'measurement', u'fill', u'pileUp',
        # u'effBE_mc', u'RecBE', u'zRecBE', u'zDelBE',
        u'zDelBE_mc',
        # u'effEE_mc', u'RecEE', u'zRecEE', u'zDelEE',
-       u'zDelEE_mc']]
+       u'zDelEE_mc',
+       # u'zDelI_mc',       
+       ]]
 
 with open(outDir + '/Mergedcsvfile_perLS_corrECALPrefire.csv', 'w') as file:
     data.to_csv(file, index=False)

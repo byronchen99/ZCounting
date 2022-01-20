@@ -36,7 +36,7 @@ parser.add_argument("-x", "--xsec",  default=None, type=str,
 parser.add_argument("-l", "--refLumi",  required=True, type=str, help="give a ByLs.csv as input for reference Luminosity")
 parser.add_argument("-s", "--saveDir",  default='./',  type=str, help="give output dir")
 parser.add_argument("-y", "--year",  default=2017, type=int, help="give a year for calculation of time")
-parser.add_argument("-f", "--fill",  default=0, type=int, help="specify a single fill to plot")
+parser.add_argument("-f", "--fill", nargs="*",  type=int,  default=[], help="specify a single fill to plot")
 parser.add_argument("-m", "--mcCorrections",  default=None, type=str, help="specify MC correction file")
 args = parser.parse_args()
 
@@ -81,8 +81,8 @@ data_ref = data_ref.drop(['#run:fill','hltpath','source'],axis=1)
 data_ref = data_ref.sort_values(['fill','run','ls','recorded(/pb)'])
 data_ref = data_ref.drop_duplicates(['fill','run','ls'])
 
-if args.fill != 0:
-    data_ref = data_ref.loc[data_ref['fill'] == data_ref.fill]
+if args.fill != []:
+    data_ref = data_ref.loc[data_ref['fill'].isin(data_ref.fill)]
 
 data_ref['time'] = data_ref['time'].apply(lambda x: to_RootTime(x,currentYear)).astype(float)
 
@@ -92,8 +92,8 @@ data_ref = data_ref[['fill','dLRec(/pb)','time', 'recorded(/pb)', 'avgpu']]		#Ke
 
 # --- z luminosity
 data = pd.read_csv(str(args.rates), sep=',',low_memory=False) #, skiprows=[1,2,3,4,5])
-if args.fill != 0:
-    data = data.loc[data['fill'] == args.fill]
+if args.fill != []:
+    data = data.loc[data['fill'].isin(args.fill)]
 
 data = data.sort_values(['fill','tdate_begin','tdate_end'])
 
@@ -423,7 +423,7 @@ for suffix, zLumi, others in (
             # legend.Draw("same")
 
             graph_rZLumi.Draw("P same")
-            canvas.SaveAs(subdir+"/ZLumi"+str(fill)+"_"+xName+"_"+suffix+".pdf")
+            canvas.SaveAs(outDir+"/ZLumi"+str(fill)+"_"+xName+"_"+suffix+".pdf")
 
             canvas.SaveAs(subdir+"/ZLumi"+str(fill)+"_"+xName+"_"+suffix+".png")
             canvas.Close()

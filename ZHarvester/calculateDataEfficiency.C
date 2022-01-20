@@ -41,9 +41,6 @@
 #include "RooExtendPdf.h"
 
 // constants
-const Float_t etaCutTag   = 2.4;
-const Float_t etaCutProbe = 2.4;
-const Float_t etaBound    = 0.9;
 
 // Set up pile-up bounds available get MC template for fitting
 const Int_t minPU = 1;
@@ -55,6 +52,11 @@ const Int_t maxPU = 60;
 Float_t massLo  = 56.;
 Float_t massHi  = 116.;
 UInt_t  massBin = (UInt_t)(massHi-massLo);
+Float_t massWidth = 1.0;
+
+Float_t etaCutTag   = 2.4;
+Float_t etaCutProbe = 2.4;
+Float_t etaBound    = 0.9;
 
 Float_t ptCutTag = 30.;
 Float_t ptCutProbe = 30.;
@@ -74,6 +76,8 @@ void set_massRange(Float_t massLo_, Float_t massHi_, UInt_t nBins=0){
     else{
         massBin = nBins;
     }
+    
+    massWidth = (massHi-massLo)/massBin;
 
     std::cout<<"Set mass range to ["<<massLo_<<","<<massHi_<<"] with "<<massBin<<" bins."<<std::endl;
 }
@@ -81,7 +85,19 @@ void set_massRange(Float_t massLo_, Float_t massHi_, UInt_t nBins=0){
 void set_ptCut(Float_t pt_){
     ptCutTag = pt_;
     ptCutProbe = pt_;
-    std::cout<<"Set pT cut of tag and probe muons to "<<pt_<<" GeV"<<std::endl;
+    std::cout<<"Set pT cut of tag and probe muons to pT > "<<pt_<<" GeV"<<std::endl;
+}
+
+void set_etaCut(Float_t eta_){
+    etaCutTag = eta_;
+    etaCutProbe = eta_;
+    std::cout<<"Set eta cut of tag and probe muons to |eta| < "<<eta_<<" "<<std::endl;
+}
+
+void set_etaBound(Float_t eta_){
+    // set the boundary where barrel and endcap is defined
+    etaBound = eta_;
+    std::cout<<"Set eta boundary for muons to |eta| < "<<eta_<<" "<<std::endl;
 }
 
 void set_output(TString dir_){
@@ -95,7 +111,7 @@ void set_luminosity(Float_t lumi_){
 
 //--------------------------------------------------------------------------------------------------
 // generate template for extraction of muon efficiency in barrel or endcap region
-void generateTemplate(
+TFile* generateTemplate(
     const TString mcfilename,
     const TString effType,
     TH1D *hPV=0
@@ -103,10 +119,16 @@ void generateTemplate(
 
 //--------------------------------------------------------------------------------------------------
 // generate template for extraction of Z yield in {BB, BE, EE} region
-void generateTemplate_ZYield(
+TFile* generateTemplate_ZYield(
 	const TString mcfilename,
-	TH1D          *hPV
+	TH1D          *hPV,
+    const int     iBin
 );
+
+//--------------------------------------------------------------------------------------------------
+// extract the correlation factor from the MC
+double extractCorrelation(TFile *histfile, const TString etaRegion);
+
 
 std::vector<double> preFit(TH1 *failHist);
 
@@ -178,7 +200,7 @@ Int_t set_background_model(
             return 6;
         case 6:
             model = new CRooCMSShape(param_mass, pass, ibin, 56., 116.);
-            return 5;
+            return 3;
         case 7:
             model = new CQCD(param_mass, hist, pass, ibin);
             return 1;
@@ -187,110 +209,22 @@ Int_t set_background_model(
 }
 
 //--------------------------------------------------------------------------------------------------
-void generateTemplate(
+TFile* generateTemplate(
 	const TString mcfilename,
     const TString effType,
 	TH1D          *hPV
 ){
 
-    TFile *outfile = TFile::Open(outputDir+"/histTemplates_"+effType+".root","CREATE");
+    TFile *outfile = TFile::Open(outputDir+"/../histTemplates_"+effType+".root","CREATE");
     if(!outfile){
+        outfile = TFile::Open(outputDir+"/../histTemplates_"+effType+".root","READ");
         cout << "Use existing template "<< endl;
-        return;
+        return outfile;
     }
     cout << "Creating histogram templates... "; cout.flush();
 
     TFile *infile    = new TFile(mcfilename);
     TTree *eventTree = (TTree*)infile->Get(effType);
-    TH1D *hPVtemplate = (TH1D*)infile->Get("hPV");
-
-    if(hPV)
-        hPV->Divide(hPVtemplate);
-
-    Double_t mass, ptTag, etaTag, ptProbe, etaProbe;
-    Double_t wgt;
-    Int_t npv;
-    Bool_t pass;
-
-    eventTree->SetBranchAddress("mass",           &mass);
-    eventTree->SetBranchAddress("ptTag",          &ptTag);
-    eventTree->SetBranchAddress("ptProbe",        &ptProbe);
-    eventTree->SetBranchAddress("etaTag",         &etaTag);
-    eventTree->SetBranchAddress("etaProbe",       &etaProbe);
-    eventTree->SetBranchAddress("nPV",            &npv);
-    eventTree->SetBranchAddress("pass",           &pass);
-    eventTree->SetBranchAddress("eventWeight",    &wgt);
-
-    TH1D *h_mass_pass_central = new TH1D("h_mass_pass_central", "", massBin, massLo, massHi);
-    TH1D *h_mass_fail_central = new TH1D("h_mass_fail_central", "", massBin, massLo, massHi);
-    TH1D *h_mass_pass_forward = new TH1D("h_mass_pass_forward", "", massBin, massLo, massHi);
-    TH1D *h_mass_fail_forward = new TH1D("h_mass_fail_forward", "", massBin, massLo, massHi);
-
-    for(UInt_t ientry=0; ientry<eventTree->GetEntries(); ientry++) {
-        eventTree->GetEntry(ientry);
-
-        if(mass < massLo)  continue;
-        if(mass > massHi)  continue;
-        if(ptTag   < ptCutTag)   continue;
-        if(ptProbe   < ptCutProbe)   continue;
-        if(fabs(etaTag) > etaCutTag) continue;
-        if(fabs(etaProbe) > etaCutProbe) continue;
-
-        if(hPV)
-            wgt *= hPV->GetBinContent(hPV->FindBin(npv));
-
-        if(fabs(etaProbe) < etaBound){
-            if(pass) h_mass_pass_central->Fill(mass, wgt);
-            else     h_mass_fail_central->Fill(mass, wgt);
-        }else{
-            if(pass) h_mass_pass_forward->Fill(mass, wgt);
-            else     h_mass_fail_forward->Fill(mass, wgt);
-        }
-    }
-
-    // set negative bin entries to 0
-    for(int i=1; i <= massBin; i++){
-        if(h_mass_pass_central->GetBinContent(i) < 0.)
-            h_mass_pass_central->SetBinContent(i, 0.);
-
-        if(h_mass_fail_central->GetBinContent(i) < 0.)
-            h_mass_fail_central->SetBinContent(i, 0.);
-
-        if(h_mass_pass_forward->GetBinContent(i) < 0.)
-            h_mass_pass_forward->SetBinContent(i, 0.);
-
-        if(h_mass_fail_forward->GetBinContent(i) < 0.)
-            h_mass_fail_forward->SetBinContent(i, 0.);
-
-    }
-    outfile->cd();
-    h_mass_pass_central->Write();
-    h_mass_fail_central->Write();
-    h_mass_pass_forward->Write();
-    h_mass_fail_forward->Write();
-    outfile->Write();
-    outfile->Close();
-
-    infile->Close();
-    delete infile;
-
-    cout << "Done!" << endl;
-}
-
-//--------------------------------------------------------------------------------------------------
-void generateTemplate_ZYield(
-	const TString mcfilename,
-	TH1D          *hPV
-){
-    TFile *outfile = TFile::Open(outputDir+"/histTemplates_HLT.root","CREATE");
-    if(!outfile){
-        cout << "Use existing template "<< endl;
-        return;
-    }
-    cout << "Creating histogram templates... "; cout.flush();
-
-    TFile *infile    = new TFile(mcfilename);
-    TTree *eventTree = (TTree*)infile->Get("HLT");
     TH1D *hPVtemplate = (TH1D*)infile->Get("hPV");
 
     if(hPV)
@@ -310,16 +244,13 @@ void generateTemplate_ZYield(
     eventTree->SetBranchAddress("pass",           &pass);
     eventTree->SetBranchAddress("eventWeight",    &wgt);
 
-    TH1D *h_mass_0hlt_BB = new TH1D("h_mass_0hlt_BB", "", massBin, massLo, massHi);
-    TH1D *h_mass_0hlt_BE = new TH1D("h_mass_0hlt_BE", "", massBin, massLo, massHi);
-    TH1D *h_mass_0hlt_EE = new TH1D("h_mass_0hlt_EE", "", massBin, massLo, massHi);
-    TH1D *h_mass_1hlt_BB = new TH1D("h_mass_1hlt_BB", "", massBin, massLo, massHi);
-    TH1D *h_mass_1hlt_BE = new TH1D("h_mass_1hlt_BE", "", massBin, massLo, massHi);
-    TH1D *h_mass_1hlt_EE = new TH1D("h_mass_1hlt_EE", "", massBin, massLo, massHi);
-    TH1D *h_mass_2hlt_BB = new TH1D("h_mass_2hlt_BB", "", massBin, massLo, massHi);
-    TH1D *h_mass_2hlt_BE = new TH1D("h_mass_2hlt_BE", "", massBin, massLo, massHi);
-    TH1D *h_mass_2hlt_EE = new TH1D("h_mass_2hlt_EE", "", massBin, massLo, massHi);
-
+    TH1D *h_mass_pass_B = new TH1D("h_mass_pass_B", "", massBin, massLo, massHi);
+    TH1D *h_mass_fail_B = new TH1D("h_mass_fail_B", "", massBin, massLo, massHi);
+    TH1D *h_mass_pass_E = new TH1D("h_mass_pass_E", "", massBin, massLo, massHi);
+    TH1D *h_mass_fail_E = new TH1D("h_mass_fail_E", "", massBin, massLo, massHi);
+    TH1D *h_mass_pass_I = new TH1D("h_mass_pass_I", "", massBin, massLo, massHi);
+    TH1D *h_mass_fail_I = new TH1D("h_mass_fail_I", "", massBin, massLo, massHi);
+    
     for(UInt_t ientry=0; ientry<eventTree->GetEntries(); ientry++) {
         eventTree->GetEntry(ientry);
 
@@ -332,6 +263,117 @@ void generateTemplate_ZYield(
 
         if(hPV)
             wgt *= hPV->GetBinContent(hPV->FindBin(npv));
+
+        if(fabs(etaProbe) < etaBound){
+            if(pass) h_mass_pass_B->Fill(mass, wgt);
+            else     h_mass_fail_B->Fill(mass, wgt);
+        }else{
+            if(pass) h_mass_pass_E->Fill(mass, wgt);
+            else     h_mass_fail_E->Fill(mass, wgt);
+        }
+    }
+
+    // set negative bin entries to 0
+    for(int i=1; i <= massBin; i++){
+        if(h_mass_pass_B->GetBinContent(i) < 0.)
+            h_mass_pass_B->SetBinContent(i, 0.);
+
+        if(h_mass_fail_B->GetBinContent(i) < 0.)
+            h_mass_fail_B->SetBinContent(i, 0.);
+
+        if(h_mass_pass_E->GetBinContent(i) < 0.)
+            h_mass_pass_E->SetBinContent(i, 0.);
+
+        if(h_mass_fail_E->GetBinContent(i) < 0.)
+            h_mass_fail_E->SetBinContent(i, 0.);
+
+    }
+    h_mass_pass_I->Add(h_mass_pass_B);
+    h_mass_fail_I->Add(h_mass_fail_B);
+    h_mass_pass_I->Add(h_mass_pass_E);
+    h_mass_fail_I->Add(h_mass_fail_E);
+    
+    outfile->cd();
+    h_mass_pass_B->Write();
+    h_mass_fail_B->Write();
+    h_mass_pass_E->Write();
+    h_mass_fail_E->Write();
+    h_mass_pass_I->Write();
+    h_mass_fail_I->Write();
+    outfile->Write();
+
+    infile->Close();
+    delete infile;
+
+    cout << "Done!" << endl;
+    return outfile;
+}
+
+//--------------------------------------------------------------------------------------------------
+TFile* generateTemplate_ZYield(
+	const TString mcfilename,
+	TH1D          *hPV,
+    const int     iBin
+){
+    const TString histfilename = hPV == 0 ? outputDir+"/../histTemplates_HLT.root" : outputDir+"/histTemplates_HLT_"+std::to_string(iBin)+".root";
+    TFile *outfile = TFile::Open(histfilename,"CREATE");
+    if(!outfile){
+        cout << "Use existing template "<< endl;
+        outfile = TFile::Open(histfilename,"READ");
+        return outfile;
+    }
+    cout << "Creating histogram templates... "; cout.flush();
+
+    TFile *infile    = new TFile(mcfilename);
+    TTree *eventTree = (TTree*)infile->Get("HLT");
+    TH1D *hPVtemplate = (TH1D*)infile->Get("hPV");
+    
+    TH1D *hRatioPV = (TH1D*)hPV->Clone("h_ratio_PV");
+
+    if(hPV){
+        std::cout<<"PV reweighting with <PV> = "<<hPV->GetMean()<<std::endl;       
+        hRatioPV->Divide(hPVtemplate);
+    }
+
+    Double_t mass, ptTag, etaTag, ptProbe, etaProbe;
+    Double_t wgt;
+    Int_t npv;
+    Int_t pass;
+
+    eventTree->SetBranchAddress("mass",           &mass);
+    eventTree->SetBranchAddress("ptTag",          &ptTag);
+    eventTree->SetBranchAddress("ptProbe",        &ptProbe);
+    eventTree->SetBranchAddress("etaTag",         &etaTag);
+    eventTree->SetBranchAddress("etaProbe",       &etaProbe);
+    eventTree->SetBranchAddress("nPV",            &npv);
+    eventTree->SetBranchAddress("pass",           &pass);
+    eventTree->SetBranchAddress("eventWeight",    &wgt);
+
+    TH1D *h_mass_0hlt_BB = new TH1D("h_mass_0hlt_BB", "", massBin, massLo, massHi);
+    TH1D *h_mass_0hlt_BE = new TH1D("h_mass_0hlt_BE", "", massBin, massLo, massHi);
+    TH1D *h_mass_0hlt_EE = new TH1D("h_mass_0hlt_EE", "", massBin, massLo, massHi);
+    TH1D *h_mass_0hlt_I = new TH1D("h_mass_0hlt_I", "", massBin, massLo, massHi);
+    TH1D *h_mass_1hlt_BB = new TH1D("h_mass_1hlt_BB", "", massBin, massLo, massHi);
+    TH1D *h_mass_1hlt_BE = new TH1D("h_mass_1hlt_BE", "", massBin, massLo, massHi);
+    TH1D *h_mass_1hlt_EE = new TH1D("h_mass_1hlt_EE", "", massBin, massLo, massHi);
+    TH1D *h_mass_1hlt_I = new TH1D("h_mass_1hlt_I", "", massBin, massLo, massHi);
+    TH1D *h_mass_2hlt_BB = new TH1D("h_mass_2hlt_BB", "", massBin, massLo, massHi);
+    TH1D *h_mass_2hlt_BE = new TH1D("h_mass_2hlt_BE", "", massBin, massLo, massHi);
+    TH1D *h_mass_2hlt_EE = new TH1D("h_mass_2hlt_EE", "", massBin, massLo, massHi);
+    TH1D *h_mass_2hlt_I = new TH1D("h_mass_2hlt_I", "", massBin, massLo, massHi);
+
+    for(UInt_t ientry=0; ientry<eventTree->GetEntries(); ientry++) {
+        eventTree->GetEntry(ientry);
+
+        if(mass < massLo)  continue;
+        if(mass > massHi)  continue;
+        if(ptTag   < ptCutTag)   continue;
+        if(ptProbe   < ptCutProbe)   continue;
+        if(fabs(etaTag) > etaCutTag) continue;
+        if(fabs(etaProbe) > etaCutProbe) continue;
+
+        if(hPV)
+            wgt *= hRatioPV->GetBinContent(hRatioPV->FindBin(npv));
 
         if(fabs(etaProbe) < etaBound && fabs(etaTag) < etaBound){
             if(pass==2)         h_mass_2hlt_BB->Fill(mass, wgt);
@@ -379,24 +421,41 @@ void generateTemplate_ZYield(
         if(h_mass_0hlt_EE->GetBinContent(i) < 0.)
             h_mass_0hlt_EE->SetBinContent(i, 0.);
     }
-
+    // inclusive
+    h_mass_0hlt_I->Add(h_mass_0hlt_BB);
+    h_mass_0hlt_I->Add(h_mass_0hlt_BE);
+    h_mass_0hlt_I->Add(h_mass_0hlt_EE);
+    h_mass_1hlt_I->Add(h_mass_1hlt_BB);
+    h_mass_1hlt_I->Add(h_mass_1hlt_BE);
+    h_mass_1hlt_I->Add(h_mass_1hlt_EE);
+    h_mass_2hlt_I->Add(h_mass_2hlt_BB);
+    h_mass_2hlt_I->Add(h_mass_2hlt_BE);
+    h_mass_2hlt_I->Add(h_mass_2hlt_EE);
+    
     outfile->cd();
+    
     h_mass_2hlt_BB->Write();
     h_mass_2hlt_BE->Write();
     h_mass_2hlt_EE->Write();
+    h_mass_2hlt_I->Write();
     h_mass_1hlt_BB->Write();
     h_mass_1hlt_BE->Write();
     h_mass_1hlt_EE->Write();
+    h_mass_1hlt_I->Write();
     h_mass_0hlt_BB->Write();
     h_mass_0hlt_BE->Write();
     h_mass_0hlt_EE->Write();
+    h_mass_0hlt_I->Write();
+    
+    hRatioPV->Write();
+
     outfile->Write();
-    outfile->Close();
 
     infile->Close();
     delete infile;
 
     cout << "Done!" << endl;
+    return outfile;
 }
 
 
@@ -408,20 +467,25 @@ Double_t make_plot(
     RooAbsData *data,
     CSignalModel *sigModel,         // only needed for label
     CBackgroundModel *bkgModel,     // only needed for label
-    RooFitResult *fitResult,
-    RooWorkspace *w,
     const Int_t nEntries,
+    RooAbsPdf* modelPdf,
+    RooRealVar* Nsig,
+    RooRealVar* Nbkg,
     const Int_t iBin,
+    RooRealVar *eff = 0,
+    RooRealVar *corr = 0,
     const TString effType="yield",
-    const Bool_t etaRegion=kTRUE,
-    const Bool_t passRegion=kTRUE,
-    const TString correlationFit=""  // HLT fit to extract correlation factor {HLT0, HLT1, HLT2}
+    const TString etaRegion="I",
+    const Int_t passRegion=1,
+    const Bool_t plot_ratio=kTRUE,
+    const Bool_t logscale=kFALSE
 ){
-
     char pname[50];
+    TString suffix = "";    
     char ctitle[100];
     char binlabelx[100];
     char binlabely[100];
+    const TString xlabel = "tag-and-probe mass [GeV]";
     char ylabel[50];
     char yield[50];
     char nsigstr[100];
@@ -438,99 +502,65 @@ Double_t make_plot(
         sigmodstr+= "_1";
         bkgmodstr+= "_1";
     }
-    else if(correlationFit != ""){
-        passstr = "HLT"+correlationFit;
-        sigmodstr+= "_"+correlationFit;
-        bkgmodstr+= "_"+correlationFit;
+    else if(effType == "HLT"){
+        // passstr = "HLT"+correlationFit;
+        sigmodstr += "_"+std::to_string(passRegion);
+        bkgmodstr += "_"+std::to_string(passRegion);
     }
     else{
         sigmodstr+= "_0";
         bkgmodstr+= "_0";
     }
+    
+    if(etaRegion=="B" || etaRegion == "BB") sprintf(binlabelx, "0.0 < |#eta| < %.1f",etaBound);
+    else if(etaRegion=="E" || etaRegion == "EE") sprintf(binlabelx, "%.1f < |#eta| < %.1f",etaBound, etaCutTag);
+    else sprintf(binlabelx, "|#eta| < %.1f", etaCutTag);
 
-    if(effType=="Sta" || effType=="Trk"){
-        passstr += effType;
-    }
 
-    RooAbsPdf *modelPdf =((RooSimultaneous*)w->pdf("totalPdf"))->getPdf(passstr);
-
-    if(correlationFit != ""){
-        passstr = correlationFit;
-    }
-
-    RooFormulaVar* Nsig = (RooFormulaVar*)w->arg("Nsig"+passstr);
-    RooRealVar* Nbkg = w->var("Nbkg"+passstr);
-
-    RooRealVar *eff = (RooRealVar*)fitResult->floatParsFinal().find("eff");
-    RooRealVar *corr = 0;
-    if(effType == "BB" || effType == "BE" || effType == "EE"){
-        sprintf(pname,"yield_%s_%s_%d", effType.Data(), passRegion ? "2HLT" : "1HLT", iBin);
-        if(correlationFit != ""){
-            sprintf(pname,"yield_%s_HLT%s_%d", effType.Data(), correlationFit.Data(), iBin);
-            sprintf(ctitle,"%sHLT %s %d ", correlationFit.Data(), effType.Data(), iBin);
-            corr = (RooRealVar*)fitResult->floatParsFinal().find("c");
-        }
-        else{
-            sprintf(ctitle,"%s %s %d ", passRegion ? "2HLT" : "1HLT", effType.Data(), iBin);
-        }
-        if(effType == "BB"){
-            sprintf(binlabelx, "|#eta| < %.1f",etaBound);
-            if(eff==0)
-                eff = (RooRealVar*)fitResult->floatParsFinal().find("effB");
-        }
-        if(effType == "BE"){
-            sprintf(binlabelx, "|#eta| < 2.4");
-        }
-        if(effType == "EE"){
-            sprintf(binlabelx, "%.1f < |#eta| < 2.4",etaBound);
-            if(eff==0)
-                eff = (RooRealVar*)fitResult->floatParsFinal().find("effE");
-        }
+    if(effType == "HLT"){
+        sprintf(pname,"%s_%s_%s_%d", effType.Data(), etaRegion.Data(), std::to_string(passRegion).c_str(), iBin);
+        sprintf(ctitle,"%s %s (%d) ", effType.Data(), std::to_string(passRegion).c_str(), iBin);
     }
     else{
-        // try to find efficiency in fitResult
-        if(effType=="Sta"){
-            eff = (RooRealVar*)fitResult->floatParsFinal().find("effSta");
-        }
-        else if(effType=="Trk"){
-            eff = (RooRealVar*)fitResult->floatParsFinal().find("effTrk");
-        }
-        else if(effType=="Glo"){
-            if(eff == 0){
-                RooRealVar *effSta = (RooRealVar*)fitResult->floatParsFinal().find("effSta");
-                RooRealVar *effTrk = (RooRealVar*)fitResult->floatParsFinal().find("effTrk");
-                RooFormulaVar effGlo("effGlo","effTrk*effSta",RooArgList(*effTrk, *effSta));
-                eff = new RooRealVar("eff","eff",effGlo.getVal());
-                eff->setError(effGlo.getPropagatedError(*fitResult));
-            }
-        }
-
-        sprintf(pname,"%s_%s_%s_%d", effType.Data(), etaRegion ? "forward" : "central", passRegion ? "pass" : "fail", iBin);
+        sprintf(pname,"%s_%s_%s_%d", effType.Data(), etaRegion.Data(), passRegion ? "pass" : "fail", iBin);
         sprintf(ctitle,"%s %s (%d) ", effType.Data(), passRegion ? "pass" : "fail", iBin);
-
-        if(!etaRegion) sprintf(binlabelx, "|#eta| < 0.9");
-        else           sprintf(binlabelx, "0.9 < |#eta| < 2.4");
     }
+    
     if(eff != 0){
-        sprintf(effstr,"#varepsilon = %.4f_{ -%.4f}^{ +%.4f}",eff->getVal(),std::abs(eff->getErrorLo()),eff->getErrorHi());
+        if(effType == "HLT")
+            sprintf(effstr,"#varepsilon^{#mu}_{HLT} = %.4f_{ -%.4f}^{ +%.4f}",eff->getVal(),std::abs(eff->getErrorLo()),eff->getErrorHi());
+        else
+            sprintf(effstr,"#varepsilon = %.4f_{ -%.4f}^{ +%.4f}",eff->getVal(),std::abs(eff->getErrorLo()),eff->getErrorHi());
+        
     }
     if(corr != 0){
-        sprintf(cstr,"c = %.4f_{ -%.4f}^{ +%.4f}",corr->getVal(),std::abs(corr->getErrorLo()),corr->getErrorHi());
+        if(corr->getErrorLo() == 0 || corr->getErrorHi() == 0)
+            sprintf(cstr,"c = %.4f", corr->getVal());
+        else
+            sprintf(cstr,"c = %.4f_{ -%.4f}^{ +%.4f}",corr->getVal(),std::abs(corr->getErrorLo()),corr->getErrorHi());
     }
-
-
+    
     const double margin_left = 0.15;
     const double margin_right = 0.03;
+    const double margin_bottom_p1 = plot_ratio ? 0.025 : 0.15;
+    const double margin_top_p1 = 0.01;
 
-    TCanvas *canvas = MakeCanvas(pname, ctitle,800,800);
-
-    TPad *pad1 = new TPad("pad1", "pad1", 0., 0.35, 1, 1.0);
+    TCanvas *canvas = 0;
+    TPad *pad1 = 0;
+    if(plot_ratio){
+        canvas = MakeCanvas(pname, ctitle,800,800);
+        pad1 = new TPad("pad1", "pad1", 0., 0.35, 1, 1.0);
+    }
+    else{
+        canvas = MakeCanvas(pname, ctitle,800,540);
+        pad1 = new TPad("pad1", "pad1", 0., 0.0, 1, 1.0);       
+    }
 
     canvas->SetTicks();
     pad1->SetLeftMargin(margin_left);
     pad1->SetRightMargin(margin_right);
-    pad1->SetTopMargin(0.01);
-    pad1->SetBottomMargin(0.025);
+    pad1->SetTopMargin(margin_top_p1);
+    pad1->SetBottomMargin(margin_bottom_p1);
     pad1->SetTickx();
     pad1->SetTicky();
     pad1->Draw();
@@ -586,12 +616,15 @@ Double_t make_plot(
     // Construct a histogram with the pulls of the data w.r.t the curve
     RooHist *hpull = mframe->pullHist();
 
-    double a = Nsig->getVal(), aErr = Nsig->getPropagatedError(*fitResult);
-    double b = Nbkg->getVal(), bErr = Nbkg->getPropagatedError(*fitResult);
+    double a = Nsig->getVal(), aErr = Nsig->getError();//*fitResult);
+    double b = Nbkg->getVal(), bErr = Nbkg->getError();//*fitResult);
     double resChi2 = mframe->chiSquare(nfl);
 
     sprintf(binlabely, "p_{T} > %i GeV",(Int_t)ptCutTag);
-    sprintf(ylabel,"Events / 1 GeV");
+    if(massWidth != 1)
+        sprintf(ylabel,"Events / %.1f GeV", massWidth);
+    else
+        sprintf(ylabel,"Events / 1 GeV");
     sprintf(yield,"%u Events",nEntries);
     sprintf(nsigstr,"N_{sig} = %.1f #pm %.1f",a,aErr);
     sprintf(chi2str,"#chi^{2}/DOF = %.3f",resChi2);
@@ -607,9 +640,28 @@ Double_t make_plot(
     mframe->GetYaxis()->SetTitleFont(42);
     mframe->GetYaxis()->SetTitleSize(textsize1*1.2);
     mframe->GetYaxis()->SetTitleOffset(1.1);
+    
+    if(!plot_ratio){
+        mframe->GetXaxis()->SetTitle(xlabel);
+        mframe->GetXaxis()->SetTitleSize(textsize1*1.2);
+        mframe->GetXaxis()->SetTitleOffset(1.);
+        mframe->GetXaxis()->SetLabelSize(textsize1);
+        mframe->GetXaxis()->SetTitleFont(42);
 
-    mframe->SetMinimum(0.);
-    mframe->SetMaximum(mframe->GetMaximum()*1.2);
+        suffix += "_noRatio";
+    }
+    if(logscale){
+        pad1->SetLogy(1);
+        mframe->SetMinimum(1.);
+        mframe->SetMaximum(mframe->GetMaximum()*5);
+        
+        suffix += "_logscale";
+    }
+    else{
+        pad1->SetLogy(0);
+        mframe->SetMinimum(0.);
+        mframe->SetMaximum(mframe->GetMaximum()*1.2);
+    }
 
     mframe->Draw();
 
@@ -638,48 +690,52 @@ Double_t make_plot(
     latex->DrawLatex(1-margin_right-0.04, 0.84, binlabely);
 
     legend->Draw("same");
+    
+    if(plot_ratio){
 
-    canvas->cd();
-    TPad *pad2 = new TPad("pad2", "pad2", 0, 0.0, 1, 0.35);
-    pad2->SetLeftMargin(margin_left);
-    pad2->SetRightMargin(margin_right);
-    pad2->SetTopMargin(0.025);
-    pad2->SetBottomMargin(0.3);
-    pad2->SetTickx();
-    pad2->SetTicky();
-    pad2->Draw("ALPF");
-    pad2->cd();
+        canvas->cd();
+        TPad *pad2 = new TPad("pad2", "pad2", 0, 0.0, 1, 0.35);
+        pad2->SetLeftMargin(margin_left);
+        pad2->SetRightMargin(margin_right);
+        pad2->SetTopMargin(0.025);
+        pad2->SetBottomMargin(0.3);
+        pad2->SetTickx();
+        pad2->SetTicky();
+        pad2->Draw("ALPF");
+        pad2->cd();
 
-    const double textsize2 = 28./(pad2->GetWh()*pad2->GetAbsHNDC());
+        const double textsize2 = 28./(pad2->GetWh()*pad2->GetAbsHNDC());
 
-    RooPlot *rframe = param_mass.frame(Bins(massBin));
+        RooPlot *rframe = param_mass.frame(Bins(massBin));
 
-    rframe->SetTitle("");
-    rframe->addPlotable(hpull, "PX");
+        rframe->SetTitle("");
+        rframe->addPlotable(hpull, "PX");
 
-    rframe->GetYaxis()->SetTitle("Pulls");
-    rframe->GetYaxis()->SetTitleSize(textsize2*1.2);
-    rframe->GetYaxis()->SetTitleOffset(0.6);
-    rframe->GetYaxis()->SetLabelSize(textsize2);
-    rframe->GetYaxis()->SetTitleFont(42);
-    rframe->GetYaxis()->CenterTitle(true);
-    rframe->GetYaxis()->SetNdivisions(405);
+        rframe->GetYaxis()->SetTitle("Pulls");
+        rframe->GetYaxis()->SetTitleSize(textsize2*1.2);
+        rframe->GetYaxis()->SetTitleOffset(0.6);
+        rframe->GetYaxis()->SetLabelSize(textsize2);
+        rframe->GetYaxis()->SetTitleFont(42);
+        rframe->GetYaxis()->CenterTitle(true);
+        rframe->GetYaxis()->SetNdivisions(405);
 
-    rframe->GetXaxis()->SetTitle("tag-and-probe mass [GeV]");
-    rframe->GetXaxis()->SetTitleSize(textsize2*1.2);
-    rframe->GetXaxis()->SetTitleOffset(1.);
-    rframe->GetXaxis()->SetLabelSize(textsize2);
-    rframe->GetXaxis()->SetTitleFont(42);
-    rframe->Draw();
+        rframe->GetXaxis()->SetTitle(xlabel);
+        rframe->GetXaxis()->SetTitleSize(textsize2*1.2);
+        rframe->GetXaxis()->SetTitleOffset(1.);
+        rframe->GetXaxis()->SetLabelSize(textsize2);
+        rframe->GetXaxis()->SetTitleFont(42);
+        rframe->Draw();
 
-    TLine *line0 = new TLine(massLo, 0., massHi, 0.);
-    line0->SetLineStyle(1);
-    line0->Draw("same");
+        TLine *line0 = new TLine(massLo, 0., massHi, 0.);
+        line0->SetLineStyle(1);
+        line0->Draw("same");
+    
+    }
 
-    canvas->SaveAs(outputDir+"/"+pname+".png");
-    canvas->SaveAs(outputDir+"/"+pname+".eps");
+    canvas->SaveAs(outputDir+"/"+pname+suffix+".png");
+    // canvas->SaveAs(outputDir+"/"+pname+suffix+".eps");
     canvas->Close();
-
+    
     return resChi2;
 }
 
@@ -689,7 +745,7 @@ std::vector<float> performCount(
 	TH1D *passHist,
     TH1D *failHist,
 	const TString effType,
-    const Bool_t etaRegion,
+    const TString etaRegion,
     const Int_t iBin
 ){
 
@@ -709,8 +765,9 @@ std::vector<float> performCount(
     char pname[50];
     char yield[50];
 
-    if(!etaRegion) sprintf(binlabelx, "0.0 < |#eta| < 0.9");
-    else           sprintf(binlabelx, "0.9 < |#eta| < 2.4");
+    if(etaRegion=="B") sprintf(binlabelx, "0.0 < |#eta| < %.1f", etaCutTag);
+    else if(etaRegion=="E") sprintf(binlabelx, "%.1f < |#eta| < %.1f", etaBound, etaCutTag);
+    else sprintf(binlabelx, "|#eta| < %.1f", etaCutTag);
 
     sprintf(binlabely, "p_{T} > %i GeV/c",(Int_t)ptCutProbe);
     sprintf(effstr,"#varepsilon = %.4f_{ -%.4f}^{ +%.4f}",resEff,resErrl,resErrh);
@@ -719,7 +776,7 @@ std::vector<float> performCount(
     TCanvas *cpass = MakeCanvas("cpass","cpass",720,540);
     cpass->SetWindowPosition(cpass->GetWindowTopX()+cpass->GetBorderSize()+800,0);
 
-    sprintf(pname,"%s_%s_pass_%d", effType.Data(), etaRegion ? "forward" : "central", iBin);
+    sprintf(pname,"%s_%s_pass_%d", effType.Data(), etaRegion.Data(), iBin);
     sprintf(yield,"%i Events",(UInt_t)npass);
     CPlot plotPass(pname,"Passing probes","tag-probe mass [GeV/c^{2}]",ylabel);
     plotPass.AddHist1D(passHist,"E");
@@ -734,7 +791,7 @@ std::vector<float> performCount(
     TCanvas *cfail = MakeCanvas("cfail","cfail",720,540);
     cfail->SetWindowPosition(cfail->GetWindowTopX()+cfail->GetBorderSize()+800,0);
 
-    sprintf(pname,"%s_%s_fail_%d", effType.Data(), etaRegion ? "forward" : "central", iBin);
+    sprintf(pname,"%s_%s_fail_%d", effType.Data(), etaRegion.Data(), iBin);
     sprintf(yield,"%i Events",(UInt_t)(ntotal-npass));
     CPlot plotFail(pname,"Failing probes","tag-probe mass [GeV/c^{2}]",ylabel);
     plotFail.AddHist1D(failHist,"E");
@@ -757,19 +814,23 @@ std::vector<float> performCount(
 }
 
 //--------------------------------------------------------------------------------------------------
-// perform fit on one histogram for yield extraxtion
+// perform fit on one histogram to extract number of Z 
 void getZyield(
-    TH1D *h_yield,
-    const Int_t    iBin,         // Label of measurement in currect run
+    TH1D*          h_yield,         // Histogram with signal and background contribution
+    const Int_t    iBin,            // Label of measurement in currect run
     const Int_t    sigMod,
     const Int_t    bkgMod,
-    const TString  etaRegion="",    // {BB, BE or EE}
+    const TString  effType="HLT",   // {Trk, Sta, Glo, Sel, HLT}
+    const TString  etaRegion="",    // {B, E, BB, BE, EE or I}
     const Bool_t   passRegion=true,
-    const TString  mcfilename="",
+    const TString  mcfilename="",   
     TH1D*          _hQCD=0,
     TH1D*          hPV=0
 ){
-    std::cout<<">>> Do fit in "<< etaRegion <<" for Z yield extraction"<<std::endl;
+    std::cout<<">>> Do fit in "<< etaRegion 
+        <<" for "<< effType <<" efficiency"
+        <<" in pass="<< passRegion <<" category "
+        <<" for extraction of number of Z"<<std::endl;
 
     RooRealVar m("m", "mass", massLo, massHi);
     m.setBins(massBin);
@@ -782,31 +843,62 @@ void getZyield(
     TFile *histfile = 0;
     TH1D *h=0;
     if(sigMod==2) {
-        generateTemplate_ZYield(mcfilename, hPV);
-        histfile = new TFile(outputDir+"/histTemplates_HLT.root");
-        if(passRegion)
-            h = (TH1D*)histfile->Get("h_mass_2hlt_"+etaRegion);
-        else
-            h = (TH1D*)histfile->Get("h_mass_1hlt_"+etaRegion);
-
-      assert(h);
+        if(effType == "HLT"){
+            histfile = generateTemplate_ZYield(mcfilename, hPV, iBin);
+            if(passRegion)
+                h = (TH1D*)histfile->Get("h_mass_2hlt_"+etaRegion);
+            else
+                h = (TH1D*)histfile->Get("h_mass_1hlt_"+etaRegion);            
+        }
+        else{
+            histfile = generateTemplate(mcfilename, effType, hPV);
+            assert(histfile);
+            if(passRegion)
+                h = (TH1D*)histfile->Get(Form("h_mass_pass_%s", etaRegion.Data()));
+            else
+                h = (TH1D*)histfile->Get(Form("h_mass_fail_%s", etaRegion.Data()));
+        }
+        assert(h);
     }
 
-    nfl += set_signal_model(sigMod, sigModel, m, kTRUE, 0, h);
-    nfl += set_background_model(bkgMod, bkgModel, m, kTRUE, 0);
-
-    RooDataHist *data = new RooDataHist("ZReco","ZReco",RooArgList(m),h_yield);
+    nfl += set_signal_model(sigMod, sigModel, m, passRegion, effType == "Sta" ? 1 : 0, h);
+    nfl += set_background_model(bkgMod, bkgModel, m, passRegion, effType == "Sta" ? 1 : 0);
+    
+    RooDataHist *data = new RooDataHist("ZReco","ZReco",RooArgList(m), h_yield);
 
     const Double_t NsigMax = h_yield->Integral();
-    RooRealVar Nsig("Nsig","sigYield",NsigMax,0.,1.5*NsigMax);
-    RooRealVar Nbkg("Nbkg","bkgYield",0.01*NsigMax,0.,NsigMax);
+    Double_t NsigInit = 0;  // initial signal contribution
+    Double_t NbkgInit = 0;  // initial background contribution
+    if(etaRegion == "HLT"){
+        NsigInit = passRegion ? NsigMax*0.995 : NsigMax*0.95;
+        NbkgInit = passRegion ? 0.005 : NsigMax*0.05;
+    }
+    else if(etaRegion == "Sel"){
+        NsigInit = passRegion ? NsigMax*0.99 : NsigMax*0.90;
+        NbkgInit = passRegion ? 0.01 : NsigMax*0.1;    
+    }
+    else if(etaRegion == "Glo"){
+        NsigInit = passRegion ? NsigMax*0.99 : NsigMax*0.2;
+        NbkgInit = passRegion ? 0.01 : NsigMax*0.8;         
+    }
+    else if(etaRegion == "Sta"){
+        NsigInit = passRegion ? NsigMax*0.99 : NsigMax*0.1;
+        NbkgInit = passRegion ? 0.01 : NsigMax*0.9;               
+    }
+    else if(etaRegion == "Trk"){
+        NsigInit = passRegion ? NsigMax*0.99 : NsigMax*0.3;
+        NbkgInit = passRegion ? 0.01 : NsigMax*0.7;        
+    }
+    
+    RooRealVar Nsig("Nsig","sigYield", NsigInit, 0., 1.5*NsigMax);
+    RooRealVar Nbkg("Nbkg","bkgYield", NbkgInit, 0., NsigMax);
     RooAddPdf modelPdf("totalPdf","Z sig+bkg",
         RooArgList(*(sigModel->model),*(bkgModel->model)),RooArgList(Nsig,Nbkg));
 
     RooFormulaVar purity("purity","Nsig/(Nsig+Nbkg)",RooArgList(Nsig,Nbkg));
 
-    TFile *fFit = new TFile(
-        outputDir+"/workspace_yield_"+etaRegion+"_"+iBin+".root",
+    TFile *fFit = new TFile(Form(
+        "%s/workspace_yield_%s_%s_%s_%i.root",outputDir.Data(), effType.Data(), etaRegion.Data(), passRegion ? "pass" : "fail", iBin),
         "RECREATE");
 
     // save all information in RooWorkspace
@@ -908,7 +1000,12 @@ void getZyield(
     fFit->Close();
 
     const Double_t chi2 = make_plot(nfl, m, data, sigModel, bkgModel,
-        best_fitResult, w, h_yield->Integral(), iBin, etaRegion, 0, passRegion);
+        h_yield->Integral(), 
+        w->pdf("totalPdf"),
+        (RooRealVar*)best_fitResult->floatParsFinal().find("Nsig"), 
+        (RooRealVar*)best_fitResult->floatParsFinal().find("Nbkg"),
+        iBin, 0,0,
+        effType.Data(), etaRegion.Data(), passRegion);
 
     RooRealVar chi2_plot("chi2plot","chi2 from plot",chi2);
     RooRealVar chi2_best("chi2","chi2",best_chi2);
@@ -931,7 +1028,7 @@ void calculateDataEfficiency(
         TH1D          *failHist,            // histogram with failing probes
 		const Int_t   iBin,                 // Label of measurement number in currect run
 		const TString effType,              // "HLT" or "Sel" or "Glo" or "Sta" or "Trk"
-        const Bool_t  etaRegion,            // Barrel (0) or Endcap (1)
+        const TString etaRegion,            // Barrel "B", Endcap "E" or Inclusive "I"
 		const Int_t   sigpass,              // signal model for PASS sample
 		const Int_t   bkgpass,              // background model for PASS sample
 		const Int_t   sigfail,              // signal model for FAIL sample
@@ -942,7 +1039,7 @@ void calculateDataEfficiency(
         const TString bkgTTFilename=""
 ){
 
-    std::cout<<">>> Do fit in "<< (etaRegion ? "E" : "B") <<" for "<<effType<<std::endl;
+    std::cout<<">>> Do fit in "<< etaRegion <<" for "<<effType<<std::endl;
 
     RooRealVar m("m","mass",massLo,massHi);
     m.setBins(massBin);
@@ -960,8 +1057,7 @@ void calculateDataEfficiency(
 
     TFile *histfile = 0;
     if(sigpass==2 || sigfail==2) {
-        generateTemplate(mcfilename, effType, hPV);
-        histfile = new TFile(outputDir+"/histTemplates_"+effType+".root");
+        histfile = generateTemplate(mcfilename, effType, hPV);
         assert(histfile);
     }
     std::vector<double> vBkgPars;
@@ -984,7 +1080,7 @@ void calculateDataEfficiency(
     // TH1D *hbkgTTFail = 0;
     if(bkgpass == 7){
         TH2D* hbkg = (TH2D*)histbkgQCDfile->Get(
-            Form("h_mass_%s_pass_%s", effType.Data(), etaRegion ? "forward" : "central"));
+            Form("h_mass_%s_pass_%s", effType.Data(), etaRegion.Data()));
         hbkgQCDPass = hbkg->ProjectionY();
         // smoothening - careful: can introduce bias
         // hbkgQCDPass->GetXaxis()->SetRangeUser(massLo,massHi);
@@ -997,7 +1093,7 @@ void calculateDataEfficiency(
     }
     if(bkgfail == 7){
         TH2D* hbkg = (TH2D*)histbkgQCDfile->Get(
-            Form("h_mass_%s_fail_%s", effType.Data(), etaRegion ? "forward" : "central"));
+            Form("h_mass_%s_fail_%s", effType.Data(), etaRegion.Data()));
         hbkgQCDFail = hbkg->ProjectionY();
         // smoothening - careful: can introduce bias
         // hbkgQCDFail->GetXaxis()->SetRangeUser(massLo,massHi);
@@ -1018,7 +1114,7 @@ void calculateDataEfficiency(
 
     TH1D *hPass=0;
     if(sigpass==2) {
-        hPass = (TH1D*)histfile->Get(Form("h_mass_pass_%s", etaRegion ? "forward" : "central"));
+        hPass = (TH1D*)histfile->Get(Form("h_mass_pass_%s", etaRegion.Data()));
         hPass->SetDirectory(0);
     }
 
@@ -1027,7 +1123,7 @@ void calculateDataEfficiency(
 
     TH1D *hFail=0;
     if(sigfail==2) {
-        hFail = (TH1D*)histfile->Get(Form("h_mass_fail_%s", etaRegion ? "forward" : "central"));
+        hFail = (TH1D*)histfile->Get(Form("h_mass_fail_%s", etaRegion.Data()));
         hFail->SetDirectory(0);
     }
 
@@ -1058,7 +1154,7 @@ void calculateDataEfficiency(
     totalPdf.addPdf(modelFail,"Fail");
 
     TFile *fFit = new TFile(
-        Form(outputDir+"/workspace_%s_%s_%i.root", effType.Data(), etaRegion ? "E" : "B", iBin),
+        Form(outputDir+"/workspace_%s_%s_%i.root", effType.Data(), etaRegion.Data(), iBin),
         "RECREATE");
 
     // save all information in RooWorkspace
@@ -1230,14 +1326,33 @@ void calculateDataEfficiency(
 
     // load best fit values into workspace
     w->loadSnapshot(("snapshot_"+std::to_string(best_fit)).c_str());
+    
+    RooFormulaVar* NsigFormular = (RooFormulaVar*)w->arg("NsigPass");
+    RooRealVar* NsigP = new RooRealVar("NsigP","NsigP",NsigFormular->getVal());
+    NsigP->setError(NsigFormular->getPropagatedError(*best_fitResult));
+    NsigFormular = (RooFormulaVar*)w->arg("NsigFail");
+    RooRealVar* NsigF = new RooRealVar("NsigF","NsigF",NsigFormular->getVal());
+    NsigF->setError(NsigFormular->getPropagatedError(*best_fitResult));
 
     const Double_t chi2pass = make_plot(nflpass, m, dataPass,
-        sigPass, bkgPass, best_fitResult, w, passHist->Integral(), iBin,
-        effType.Data(), etaRegion, kTRUE);
+        sigPass, bkgPass, 
+        passHist->Integral(), 
+        ((RooSimultaneous*)w->pdf("totalPdf"))->getPdf("Pass"),
+        NsigP, 
+        (RooRealVar*)best_fitResult->floatParsFinal().find("NbkgPass"),
+        iBin, 
+        (RooRealVar*)best_fitResult->floatParsFinal().find("eff"), 
+        0, effType.Data(), etaRegion.Data(), kTRUE);
 
     const Double_t chi2fail = make_plot(nflfail, m, dataFail,
-        sigFail, bkgFail, best_fitResult, w, failHist->Integral(), iBin,
-        effType.Data(), etaRegion, kFALSE);
+        sigFail, bkgFail, 
+        failHist->Integral(), 
+        ((RooSimultaneous*)w->pdf("totalPdf"))->getPdf("Fail"),
+        NsigF, 
+        (RooRealVar*)best_fitResult->floatParsFinal().find("NbkgFail"),
+        iBin, 
+        (RooRealVar*)best_fitResult->floatParsFinal().find("eff"), 
+        0, effType.Data(), etaRegion.Data(), kFALSE);
 
     std::cout<<"---------------------------------------"<<std::endl;
     std::cout<<"------ chi2pass = " << chi2pass <<std::endl;
@@ -1277,7 +1392,7 @@ void calculateGloEfficiency(
         TH1D          *failHistTrk,         // hist with inner track failing probes
         TH1D          *failHistSta,         // hist with outer track failing probes
 		const Int_t   iBin,                 // Label of measurement number in currect run
-        const Bool_t  etaRegion,            // Barrel (0) or Endcap (1)
+        const TString etaRegion,            // Barrel (B), Endcap (E) or Inclusive (I)
 		const Int_t   sigpass,              // signal extraction method for PASS sample
 		const Int_t   bkgpass,              // background model for PASS sample
 		const Int_t   sigfail,              // signal extraction method for FAIL sample
@@ -1287,8 +1402,7 @@ void calculateGloEfficiency(
         const TString bkgQCDFilename="",    // ROOT file containing bkg template
         const TString bkgTTFilename=""
 ){
-
-    std::cout<<">>> Do fit in "<< (etaRegion ? "E" : "B") <<" for Glo "<<std::endl;
+    std::cout<<">>> Do fit in "<< etaRegion <<" for Glo "<<std::endl;
 
     RooRealVar m("m","mass",massLo,massHi);
     m.setBins(massBin);
@@ -1312,10 +1426,8 @@ void calculateGloEfficiency(
     TFile *histfileSta = 0;
     if(sigpass==2 || sigfail==2) {
         // Generate histogram templates from MC (if necessary)
-        generateTemplate(mcfilename, "Sta", hPV);
-        generateTemplate(mcfilename, "Trk", hPV);
-        histfileTrk = new TFile(outputDir+"/histTemplates_Trk.root");
-        histfileSta = new TFile(outputDir+"/histTemplates_Sta.root");
+        histfileTrk = generateTemplate(mcfilename, "Sta", hPV);
+        histfileSta = generateTemplate(mcfilename, "Trk", hPV);
         assert(histfileTrk);
         assert(histfileSta);
     }
@@ -1332,7 +1444,7 @@ void calculateGloEfficiency(
     TH1D *h=0;
     if(sigpass==2) {
         // Sta pass == Trk pass =: Glo
-        h = (TH1D*)histfileSta->Get(Form("h_mass_pass_%s", etaRegion ? "forward" : "central"));
+        h = (TH1D*)histfileSta->Get(Form("h_mass_pass_%s", etaRegion.Data()));
         h->SetDirectory(0);
     }
 
@@ -1342,8 +1454,8 @@ void calculateGloEfficiency(
     TH1D *hSta = 0;
     TH1D *hTrk = 0;
     if(sigfail==2) {
-        hTrk = (TH1D*)histfileTrk->Get(Form("h_mass_fail_%s", etaRegion ? "forward" : "central"));
-        hSta = (TH1D*)histfileSta->Get(Form("h_mass_fail_%s", etaRegion ? "forward" : "central"));
+        hTrk = (TH1D*)histfileTrk->Get(Form("h_mass_fail_%s", etaRegion.Data()));
+        hSta = (TH1D*)histfileSta->Get(Form("h_mass_fail_%s", etaRegion.Data()));
         hTrk->SetDirectory(0);
         hSta->SetDirectory(0);
     }
@@ -1361,7 +1473,8 @@ void calculateGloEfficiency(
     RooRealVar Nsig("Nsig","Signal Yield",NsigMax, 0, 1.5*NsigMax);
     RooRealVar effTrk("effTrk","Tracking Efficiency",0.98,0.,1.0);
     RooRealVar effSta("effSta","Standalone Efficiency",0.98,0.,1.0);
-
+    RooFormulaVar effGlo("effGlo","effTrk*effSta",RooArgList( effTrk, effSta));
+    
     RooRealVar NbkgPass("NbkgPass","Background count in PASS sample",0.01*NbkgPassMax, 0.0, NbkgPassMax);
 
     if(bkgpass==0)
@@ -1389,13 +1502,14 @@ void calculateGloEfficiency(
     totalPdf.addPdf(modelFailSta,"FailSta");
 
     TFile *fFit = new TFile(
-        Form(outputDir+"/workspace_Glo_%s_%i.root", etaRegion ? "E" : "B", iBin),
+        Form(outputDir+"/workspace_Glo_%s_%i.root", etaRegion.Data(), iBin),
         "RECREATE");
 
     // save all information in RooWorkspace
     RooWorkspace* w = new RooWorkspace("workspace","Workspace");
     w->import(*dataCombined);
     w->import(totalPdf);
+    w->import(effGlo);
 
     RooMsgService::instance().setSilentMode(kTRUE);
 
@@ -1427,8 +1541,8 @@ void calculateGloEfficiency(
             sigFailTrk->Reset();
             sigFailSta->Reset();
 
-            effTrk.setVal(0.98);
-            effSta.setVal(0.98);
+            effTrk.setVal(0.99);
+            effSta.setVal(0.97);
             Nsig.setVal(NsigMax);
 
             // freeze efficiency so each region is fit seprarately first
@@ -1579,21 +1693,50 @@ void calculateGloEfficiency(
     // load best fit values into workspace
     w->loadSnapshot(("snapshot_"+std::to_string(best_fit)).c_str());
 
+    RooFormulaVar* NsigFormular = (RooFormulaVar*)w->arg("NsigPass");
+    RooRealVar* NsigP = new RooRealVar("NsigP","NsigP",NsigFormular->getVal());
+    NsigP->setError(NsigFormular->getPropagatedError(*best_fitResult));
+    NsigFormular = (RooFormulaVar*)w->arg("NsigFailTrk");
+    RooRealVar* NsigF1 = new RooRealVar("NsigF1","NsigF1",NsigFormular->getVal());
+    NsigF1->setError(NsigFormular->getPropagatedError(*best_fitResult));
+    NsigFormular = (RooFormulaVar*)w->arg("NsigFailSta");
+    RooRealVar* NsigF2 = new RooRealVar("NsigF2","NsigF2",NsigFormular->getVal());
+    NsigF2->setError(NsigFormular->getPropagatedError(*best_fitResult));
+
+    RooRealVar* effGloVar = new RooRealVar("effGloVar","effGloVar",
+        ((RooFormulaVar*)w->arg("effGlo"))->getVal());
+    effGloVar->setError(effGlo.getPropagatedError(*best_fitResult));
+    
     const Double_t chi2pass = make_plot(nflpass, m, dataPass,
-        sigPass, bkgPass, best_fitResult, w,
-        passHist->Integral(), iBin, "Glo", etaRegion, kTRUE);
+        sigPass, bkgPass, 
+        passHist->Integral(), 
+        ((RooSimultaneous*)w->pdf("totalPdf"))->getPdf("Pass"),
+        NsigP, 
+        (RooRealVar*)best_fitResult->floatParsFinal().find("NbkgPass"),
+        iBin, effGloVar, 
+        0, "Glo", etaRegion.Data(), kTRUE);
 
     Double_t yMax = 1.5*failHistTrk->GetMaximum();
 
     const Double_t chi2failTrk = make_plot(nflfailTrk, m, dataFailTrk,
-        sigFailTrk, bkgFailTrk, best_fitResult, w,
-        failHistTrk->Integral(), iBin, "Trk", etaRegion, kFALSE);
+        sigFailTrk, bkgFailTrk, 
+        failHistTrk->Integral(), 
+        ((RooSimultaneous*)w->pdf("totalPdf"))->getPdf("FailTrk"),
+        NsigF1, 
+        (RooRealVar*)best_fitResult->floatParsFinal().find("NbkgFailTrk"),
+        iBin, (RooRealVar*)best_fitResult->floatParsFinal().find("effTrk"), 
+        0, "Trk", etaRegion.Data(), kFALSE);
 
     yMax = 1.5*failHistSta->GetMaximum();
 
     const Double_t chi2failSta = make_plot(nflfailSta, m, dataFailSta,
-        sigFailSta, bkgFailSta, best_fitResult, w,
-        failHistSta->Integral(), iBin, "Sta", etaRegion, kFALSE);
+        sigFailSta, bkgFailSta, 
+        failHistSta->Integral(), 
+        ((RooSimultaneous*)w->pdf("totalPdf"))->getPdf("FailSta"),
+        NsigF2, 
+        (RooRealVar*)best_fitResult->floatParsFinal().find("NbkgFailSta"),
+        iBin, (RooRealVar*)best_fitResult->floatParsFinal().find("effSta"), 
+        0, "Sta", etaRegion.Data(), kFALSE);
 
     std::cout<<"---------------------------------------"<<std::endl;
     std::cout<<"------ chi2pass = " << chi2pass <<std::endl;
@@ -1643,7 +1786,7 @@ void calculateHLTEfficiencyAndYield(
 	const Int_t   bkgpass,              // background model for PASS sample
 	const Int_t   sigfail,              // signal model for FAIL sample
 	const Int_t   bkgfail,              // background model for FAIL sample
-    const Double_t corr = 1.,           // correlation factors for second muon
+    // const Double_t corr = 1.,           // correlation factors for second muon
     TH1D          *hPV=0,
     const TString mcfilename="",        // ROOT file containing MC events to generate templates from
     const TString bkgQCDFilename="",    // ROOT file containing bkg template
@@ -1667,11 +1810,12 @@ void calculateHLTEfficiencyAndYield(
         RooFit::Import("Fail",*dataFail));
 
     TFile *histfile = 0;
-    if(sigpass==2 || sigfail==2) {
-        generateTemplate_ZYield(mcfilename, hPV);
-        histfile = new TFile(outputDir+"/histTemplates_HLT.root");
-        assert(histfile);
-    }
+    // if(sigpass==2 || sigfail==2) {
+    histfile = generateTemplate_ZYield(mcfilename, hPV, iBin);
+    assert(histfile);
+    // }
+    const double corr = extractCorrelation(histfile, etaRegion);
+
     std::vector<double> vBkgPars;
     if(bkgfail== 2 or bkgfail==3){
         vBkgPars = preFit(failHist);
@@ -1708,8 +1852,8 @@ void calculateHLTEfficiencyAndYield(
         hPass->SetDirectory(0);
     }
 
-    nflpass += set_signal_model(sigpass, sigPass, m, kTRUE, 0, hPass);
-    nflpass += set_background_model(bkgpass, bkgPass, m, kTRUE, 0, hbkgQCDPass);
+    nflpass += set_signal_model(sigpass, sigPass, m, kTRUE, 2, hPass);
+    nflpass += set_background_model(bkgpass, bkgPass, m, kTRUE, 2, hbkgQCDPass);
 
     TH1D *hFail=0;
     if(sigfail==2) {
@@ -1718,16 +1862,16 @@ void calculateHLTEfficiencyAndYield(
         hFail->SetDirectory(0);
     }
 
-    nflfail += set_signal_model(sigfail, sigFail, m, kFALSE, 0, hFail);
-    nflfail += set_background_model(bkgfail, bkgFail, m, kFALSE, 0, hbkgQCDFail);
+    nflfail += set_signal_model(sigfail, sigFail, m, kTRUE, 1, hFail);
+    nflfail += set_background_model(bkgfail, bkgFail, m, kTRUE, 1, hbkgQCDFail);
 
     Double_t NsigMax     = passHist->Integral() + failHist->Integral();
     Double_t NbkgFailMax = failHist->Integral();
     Double_t NbkgPassMax = passHist->Integral();
 
     RooRealVar eff("eff","Efficiency barrel",0.95,0.,1);
-    RooRealVar Nsig("Nsig","Signal Yield ",0.8*NsigMax,0,1.5*NsigMax);
-    RooRealVar c("c", "Correlation factor ", corr);
+    RooRealVar Nsig("Nsig","Signal Yield",0.8*NsigMax,0,1.5*NsigMax);
+    RooConstVar c("c", "Correlation factor", corr);
 
     RooFormulaVar NsigPass("NsigPass","eff*eff*Nsig*c",RooArgList(eff,Nsig,c));
     RooFormulaVar NsigFail("NsigFail","2*eff*(1.0-c*eff)*Nsig",RooArgList(eff,Nsig,c));
@@ -1735,10 +1879,10 @@ void calculateHLTEfficiencyAndYield(
     RooRealVar NbkgPass("NbkgPass","Background count in  PASS sample",0.01*NbkgPassMax, 0.0, NbkgPassMax);
     RooRealVar NbkgFail("NbkgFail","Background count in  FAIL sample",0.05*NbkgFailMax, 0.0, NbkgFailMax);
 
-    RooAddPdf modelPass("modelPass ","Model for  PASS sample",
+    RooAddPdf modelPass("model2","Model for  PASS sample",
         RooArgList(*(sigPass->model),*(bkgPass->model)),
         RooArgList(NsigPass, NbkgPass));
-    RooAddPdf modelFail("modelFail ","Model for  FAIL sample",
+    RooAddPdf modelFail("model1","Model for  FAIL sample",
         RooArgList(*(sigFail->model),*(bkgFail->model)),
         RooArgList(NsigFail, NbkgFail));
 
@@ -1894,7 +2038,7 @@ void calculateHLTEfficiencyAndYield(
             RooFit::Warnings(0),
             RooFit::Extended(1),
             RooFit::Strategy(strategy), // MINUIT STRATEGY
-            // RooFit::Minos(RooArgSet(eff)),
+            RooFit::Minos(RooArgSet(eff)),
             RooFit::Save());
 
         fitResult = totalPdf.fitTo(*dataCombined,
@@ -1903,7 +2047,9 @@ void calculateHLTEfficiencyAndYield(
             RooFit::Warnings(0),
             RooFit::Extended(1),
             RooFit::Strategy(strategy), // MINUIT STRATEGY
-            // RooFit::Minos(RooArgSet(Nsig, eff)),
+            RooFit::Minos(kTRUE),
+            RooFit::InitialHesse(kTRUE),
+            // RooFit::Minos(RooArgSet(Nsig, eff, NbkgPass, NbkgFail)),
             RooFit::Save());
 
         RooChi2Var chi2Var("chi2", "chi 2", totalPdf, *dataCombined,
@@ -1911,12 +2057,20 @@ void calculateHLTEfficiencyAndYield(
         );
 
         // reduced chi2 value from number of degree of freedom in the fit nDoF = nBins - nParams
-        const Double_t chi2ndf = chi2Var.getVal() / (dataCombined->numEntries() - fitResult->floatParsFinal().getSize());
+        const Int_t ndf = dataCombined->numEntries() - fitResult->floatParsFinal().getSize();
+        Double_t chi2ndf = chi2Var.getVal() / ndf;
 
         std::cout<<"---------------------------------------" <<std::endl;
         std::cout<<"------ strategy = " << i << std::endl;
-        std::cout<<"------ chi2/ndf = " << chi2ndf <<std::endl;
+        std::cout<<"------ chi2/"<<ndf<<" = " << chi2ndf <<std::endl;
+        std::cout<<"------ eff = "<<eff.getVal()<<std::endl;
+        std::cout<<"------ Nsig = "<<Nsig.getVal()<<std::endl;          
         std::cout<<"---------------------------------------" <<std::endl;
+
+        if(NsigPass.getVal() > passHist->Integral() || NsigFail.getVal() > failHist->Integral()){
+            std::cout<<"WARNING: something went wrong in the fit, we give a bad chi2"<<std::endl;
+            chi2ndf = 99;
+        }        
 
         if(i==0 || (chi2ndf < best_chi2 && chi2ndf > 0) ){
             best_chi2 = chi2ndf;
@@ -1933,15 +2087,30 @@ void calculateHLTEfficiencyAndYield(
     // load best fit values into workspace
     w->loadSnapshot(("snapshot_"+std::to_string(best_fit)).c_str());
 
+    RooFormulaVar* NsigFormular = (RooFormulaVar*)w->arg("NsigPass");
+    RooRealVar* NsigP = new RooRealVar("NsigP","NsigP",NsigFormular->getVal());
+    NsigP->setError(NsigFormular->getPropagatedError(*best_fitResult));
+    NsigFormular = (RooFormulaVar*)w->arg("NsigFail");
+    RooRealVar* NsigF = new RooRealVar("NsigF","NsigF",NsigFormular->getVal());
+    NsigF->setError(NsigFormular->getPropagatedError(*best_fitResult));
+
     const Double_t chi2pass = make_plot(nflpass, m, dataPass,
-        sigPass, bkgPass, best_fitResult, w,
+        sigPass, bkgPass,
         passHist->Integral(),
-        iBin, etaRegion, 0, kTRUE);
+        ((RooSimultaneous*)w->pdf("totalPdf"))->getPdf("Pass"),
+        NsigP, 
+        (RooRealVar*)best_fitResult->floatParsFinal().find("NbkgPass"),
+        iBin, (RooRealVar*)best_fitResult->floatParsFinal().find("eff"), 
+        (RooRealVar*)&c, "HLT", etaRegion.Data(), 2);
 
     const Double_t chi2fail = make_plot(nflfail, m, dataFail,
-        sigFail, bkgFail, best_fitResult, w,
+        sigFail, bkgFail, 
         failHist->Integral(),
-        iBin, etaRegion, 0, kFALSE);
+        ((RooSimultaneous*)w->pdf("totalPdf"))->getPdf("Fail"),
+        NsigF, 
+        (RooRealVar*)best_fitResult->floatParsFinal().find("NbkgFail"),
+        iBin, (RooRealVar*)best_fitResult->floatParsFinal().find("eff"), 
+        (RooRealVar*)&c, "HLT", etaRegion.Data(), 1);
 
     std::cout<<"---------------------------------------"<<std::endl;
     std::cout<<"------ chi2pass = " << chi2pass <<std::endl;
@@ -1955,6 +2124,7 @@ void calculateHLTEfficiencyAndYield(
     w->import(chi2p);
     w->import(chi2f);
     w->import(chi2);
+    w->import(c);
     w->Write();
 
     best_fitResult->Write("fitResult");
@@ -2009,11 +2179,12 @@ void calculateHLTCorrelation(
         RooFit::Import("HLT2",*dataHLT2));
 
     TFile *histfile = 0;
-    if(sig==2) {
-        generateTemplate_ZYield(mcfilename, hPV);
-        histfile = new TFile(outputDir+"/histTemplates_HLT.root");
-        assert(histfile);
-    }
+    // if(sig==2) {
+    generateTemplate_ZYield(mcfilename, hPV, iBin);
+    histfile = new TFile(outputDir+"/../histTemplates_HLT.root");
+    assert(histfile);
+    const double corr = extractCorrelation(histfile, etaRegion);
+    // }
     std::vector<double> vBkgPars;
     if(bkg == 2 or bkg == 3){
         vBkgPars = preFit(h_HLT0);
@@ -2035,8 +2206,8 @@ void calculateHLTCorrelation(
         h0->SetDirectory(0);
     }
 
-    nfl0 += set_signal_model(sig, sig0, m, kFALSE, 0, h0);
-    nfl0 += set_background_model(bkg, bkg0, m, kFALSE, 0, 0);
+    nfl0 += set_signal_model(sig, sig0, m, kTRUE, 0, h0);
+    nfl0 += set_background_model(bkg, bkg0, m, kTRUE, 0, 0);
 
     TH1D *h1=0;
     if(sig==2) {
@@ -2045,8 +2216,8 @@ void calculateHLTCorrelation(
         h1->SetDirectory(0);
     }
 
-    nfl1 += set_signal_model(sig, sig1, m, kFALSE, 1, h1);
-    nfl1 += set_background_model(bkg, bkg1, m, kFALSE, 1, 0);
+    nfl1 += set_signal_model(sig, sig1, m, kTRUE, 1, h1);
+    nfl1 += set_background_model(bkg, bkg1, m, kTRUE, 1, 0);
 
     TH1D *h2=0;
     if(sig==2) {
@@ -2055,25 +2226,30 @@ void calculateHLTCorrelation(
         h2->SetDirectory(0);
     }
 
-    nfl2 += set_signal_model(sig, sig2, m, kFALSE, 2, h2);
-    nfl2 += set_background_model(bkg, bkg2, m, kFALSE, 2, 0);
+    nfl2 += set_signal_model(sig, sig2, m, kTRUE, 2, h2);
+    nfl2 += set_background_model(bkg, bkg2, m, kTRUE, 2, 0);
 
     Double_t NsigMax  = h_HLT0->Integral() + h_HLT1->Integral() + h_HLT2->Integral();
     Double_t Nbkg0Max = h_HLT0->Integral();
     Double_t Nbkg1Max = h_HLT1->Integral();
     Double_t Nbkg2Max = h_HLT2->Integral();
 
-    RooRealVar eff("eff","Efficiency",0.95,0.,1);
+    RooRealVar eff("eff","Efficiency",0.90,0.,1);
     RooRealVar Nsig("Nsig","Signal Yield ",0.8*NsigMax, 0, NsigMax);
-    RooRealVar c("c", "Correlation factor ", 1.0, 0.5, 2.0);
+    RooRealVar c("c", "Correlation factor ", corr, 0.5, 2.0);
 
     RooFormulaVar Nsig0("Nsig0","(1-2*eff+c*eff*eff)*Nsig",RooArgList(eff,Nsig,c));
     RooFormulaVar Nsig1("Nsig1","2*eff*(1.0-c*eff)*Nsig",RooArgList(eff,Nsig,c));
     RooFormulaVar Nsig2("Nsig2","eff*eff*Nsig*c",RooArgList(eff,Nsig,c));
 
-    RooRealVar Nbkg0("Nbkg0","Background count in HLT 0 sample",0.8*Nbkg0Max, 0.0, Nbkg0Max);
-    RooRealVar Nbkg1("Nbkg1","Background count in HLT 1 sample",0.1*Nbkg1Max, 0.0, Nbkg1Max);
-    RooRealVar Nbkg2("Nbkg2","Background count in HLT 2 sample",0.01*Nbkg2Max, 0.0, Nbkg2Max);
+    RooRealVar Nbkg0("NbkgHLT0","Background count in HLT 0 sample",0.75*Nbkg0Max, 0.0, Nbkg0Max);
+    RooRealVar Nbkg1("NbkgHLT1","Background count in HLT 1 sample",0.1*Nbkg1Max, 0.0, Nbkg1Max);
+    RooRealVar Nbkg2("NbkgHLT2","Background count in HLT 2 sample",0.01*Nbkg2Max, 0.0, Nbkg2Max);
+
+    // turn out background for closure test
+    // RooRealVar Nbkg0("NbkgHLT0","Background count in HLT 0 sample",0.0, 0.0, 0.0);
+    // RooRealVar Nbkg1("NbkgHLT1","Background count in HLT 1 sample",0.0, 0.0, 0.0);
+    // RooRealVar Nbkg2("NbkgHLT2","Background count in HLT 2 sample",0.0, 0.0, 0.0);
 
     RooAddPdf model0("model0","Model for HLT 0 sample",
         RooArgList(*(sig0->model),*(bkg0->model)),
@@ -2130,20 +2306,20 @@ void calculateHLTCorrelation(
             sig1->Reset();
             sig2->Reset();
 
-            c.setVal(1.0);
-            eff.setVal(0.95);
+            c.setVal(1.015);
+            eff.setVal(0.85);
             Nsig.setVal(NsigMax);
 
             if(i==3){
-                c.setVal(1.02);
-                eff.setVal(0.8);
+                c.setVal(1.03);
+                eff.setVal(0.80);
                 Nsig.setVal(NsigMax*0.5);
                 // freeze efficiency and correlation so each region is fit seprarately first
                 eff.setConstant(kTRUE);
                 c.setConstant(kTRUE);
 
-                m.setRange("rangeLow", massLo, 79);
-                m.setRange("rangeHigh", 103, massHi);
+                m.setRange("rangeLow", massLo, 78);
+                m.setRange("rangeHigh", 104, massHi);
                 m.setRange("rangeCenter", 79, 103);
             }
             else{
@@ -2279,7 +2455,7 @@ void calculateHLTCorrelation(
             RooFit::PrintLevel(-1),
             RooFit::Warnings(0),
             RooFit::Extended(1),
-            RooFit::Strategy(strategy), // MINUIT STRATEGY
+            RooFit::Strategy(0), // MINUIT STRATEGY
             // RooFit::Minos(RooArgSet(eff)),
             RooFit::Save());
 
@@ -2288,8 +2464,17 @@ void calculateHLTCorrelation(
             RooFit::PrintLevel(-1),
             RooFit::Warnings(0),
             RooFit::Extended(1),
-            RooFit::Strategy(strategy), // MINUIT STRATEGY
+            RooFit::Strategy(1), // MINUIT STRATEGY
             // RooFit::Minos(RooArgSet(Nsig, eff)),
+            RooFit::Save());
+
+        fitResult = totalPdf.fitTo(*dataCombined,
+            RooFit::PrintEvalErrors(-1),
+            RooFit::PrintLevel(-1),
+            RooFit::Warnings(0),
+            RooFit::Extended(1),
+            RooFit::Strategy(strategy), // MINUIT STRATEGY
+            RooFit::Minos(RooArgSet(c)),
             RooFit::Save());
 
         RooChi2Var chi2Var("chi2", "chi 2", totalPdf, *dataCombined,
@@ -2319,20 +2504,48 @@ void calculateHLTCorrelation(
     // load best fit values into workspace
     w->loadSnapshot(("snapshot_"+std::to_string(best_fit)).c_str());
 
+    RooFormulaVar* NsigFormular = (RooFormulaVar*)w->arg("Nsig0");
+    RooRealVar* NsigHLT0 = new RooRealVar("NsigHLT0","NsigHLT0",NsigFormular->getVal());
+    NsigHLT0->setError(NsigFormular->getPropagatedError(*best_fitResult));
+    NsigFormular = (RooFormulaVar*)w->arg("Nsig1");
+    RooRealVar* NsigHLT1 = new RooRealVar("NsigHLT1","NsigHLT1",NsigFormular->getVal());
+    NsigHLT1->setError(NsigFormular->getPropagatedError(*best_fitResult));
+    NsigFormular = (RooFormulaVar*)w->arg("Nsig2");
+    RooRealVar* NsigHLT2 = new RooRealVar("NsigHLT2","NsigHLT2",NsigFormular->getVal());
+    NsigHLT2->setError(NsigFormular->getPropagatedError(*best_fitResult));    
+
     const Double_t chi2hlt0 = make_plot(nfl0, m, dataHLT0,
-        sig0, bkg0, best_fitResult, w,
+        sig0, bkg0, 
         h_HLT0->Integral(),
-        iBin, etaRegion, 0, kFALSE, "0");
+        ((RooSimultaneous*)w->pdf("totalPdf"))->getPdf("HLT0"),
+        NsigHLT0, 
+        (RooRealVar*)best_fitResult->floatParsFinal().find("NbkgHLT0"),
+        iBin, 
+        (RooRealVar*)best_fitResult->floatParsFinal().find("eff"), 
+        (RooRealVar*)best_fitResult->floatParsFinal().find("c"), 
+        "HLT", etaRegion.Data(), 0);
 
     const Double_t chi2hlt1 = make_plot(nfl1, m, dataHLT1,
-        sig1, bkg1, best_fitResult, w,
+        sig1, bkg1, 
         h_HLT1->Integral(),
-        iBin, etaRegion, 0, kFALSE, "1");
+        ((RooSimultaneous*)w->pdf("totalPdf"))->getPdf("HLT1"),
+        NsigHLT1, 
+        (RooRealVar*)best_fitResult->floatParsFinal().find("NbkgHLT1"),
+        iBin, 
+        (RooRealVar*)best_fitResult->floatParsFinal().find("eff"), 
+        (RooRealVar*)best_fitResult->floatParsFinal().find("c"), 
+        "HLT", etaRegion.Data(), 1);
 
     const Double_t chi2hlt2 = make_plot(nfl2, m, dataHLT2,
-        sig2, bkg2, best_fitResult, w,
+        sig2, bkg2, 
         h_HLT2->Integral(),
-        iBin, etaRegion, 0, kFALSE, "2");
+        ((RooSimultaneous*)w->pdf("totalPdf"))->getPdf("HLT2"),
+        NsigHLT2, 
+        (RooRealVar*)best_fitResult->floatParsFinal().find("NbkgHLT2"),
+        iBin, 
+        (RooRealVar*)best_fitResult->floatParsFinal().find("eff"), 
+        (RooRealVar*)best_fitResult->floatParsFinal().find("c"), 
+        "HLT", etaRegion.Data(), 2);
 
     std::cout<<"---------------------------------------"<<std::endl;
     std::cout<<"------ chi2hlt0 = " << chi2hlt0 <<std::endl;
@@ -2367,6 +2580,26 @@ void calculateHLTCorrelation(
     delete sig2;
     delete bkg2;
     delete histfile;
+}
+
+//--------------------------------------------------------------------------------------------------
+double extractCorrelation(TFile *histfile, const TString etaRegion){
+    
+    TH1D* h0 = (TH1D*)histfile->Get("h_mass_0hlt_"+etaRegion);        
+    TH1D* h1 = (TH1D*)histfile->Get("h_mass_1hlt_"+etaRegion);    
+    TH1D* h2 = (TH1D*)histfile->Get("h_mass_2hlt_"+etaRegion);
+
+    const double n0 = h0->Integral();
+    const double n1 = h1->Integral();
+    const double n2 = h2->Integral();
+    const double n = n0+n1+n2;
+    
+    const double corr = 4*n*n2 / std::pow(n1 + 2*n2, 2);
+    
+    std::cout<<"EXTRACT c("<<etaRegion<<") = "<<corr<<std::endl;
+    
+    return corr;
+    
 }
 
 

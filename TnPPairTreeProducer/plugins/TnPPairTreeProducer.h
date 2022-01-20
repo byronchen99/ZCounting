@@ -19,10 +19,13 @@
 #include "DataFormats/MuonReco/interface/MuonSelectors.h"
 
 #include "ZCounting/TnPPairTreeProducer/interface/triggertool.h"
+#include "ZCounting/TnPPairTreeProducer/interface/getFilename.h"
 
 // ROOT includes
 #include "TTree.h"
-
+#include "TFile.h"
+#include "TTreeReader.h"
+#include "TTreeReaderValue.h"
 
 //
 // class declaration
@@ -43,6 +46,7 @@ public:
 
 private:
     void beginRun(const edm::Run&, const edm::EventSetup&) override;
+    void beginLuminosityBlock(const edm::LuminosityBlock&, const edm::EventSetup&) override;
     virtual void beginJob() override;
     virtual void analyze(const edm::Event&, const edm::EventSetup&) override;
     virtual void endJob() override;
@@ -56,6 +60,7 @@ private:
 
     bool isMuonTrigger();
     bool isMuonTriggerObj(const double eta, const double phi);
+    bool isMuonTriggerObjEmulated(const double eta, const double phi, const long long unsigned eventNumber);
     bool passMuonIso(const reco::Muon&);
     bool passMuonID(const reco::Muon&, const reco::Vertex&);
 
@@ -72,6 +77,8 @@ private:
 
     HLTConfigProvider hltConfigProvider_;
     triggertool *triggers;
+
+    TFile *_fileHLTEmulation = 0;
 
     // --- input
 
@@ -116,7 +123,7 @@ private:
     int nPV_;
     unsigned run_;
     unsigned ls_;
-    unsigned eventNumber_;
+    long long unsigned eventNumber_;
 
     float pt1_;
     float eta1_;
@@ -148,6 +155,10 @@ private:
 
     float dilepMass_;
     float delR_;
+
+    // --- things for trigger emulation
+    // filter tag for HLT_IsoMu24_v11:
+
 };
 
 

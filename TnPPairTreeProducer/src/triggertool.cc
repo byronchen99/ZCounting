@@ -19,7 +19,7 @@ bool triggertool::readEvent(const edm::Event& iEvent){
     }
 
     iEvent.getByToken(fHLTObjTag_token, hTrgEvt);
-    if (!hTrgRes.isValid()){
+    if (!hTrgEvt.isValid()){
         edm::LogWarning("triggertool") << "No valid trigger event product found" ;
     }
 
@@ -114,6 +114,8 @@ void triggertool::initHLTObjects(const HLTConfigProvider& hltConfigProvider_){
         std::vector<std::string> hltFiltersWithTags_;
 
         for (auto const& iPathName : triggerNames) {
+
+            edm::LogVerbatim("triggertools")<<"trigger name"<<iPathName;
 
             if(iPathName != iRec.hltPathName){
                 continue;
