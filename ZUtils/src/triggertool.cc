@@ -1,4 +1,4 @@
-#include "ZCounting/TnPPairTreeProducer/interface/triggertool.h"
+#include "ZCounting/ZUtils/interface/triggertool.h"
 
 #include "FWCore/Utilities/interface/RegexMatch.h"
 #include "FWCore/Utilities/interface/InputTag.h"

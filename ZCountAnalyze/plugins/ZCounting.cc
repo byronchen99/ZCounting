@@ -94,19 +94,13 @@ private:
                                                                      const std::string&
                                                                      );
     bool isTriggerObject(const std::vector<pat::TriggerObjectStandAlone>&, const pat::Muon&);
-    bool isGoodPV(const reco::Vertex&);
-    bool isValidTrack(const reco::Track&);
-    bool customIsTightMuon(const pat::Muon&);
-    double pfIso(const pat::Muon&);
-    double tkIso(const pat::Muon&);
+
+
     int getMuonID(const pat::Muon&, const reco::Vertex&);
     double dxy(const pat::Muon&, const reco::Vertex&);
     double dz(const pat::Muon&, const reco::Vertex&);
     double pointsDistance(const reco::Candidate::Point&, const reco::Candidate::Point&);
     bool isPVClosestVertex(const std::vector<reco::Vertex>&, const pat::Muon&);
-
-    bool isTau(const reco::GenParticle* lepton)const;
-    const reco::GenParticle* tauDaughter(const reco::GenParticle* tau)const;
 
 
     // ----------member data ---------------------------
@@ -176,12 +170,6 @@ private:
     bool isData_;
     bool hasGenZ_;
     bool hasGenTt_;
-
-    // primary vertex cuts
-    double VtxNTracksFitCut_;
-    double VtxNdofCut_;
-    double VtxAbsZCut_;
-    double VtxRhoCut_;
 
     // --- output
 
@@ -322,10 +310,6 @@ ZCounting::ZCounting(const edm::ParameterSet& iConfig):
     muonTriggerPatterns_ = iConfig.getParameter<std::vector<std::string>>("muon_trigger_patterns");
     DRMAX = iConfig.getUntrackedParameter<double>("muon_trigger_DRMAX");
 
-    VtxNTracksFitCut_ = iConfig.getUntrackedParameter<double>("VtxNTracksFitMin");
-    VtxNdofCut_       = iConfig.getUntrackedParameter<double>("VtxNdofMin");
-    VtxAbsZCut_       = iConfig.getUntrackedParameter<double>("VtxAbsZMax");
-    VtxRhoCut_        = iConfig.getUntrackedParameter<double>("VtxRhoMax");
     hltChanged_ = true;
 
     prefweightECAL_token = consumes< double >(edm::InputTag("prefiringweight:nonPrefiringProbECAL"));
@@ -535,18 +519,18 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
             if(genTtEvent->lepton()){
                 LogDebug("ZCounting::analyze")<<"hasLepton";
                 genLepton = genTtEvent->lepton();
-                if(this->isTau(genLepton)){
+                if(isTau(genLepton)){
                     decayMode_ += 150000;
-                    genLepton = this->tauDaughter(genTtEvent->lepton());
+                    genLepton = tauDaughter(genTtEvent->lepton());
                 }
 
             }
             if(genTtEvent->leptonBar()){
                 LogDebug("ZCounting::analyze")<<"hasAntiLepton";
                 genAntiLepton = genTtEvent->leptonBar();
-                if(this->isTau(genAntiLepton)){
+                if(isTau(genAntiLepton)){
                     decayMode_ += 150000;
-                    genAntiLepton = this->tauDaughter(genTtEvent->leptonBar());
+                    genAntiLepton = tauDaughter(genTtEvent->leptonBar());
                 }
             }
             LogDebug("ZCounting::analyze")<<"setDecayMode";
@@ -713,8 +697,8 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
             muon_nTrackHits_.push_back(-1);
         }
 
-        muon_tkRelIso_.push_back(tkIso(mu));
-        muon_pfRelIso04_all_.push_back(pfIso(mu));
+        muon_tkRelIso_.push_back(getTkIso(mu));
+        muon_pfRelIso04_all_.push_back(getPFIso(mu));
         muon_dxy_.push_back(dxy(mu, pv));
         muon_dz_.push_back(dz(mu, pv));
         muon_isFromPV_.push_back(isPVClosestVertex(*pvCol, mu));
@@ -1075,62 +1059,15 @@ bool ZCounting::isTriggerObject(const std::vector<pat::TriggerObjectStandAlone> 
     return false;
 }
 
-//--------------------------------------------------------------------------------------------------
-bool ZCounting::isGoodPV(const reco::Vertex &vtx){
-    if (vtx.isFake())
-        return false;
-    if (vtx.tracksSize() < VtxNTracksFitCut_)
-        return false;
-    if (vtx.ndof() < VtxNdofCut_)
-        return false;
-    if (fabs(vtx.z()) > VtxAbsZCut_)
-        return false;
-    if (vtx.position().Rho() > VtxRhoCut_)
-        return false;
-
-    return true;
-}
-
-//--------------------------------------------------------------------------------------------------
-bool ZCounting::isValidTrack(const reco::Track &trk){
-    if(trk.hitPattern().trackerLayersWithMeasurement() >= 6 && trk.hitPattern().numberOfValidPixelHits() >= 1)
-        return true;
-    return false;
-}
-
-//--------------------------------------------------------------------------------------------------
-bool ZCounting::customIsTightMuon(const pat::Muon &mu){
-    // From https://twiki.cern.ch/twiki/bin/view/CMSPublic/SWGuideMuonId#Tight_Muon releasing the PV criterias
-    return (mu.isGlobalMuon()
-        && mu.isPFMuon()
-        && (mu.globalTrack()->normalizedChi2() < 10.)
-        && (mu.globalTrack()->hitPattern().numberOfValidMuonHits() > 0)
-        && (mu.numberOfMatchedStations() > 1)
-        && (mu.innerTrack()->hitPattern().numberOfValidPixelHits() > 0)
-        && (mu.innerTrack()->hitPattern().trackerLayersWithMeasurement() > 5));
-}
 
 //--------------------------------------------------------------------------------------------------
 int ZCounting::getMuonID(const pat::Muon &mu, const reco::Vertex &vtx){
     if(mu.isTightMuon(vtx)) return 5;
-    if(customIsTightMuon(mu)) return 4;
+    if(isCustomTightMuon(mu)) return 4;
     if(mu.isGlobalMuon()) return 3;
     if(mu.isStandAloneMuon()) return 2;
     if(isValidTrack(*(mu.innerTrack()))) return 1;
     return 0;
-}
-
-//--------------------------------------------------------------------------------------------------
-double ZCounting::tkIso(const pat::Muon &mu){
-    return mu.isolationR03().sumPt / mu.pt();
-}
-
-//--------------------------------------------------------------------------------------------------
-double ZCounting::pfIso(const pat::Muon &mu){
-    return (mu.pfIsolationR04().sumChargedHadronPt + std::max(0., mu.pfIsolationR04().sumNeutralHadronEt
-                                                                         + mu.pfIsolationR04().sumPhotonEt
-                                                                         - 0.5 * mu.pfIsolationR04().sumPUPt)
-                   ) / mu.pt();
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1169,23 +1106,6 @@ bool ZCounting::isPVClosestVertex(const std::vector<reco::Vertex> &vtxCol, const
     return true;
 }
 
-
-//--------------------------------------------------------------------------------------------------
-bool ZCounting::isTau(const reco::GenParticle* lepton)const
-{
-    return std::abs(lepton->pdgId()) == 15;
-}
-
-//--------------------------------------------------------------------------------------------------
-const reco::GenParticle* ZCounting::tauDaughter(const reco::GenParticle* tau)const
-{
-    for(size_t iDaughter = 0; iDaughter < tau->numberOfDaughters(); ++iDaughter){
-        const reco::GenParticle* daughter = dynamic_cast<const reco::GenParticle*>(tau->daughter(iDaughter));
-        if(std::abs(daughter->pdgId())==11 || std::abs(daughter->pdgId())==13) return daughter;
-        else if(this->isTau(daughter)) return this->tauDaughter(daughter);
-    }
-    return tau;
-}
 
 
 

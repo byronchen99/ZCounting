@@ -1,3 +1,4 @@
+getFilename.h
 *.so
 *.d*
 *.pcm

@@ -6,11 +6,6 @@ zcounting = cms.EDAnalyzer('ZCounting',
     era = cms.string("None"),
     # Primary vertex - source
     edmPVName = cms.InputTag("offlineSlimmedPrimaryVertices"),
-    # Primary vertex - settings
-    VtxNTracksFitMin = cms.untracked.double(0.),
-    VtxNdofMin       = cms.untracked.double(4.),
-    VtxAbsZMax       = cms.untracked.double(24.),
-    VtxRhoMax        = cms.untracked.double(2.),
 
     # Trigger - sources
     trigger_bits = cms.InputTag("TriggerResults","","HLT"),

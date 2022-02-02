@@ -92,7 +92,7 @@ process.source = cms.Source("PoolSource",
         # '/store/data/Run2017E/MET/MINIAOD/UL2017_MiniAODv2-v1/40000/167938D2-F982-C443-AF74-1F2717B565E3.root'
 
         # AOD
-        '/pnfs/desy.de/cms/tier2/store/mc/RunIISummer20UL17RECO/DYJetsToLL_M-50_HT-100to200_TuneCP5_PSweights_13TeV-madgraphMLM-pythia8/AODSIM/106X_mc2017_realistic_v6-v1/00000/0C0FD46D-6DAE-6F45-B9F4-129A6ABC69C4.root'
+        'file:/pnfs/desy.de/cms/tier2/store/mc/RunIISummer20UL17RECO/DYJetsToLL_M-50_HT-100to200_TuneCP5_PSweights_13TeV-madgraphMLM-pythia8/AODSIM/106X_mc2017_realistic_v6-v1/00000/0C0FD46D-6DAE-6F45-B9F4-129A6ABC69C4.root'
     )
 )
 
@@ -138,98 +138,42 @@ process.TFileService = cms.Service("TFileService", fileName=cms.string(outFileNa
 
 tasks = cms.Task()
 
-from PhysicsTools.PatAlgos.tools.jetTools import updateJetCollection
-updateJetCollection(process,
-    jetSource = cms.InputTag('slimmedJets'),
-    labelName = 'UpdatedJEC',
-    pvSource = cms.InputTag('offlineSlimmedPrimaryVertices'),
-    svSource = cms.InputTag('slimmedSecondaryVertices'),
-    jetCorrections = ('AK4PFchs', cms.vstring(['L1FastJet', 'L2Relative', 'L3Absolute']), 'None'),
-)
-process.jecSequence = cms.Sequence(process.patJetCorrFactorsUpdatedJEC * process.updatedPatJetsUpdatedJEC)
-
 # main analyzer
-process.load("ZCounting.ZCountAnalyze.ZCounting_cfi")
-# events before selection
-process.load("ZCounting.ZCountAnalyze.CountEventAnalyzer_cfi")
-# pileup MC template maker
-process.load("ZCounting.ZCountAnalyze.PileupMCTemplateMaker_cfi")
+process.load("ZCounting.ZCountAnalyze.ZCountingAOD_cfi")
+# # events before selection
+# process.load("ZCounting.ZCountAnalyze.CountEventAnalyzer_cfi")
+# # pileup MC template maker
+# process.load("ZCounting.ZCountAnalyze.PileupMCTemplateMaker_cfi")
 
-from PhysicsTools.PatUtils.l1PrefiringWeightProducer_cfi import l1PrefiringWeightProducer
 
-process.prefiringweight = l1PrefiringWeightProducer.clone(
-TheJets = cms.InputTag("updatedPatJetsUpdatedJEC"),
-# L1Maps = cms.string("../../../ZCounting/ZCountAnalyze/data/All2017Gand2017HPrefiringMaps.root"),
-DataEraECAL = cms.string(l1PrefireECAL),
-DataEraMuon = cms.string(l1PrefireMuon),
-UseJetEMPt = cms.bool(False),
-PrefiringRateSystematicUnctyECAL = cms.double(0.2),
-PrefiringRateSystematicUnctyMuon = cms.double(0.2)
-)
-
-if options.year == "2016postVFP":
-    process.prefiringweight2016H = l1PrefiringWeightProducer.clone(
-    DataEraECAL = cms.string("None"),
-    DataEraMuon = cms.string("2016H"),
-    UseJetEMPt = cms.bool(False),
-    PrefiringRateSystematicUnctyECAL = cms.double(0.2),
-    PrefiringRateSystematicUnctyMuon = cms.double(0.2)
-    )
-    process.prefireSequence = cms.Sequence(process.prefiringweight + process.prefiringweight2016H)
-elif options.year == "2017":
-    # alternative ECAL prefiring for 2017H low PU run
-    process.prefiringweight2017H = l1PrefiringWeightProducer.clone(
-    DataEraECAL = cms.string("2017H"),
-    DataEraMuon = cms.string("None"),
-    UseJetEMPt = cms.bool(False),
-    DoMuons = cms.bool(False),
-    PrefiringRateSystematicUnctyECAL = cms.double(0.2),
-    PrefiringRateSystematicUnctyMuon = cms.double(0.2)
-    )
-    process.prefireSequence = cms.Sequence(process.prefiringweight + process.prefiringweight2017H)
-else:
-    process.prefireSequence = cms.Sequence(process.prefiringweight)
 
 ### apply rochester corrections
-from ZCounting.ZUtils.muonPATUserDataRochesterCorrectionAdder_cfi import muonPATUserDataRochesterCorrectionAdder
-process.selectedMuonsWithEnCorrInfo = muonPATUserDataRochesterCorrectionAdder.clone(
-    src = 'slimmedMuons',
-    path = roccoFile,
-    applyEnergyCorrections = False,
-    debug = False,
-)
-tasks.add(process.selectedMuonsWithEnCorrInfo)
+# from ZCounting.ZUtils.muonPATUserDataRochesterCorrectionAdder_cfi import muonPATUserDataRochesterCorrectionAdder
+# process.selectedMuonsWithEnCorrInfo = muonPATUserDataRochesterCorrectionAdder.clone(
+#     src = 'muons',
+#     path = roccoFile,
+#     applyEnergyCorrections = False,
+#     debug = False,
+# )
+# tasks.add(process.selectedMuonsWithEnCorrInfo)
 
 process.zcounting.era = options.year
-process.zcounting.pat_muons = cms.InputTag('selectedMuonsWithEnCorrInfo')
+# process.zcounting.reco_muons = cms.InputTag('selectedMuonsWithEnCorrInfo')
 
 # if no good Z candidate is found. E.g. if gamma is found instead
 if options.samplename in ('dy', 'zz', 'wz', 'ttz'):
     from ZCounting.ZUtils.GenZLeptonDecay_cfi import genZLeptonDecay
-    process.genZLeptonDecay = genZLeptonDecay.clone(src="prunedGenParticles",)
+    process.genZLeptonDecay = genZLeptonDecay.clone(src="genParticles",)
     tasks.add(process.genZLeptonDecay)
 
     process.zcounting.hasGenZ = True
     process.zcounting.genZLeptonCollection = cms.InputTag("genZLeptonDecay")
 
-elif options.samplename in ('tt','ttW','ttZ'):
-    process.load('TopQuarkAnalysis.TopEventProducers.sequences.ttGenEvent_cff')
-    process.initSubset.src = cms.InputTag("prunedGenParticles")
-    process.decaySubset.src = cms.InputTag("prunedGenParticles")
-    process.decaySubset.runMode = 'Run2'
-    process.decaySubset.fillMode = 'kStable' # Top before Decay, after Radiation
-    tasks.add(process.makeGenEvtTask)
-
-    process.zcounting.hasGenTt = True
-    process.zcounting.genTtCollection = cms.InputTag("genEvt")
-elif options.samplename in ('met',):
-    process.zcounting.isData = True
-
 
 process.p = cms.Path(
-    process.countEvents *
-    process.pileupMCTemplateMaker *
-    process.jecSequence *
-    process.prefireSequence *
+    # process.countEvents *
+    # process.pileupMCTemplateMaker *
+    # process.jecSequence *
+    # process.prefireSequence *
     process.zcounting,
     tasks)

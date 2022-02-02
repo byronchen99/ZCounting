@@ -1,12 +1,12 @@
-#ifndef ZCOUNTING_TNPPAIRTREEPRODUCER_INTERFACE_TRIGGERTOOL_H
-#define ZCOUNTING_TNPPAIRTREEPRODUCER_INTERFACE_TRIGGERTOOL_H
+#ifndef ZCOUNTING_ZUTILS_INTERFACE_TRIGGERTOOL_H
+#define ZCOUNTING_ZUTILS_INTERFACE_TRIGGERTOOL_H
 
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 #include "FWCore/Common/interface/TriggerNames.h"
-#include "DataFormats/HLTReco/interface/TriggerEvent.h"
 #include "DataFormats/Common/interface/TriggerResults.h"
+#include "DataFormats/HLTReco/interface/TriggerEvent.h"
 #include "HLTrigger/HLTcore/interface/HLTConfigProvider.h"
 
 #include <bitset>

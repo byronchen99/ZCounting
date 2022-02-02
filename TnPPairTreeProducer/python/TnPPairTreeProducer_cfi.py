@@ -8,12 +8,6 @@ tnpPairTreeProducer = cms.EDAnalyzer('TnPPairTreeProducer',
     # PV source
     edmPVName=cms.untracked.string('offlinePrimaryVertices'),
 
-    # PV selection
-    VtxNTracksFitMin=cms.untracked.double(0.),
-    VtxNdofMin=cms.untracked.double(4.),
-    VtxAbsZMax=cms.untracked.double(24.),
-    VtxRhoMax=cms.untracked.double(2.),
-
     # Muon and Track sources
     edmMuonName  = cms.untracked.string('muons'),
     edmTrackName = cms.untracked.string('generalTracks'),
@@ -21,6 +15,7 @@ tnpPairTreeProducer = cms.EDAnalyzer('TnPPairTreeProducer',
     # Muons - triggers
     MuonTriggerNames=cms.vstring("HLT_IsoMu27_v*"),
     MuonTriggerDRMAX = cms.double(0.1),
+    emulateTrigger = cms.untracked.bool(False),
 
     # Muon selection
     IDType   = cms.untracked.string("Tight"),  # Custom, Tight, Medium, Loose

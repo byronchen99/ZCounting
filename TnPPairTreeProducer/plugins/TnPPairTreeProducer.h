@@ -18,8 +18,8 @@
 #include "DataFormats/MuonReco/interface/Muon.h"
 #include "DataFormats/MuonReco/interface/MuonSelectors.h"
 
-#include "ZCounting/TnPPairTreeProducer/interface/triggertool.h"
-#include "ZCounting/TnPPairTreeProducer/interface/getFilename.h"
+#include "ZCounting/ZUtils/interface/triggertool.h"
+#include "ZCounting/ZUtils/interface/Helper.h"
 
 // ROOT includes
 #include "TTree.h"
@@ -51,13 +51,6 @@ private:
     virtual void analyze(const edm::Event&, const edm::EventSetup&) override;
     virtual void endJob() override;
 
-    float getPFIso(const reco::Muon& muon);
-    float getTkIso(const reco::Muon& muon);
-    float getDxy(const reco::Muon& muon, const reco::Vertex& vtx);
-    float getDz(const reco::Muon& muon, const reco::Vertex& vtx);
-
-    bool isCustomID(const reco::Muon&, const reco::Vertex&);
-
     bool isMuonTrigger();
     bool isMuonTriggerObj(const double eta, const double phi);
     bool isMuonTriggerObjEmulated(const double eta, const double phi, const long long unsigned eventNumber);
@@ -75,18 +68,18 @@ private:
     edm::Service<TFileService> fs;
     TTree *tree_;
 
-    HLTConfigProvider hltConfigProvider_;
-    triggertool *triggers;
-
-    TFile *_fileHLTEmulation = 0;
-
     // --- input
-
     double MassMin_;
     double MassMax_;
 
     // trigger
     const edm::InputTag triggerResultsInputTag_;
+    
+    HLTConfigProvider hltConfigProvider_;
+    triggertool *triggers;
+
+    bool emulateTrigger_;
+    TFile *_fileHLTEmulation = 0;
 
     // Tracks
     std::string fTrackName;
@@ -131,8 +124,8 @@ private:
     float q1_;
     float pfIso1_;
     float tkIso1_;
-    float dxy1_;
-    float dz1_;
+    float dxy1_;        // transvers distance of muon from nominal interaction point
+    float dz1_;         // longitudinal distance of muon from nominal interaction point    
     bool is1IsoMu27_;
 
     float pt2_;
@@ -141,11 +134,13 @@ private:
     float q2_;
     float pfIso2_;
     float tkIso2_;
-    float dxy2_;
-    float dz2_;
+    float dxy2_;        // transvers distance of muon from nominal interaction point
+    float dz2_;         // longitudinal distance of muon from nominal interaction point  
     float nTrackerLayers2_;
     float nValidPixelHits2_;
+    int trackAlgo2_;    // algorithm used in the track reconstruction, to identify muon seeded track
     bool is2IsoMu27_;
+
 
     bool is2HLT_;
     bool isSel_;
@@ -155,6 +150,9 @@ private:
 
     float dilepMass_;
     float delR_;
+
+    float drhoPV_;      // transvers distance of PV from nominal interaction point
+    float dzPV_;       // longitudinal distance of PV from nominal interaction point
 
     // --- things for trigger emulation
     // filter tag for HLT_IsoMu24_v11:

@@ -7,6 +7,10 @@
 #include "DataFormats/Math/interface/deltaR.h"
 
 #include "ZCounting/TnPPairTreeProducer/plugins/TnPPairTreeProducer.h"
+#include "ZCounting/TnPPairTreeProducer/interface/getFilename.h"
+
+#include "ZCounting/ZUtils/interface/triggertool.h"
+#include "ZCounting/ZUtils/interface/Helper.h"
 
 #include <TLorentzVector.h>
 
@@ -22,17 +26,13 @@ TnPPairTreeProducer::TnPPairTreeProducer(const edm::ParameterSet& iConfig):
     fMuonHLTDRMAX = iConfig.getParameter<double>("MuonTriggerDRMAX");
     fPVName = iConfig.getUntrackedParameter<std::string>("edmPVName", "offlinePrimaryVertices");
 
-    VtxNTracksFitCut_ = iConfig.getUntrackedParameter<double>("VtxNTracksFitMin");
-    VtxNdofCut_ = iConfig.getUntrackedParameter<double>("VtxNdofMin");
-    VtxAbsZCut_ = iConfig.getUntrackedParameter<double>("VtxAbsZMax");
-    VtxRhoCut_ = iConfig.getUntrackedParameter<double>("VtxRhoMax");
-
     // Muon-specific Cuts
     IDTypestr_ = iConfig.getUntrackedParameter<std::string>("IDType");
     IsoTypestr_ = iConfig.getUntrackedParameter<std::string>("IsoType");
     IsoCut_ = iConfig.getUntrackedParameter<double>("IsoCut");
     DxyCut_ = iConfig.getUntrackedParameter<double>("DxyCut");
     DzCut_ = iConfig.getUntrackedParameter<double>("DzCut");
+    emulateTrigger_ = iConfig.getUntrackedParameter<bool>("emulateTrigger");
 
     if (IDTypestr_ == "Loose")
         IDType_ = LooseID;
@@ -123,21 +123,18 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
     const reco::Vertex* pv = &(*pvCol->begin());
 
     for (auto const& itVtx : *hVertexProduct) {
-        if (itVtx.isFake())
+        if(!isGoodPV(itVtx))
             continue;
-        if (itVtx.tracksSize() < VtxNTracksFitCut_)
-            continue;
-        if (itVtx.ndof() < VtxNdofCut_)
-            continue;
-        if (fabs(itVtx.z()) > VtxAbsZCut_)
-            continue;
-        if (itVtx.position().Rho() > VtxRhoCut_)
-            continue;
+
         if (nPV_ == 0) {
             pv = &itVtx;
         }
         nPV_++;
     }
+    
+    dzPV_ = pv->z();
+    drhoPV_ = pv->position().Rho();
+
 
     //-------------------------------
     //--- Muons and Tracks
@@ -175,16 +172,17 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
             continue;
         if (!(passMuonID(itMu1, *pv) && passMuonIso(itMu1)))
             continue;
-        // if (!isMuonTriggerObj(eta1_, phi1_))
-        //     continue;
-
-        if (!isMuonTriggerObjEmulated(eta1_, phi1_, eventNumber_))
+        
+        const bool passTrigger1 = isMuonTriggerObj(eta1_, phi1_) || (emulateTrigger_ && isMuonTriggerObjEmulated(eta1_, phi1_, eventNumber_));
+            
+        if (!passTrigger1)
             continue;
+
 
         pfIso1_ = getPFIso(itMu1);
         tkIso1_ = getTkIso(itMu1);
-        dxy1_ = getDxy(itMu1, *pv);
-        dz1_ = getDz(itMu1, *pv);
+        dxy1_ = itMu1.muonBestTrack()->dxy();
+        dz1_ = itMu1.muonBestTrack()->dz();
         // is1IsoMu27_ = triggers->passObj("HLT_IsoMu27_v*", eta1_, phi1_);
 
         vTag.SetPtEtaPhiM(pt1_, eta1_, phi1_, MUON_MASS);
@@ -212,9 +210,9 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
             if ((dilepMass_ < MassMin_) || (dilepMass_ > MassMax_))
                 continue;
             if (passMuonID(itMu2, *pv) && passMuonIso(itMu2)) {
-                if (isMuonTriggerObjEmulated(eta2_, phi2_, eventNumber_)){
-                //     continue;
-                // if (isMuonTriggerObj(eta2_, phi2_)) {
+                const bool passTrigger2 = isMuonTriggerObj(eta2_, phi2_) || (emulateTrigger_ && isMuonTriggerObjEmulated(eta2_, phi2_, eventNumber_));
+
+                if (passTrigger2) {
                     // category 2HLT: both muons passing trigger requirements
                     if (&itMu1 > &itMu2)
                         continue;  // make sure we don't double count MuMu2HLT category
@@ -236,13 +234,14 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
             ){      // has valid inner track
                 nTrackerLayers2_ = itMu2.innerTrack()->hitPattern().trackerLayersWithMeasurement();
                 nValidPixelHits2_ = itMu2.innerTrack()->hitPattern().numberOfValidPixelHits();
+                trackAlgo2_ = itMu2.innerTrack()->algo();
                 isTrk_ = true;
             }
 
             pfIso2_ = getPFIso(itMu2);
             tkIso2_ = getTkIso(itMu2);
-            dxy2_ = getDxy(itMu2, *pv);
-            dz2_ = getDz(itMu2, *pv);
+            dxy2_ = itMu2.muonBestTrack()->dxy();
+            dz2_ = itMu2.muonBestTrack()->dz();
             // is2IsoMu27_ = triggers->passObj("HLT_IsoMu27_v*", eta2_, phi2_);
             delR_ = vTag.DeltaR(vProbe);
 
@@ -285,8 +284,13 @@ TnPPairTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iS
             if ((dilepMass_ < MassMin_) || (dilepMass_ > MassMax_))
                 continue;
 
+            dxy2_ = itTrk.dxy(pv->position());
+            dz2_ = itTrk.dz(pv->position());
+            dxy2_ = itTrk.dxy();
+            dz2_ = itTrk.dz();
             nTrackerLayers2_ = itTrk.hitPattern().trackerLayersWithMeasurement();
             nValidPixelHits2_ = itTrk.hitPattern().numberOfValidPixelHits();
+            trackAlgo2_ = itTrk.algo();
             isTrk_ = true;
 
             tree_->Fill();
@@ -305,15 +309,16 @@ TnPPairTreeProducer::beginLuminosityBlock(const edm::LuminosityBlock& iLumi, con
 
     std::cout<<"TnPPairTreeProducer::beginLuminosityBlock --- now at LS "<< ls_ <<std::endl;
 
-    // find and open file with HLT information
-    const std::string fNameHLT = getFilname(run_, ls_);
+    if(emulateTrigger_){
+        // find and open file with emulated HLT information
+        const std::string fNameHLT = getFilename(run_, ls_);
 
-    if(_fileHLTEmulation != 0)
-        _fileHLTEmulation->Close();
+        if(_fileHLTEmulation != 0)
+            _fileHLTEmulation->Close();
 
-    _fileHLTEmulation = TFile::Open(("root://xrootd-cms.infn.it//"+fNameHLT).c_str());
-    
-    fs->cd();
+        _fileHLTEmulation = TFile::Open(("root://xrootd-cms.infn.it//"+fNameHLT).c_str());        
+        fs->cd();
+    }
 }
 
 // ------------ method called once each run just before starting event loop  ------------
@@ -362,6 +367,7 @@ TnPPairTreeProducer::beginJob()
     tree_->Branch("tkIso1", &tkIso1_,"tkIso1_/f");
     tree_->Branch("dxy1", &dxy1_,"dxy1_/f");
     tree_->Branch("dz1", &dz1_,"dz1_/f");
+
     //tree_->Branch("is1IsoMu27", &is1IsoMu27_,"is1IsoMu27_/b");
 
     tree_->Branch("pt2", &pt2_,"pt2_/f");
@@ -374,6 +380,8 @@ TnPPairTreeProducer::beginJob()
     tree_->Branch("dz2", &dz2_,"dz2_/f");
     tree_->Branch("nTrackerLayers2", &nTrackerLayers2_,"nTrackerLayers2_/f");
     tree_->Branch("nValidPixelHits2", &nValidPixelHits2_,"nValidPixelHits2_/f");
+    tree_->Branch("trackAlgo2", &trackAlgo2_,"trackAlgo2_/i");
+
     //tree_->Branch("is2IsoMu27", &is2IsoMu27_,"is2IsoMu27_/b");
 
     tree_->Branch("is2HLT", &is2HLT_,"is2HLT_/b");
@@ -384,6 +392,8 @@ TnPPairTreeProducer::beginJob()
 
     tree_->Branch("dilepMass", &dilepMass_,"dilepMass_/f");
     tree_->Branch("delR", &delR_,"delR_/f");
+    tree_->Branch("drhoPV", &drhoPV_,"drhoPV_/f");
+    tree_->Branch("dzPV", &dzPV_,"dzPV_/f");
 
 }
 
@@ -437,8 +447,11 @@ void TnPPairTreeProducer::clearProbeVariables(){
     tkIso2_ = 0.;
     dxy2_ = 0.;
     dz2_ = 0.;
+    dxy2_ = 0.;
+    dz2_ = 0.;
     nTrackerLayers2_ = 0.;
     nValidPixelHits2_ = 0.;
+    trackAlgo2_ = 0;
     //is2IsoMu27_ = false;
 
     is2HLT_ = false;
@@ -453,30 +466,12 @@ void TnPPairTreeProducer::clearProbeVariables(){
 
 //--------------------------------------------------------------------------------------------------
 bool TnPPairTreeProducer::isMuonTrigger() {
-    if (triggers->pass(fMuonHLTNames)){
-        return true;
-    }
-    return false;
+    return triggers->pass(fMuonHLTNames);
 }
 
 //--------------------------------------------------------------------------------------------------
 bool TnPPairTreeProducer::isMuonTriggerObj(const double eta, const double phi) {
-    if (triggers->passObj(fMuonHLTNames, eta, phi))
-        return true;
-    return false;
-}
-
-//--------------------------------------------------------------------------------------------------
-bool TnPPairTreeProducer::isCustomID(const reco::Muon& muon, const reco::Vertex& vtx){
-    return muon.isGlobalMuon()
-        && muon.isPFMuon()
-        && muon.globalTrack()->normalizedChi2() < 10.
-        && muon.globalTrack()->hitPattern().numberOfValidMuonHits() > 0
-        && muon.numberOfMatchedStations() > 1
-        && (getDxy(muon, vtx) < DxyCut_ || DxyCut_ <=0.)
-        && (getDz(muon, vtx) < DzCut_ || DzCut_ <=0.)
-        && muon.innerTrack()->hitPattern().numberOfValidPixelHits() > 0
-        && muon.innerTrack()->hitPattern().trackerLayersWithMeasurement() > 5;
+    return triggers->passObj(fMuonHLTNames, eta, phi);
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -489,7 +484,7 @@ bool TnPPairTreeProducer::passMuonID(const reco::Muon& muon, const reco::Vertex&
         return true;
     else if (IDType_ == TightID && muon::isTightMuon(muon, vtx))
         return true;
-    else if (IDType_ == CustomID && isCustomID(muon, vtx))
+    else if (IDType_ == CustomID && isCustomTightMuon(muon))
         return true;
     else if (IDType_ == NoneID)
         return true;
@@ -512,28 +507,7 @@ bool TnPPairTreeProducer::passMuonIso(const reco::Muon& muon) {
     return false;
 }
 
-//--------------------------------------------------------------------------------------------------
-float TnPPairTreeProducer::getPFIso(const reco::Muon& muon) {
-    return (muon.pfIsolationR04().sumChargedHadronPt +
-                   std::max(0.,
-                            muon.pfIsolationR04().sumNeutralHadronEt + muon.pfIsolationR04().sumPhotonEt -
-                                0.5 * muon.pfIsolationR04().sumPUPt)) / muon.pt();
-}
 
-//--------------------------------------------------------------------------------------------------
-float TnPPairTreeProducer::getTkIso(const reco::Muon& muon) {
-    return muon.isolationR03().sumPt / muon.pt();
-}
-
-//--------------------------------------------------------------------------------------------------
-float TnPPairTreeProducer::getDxy(const reco::Muon& muon, const reco::Vertex& vtx) {
-    return fabs(muon.muonBestTrack()->dxy(vtx.position()));
-}
-
-//--------------------------------------------------------------------------------------------------
-float TnPPairTreeProducer::getDz(const reco::Muon& muon, const reco::Vertex& vtx) {
-    return fabs(muon.muonBestTrack()->dz(vtx.position()));
-}
 
 //--------------------------------------------------------------------------------------------------
 // For trigger emulation in the 2017H (low PU) dataset
