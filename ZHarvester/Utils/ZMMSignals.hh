@@ -24,6 +24,15 @@ public:
     RooAbsPdf *model;
 };
 
+class CBreitWigner : public CSignalModel
+{
+public:
+    CBreitWigner(RooRealVar &m, const Bool_t pass, const int ibin);
+    ~CBreitWigner();
+    void Reset();
+    RooRealVar     *mass, *width;
+};
+
 class CBreitWignerConvCrystalBall : public CSignalModel
 {
 public:
@@ -34,6 +43,17 @@ public:
     RooBreitWigner *bw;
     RooRealVar     *mean, *sigma, *alpha, *n;
     RooCBShape     *cb;
+};
+
+class CMCTemplate : public CSignalModel
+{
+public:
+    CMCTemplate(RooRealVar &m, TH1D* hist, const Bool_t pass, const int ibin, int intOrder=1);
+    ~CMCTemplate();
+    void Reset();
+    TH1D        *inHist;
+    RooDataHist *dataHist;
+    RooHistPdf  *histPdf;
 };
 
 class CMCTemplateConvGaussian : public CSignalModel
@@ -62,6 +82,39 @@ public:
     RooHistPdf  *histPdf_dy, *histPdf_tt;
     RooAddPdf   *stack;
 };
+
+//--------------------------------------------------------------------------------------------------
+CBreitWigner::CBreitWigner(RooRealVar &m, const Bool_t pass, const int ibin)
+{
+    char name[10];
+    if(pass) sprintf(name,"%s_%i","Pass",ibin);
+    else     sprintf(name,"%s_%i","Fail",ibin);
+    char vname[50];
+
+    sprintf(vname,"sig_mass%s",name);
+    mass = new RooRealVar(vname,vname,91,80,100);
+    mass->setVal(91.1876);
+    mass->setConstant(kTRUE);
+
+    sprintf(vname,"sid_width%s",name);
+    width = new RooRealVar(vname,vname,2.5,0.1,10);
+    width->setVal(2.4952);
+    width->setConstant(kTRUE);
+
+    sprintf(vname,"sig_bw%s",name);
+    model = new RooBreitWigner(vname,"BW", m,*mass,*width);
+
+}
+
+void CBreitWigner::Reset(){
+    std::cout<<"CBreitWigner::Reset() --- "<<std::endl;
+}
+
+CBreitWigner::~CBreitWigner()
+{
+    delete mass;
+    delete width;
+}
 
 //--------------------------------------------------------------------------------------------------
 CBreitWignerConvCrystalBall::CBreitWignerConvCrystalBall(RooRealVar &m, const Bool_t pass, const int ibin)
@@ -115,6 +168,36 @@ CBreitWignerConvCrystalBall::~CBreitWignerConvCrystalBall()
     delete alpha;
     delete n;
     delete cb;
+}
+
+//--------------------------------------------------------------------------------------------------
+CMCTemplate::CMCTemplate(RooRealVar &m, TH1D* hist, const Bool_t pass, const int ibin, int intOrder)
+{
+    char name[10];
+    if(pass) sprintf(name,"%s_%i","Pass",ibin);
+    else     sprintf(name,"%s_%i","Fail",ibin);
+    char vname[50];
+
+    sprintf(vname,"sig_inHist_%s",hist->GetName());
+    inHist = (TH1D*)hist->Clone(vname);
+
+    sprintf(vname,"sig_dataHist%s",name);
+    dataHist = new RooDataHist(vname,vname,RooArgSet(m),inHist);
+    
+    sprintf(vname,"sig_histPdf%s",name);
+    model  = new RooHistPdf(vname,"MC",m,*dataHist,intOrder);
+
+}
+
+void CMCTemplate::Reset(){
+    std::cout<<"CMCTemplate::Reset() --- "<<std::endl;
+
+}
+
+CMCTemplate::~CMCTemplate()
+{
+    delete inHist;
+    delete dataHist;
 }
 
 //--------------------------------------------------------------------------------------------------

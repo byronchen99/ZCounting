@@ -80,6 +80,7 @@ void set_massRange(Float_t massLo_, Float_t massHi_, UInt_t nBins=0){
     massWidth = (massHi-massLo)/massBin;
 
     std::cout<<"Set mass range to ["<<massLo_<<","<<massHi_<<"] with "<<massBin<<" bins."<<std::endl;
+
 }
 
 void set_ptCut(Float_t pt_){
@@ -126,8 +127,19 @@ TFile* generateTemplate_ZYield(
 );
 
 //--------------------------------------------------------------------------------------------------
-// extract the correlation factor from the MC
-double extractCorrelation(TFile *histfile, const TString etaRegion);
+// generate template for extraction of HLT correlation coefficient
+TFile* generateTemplate_cHLT(const TString mcfilename);
+
+//--------------------------------------------------------------------------------------------------
+// generate template for extraction of Glo correlation coefficient
+TFile* generateTemplate_cGlo(const TString mcfilename);
+
+//--------------------------------------------------------------------------------------------------
+// extract the HLT correlation factor from the MC
+double extractCorrelation_HLT(const TString mcfilename, TH1D *hPV, const TString etaRegion);
+//--------------------------------------------------------------------------------------------------
+// extract the Glo correlation factor from the MC
+double extractCorrelation_Glo(const TString mcfilename, TH1D *hPV, const TString etaRegion);
 
 
 std::vector<double> preFit(TH1 *failHist);
@@ -152,6 +164,12 @@ Int_t set_signal_model(
         case 2:
             model = new CMCTemplateConvGaussian(param_mass, hist, pass, ibin);
             return 2;
+        case 3:
+            model = new CBreitWigner(param_mass, pass, ibin);
+            return 0;
+        case 4:
+            model = new CMCTemplate(param_mass, hist, pass, ibin);
+            return 0;
     }
     return 0;
 }
@@ -210,9 +228,9 @@ Int_t set_background_model(
 
 //--------------------------------------------------------------------------------------------------
 TFile* generateTemplate(
-	const TString mcfilename,
+    const TString mcfilename,
     const TString effType,
-	TH1D          *hPV
+    TH1D          *hPV
 ){
 
     TFile *outfile = TFile::Open(outputDir+"/../histTemplates_"+effType+".root","CREATE");
@@ -311,11 +329,12 @@ TFile* generateTemplate(
 
 //--------------------------------------------------------------------------------------------------
 TFile* generateTemplate_ZYield(
-	const TString mcfilename,
-	TH1D          *hPV,
+    const TString mcfilename,
+    TH1D          *hPV,
     const int     iBin
 ){
-    const TString histfilename = hPV == 0 ? outputDir+"/../histTemplates_HLT.root" : outputDir+"/histTemplates_HLT_"+std::to_string(iBin)+".root";
+    //const TString histfilename = hPV == 0 ? outputDir+"/../histTemplates_HLT.root" : outputDir+"/histTemplates_HLT_"+std::to_string(iBin)+".root";
+    const TString histfilename = outputDir+"/../histTemplates_HLT.root";
     TFile *outfile = TFile::Open(histfilename,"CREATE");
     if(!outfile){
         cout << "Use existing template "<< endl;
@@ -328,11 +347,9 @@ TFile* generateTemplate_ZYield(
     TTree *eventTree = (TTree*)infile->Get("HLT");
     TH1D *hPVtemplate = (TH1D*)infile->Get("hPV");
     
-    TH1D *hRatioPV = (TH1D*)hPV->Clone("h_ratio_PV");
-
     if(hPV){
         std::cout<<"PV reweighting with <PV> = "<<hPV->GetMean()<<std::endl;       
-        hRatioPV->Divide(hPVtemplate);
+        hPV->Divide(hPVtemplate);
     }
 
     Double_t mass, ptTag, etaTag, ptProbe, etaProbe;
@@ -348,19 +365,19 @@ TFile* generateTemplate_ZYield(
     eventTree->SetBranchAddress("nPV",            &npv);
     eventTree->SetBranchAddress("pass",           &pass);
     eventTree->SetBranchAddress("eventWeight",    &wgt);
-
+    
     TH1D *h_mass_0hlt_BB = new TH1D("h_mass_0hlt_BB", "", massBin, massLo, massHi);
     TH1D *h_mass_0hlt_BE = new TH1D("h_mass_0hlt_BE", "", massBin, massLo, massHi);
     TH1D *h_mass_0hlt_EE = new TH1D("h_mass_0hlt_EE", "", massBin, massLo, massHi);
-    TH1D *h_mass_0hlt_I = new TH1D("h_mass_0hlt_I", "", massBin, massLo, massHi);
+    TH1D *h_mass_0hlt_I  = new TH1D("h_mass_0hlt_I",  "", massBin, massLo, massHi);
     TH1D *h_mass_1hlt_BB = new TH1D("h_mass_1hlt_BB", "", massBin, massLo, massHi);
     TH1D *h_mass_1hlt_BE = new TH1D("h_mass_1hlt_BE", "", massBin, massLo, massHi);
     TH1D *h_mass_1hlt_EE = new TH1D("h_mass_1hlt_EE", "", massBin, massLo, massHi);
-    TH1D *h_mass_1hlt_I = new TH1D("h_mass_1hlt_I", "", massBin, massLo, massHi);
+    TH1D *h_mass_1hlt_I  = new TH1D("h_mass_1hlt_I",  "", massBin, massLo, massHi);
     TH1D *h_mass_2hlt_BB = new TH1D("h_mass_2hlt_BB", "", massBin, massLo, massHi);
     TH1D *h_mass_2hlt_BE = new TH1D("h_mass_2hlt_BE", "", massBin, massLo, massHi);
     TH1D *h_mass_2hlt_EE = new TH1D("h_mass_2hlt_EE", "", massBin, massLo, massHi);
-    TH1D *h_mass_2hlt_I = new TH1D("h_mass_2hlt_I", "", massBin, massLo, massHi);
+    TH1D *h_mass_2hlt_I  = new TH1D("h_mass_2hlt_I",  "", massBin, massLo, massHi);
 
     for(UInt_t ientry=0; ientry<eventTree->GetEntries(); ientry++) {
         eventTree->GetEntry(ientry);
@@ -373,7 +390,7 @@ TFile* generateTemplate_ZYield(
         if(fabs(etaProbe) > etaCutProbe) continue;
 
         if(hPV)
-            wgt *= hRatioPV->GetBinContent(hRatioPV->FindBin(npv));
+            wgt *= hPV->GetBinContent(hPV->FindBin(npv));
 
         if(fabs(etaProbe) < etaBound && fabs(etaTag) < etaBound){
             if(pass==2)         h_mass_2hlt_BB->Fill(mass, wgt);
@@ -447,7 +464,6 @@ TFile* generateTemplate_ZYield(
     h_mass_0hlt_EE->Write();
     h_mass_0hlt_I->Write();
     
-    hRatioPV->Write();
 
     outfile->Write();
 
@@ -458,6 +474,284 @@ TFile* generateTemplate_ZYield(
     return outfile;
 }
 
+// generate histogram templates binned as function of number of primary vertices, for the extraction of the correlation coefficient
+TFile* generateTemplate_cHLT(
+    const TString mcfilename
+){
+    const TString histfilename = outputDir+"/../histTemplates_cHLT.root";
+    TFile *outfile = TFile::Open(histfilename,"CREATE");
+    if(!outfile){
+        cout << "Use existing template "<< endl;
+        outfile = TFile::Open(histfilename,"READ");
+        return outfile;
+    }
+    cout << "Creating histogram templates... "; cout.flush();
+
+    TFile *infile    = new TFile(mcfilename);
+    TTree *eventTree = (TTree*)infile->Get("HLT");
+    TH1D *hPVtemplate = (TH1D*)infile->Get("hPV");
+
+    Double_t mass, ptTag, etaTag, ptProbe, etaProbe;
+    Double_t wgt;
+    Int_t npv;
+    Int_t pass;
+
+    eventTree->SetBranchAddress("mass",           &mass);
+    eventTree->SetBranchAddress("ptTag",          &ptTag);
+    eventTree->SetBranchAddress("ptProbe",        &ptProbe);
+    eventTree->SetBranchAddress("etaTag",         &etaTag);
+    eventTree->SetBranchAddress("etaProbe",       &etaProbe);
+    eventTree->SetBranchAddress("nPV",            &npv);
+    eventTree->SetBranchAddress("pass",           &pass);
+    eventTree->SetBranchAddress("eventWeight",    &wgt);
+    
+    const int npvBin = 75;
+    const double npvLo = -0.5;
+    const double npvHi = 74.5;
+    
+    TH1D *h_npv_0hlt_BB = new TH1D("h_npv_0hlt_BB", "", npvBin, npvLo, npvHi);
+    TH1D *h_npv_0hlt_BE = new TH1D("h_npv_0hlt_BE", "", npvBin, npvLo, npvHi);
+    TH1D *h_npv_0hlt_EE = new TH1D("h_npv_0hlt_EE", "", npvBin, npvLo, npvHi);
+    TH1D *h_npv_0hlt_I  = new TH1D("h_npv_0hlt_I",  "", npvBin, npvLo, npvHi);
+    TH1D *h_npv_1hlt_BB = new TH1D("h_npv_1hlt_BB", "", npvBin, npvLo, npvHi);
+    TH1D *h_npv_1hlt_BE = new TH1D("h_npv_1hlt_BE", "", npvBin, npvLo, npvHi);
+    TH1D *h_npv_1hlt_EE = new TH1D("h_npv_1hlt_EE", "", npvBin, npvLo, npvHi);
+    TH1D *h_npv_1hlt_I  = new TH1D("h_npv_1hlt_I",  "", npvBin, npvLo, npvHi);
+    TH1D *h_npv_2hlt_BB = new TH1D("h_npv_2hlt_BB", "", npvBin, npvLo, npvHi);
+    TH1D *h_npv_2hlt_BE = new TH1D("h_npv_2hlt_BE", "", npvBin, npvLo, npvHi);
+    TH1D *h_npv_2hlt_EE = new TH1D("h_npv_2hlt_EE", "", npvBin, npvLo, npvHi);
+    TH1D *h_npv_2hlt_I  = new TH1D("h_npv_2hlt_I",  "", npvBin, npvLo, npvHi);
+
+    for(UInt_t ientry=0; ientry<eventTree->GetEntries(); ientry++) {
+        eventTree->GetEntry(ientry);
+
+        if(mass < massLo)  continue;
+        if(mass > massHi)  continue;
+        if(ptTag   < ptCutTag)   continue;
+        if(ptProbe   < ptCutProbe)   continue;
+        if(fabs(etaTag) > etaCutTag) continue;
+        if(fabs(etaProbe) > etaCutProbe) continue;
+
+        if(fabs(etaProbe) < etaBound && fabs(etaTag) < etaBound){
+            if(pass==2)         h_npv_2hlt_BB->Fill(npv, wgt);
+            else if(pass==1)    h_npv_1hlt_BB->Fill(npv, wgt);
+            else                h_npv_0hlt_BB->Fill(npv, wgt);
+        }
+        else if(fabs(etaProbe) >= etaBound && fabs(etaTag) >= etaBound){
+            if(pass==2)         h_npv_2hlt_EE->Fill(npv, wgt);
+            else if(pass==1)    h_npv_1hlt_EE->Fill(npv, wgt);
+            else                h_npv_0hlt_EE->Fill(npv, wgt);
+        }
+        else{
+            if(pass==2)         h_npv_2hlt_BE->Fill(npv, wgt);
+            else if(pass==1)    h_npv_1hlt_BE->Fill(npv, wgt);
+            else                h_npv_0hlt_BE->Fill(npv, wgt);
+        }
+    }
+
+    // set negative bin entries to 0
+    for(int i=1; i <= npvBin+1; i++){
+        if(h_npv_2hlt_BB->GetBinContent(i) < 0.)
+            h_npv_2hlt_BB->SetBinContent(i, 0.);
+
+        if(h_npv_2hlt_BE->GetBinContent(i) < 0.)
+            h_npv_2hlt_BE->SetBinContent(i, 0.);
+
+        if(h_npv_2hlt_EE->GetBinContent(i) < 0.)
+            h_npv_2hlt_EE->SetBinContent(i, 0.);
+
+        if(h_npv_1hlt_BB->GetBinContent(i) < 0.)
+            h_npv_1hlt_BB->SetBinContent(i, 0.);
+
+        if(h_npv_1hlt_BE->GetBinContent(i) < 0.)
+            h_npv_1hlt_BE->SetBinContent(i, 0.);
+
+        if(h_npv_1hlt_EE->GetBinContent(i) < 0.)
+            h_npv_1hlt_EE->SetBinContent(i, 0.);
+
+        if(h_npv_0hlt_BB->GetBinContent(i) < 0.)
+            h_npv_0hlt_BB->SetBinContent(i, 0.);
+
+        if(h_npv_0hlt_BE->GetBinContent(i) < 0.)
+            h_npv_0hlt_BE->SetBinContent(i, 0.);
+
+        if(h_npv_0hlt_EE->GetBinContent(i) < 0.)
+            h_npv_0hlt_EE->SetBinContent(i, 0.);
+    }
+    // inclusive
+    h_npv_0hlt_I->Add(h_npv_0hlt_BB);
+    h_npv_0hlt_I->Add(h_npv_0hlt_BE);
+    h_npv_0hlt_I->Add(h_npv_0hlt_EE);
+    h_npv_1hlt_I->Add(h_npv_1hlt_BB);
+    h_npv_1hlt_I->Add(h_npv_1hlt_BE);
+    h_npv_1hlt_I->Add(h_npv_1hlt_EE);
+    h_npv_2hlt_I->Add(h_npv_2hlt_BB);
+    h_npv_2hlt_I->Add(h_npv_2hlt_BE);
+    h_npv_2hlt_I->Add(h_npv_2hlt_EE);
+    
+    outfile->cd();
+    
+    h_npv_2hlt_BB->Write();
+    h_npv_2hlt_BE->Write();
+    h_npv_2hlt_EE->Write();
+    h_npv_2hlt_I->Write();
+    h_npv_1hlt_BB->Write();
+    h_npv_1hlt_BE->Write();
+    h_npv_1hlt_EE->Write();
+    h_npv_1hlt_I->Write();
+    h_npv_0hlt_BB->Write();
+    h_npv_0hlt_BE->Write();
+    h_npv_0hlt_EE->Write();
+    h_npv_0hlt_I->Write();
+    hPVtemplate->Write();
+    
+
+    outfile->Write();
+
+    infile->Close();
+    delete infile;
+
+    cout << "Done!" << endl;
+    return outfile;
+}
+
+// generate histogram templates binned as function of number of primary vertices, for the extraction of the correlation coefficient
+TFile* generateTemplate_cGlo(
+    const TString mcfilename
+){
+    const TString histfilename = outputDir+"/../histTemplates_cGlo.root";
+    TFile *outfile = TFile::Open(histfilename,"CREATE");
+    cout << "Creating histogram templates... in: "<<outputDir; cout.flush();
+    if(!outfile){
+        cout << "Use existing template "<< endl;
+        outfile = TFile::Open(histfilename,"READ");
+        return outfile;
+    }
+    cout << "Creating histogram templates... "; cout.flush();
+
+    TFile *infile    = new TFile(mcfilename);
+    TTree *eventTree = (TTree*)infile->Get("Glo");
+    TH1D *hPVtemplate = (TH1D*)infile->Get("hPV");
+
+    Double_t mass, delR, ptTag, etaTag, ptProbe, etaProbe;
+    Double_t wgt;
+    Int_t npv;
+    Int_t pass;
+
+    eventTree->SetBranchAddress("mass",           &mass);
+    eventTree->SetBranchAddress("delR",           &delR);
+    eventTree->SetBranchAddress("ptTag",          &ptTag);
+    eventTree->SetBranchAddress("ptProbe",        &ptProbe);
+    eventTree->SetBranchAddress("etaTag",         &etaTag);
+    eventTree->SetBranchAddress("etaProbe",       &etaProbe);
+    eventTree->SetBranchAddress("nPV",            &npv);
+    eventTree->SetBranchAddress("pass",           &pass);
+    eventTree->SetBranchAddress("eventWeight",    &wgt);
+    
+    const int npvBin = 75;
+    const double npvLo = -0.5;
+    const double npvHi = 74.5;
+    
+    TH1D *h_npv_0Glo_B = new TH1D("h_npv_0Glo_B", "", npvBin, npvLo, npvHi);
+    TH1D *h_npv_0Glo_E = new TH1D("h_npv_0Glo_E", "", npvBin, npvLo, npvHi);
+    TH1D *h_npv_0Glo_I = new TH1D("h_npv_0Glo_I",  "", npvBin, npvLo, npvHi);
+    TH1D *h_npv_1Sta_B = new TH1D("h_npv_1Sta_B", "", npvBin, npvLo, npvHi);
+    TH1D *h_npv_1Sta_E = new TH1D("h_npv_1Sta_E", "", npvBin, npvLo, npvHi);
+    TH1D *h_npv_1Sta_I = new TH1D("h_npv_1Sta_I",  "", npvBin, npvLo, npvHi);
+    TH1D *h_npv_1Trk_B = new TH1D("h_npv_1Trk_B", "", npvBin, npvLo, npvHi);
+    TH1D *h_npv_1Trk_E = new TH1D("h_npv_1Trk_E", "", npvBin, npvLo, npvHi);
+    TH1D *h_npv_1Trk_I = new TH1D("h_npv_1Trk_I",  "", npvBin, npvLo, npvHi);
+    TH1D *h_npv_2Glo_B = new TH1D("h_npv_2Glo_B", "", npvBin, npvLo, npvHi);
+    TH1D *h_npv_2Glo_E = new TH1D("h_npv_2Glo_E", "", npvBin, npvLo, npvHi);
+    TH1D *h_npv_2Glo_I = new TH1D("h_npv_2Glo_I",  "", npvBin, npvLo, npvHi);
+
+    for(UInt_t ientry=0; ientry<eventTree->GetEntries(); ientry++) {
+        eventTree->GetEntry(ientry);
+
+        if(mass < massLo)  continue;
+        if(mass > massHi)  continue;
+        if(ptTag   < ptCutTag)   continue;
+        if(ptProbe   < ptCutProbe)   continue;
+        if(fabs(etaTag) > etaCutTag) continue;
+        if(fabs(etaProbe) > etaCutProbe) continue;
+        if(delR < 0.8) continue;
+
+        if(fabs(etaProbe) < etaBound){
+            if(pass==3)         h_npv_2Glo_B->Fill(npv, wgt);
+            else if(pass==2)    h_npv_1Trk_B->Fill(npv, wgt);
+            else if(pass==1)    h_npv_1Sta_B->Fill(npv, wgt);
+            else                h_npv_0Glo_B->Fill(npv, wgt);
+        }
+        else{
+            if(pass==3)         h_npv_2Glo_E->Fill(npv, wgt);
+            else if(pass==2)    h_npv_1Trk_E->Fill(npv, wgt);
+            else if(pass==1)    h_npv_1Sta_E->Fill(npv, wgt);
+            else                h_npv_0Glo_E->Fill(npv, wgt);
+        }
+    }
+
+    // set negative bin entries to 0
+    for(int i=1; i <= npvBin+1; i++){
+        if(h_npv_2Glo_B->GetBinContent(i) < 0.)
+            h_npv_2Glo_B->SetBinContent(i, 0.);
+
+        if(h_npv_2Glo_E->GetBinContent(i) < 0.)
+            h_npv_2Glo_E->SetBinContent(i, 0.);
+
+        if(h_npv_1Sta_B->GetBinContent(i) < 0.)
+            h_npv_1Sta_B->SetBinContent(i, 0.);
+
+        if(h_npv_1Sta_E->GetBinContent(i) < 0.)
+            h_npv_1Sta_E->SetBinContent(i, 0.);
+
+        if(h_npv_1Trk_B->GetBinContent(i) < 0.)
+            h_npv_1Trk_B->SetBinContent(i, 0.);
+
+        if(h_npv_1Trk_E->GetBinContent(i) < 0.)
+            h_npv_1Trk_E->SetBinContent(i, 0.);
+
+        if(h_npv_0Glo_B->GetBinContent(i) < 0.)
+            h_npv_0Glo_B->SetBinContent(i, 0.);
+
+        if(h_npv_0Glo_E->GetBinContent(i) < 0.)
+            h_npv_0Glo_E->SetBinContent(i, 0.);
+    }
+    
+    // inclusive
+    h_npv_0Glo_I->Add(h_npv_0Glo_B);
+    h_npv_0Glo_I->Add(h_npv_0Glo_E);
+    h_npv_1Sta_I->Add(h_npv_1Sta_B);
+    h_npv_1Sta_I->Add(h_npv_1Sta_E);
+    h_npv_1Trk_I->Add(h_npv_1Trk_B);
+    h_npv_1Trk_I->Add(h_npv_1Trk_E);
+    h_npv_2Glo_I->Add(h_npv_2Glo_B);
+    h_npv_2Glo_I->Add(h_npv_2Glo_E);
+    
+    outfile->cd();
+    
+    h_npv_2Glo_B->Write();
+    h_npv_2Glo_E->Write();
+    h_npv_2Glo_I->Write();
+    h_npv_1Sta_B->Write();
+    h_npv_1Sta_E->Write();
+    h_npv_1Sta_I->Write();
+    h_npv_1Trk_B->Write();
+    h_npv_1Trk_E->Write();
+    h_npv_1Trk_I->Write();
+    h_npv_0Glo_B->Write();
+    h_npv_0Glo_E->Write();
+    h_npv_0Glo_I->Write();
+    hPVtemplate->Write();
+    
+
+    outfile->Write();
+
+    infile->Close();
+    delete infile;
+
+    cout << "Done!" << endl;
+    return outfile;
+}
 
 //--------------------------------------------------------------------------------------------------
 // template<typename T>
@@ -842,16 +1136,16 @@ void getZyield(
 
     TFile *histfile = 0;
     TH1D *h=0;
-    if(sigMod==2) {
+    if(sigMod==2 || sigMod==4) {
         if(effType == "HLT"){
-            histfile = generateTemplate_ZYield(mcfilename, hPV, iBin);
+            histfile = generateTemplate_ZYield(mcfilename, 0, iBin);
             if(passRegion)
                 h = (TH1D*)histfile->Get("h_mass_2hlt_"+etaRegion);
             else
                 h = (TH1D*)histfile->Get("h_mass_1hlt_"+etaRegion);            
         }
         else{
-            histfile = generateTemplate(mcfilename, effType, hPV);
+            histfile = generateTemplate(mcfilename, effType, 0);
             assert(histfile);
             if(passRegion)
                 h = (TH1D*)histfile->Get(Form("h_mass_pass_%s", etaRegion.Data()));
@@ -1019,6 +1313,7 @@ void getZyield(
     delete sigModel;
     delete bkgModel;
     delete data;
+    delete histfile;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1056,8 +1351,8 @@ void calculateDataEfficiency(
         RooFit::Import("Fail",*dataFail));
 
     TFile *histfile = 0;
-    if(sigpass==2 || sigfail==2) {
-        histfile = generateTemplate(mcfilename, effType, hPV);
+    if(sigpass==2 || sigfail==2 || sigpass==4 || sigfail==4) {
+        histfile = generateTemplate(mcfilename, effType, 0);
         assert(histfile);
     }
     std::vector<double> vBkgPars;
@@ -1113,7 +1408,7 @@ void calculateDataEfficiency(
     Int_t nflpass=0, nflfail=0;
 
     TH1D *hPass=0;
-    if(sigpass==2) {
+    if(sigpass==2 || sigpass==2) {
         hPass = (TH1D*)histfile->Get(Form("h_mass_pass_%s", etaRegion.Data()));
         hPass->SetDirectory(0);
     }
@@ -1122,7 +1417,7 @@ void calculateDataEfficiency(
     nflpass += set_background_model(bkgpass, bkgPass, m, kTRUE, 0, hbkgQCDPass);
 
     TH1D *hFail=0;
-    if(sigfail==2) {
+    if(sigfail==2 || sigfail==4) {
         hFail = (TH1D*)histfile->Get(Form("h_mass_fail_%s", etaRegion.Data()));
         hFail->SetDirectory(0);
     }
@@ -1399,6 +1694,7 @@ void calculateGloEfficiency(
 		const Int_t   bkgfail,              // background model for FAIL sample
         TH1D          *hPV=0,
         const TString mcfilename="",        // ROOT file containing DY MC events to generate templates from
+        const TString mcCorrfilename="",        // ROOT file containing DY MC events to generate correlation from
         const TString bkgQCDFilename="",    // ROOT file containing bkg template
         const TString bkgTTFilename=""
 ){
@@ -1422,16 +1718,6 @@ void calculateGloEfficiency(
         RooFit::Import("FailSta",*dataFailSta)
         );
 
-    TFile *histfileTrk = 0;
-    TFile *histfileSta = 0;
-    if(sigpass==2 || sigfail==2) {
-        // Generate histogram templates from MC (if necessary)
-        histfileTrk = generateTemplate(mcfilename, "Sta", hPV);
-        histfileSta = generateTemplate(mcfilename, "Trk", hPV);
-        assert(histfileTrk);
-        assert(histfileSta);
-    }
-
     CSignalModel     *sigPass = 0;
     CBackgroundModel *bkgPass = 0;
     CSignalModel     *sigFailTrk = 0;
@@ -1439,31 +1725,38 @@ void calculateGloEfficiency(
     CSignalModel     *sigFailSta = 0;
     CBackgroundModel *bkgFailSta = 0;
 
-    Int_t nflpass=0, nflfailTrk=0, nflfailSta=0;
+    Int_t nflpass, nflfailTrk, nflfailSta;
 
     TH1D *h=0;
-    if(sigpass==2) {
+    TH1D *hSta = 0;
+    TH1D *hTrk = 0;
+    if(sigpass==2 || sigfail==2 || sigpass==4 || sigfail==4) {
+        // Generate histogram templates from MC (if necessary)
+        TFile *histfileTrk = generateTemplate(mcfilename, "Sta", 0);
+        TFile *histfileSta = generateTemplate(mcfilename, "Trk", 0);
+        assert(histfileTrk);
+        assert(histfileSta);
+
         // Sta pass == Trk pass =: Glo
         h = (TH1D*)histfileSta->Get(Form("h_mass_pass_%s", etaRegion.Data()));
         h->SetDirectory(0);
-    }
-
-    nflpass += set_signal_model(sigpass, sigPass, m, kTRUE, 0, h);
-    nflpass += set_background_model(bkgpass, bkgPass, m, kTRUE, 0);
-
-    TH1D *hSta = 0;
-    TH1D *hTrk = 0;
-    if(sigfail==2) {
         hTrk = (TH1D*)histfileTrk->Get(Form("h_mass_fail_%s", etaRegion.Data()));
         hSta = (TH1D*)histfileSta->Get(Form("h_mass_fail_%s", etaRegion.Data()));
         hTrk->SetDirectory(0);
         hSta->SetDirectory(0);
+        
+        histfileTrk->Close();
+        histfileSta->Close();
     }
 
-    nflfailTrk += set_signal_model(sigfail, sigFailTrk, m, kFALSE, 0, hTrk);
+    nflpass = set_signal_model(sigpass, sigPass, m, kTRUE, 0, h);
+    nflpass += set_background_model(bkgpass, bkgPass, m, kTRUE, 0);
+    nflfailTrk = set_signal_model(sigfail, sigFailTrk, m, kFALSE, 0, hTrk);
     nflfailTrk += set_background_model(bkgfail, bkgFailTrk, m, kFALSE, 0);
-    nflfailSta += set_signal_model(sigfail, sigFailSta, m, kFALSE, 1, hSta);
+    nflfailSta = set_signal_model(sigfail, sigFailSta, m, kFALSE, 1, hSta);
     nflfailSta += set_background_model(bkgfail, bkgFailSta, m, kFALSE, 1);
+
+    double corr = extractCorrelation_Glo(mcCorrfilename, hPV, etaRegion);
 
     Double_t NsigMax = passHist->Integral() + failHistTrk->Integral() + failHistSta->Integral();
     Double_t NbkgFailTrkMax = failHistTrk->Integral();
@@ -1473,7 +1766,8 @@ void calculateGloEfficiency(
     RooRealVar Nsig("Nsig","Signal Yield",NsigMax, 0, 1.5*NsigMax);
     RooRealVar effTrk("effTrk","Tracking Efficiency",0.98,0.,1.0);
     RooRealVar effSta("effSta","Standalone Efficiency",0.98,0.,1.0);
-    RooFormulaVar effGlo("effGlo","effTrk*effSta",RooArgList( effTrk, effSta));
+    RooConstVar c("c", "Correlation factor", corr);
+    RooFormulaVar effGlo("effGlo","effTrk*effSta*c",RooArgList( effTrk, effSta, c));
     
     RooRealVar NbkgPass("NbkgPass","Background count in PASS sample",0.01*NbkgPassMax, 0.0, NbkgPassMax);
 
@@ -1484,9 +1778,9 @@ void calculateGloEfficiency(
     RooRealVar NbkgFailSta("NbkgFailSta", "Background count in Sta FAIL sample",
         0.9*NbkgFailStaMax, 0.0, NbkgFailStaMax);
 
-    RooFormulaVar NsigPass("NsigPass","effTrk*effSta*Nsig",RooArgList(effTrk, effSta, Nsig));
-    RooFormulaVar NsigFailTrk("NsigFailTrk","effSta*(1.0-effTrk)*Nsig",RooArgList(effSta,effTrk,Nsig));
-    RooFormulaVar NsigFailSta("NsigFailSta","effTrk*(1.0-effSta)*Nsig",RooArgList(effTrk,effSta,Nsig));
+    RooFormulaVar NsigPass("NsigPass","c*effTrk*effSta*Nsig",RooArgList(effTrk, effSta, c, Nsig));
+    RooFormulaVar NsigFailTrk("NsigFailTrk","effSta*(1.0-c*effTrk)*Nsig",RooArgList(effSta, effTrk, c, Nsig));
+    RooFormulaVar NsigFailSta("NsigFailSta","effTrk*(1.0-c*effSta)*Nsig",RooArgList(effTrk, effSta, c, Nsig));
 
     RooAddPdf modelPass("modelPass","Model for PASS sample",
         (bkgpass>0) ? RooArgList(*(sigPass->model),*(bkgPass->model)) :  RooArgList(*(sigPass->model)),
@@ -1633,9 +1927,9 @@ void calculateGloEfficiency(
             effTrk.setConstant(kFALSE);
             effSta.setConstant(kFALSE);
 
-            const Double_t iEffTrk = n0/(n1+n0);
-            const Double_t iEffSta = n0/(n2+n0);
-            const Double_t iNsig = n0/(iEffTrk * iEffSta);
+            const Double_t iEffTrk = n0/(corr*(n1+n0));
+            const Double_t iEffSta = n0/(corr*(n2+n0));
+            const Double_t iNsig = n0/(corr * iEffTrk * iEffSta);
 
             std::cout<<">>> Set parameters to initial values:"<<std::endl;
             std::cout<<"effSta = "<<iEffSta<<std::endl;
@@ -1714,7 +2008,7 @@ void calculateGloEfficiency(
         NsigP, 
         (RooRealVar*)best_fitResult->floatParsFinal().find("NbkgPass"),
         iBin, effGloVar, 
-        0, "Glo", etaRegion.Data(), kTRUE);
+        (RooRealVar*)&c, "Glo", etaRegion.Data(), kTRUE);
 
     Double_t yMax = 1.5*failHistTrk->GetMaximum();
 
@@ -1725,7 +2019,7 @@ void calculateGloEfficiency(
         NsigF1, 
         (RooRealVar*)best_fitResult->floatParsFinal().find("NbkgFailTrk"),
         iBin, (RooRealVar*)best_fitResult->floatParsFinal().find("effTrk"), 
-        0, "Trk", etaRegion.Data(), kFALSE);
+        (RooRealVar*)&c, "Trk", etaRegion.Data(), kFALSE);
 
     yMax = 1.5*failHistSta->GetMaximum();
 
@@ -1736,7 +2030,7 @@ void calculateGloEfficiency(
         NsigF2, 
         (RooRealVar*)best_fitResult->floatParsFinal().find("NbkgFailSta"),
         iBin, (RooRealVar*)best_fitResult->floatParsFinal().find("effSta"), 
-        0, "Sta", etaRegion.Data(), kFALSE);
+        (RooRealVar*)&c, "Sta", etaRegion.Data(), kFALSE);
 
     std::cout<<"---------------------------------------"<<std::endl;
     std::cout<<"------ chi2pass = " << chi2pass <<std::endl;
@@ -1753,6 +2047,7 @@ void calculateGloEfficiency(
     w->import(chi2fSta);
     w->import(chi2fTrk);
     w->import(chi2);
+    w->import(c);
     w->Write();
 
     best_fitResult->Write("fitResult");
@@ -1770,8 +2065,6 @@ void calculateGloEfficiency(
     delete bkgFailTrk;
     delete sigFailSta;
     delete bkgFailSta;
-    delete histfileSta;
-    delete histfileTrk;
     // delete histbkgTTfile;
 }
 
@@ -1810,11 +2103,11 @@ void calculateHLTEfficiencyAndYield(
         RooFit::Import("Fail",*dataFail));
 
     TFile *histfile = 0;
-    // if(sigpass==2 || sigfail==2) {
-    histfile = generateTemplate_ZYield(mcfilename, hPV, iBin);
-    assert(histfile);
-    // }
-    const double corr = extractCorrelation(histfile, etaRegion);
+    if(sigpass==2 || sigfail==2 || sigpass==4 || sigfail==4) {
+        histfile = generateTemplate_ZYield(mcfilename, 0, iBin);
+        assert(histfile);
+    }
+    const double corr = extractCorrelation_HLT(mcfilename, hPV, etaRegion);
 
     std::vector<double> vBkgPars;
     if(bkgfail== 2 or bkgfail==3){
@@ -1846,7 +2139,7 @@ void calculateHLTEfficiencyAndYield(
     Int_t nflpass=0, nflfail=0;
 
     TH1D *hPass=0;
-    if(sigpass==2) {
+    if(sigpass==2 || sigpass==4) {
         // set signal templates of fail histograms
         hPass = (TH1D*)histfile->Get("h_mass_2hlt_"+ etaRegion);
         hPass->SetDirectory(0);
@@ -1856,7 +2149,7 @@ void calculateHLTEfficiencyAndYield(
     nflpass += set_background_model(bkgpass, bkgPass, m, kTRUE, 2, hbkgQCDPass);
 
     TH1D *hFail=0;
-    if(sigfail==2) {
+    if(sigfail==2 || sigfail==4) {
         // set signal templates of pass histograms
         hFail = (TH1D*)histfile->Get("h_mass_1hlt_"+ etaRegion);
         hFail->SetDirectory(0);
@@ -2139,9 +2432,270 @@ void calculateHLTEfficiencyAndYield(
     delete bkgPass;
     delete sigFail;
     delete bkgFail;
-    delete histfile;
 }
 
+//--------------------------------------------------------------------------------------------------
+// perform fit in 5 regions: 2HLT, 1HLT, Sel fail, Track fail, Standalone fial
+// extract the Z yield and efficiencies together
+void calculateEfficienciesAndYield(
+    TH1D          *h_HLT2,            // histogram with events where both muon pass HLT
+    TH1D          *h_HLT1,            // histogram with events where one muon pass HLT
+    TH1D          *h_SelFail,         // histogram with events where probe fails selection but pass global
+    TH1D          *h_TrkFail,         // histogram with events where probe fails track but pass standalone
+    TH1D          *h_StaFail,         // histogram with events where probe fails standalone but pass track
+    const Int_t   iBin,                 // Label of measurement number in currect run
+    const TString etaRegion,            // {BB, BE, EE}
+    const Int_t   sig,              // signal model
+    const Int_t   bkg,              // background model
+    TH1D          *hPV=0,
+    const TString mcfilename="",        // ROOT file containing MC events to generate templates from
+    const TString bkgQCDFilename="",    // ROOT file containing bkg template
+    const TString bkgTTFilename=""
+){
+    // --- prepare data
+
+    RooRealVar m("m","mass",massLo,massHi);
+    m.setBins(massBin);
+
+    RooCategory sample("sample","");
+    sample.defineType("HLT1",1);
+    sample.defineType("HLT2",2);
+    sample.defineType("SelFail",3);
+    sample.defineType("TrkFail",4);
+    sample.defineType("StaFail",5);
+
+    RooDataHist *dataHLT1 = new RooDataHist("dataHLT1","dataHLT1",RooArgSet(m),h_HLT1);
+    RooDataHist *dataHLT2 = new RooDataHist("dataHLT2","dataHLT2",RooArgSet(m),h_HLT2);
+    RooDataHist *dataSelFail = new RooDataHist("dataSelFail","dataSelFail",RooArgSet(m),h_SelFail);
+    RooDataHist *dataTrkFail = new RooDataHist("dataTrkFail","dataTrkFail",RooArgSet(m),h_TrkFail);
+    RooDataHist *dataStaFail = new RooDataHist("dataStaFail","dataStaFail",RooArgSet(m),h_StaFail);
+
+    RooDataHist *dataCombined = new RooDataHist(
+        "dataCombined","dataCombined",RooArgList(m),
+        RooFit::Index(sample),
+        RooFit::Import("HLT1",*dataHLT1),
+        RooFit::Import("HLT2",*dataHLT2),
+        RooFit::Import("SelFail",*dataSelFail),
+        RooFit::Import("TrkFail",*dataTrkFail),    
+        RooFit::Import("StaFail",*dataStaFail)
+    );
+    
+    // --- prepare fit models
+    const double icHLT = extractCorrelation_HLT(mcfilename, hPV, etaRegion);
+    const double icGlo = extractCorrelation_Glo(mcfilename, hPV, etaRegion);
+
+    CSignalModel     *sigHLT1 = 0;
+    CSignalModel     *sigHLT2 = 0;
+    CSignalModel     *sigSelFail = 0;
+    CSignalModel     *sigTrkFail = 0;
+    CSignalModel     *sigStaFail = 0;
+    CBackgroundModel     *bkgHLT1 = 0;
+    CBackgroundModel     *bkgHLT2 = 0;
+    CBackgroundModel     *bkgSelFail = 0;
+    CBackgroundModel     *bkgTrkFail = 0;
+    CBackgroundModel     *bkgStaFail = 0;
+
+    Int_t nflHLT1, nflHLT2, nflSelFail, nflTrkFail, nflStaFail; 
+
+    TH1D *hHLT1=0;
+    TH1D *hHLT2=0;
+    TH1D *hSelFail=0;
+    TH1D *hTrkFail=0;
+    TH1D *hStaFail=0;
+    if(sig==2 || sig==4) {
+        TFile *histfileHLT = generateTemplate_ZYield(mcfilename, 0, iBin);
+        TFile *histfileTrk = generateTemplate(mcfilename, "Sta", 0);
+        TFile *histfileSta = generateTemplate(mcfilename, "Trk", 0);
+        assert(histfileHLT);
+        assert(histfileTrk);
+        assert(histfileSta);
+        // set signal templates histograms
+        hHLT1 = (TH1D*)histfileHLT->Get("h_mass_1hlt_"+ etaRegion);
+        hHLT2 = (TH1D*)histfileHLT->Get("h_mass_2hlt_"+ etaRegion);
+        hSelFail = (TH1D*)histfileTrk->Get("h_mass_pass_"+ etaRegion);
+        hTrkFail = (TH1D*)histfileTrk->Get("h_mass_fail_"+ etaRegion);
+        hStaFail = (TH1D*)histfileSta->Get("h_mass_fail_"+ etaRegion);
+
+        hHLT1->SetDirectory(0);
+        hHLT2->SetDirectory(0);
+        hSelFail->SetDirectory(0);
+        hTrkFail->SetDirectory(0);
+        hStaFail->SetDirectory(0);
+        
+        histfileHLT->Close();
+        histfileTrk->Close();
+        histfileSta->Close();
+    }
+
+    nflHLT1 = set_signal_model(sig, sigHLT1, m, kTRUE, 1, hHLT1);
+    nflHLT2 = set_signal_model(sig, sigHLT2, m, kTRUE, 2, hHLT2);
+    nflSelFail = set_signal_model(sig, sigSelFail, m, kTRUE, 0, hSelFail);
+    nflTrkFail = set_signal_model(sig, sigTrkFail, m, kFALSE, 0, hTrkFail);
+    nflStaFail = set_signal_model(sig, sigStaFail, m, kFALSE, 1, hStaFail);
+
+    nflHLT1 += set_background_model(bkg, bkgHLT1, m, kTRUE, 1);
+    nflHLT2 += set_background_model(bkg, bkgHLT2, m, kTRUE, 2);
+    nflSelFail += set_background_model(bkg, bkgSelFail, m, kTRUE, 0);
+    nflTrkFail += set_background_model(bkg, bkgTrkFail, m, kFALSE, 0);
+    nflStaFail += set_background_model(bkg, bkgStaFail, m, kFALSE, 1);
+
+    // --- set fit model
+    
+    const Double_t nHLT1Max = h_HLT1->Integral();
+    const Double_t nHLT2Max = h_HLT2->Integral();
+    const Double_t nSelFailMax = h_SelFail->Integral();
+    const Double_t nTrkFailMax = h_TrkFail->Integral();
+    const Double_t nStaFailMax = h_StaFail->Integral();
+
+    const Double_t NsigMax = nHLT1Max + nHLT2Max + nSelFailMax + nTrkFailMax + nStaFailMax;
+    
+    // initial guesses
+    const Double_t nHLT1ExpSig = nHLT1Max*0.99;
+    const Double_t nHLT2ExpSig = nHLT2Max*0.995;
+    const Double_t nSelFailExpSig = nSelFailMax*0.8;
+    const Double_t nTrkFailExpSig = nTrkFailMax*0.15;
+    const Double_t nStaFailExpSig = nStaFailMax*0.15;
+
+    const Double_t ieffHLT  =  2*nHLT2ExpSig                                 / (2*nHLT2ExpSig + nHLT1ExpSig);
+    const Double_t ieffSel  = (2*nHLT2ExpSig + nHLT1ExpSig )                 / (2*nHLT2ExpSig + nHLT1ExpSig + nSelFailExpSig);
+    const Double_t ieffTrk = (2*nHLT2ExpSig + nHLT1ExpSig + nSelFailExpSig) / (2*nHLT2ExpSig + nHLT1ExpSig + nSelFailExpSig + nTrkFailExpSig);
+    const Double_t ieffSta = (2*nHLT2ExpSig + nHLT1ExpSig + nSelFailExpSig) / (2*nHLT2ExpSig + nHLT1ExpSig + nSelFailExpSig + nStaFailExpSig);
+    
+    const Double_t iNsig = (std::pow(nHLT2ExpSig+nHLT1ExpSig/2.,2) * icHLT / nHLT2ExpSig ) / std::pow(ieffSel*ieffTrk*ieffSta*icGlo,2);
+    // free fit parameters
+    RooRealVar Nsig("Nsig","Signal yield",              iNsig,  0., 1.5*NsigMax);
+    RooRealVar effHLT("effHLT","HLT efficiency",        ieffHLT, 0.,1);
+    RooRealVar effSel("effSel","Selection Efficiency",  ieffSel, 0.,1);
+    RooRealVar effTrk("effTrk","Track Efficiency",      ieffTrk,0.,1);
+    RooRealVar effSta("effSta","Standalone Efficiency", ieffSta,0.,1);
+
+    RooRealVar NbkgHLT1("NbkgHLT1",      "Background count in  HLT1 sample",    nHLT1Max-nHLT1ExpSig,       0.0, nHLT1Max);
+    RooRealVar NbkgHLT2("NbkgHLT2",      "Background count in  HLT2 sample",    nHLT2Max-nHLT2ExpSig,       0.0, nHLT2Max);    
+    RooRealVar NbkgSelFail("NbkgSelFail","Background count in  SelFail sample", nSelFailMax-nSelFailExpSig, 0.0, nSelFailMax);
+    RooRealVar NbkgTrkFail("NbkgTrkFail","Background count in  TrkFail sample", nTrkFailMax-nTrkFailExpSig, 0.0, nTrkFailMax);    
+    RooRealVar NbkgStaFail("NbkgStaFail","Background count in  StaFail sample", nStaFailMax-nStaFailExpSig, 0.0, nStaFailMax);    
+    
+    RooConstVar cHLT("cHLT", "Correlation factor between HLT muons", icHLT);
+    RooConstVar cGlo("cGlo", "Correlation factor between inner and outer track of gluon muon", icGlo);
+
+    RooFormulaVar NsigHLT2("NsigHLT2","effHLT*effHLT*cHLT*Nsig*effSel*effSel*effTrk*effTrk*effSta*effSta*cGlo*cGlo",        RooArgList(Nsig, effHLT ,cHLT, effSel, effTrk, effSta, cGlo));
+    RooFormulaVar NsigHLT1("NsigHLT1","2*effHLT*(1.0-cHLT*effHLT)*Nsig*effSel*effSel*effTrk*effTrk*effSta*effSta*cGlo*cGlo",RooArgList(Nsig, effHLT ,cHLT, effSel, effTrk, effSta, cGlo));
+    RooFormulaVar NsigSelFail("NsigSelFail","2*effHLT*Nsig*effSel*(1-effSel)*effTrk*effTrk*effSta*effSta*cGlo*cGlo",        RooArgList(Nsig, effHLT ,cHLT, effSel, effTrk, effSta, cGlo));
+    RooFormulaVar NsigTrkFail("NsigTrkFail","2*effHLT*Nsig*effSel*effSta*effSta*(1-cGlo*effTrk)*effTrk*cGlo",               RooArgList(Nsig, effHLT ,cHLT, effSel, effTrk, effSta, cGlo));
+    RooFormulaVar NsigStaFail("NsigStaFail","2*effHLT*Nsig*effSel*effTrk*effTrk*(1-cGlo*effSta)*effSta*cGlo",               RooArgList(Nsig, effHLT ,cHLT, effSel, effTrk, effSta, cGlo));
+
+    RooAddPdf mHLT1("mHLT1","Model for HLT1 sample",
+        RooArgList(*(sigHLT1->model), *(bkgHLT1->model)),
+        RooArgList(NsigHLT1, NbkgHLT1));
+    RooAddPdf mHLT2("mHLT2","Model for HLT2 sample",
+        RooArgList(*(sigHLT2->model), *(bkgHLT2->model)),
+        RooArgList(NsigHLT2, NbkgHLT2));
+    RooAddPdf mSelFail("mSelFail","Model for SelFail sample",
+        RooArgList(*(sigSelFail->model), *(bkgSelFail->model)),
+        RooArgList(NsigSelFail, NbkgSelFail));
+    RooAddPdf mTrkFail("mTrkFail","Model for TrkFail sample",
+        RooArgList(*(sigTrkFail->model), *(bkgTrkFail->model)),
+        RooArgList(NsigTrkFail, NbkgTrkFail));
+    RooAddPdf mStaFail("mStaFail","Model for StaFail sample",
+        RooArgList(*(sigStaFail->model), *(bkgStaFail->model)),
+        RooArgList(NsigStaFail, NbkgStaFail));
+
+
+    RooSimultaneous totalPdf("totalPdf","totalPdf", sample);
+    totalPdf.addPdf(mHLT1,"HLT1");
+    totalPdf.addPdf(mHLT2,"HLT2");
+    totalPdf.addPdf(mSelFail,"SelFail");
+    totalPdf.addPdf(mTrkFail,"TrkFail");
+    totalPdf.addPdf(mStaFail,"StaFail");
+
+    // --- set workspace for saving results
+    
+    TFile *fFit = new TFile(
+        outputDir+"/workspace_"+etaRegion+"_"+iBin+".root",
+        "RECREATE");
+
+    // save all information in RooWorkspace
+    RooWorkspace* w = new RooWorkspace("workspace","Workspace");
+    w->import(*dataCombined);
+    w->import(totalPdf);
+    
+    // --- perform fit
+    Int_t strategy = 2; // Minuit strategy
+
+    // first fit each region separately
+    mHLT1.fitTo(*dataHLT1,
+        RooFit::PrintEvalErrors(-1),
+        RooFit::PrintLevel(-1),
+        RooFit::Warnings(0),
+        RooFit::Extended(1),
+        RooFit::Strategy(strategy) // MINUIT STRATEGY
+        // RooFit::Minos(RooArgSet(Nsig)),
+    );
+    mHLT2.fitTo(*dataHLT2,
+        RooFit::PrintEvalErrors(-1),
+        RooFit::PrintLevel(-1),
+        RooFit::Warnings(0),
+        RooFit::Extended(1),
+        RooFit::Strategy(strategy) // MINUIT STRATEGY
+        // RooFit::Minos(RooArgSet(Nsig)),
+    );
+    mSelFail.fitTo(*dataSelFail,
+        RooFit::PrintEvalErrors(-1),
+        RooFit::PrintLevel(-1),
+        RooFit::Warnings(0),
+        RooFit::Extended(1),
+        RooFit::Strategy(strategy) // MINUIT STRATEGY
+        // RooFit::Minos(RooArgSet(Nsig)),
+    );
+    mStaFail.fitTo(*dataStaFail,
+        RooFit::PrintEvalErrors(-1),
+        RooFit::PrintLevel(-1),
+        RooFit::Warnings(0),
+        RooFit::Extended(1),
+        RooFit::Strategy(strategy) // MINUIT STRATEGY
+        // RooFit::Minos(RooArgSet(Nsig)),
+    );            
+    mTrkFail.fitTo(*dataTrkFail,
+        RooFit::PrintEvalErrors(-1),
+        RooFit::PrintLevel(-1),
+        RooFit::Warnings(0),
+        RooFit::Extended(1),
+        RooFit::Strategy(strategy) // MINUIT STRATEGY
+        // RooFit::Minos(RooArgSet(Nsig)),
+    );
+
+    RooFitResult *fitResult=0;
+
+    // now fit the full model
+    fitResult = totalPdf.fitTo(*dataCombined,
+        RooFit::PrintEvalErrors(-1),
+        RooFit::PrintLevel(-1),
+        RooFit::Warnings(0),
+        RooFit::Extended(1),
+        RooFit::Strategy(0), // MINUIT STRATEGY
+        // RooFit::Minos(RooArgSet(eff)),
+        RooFit::Save());
+
+    fitResult = totalPdf.fitTo(*dataCombined,
+        RooFit::PrintEvalErrors(-1),
+        RooFit::PrintLevel(-1),
+        RooFit::Warnings(0),
+        RooFit::Extended(1),
+        RooFit::Strategy(1), // MINUIT STRATEGY
+        // RooFit::Minos(RooArgSet(Nsig, eff)),
+        RooFit::Save());
+
+    fitResult = totalPdf.fitTo(*dataCombined,
+        RooFit::PrintEvalErrors(-1),
+        RooFit::PrintLevel(-1),
+        RooFit::Warnings(0),
+        RooFit::Extended(1),
+        RooFit::Strategy(strategy), // MINUIT STRATEGY
+        // RooFit::Minos(RooArgSet(Nsig, eff)),
+        RooFit::Save());
+
+
+}
 
 //--------------------------------------------------------------------------------------------------
 // perform fit in 3 region (0HLT, 1HLT and 2HLT) to extract the Z yield, efficiency and correlation together
@@ -2178,13 +2732,8 @@ void calculateHLTCorrelation(
         RooFit::Import("HLT1",*dataHLT1),
         RooFit::Import("HLT2",*dataHLT2));
 
-    TFile *histfile = 0;
-    // if(sig==2) {
-    generateTemplate_ZYield(mcfilename, hPV, iBin);
-    histfile = new TFile(outputDir+"/../histTemplates_HLT.root");
-    assert(histfile);
-    const double corr = extractCorrelation(histfile, etaRegion);
-    // }
+
+    const double corr = extractCorrelation_HLT(mcfilename, hPV, etaRegion);
     std::vector<double> vBkgPars;
     if(bkg == 2 or bkg == 3){
         vBkgPars = preFit(h_HLT0);
@@ -2197,36 +2746,32 @@ void calculateHLTCorrelation(
     CSignalModel     *sig2 = 0;
     CBackgroundModel *bkg2 = 0;
 
-    Int_t nfl0=0, nfl1=0, nfl2=0;
+    Int_t nfl0, nfl1, nfl2;
 
     TH1D *h0=0;
-    if(sig==2) {
+    TH1D *h1=0;
+    TH1D *h2=0;
+    if(sig==2 || sig==4) {
+        TFile *histfile = generateTemplate_ZYield(mcfilename, 0, iBin);
+        assert(histfile);
         // set signal templates of fail histograms
         h0 = (TH1D*)histfile->Get("h_mass_0hlt_"+ etaRegion);
         h0->SetDirectory(0);
-    }
-
-    nfl0 += set_signal_model(sig, sig0, m, kTRUE, 0, h0);
-    nfl0 += set_background_model(bkg, bkg0, m, kTRUE, 0, 0);
-
-    TH1D *h1=0;
-    if(sig==2) {
-        // set signal templates of pass histograms
-        h1 = (TH1D*)histfile->Get("h_mass_1hlt_"+ etaRegion);
-        h1->SetDirectory(0);
-    }
-
-    nfl1 += set_signal_model(sig, sig1, m, kTRUE, 1, h1);
-    nfl1 += set_background_model(bkg, bkg1, m, kTRUE, 1, 0);
-
-    TH1D *h2=0;
-    if(sig==2) {
         // set signal templates of pass histograms
         h2 = (TH1D*)histfile->Get("h_mass_2hlt_"+ etaRegion);
         h2->SetDirectory(0);
+        // set signal templates of pass histograms
+        h1 = (TH1D*)histfile->Get("h_mass_1hlt_"+ etaRegion);
+        h1->SetDirectory(0);
+        
+        histfile->Close();
     }
 
-    nfl2 += set_signal_model(sig, sig2, m, kTRUE, 2, h2);
+    nfl0 = set_signal_model(sig, sig0, m, kTRUE, 0, h0);
+    nfl0 += set_background_model(bkg, bkg0, m, kTRUE, 0, 0);
+    nfl1 = set_signal_model(sig, sig1, m, kTRUE, 1, h1);
+    nfl1 += set_background_model(bkg, bkg1, m, kTRUE, 1, 0);
+    nfl2 = set_signal_model(sig, sig2, m, kTRUE, 2, h2);
     nfl2 += set_background_model(bkg, bkg2, m, kTRUE, 2, 0);
 
     Double_t NsigMax  = h_HLT0->Integral() + h_HLT1->Integral() + h_HLT2->Integral();
@@ -2242,14 +2787,14 @@ void calculateHLTCorrelation(
     RooFormulaVar Nsig1("Nsig1","2*eff*(1.0-c*eff)*Nsig",RooArgList(eff,Nsig,c));
     RooFormulaVar Nsig2("Nsig2","eff*eff*Nsig*c",RooArgList(eff,Nsig,c));
 
-    RooRealVar Nbkg0("NbkgHLT0","Background count in HLT 0 sample",0.75*Nbkg0Max, 0.0, Nbkg0Max);
-    RooRealVar Nbkg1("NbkgHLT1","Background count in HLT 1 sample",0.1*Nbkg1Max, 0.0, Nbkg1Max);
-    RooRealVar Nbkg2("NbkgHLT2","Background count in HLT 2 sample",0.01*Nbkg2Max, 0.0, Nbkg2Max);
+    // RooRealVar Nbkg0("NbkgHLT0","Background count in HLT 0 sample",0.75*Nbkg0Max, 0.0, Nbkg0Max);
+    // RooRealVar Nbkg1("NbkgHLT1","Background count in HLT 1 sample",0.1*Nbkg1Max, 0.0, Nbkg1Max);
+    // RooRealVar Nbkg2("NbkgHLT2","Background count in HLT 2 sample",0.01*Nbkg2Max, 0.0, Nbkg2Max);
 
     // turn out background for closure test
-    // RooRealVar Nbkg0("NbkgHLT0","Background count in HLT 0 sample",0.0, 0.0, 0.0);
-    // RooRealVar Nbkg1("NbkgHLT1","Background count in HLT 1 sample",0.0, 0.0, 0.0);
-    // RooRealVar Nbkg2("NbkgHLT2","Background count in HLT 2 sample",0.0, 0.0, 0.0);
+    RooRealVar Nbkg0("NbkgHLT0","Background count in HLT 0 sample",0.0, 0.0, 0.0);
+    RooRealVar Nbkg1("NbkgHLT1","Background count in HLT 1 sample",0.0, 0.0, 0.0);
+    RooRealVar Nbkg2("NbkgHLT2","Background count in HLT 2 sample",0.0, 0.0, 0.0);
 
     RooAddPdf model0("model0","Model for HLT 0 sample",
         RooArgList(*(sig0->model),*(bkg0->model)),
@@ -2579,19 +3124,75 @@ void calculateHLTCorrelation(
     delete bkg1;
     delete sig2;
     delete bkg2;
-    delete histfile;
 }
 
 //--------------------------------------------------------------------------------------------------
-double extractCorrelation(TFile *histfile, const TString etaRegion){
+double extractCorrelation_Glo(const TString mcfilename, TH1D *hPV, const TString etaRegion){
     
-    TH1D* h0 = (TH1D*)histfile->Get("h_mass_0hlt_"+etaRegion);        
-    TH1D* h1 = (TH1D*)histfile->Get("h_mass_1hlt_"+etaRegion);    
-    TH1D* h2 = (TH1D*)histfile->Get("h_mass_2hlt_"+etaRegion);
+    std::cout<<"Mean number of PV in data <PV> = " <<hPV->GetMean()<<std::endl;
+    
+    TFile* histfile = generateTemplate_cGlo(mcfilename);
+    
+    TH1D* h0 = (TH1D*)histfile->Get("h_npv_0Glo_"+etaRegion);        
+    TH1D* h1 = (TH1D*)histfile->Get("h_npv_1Sta_"+etaRegion);    
+    TH1D* h2 = (TH1D*)histfile->Get("h_npv_1Trk_"+etaRegion);    
+    TH1D* h3 = (TH1D*)histfile->Get("h_npv_2Glo_"+etaRegion);
+    TH1D* hPV_MC = (TH1D*)histfile->Get("hPV");
+    
+    TH1D* hRatio = (TH1D*)hPV->Clone("hPV_ratio");
+    hRatio->Divide(hPV_MC);
 
-    const double n0 = h0->Integral();
-    const double n1 = h1->Integral();
-    const double n2 = h2->Integral();
+    double n0 = 0;
+    double n1 = 0;
+    double n2 = 0;
+    double n3 = 0;
+    
+    for(int i=1; i<= hPV_MC->GetNbinsX()+1; i++){
+        
+        const double wgt = hRatio->GetBinContent(i);
+        
+        n0 += wgt*h0->GetBinContent(i);
+        n1 += wgt*h1->GetBinContent(i);
+        n2 += wgt*h2->GetBinContent(i);
+        n3 += wgt*h3->GetBinContent(i);
+    }
+
+    const double n = n0+n1+n2+n3;
+    
+    const double corr = n*n3 / ((n1 + n3)*(n2 + n3));
+    
+    std::cout<<"EXTRACT c("<<etaRegion<<") = "<<corr<<std::endl;
+    
+    return corr;
+    
+}
+
+//--------------------------------------------------------------------------------------------------
+double extractCorrelation_HLT(const TString mcfilename, TH1D *hPV, const TString etaRegion){
+    
+    TFile* histfile = generateTemplate_cHLT(mcfilename);
+    
+    TH1D* h0 = (TH1D*)histfile->Get("h_npv_0hlt_"+etaRegion);        
+    TH1D* h1 = (TH1D*)histfile->Get("h_npv_1hlt_"+etaRegion);    
+    TH1D* h2 = (TH1D*)histfile->Get("h_npv_2hlt_"+etaRegion);
+    TH1D* hPV_MC = (TH1D*)histfile->Get("hPV");
+    
+    TH1D* hRatio = (TH1D*)hPV->Clone("hPV_ratio");
+    hRatio->Divide(hPV_MC);
+
+    double n0 = 0;
+    double n1 = 0;
+    double n2 = 0;
+    
+    for(int i=0; i<= hPV_MC->GetNbinsX()+1; i++){
+        
+        const double wgt = hRatio->GetBinContent(i);
+        
+        n0 += wgt*h0->GetBinContent(i);
+        n1 += wgt*h1->GetBinContent(i);
+        n2 += wgt*h2->GetBinContent(i);
+    }
+
     const double n = n0+n1+n2;
     
     const double corr = 4*n*n2 / std::pow(n1 + 2*n2, 2);
