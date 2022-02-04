@@ -11,7 +11,7 @@
 
 //--------------------------------------------------------------------------------------------------
 bool triggertool::readEvent(const edm::Event& iEvent){
-    edm::LogVerbatim("triggertools") << "triggertools: readEvent";
+    LogDebug("triggertools") << "triggertools: readEvent";
 
     iEvent.getByToken(fHLTTag_token, hTrgRes);
     if (!hTrgRes.isValid()){
@@ -26,14 +26,14 @@ bool triggertool::readEvent(const edm::Event& iEvent){
     triggerBits.reset();
     for (unsigned int i = 0; i < records.size(); i++) {
         if (records.at(i).hltPathIndex == (unsigned int)-1){
-            edm::LogWarning("triggertools")<<"hltPathIndex has not been set"<<std::endl;
+            LogDebug("triggertools")<<"hltPathIndex has not been set"<<std::endl;
             continue;
         }
         if (hTrgRes->accept(records.at(i).hltPathIndex)) {
             triggerBits[i] = true;
         }
     }
-    edm::LogVerbatim("triggertools") << "triggertools: bitset = "<<triggerBits[1]<<triggerBits[0];
+    LogDebug("triggertools") << "triggertools: bitset = "<<triggerBits[1]<<triggerBits[0];
 
     return true;
 }
@@ -115,11 +115,10 @@ void triggertool::initHLTObjects(const HLTConfigProvider& hltConfigProvider_){
 
         for (auto const& iPathName : triggerNames) {
 
-            edm::LogVerbatim("triggertools")<<"trigger name"<<iPathName;
-
             if(iPathName != iRec.hltPathName){
                 continue;
             }
+            edm::LogVerbatim("triggertools")<<"trigger name: "<<iPathName;
 
             iRec.hltPathIndex = hltConfigProvider_.triggerIndex(iPathName);
 
@@ -146,11 +145,16 @@ void triggertool::initHLTObjects(const HLTConfigProvider& hltConfigProvider_){
                 iRec.hltObjName = moduleLabel;
                 break;
             }
-
             break;
-
+        }
+        
+        if (iRec.hltPathIndex == (unsigned int)-1){
+            edm::LogWarning("triggertools")<<"hltPathIndex has not been found for: "<<iRec.hltPattern<<std::endl;
+            continue;
         }
     }
+    
+    
 }
 
 //--------------------------------------------------------------------------------------------------

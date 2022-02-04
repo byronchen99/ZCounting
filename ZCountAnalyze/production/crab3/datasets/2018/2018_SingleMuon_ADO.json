@@ -1,0 +1,62 @@
+{
+"SingleMuon_Run2018A": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/SingleMuon/Run2018A-12Nov2019_UL2018-v3/AOD",
+    "Data.lumiMask": "/afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions18/13TeV/Legacy_2018/Cert_314472-325175_13TeV_Legacy2018_Collisions18_JSON_MuonPhys.txt",
+    "Data.splitting": "LumiBased",
+    "Data.unitsPerJob": 100,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "year=2018",
+      "samplename=smu",
+      "outputFile=SingleMuon_Run2018A"
+    ]
+  }
+},
+"SingleMuon_Run2018B": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/SingleMuon/Run2018B-12Nov2019_UL2018-v3/AOD",
+    "Data.lumiMask": "/afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions18/13TeV/Legacy_2018/Cert_314472-325175_13TeV_Legacy2018_Collisions18_JSON_MuonPhys.txt",
+    "Data.splitting": "LumiBased",
+    "Data.unitsPerJob": 100,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "year=2018",
+      "samplename=smu",
+      "outputFile=SingleMuon_Run2018B"
+    ]
+  }
+},
+"SingleMuon_Run2018C": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/SingleMuon/Run2018C-12Nov2019_UL2018-v3/AOD",
+    "Data.lumiMask": "/afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions18/13TeV/Legacy_2018/Cert_314472-325175_13TeV_Legacy2018_Collisions18_JSON_MuonPhys.txt",
+    "Data.splitting": "LumiBased",
+    "Data.unitsPerJob": 50,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "year=2018",
+      "samplename=smu",
+      "outputFile=SingleMuon_Run2018C"
+    ]
+  }
+},
+"SingleMuon_Run2018D": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/SingleMuon/Run2018D-12Nov2019_UL2018-v8/AOD",
+    "Data.lumiMask": "/afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions18/13TeV/Legacy_2018/Cert_314472-325175_13TeV_Legacy2018_Collisions18_JSON_MuonPhys.txt",
+    "Data.splitting": "LumiBased",
+    "Data.unitsPerJob": 100,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "year=2018",
+      "samplename=smu",
+      "outputFile=SingleMuon_Run2018D"
+    ]
+  }
+}
+}

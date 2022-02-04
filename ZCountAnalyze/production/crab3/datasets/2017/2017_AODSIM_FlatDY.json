@@ -2,7 +2,7 @@
 "DYJetsToLL_M_50_LO_FlatPU0to75_Fall17": {
     "OutputSplitFiles": 1,
     "crab3": {
-      "Data.inputDataset": "/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/RunIISummer20UL17MiniAODv2-FlatPU0to75_106X_mc2017_realistic_v9-v2/MINIAODSIM",
+      "Data.inputDataset": "/DYJetsToLL_M-50_TuneCP5_13TeV-madgraphMLM-pythia8/RunIISummer20UL17RECO-FlatPU0to75_106X_mc2017_realistic_v6-v2/AODSIM",
       "Data.splitting": "FileBased",
       "Data.unitsPerJob": 1,
       "JobType.maxMemoryMB": 2500,

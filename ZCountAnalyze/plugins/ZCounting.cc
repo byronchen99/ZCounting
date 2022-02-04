@@ -95,12 +95,9 @@ private:
                                                                      );
     bool isTriggerObject(const std::vector<pat::TriggerObjectStandAlone>&, const pat::Muon&);
 
-
     int getMuonID(const pat::Muon&, const reco::Vertex&);
     double dxy(const pat::Muon&, const reco::Vertex&);
     double dz(const pat::Muon&, const reco::Vertex&);
-    double pointsDistance(const reco::Candidate::Point&, const reco::Candidate::Point&);
-    bool isPVClosestVertex(const std::vector<reco::Vertex>&, const pat::Muon&);
 
 
     // ----------member data ---------------------------
@@ -1079,33 +1076,6 @@ double ZCounting::dxy(const pat::Muon &mu, const reco::Vertex &vtx){
 double ZCounting::dz(const pat::Muon &mu, const reco::Vertex &vtx){
     return fabs(mu.muonBestTrack()->dz(vtx.position()));
 }
-
-//--------------------------------------------------------------------------------------------------
-double ZCounting::pointsDistance(const reco::Candidate::Point &p1, const reco::Candidate::Point &p2){
-    // computes the euclidean distance of two points
-    return std::sqrt(std::pow(p1.x() - p2.x(),2) + std::pow(p1.y() - p2.y(),2) + std::pow(p1.z() - p2.z(),2));
-}
-
-//--------------------------------------------------------------------------------------------------
-bool ZCounting::isPVClosestVertex(const std::vector<reco::Vertex> &vtxCol, const pat::Muon &mu){
-    reco::Vertex vtx = *vtxCol.begin();
-    double minDist = 999.;
-    int nPV = 0;
-    for (auto const& itVtx : vtxCol) {
-        if(!isGoodPV(itVtx))
-            continue;
-        const float dist = pointsDistance(itVtx.position(), mu.vertex());
-        if (dist < minDist){
-            vtx = itVtx;
-            minDist = dist;
-            if(nPV > 0)
-                return false;
-        }
-        nPV++;
-    }
-    return true;
-}
-
 
 
 

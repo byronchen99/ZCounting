@@ -58,7 +58,7 @@
 "WW_Fall17": {
   "OutputSplitFiles": 1,
   "crab3": {
-    "Data.inputDataset": "/WW_TuneCP5_13TeV-pythia8/RunIISummer20UL17MiniAOD-106X_mc2017_realistic_v6-v2/MINIAODSIM",
+    "Data.inputDataset": "/WW_TuneCP5_13TeV-pythia8/RunIISummer20UL17MiniAODv2-106X_mc2017_realistic_v9-v1/MINIAODSIM",
     "Data.splitting": "FileBased",
     "Data.unitsPerJob": 1,
     "JobType.maxMemoryMB": 2500,
@@ -72,7 +72,7 @@
 "WZ_Fall17": {
   "OutputSplitFiles": 1,
   "crab3": {
-    "Data.inputDataset": "/WZ_TuneCP5_13TeV-pythia8/RunIISummer20UL17MiniAOD-106X_mc2017_realistic_v6-v2/MINIAODSIM",
+    "Data.inputDataset": "/WZ_TuneCP5_13TeV-pythia8/RunIISummer20UL17MiniAODv2-106X_mc2017_realistic_v9-v1/MINIAODSIM",
     "Data.splitting": "FileBased",
     "Data.unitsPerJob": 1,
     "JobType.maxMemoryMB": 2500,
@@ -86,7 +86,7 @@
 "ZZ_Fall17": {
   "OutputSplitFiles": 1,
   "crab3": {
-    "Data.inputDataset": "/ZZ_TuneCP5_13TeV-pythia8/RunIISummer20UL17MiniAOD-106X_mc2017_realistic_v6-v2/MINIAODSIM",
+    "Data.inputDataset": "/ZZ_TuneCP5_13TeV-pythia8/RunIISummer20UL17MiniAODv2-106X_mc2017_realistic_v9-v1/MINIAODSIM",
     "Data.splitting": "FileBased",
     "Data.unitsPerJob": 1,
     "JobType.maxMemoryMB": 2500,
@@ -94,6 +94,90 @@
       "samplename=zz",
       "year=2017",
       "outputFile=ZZ_Fall17"
+    ]
+  }
+},
+"ST_t_channel_top_Fall17": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/ST_t-channel_top_4f_InclusiveDecays_TuneCP5_13TeV-powheg-madspin-pythia8/RunIISummer20UL17MiniAOD-106X_mc2017_realistic_v6-v1/MINIAODSIM",
+    "Data.splitting": "FileBased",
+    "Data.unitsPerJob": 1,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "samplename=t",
+      "year=2017",
+      "outputFile=ST_t_channel_top_Fall17"
+    ]
+  }
+},
+"ST_t_channel_antitop_Fall17": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/ST_t-channel_antitop_4f_InclusiveDecays_TuneCP5_13TeV-powheg-madspin-pythia8/RunIISummer20UL17MiniAODv2-106X_mc2017_realistic_v9-v1/MINIAODSIM",
+    "Data.splitting": "FileBased",
+    "Data.unitsPerJob": 1,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "samplename=t",
+      "year=2017",
+      "outputFile=ST_t_channel_antitop_Fall17"
+    ]
+  }
+},
+"ST_tW_top_Fall17": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/ST_tW_top_5f_inclusiveDecays_TuneCP5_13TeV-powheg-pythia8/RunIISummer20UL17MiniAODv2-106X_mc2017_realistic_v9-v2/MINIAODSIM",
+    "Data.splitting": "FileBased",
+    "Data.unitsPerJob": 1,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "samplename=t",
+      "year=2017",
+      "outputFile=ST_tW_top_Fall17"
+    ]
+  }
+},
+"ST_tW_antitop_Fall17": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/ST_tW_antitop_5f_inclusiveDecays_TuneCP5_13TeV-powheg-pythia8/RunIISummer20UL17MiniAODv2-106X_mc2017_realistic_v9-v2/MINIAODSIM",
+    "Data.splitting": "FileBased",
+    "Data.unitsPerJob": 1,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "samplename=t",
+      "year=2017",
+      "outputFile=ST_tW_antitop_Fall17"
+    ]
+  }
+},
+"TTZJets_Fall17": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/ttZJets_TuneCP5_13TeV_madgraphMLM_pythia8/RunIISummer20UL17MiniAODv2-106X_mc2017_realistic_v9-v2/MINIAODSIM",
+    "Data.splitting": "FileBased",
+    "Data.unitsPerJob": 1,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "samplename=ttz",
+      "year=2017",
+      "outputFile=TTZJets_Fall17"
+    ]
+  }
+},
+"TTWJets_Fall17": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/ttWJets_TuneCP5_13TeV_madgraphMLM_pythia8/RunIISummer20UL17MiniAODv2-106X_mc2017_realistic_v9-v2/MINIAODSIM",
+    "Data.splitting": "FileBased",
+    "Data.unitsPerJob": 1,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "samplename=ttw",
+      "year=2017",
+      "outputFile=TTWJets_Fall17"
     ]
   }
 }

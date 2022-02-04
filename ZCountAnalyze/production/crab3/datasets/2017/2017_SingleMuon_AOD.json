@@ -1,0 +1,77 @@
+{
+"SingleMuon_Run2017B": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/SingleMuon/Run2017B-09Aug2019_UL2017-v1/AOD",
+    "Data.lumiMask": "/afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions17/13TeV/Legacy_2017/Cert_294927-306462_13TeV_UL2017_Collisions17_MuonJSON.txt",
+    "Data.splitting": "LumiBased",
+    "Data.unitsPerJob": 100,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "year=2017",
+      "samplename=smu",
+      "outputFile=SingleMuon_Run2017B"
+    ]
+  }
+},
+"SingleMuon_Run2017C": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/SingleMuon/Run2017C-09Aug2019_UL2017-v1/AOD",
+    "Data.lumiMask": "/afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions17/13TeV/Legacy_2017/Cert_294927-306462_13TeV_UL2017_Collisions17_MuonJSON.txt",
+    "Data.splitting": "LumiBased",
+    "Data.unitsPerJob": 50,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "year=2017",
+      "samplename=smu",
+      "outputFile=SingleMuon_Run2017C"
+    ]
+  }
+},
+"SingleMuon_Run2017D": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/SingleMuon/Run2017D-09Aug2019_UL2017-v1/AOD",
+    "Data.lumiMask": "/afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions17/13TeV/Legacy_2017/Cert_294927-306462_13TeV_UL2017_Collisions17_MuonJSON.txt",
+    "Data.splitting": "LumiBased",
+    "Data.unitsPerJob": 100,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "year=2017",
+      "samplename=smu",
+      "outputFile=SingleMuon_Run2017D"
+    ]
+  }
+},
+"SingleMuon_Run2017E": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/SingleMuon/Run2017E-09Aug2019_UL2017-v1/AOD",
+    "Data.lumiMask": "/afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions17/13TeV/Legacy_2017/Cert_294927-306462_13TeV_UL2017_Collisions17_MuonJSON.txt",
+    "Data.splitting": "LumiBased",
+    "Data.unitsPerJob": 100,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "year=2017",
+      "samplename=smu",
+      "outputFile=SingleMuon_Run2017E"
+    ]
+  }
+},
+"SingleMuon_Run2017F": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/SingleMuon/Run2017F-09Aug2019_UL2017-v1/AOD",
+    "Data.lumiMask": "/afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions17/13TeV/Legacy_2017/Cert_294927-306462_13TeV_UL2017_Collisions17_MuonJSON.txt",
+    "Data.splitting": "LumiBased",
+    "Data.unitsPerJob": 50,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "year=2017",
+      "samplename=smu",
+      "outputFile=SingleMuon_Run2017F"
+    ]
+  }
+}
+}

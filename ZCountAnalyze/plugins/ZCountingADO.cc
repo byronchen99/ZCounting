@@ -62,12 +62,17 @@
 #include "ZCounting/ZUtils/interface/triggertool.h"
 
 #include "ZCounting/ZUtils/interface/Helper.h"
+#include "ZCounting/ZUtils/interface/RoccoR.h"
+#include "ZCounting/ZUtils/interface/getFilename.h"
 
 // ROOT includes
 #include "TTree.h"
+#include "TFile.h"
+#include "TTreeReader.h"
+#include "TTreeReaderValue.h"
+#include "TRandom3.h"
 #include "Math/Vector4D.h"
 #include <TLorentzVector.h>
-
 //
 // class declaration
 //
@@ -85,6 +90,7 @@ public:
 
 private:
     void beginRun(const edm::Run&, const edm::EventSetup&) override;
+    void beginLuminosityBlock(const edm::LuminosityBlock&, const edm::EventSetup&) override;
     virtual void beginJob() override;
     virtual void analyze(const edm::Event&, const edm::EventSetup&) override;
     virtual void endJob() override;
@@ -93,11 +99,13 @@ private:
 
     std::string get_triggerPath(std::string, const edm::TriggerNames&);
 
-
     int getMuonID(const reco::Muon&, const reco::Vertex&);
+    
+    bool isMuonTriggerObjEmulated(const double eta, const double phi, const long long unsigned eventNumber);
 
 
     // ----------member data ---------------------------
+    const double MUON_MASS = 0.105658369;
 
     edm::Service<TFileService> fs;
     TTree *tree_;
@@ -105,7 +113,13 @@ private:
     HLTConfigProvider hltConfigProvider_;
     triggertool *triggers;
 
-    const double MUON_MASS = 0.105658369;
+    bool emulateTrigger_;
+    TFile *_fileHLTEmulation = 0;
+        
+    // rocchester corrections
+    RoccoR rc; 
+    std::string roccorFile;   
+    TRandom3 rand_;
 
     TLorentzVector vMuon;
     TLorentzVector vAntiMuon;
@@ -113,6 +127,7 @@ private:
     // --- input
     const edm::InputTag triggerResultsInputTag_;
     edm::EDGetTokenT<std::vector<reco::Muon>> muonCollection_;
+    edm::EDGetTokenT<std::vector<reco::Track>> trackCollection_;
     edm::EDGetTokenT<std::vector<reco::Vertex>> pvCollection_;
     edm::EDGetTokenT<std::vector<GenZDecayProperties>> genZCollection_;
     edm::EDGetTokenT<TtGenEvent> genTtEvent_;
@@ -123,10 +138,14 @@ private:
 
     std::string era_;
 
-    // Muon trigger
+    // Triggers
     bool hltChanged_;
-    std::vector<std::string> muonTriggerPatterns_;
 
+    // MET trigger
+    std::vector<std::string> metTriggerPatterns_;
+
+    // Muon trigger
+    std::vector<std::string> muonTriggerPatterns_;
     // max dR matching between muon and hlt object
     double DRMAX;
 
@@ -157,32 +176,39 @@ private:
     float z_genMass_;
     float z_recoMass_;
 
+    int met_triggerBits_;
+
     int muon_genRecoMatches_;
     int muon_genRecoObj_;
+    int muon_genRecoTrackMatches_;
+    int muon_genRecoTrackObj_;
     float muon_genPt_;
     float muon_genEta_;
     float muon_genPhi_;
-    float muon_genVtxToPV_;
 
     int antiMuon_genRecoMatches_;
     int antiMuon_genRecoObj_;
+    int antiMuon_genRecoTrackMatches_;
+    int antiMuon_genRecoTrackObj_;
     float antiMuon_genPt_;
     float antiMuon_genEta_;
     float antiMuon_genPhi_;
-    float antiMuon_genVtxToPV_;
 
     unsigned int nMuon_;
-    std::vector<int> muon_matchValue_;
+    std::vector<float> muon_pt_;
+    std::vector<float> muon_eta_;
+    std::vector<float> muon_phi_;
     std::vector<int> muon_charge_;
+    std::vector<float> muon_dx_;
+    std::vector<float> muon_dy_;
+    std::vector<float> muon_dz_;
+    
+    std::vector<int> muon_matchValue_;
     std::vector<float> muon_tkRelIso_;
     std::vector<float> muon_pfRelIso04_all_;
     std::vector<int> muon_ID_;
     std::vector<int> muon_triggerBits_;
-    std::vector<float> muon_dxy_;
-    std::vector<float> muon_dz_;
-    std::vector<float> muon_pt_;
-    std::vector<float> muon_eta_;
-    std::vector<float> muon_phi_;
+
     std::vector<bool> muon_isMedium_;
     std::vector<bool> muon_isStandalone_;
     std::vector<bool> muon_isTracker_;
@@ -197,14 +223,31 @@ private:
     std::vector<int> muon_nPixelHits_;
     std::vector<int> muon_nTrackerLayers_;
     std::vector<float> muon_validFraction_;
+    std::vector<float> muon_trackAlgo_;
 
-    std::vector<float> v_muon_ScaleCorr_;
-    std::vector<float> v_muon_ScaleCorr_stat_RMS_;
-    std::vector<float> v_muon_ScaleCorr_Zpt_;
-    std::vector<float> v_muon_ScaleCorr_Ewk_;
-    std::vector<float> v_muon_ScaleCorr_deltaM_;
-    std::vector<float> v_muon_ScaleCorr_Ewk2_;
-    std::vector<float> v_muon_ScaleCorr_Total_;
+    std::vector<float> muon_ScaleCorr_;
+    //std::vector<float> muon_ScaleCorr_stat_RMS_;
+    //std::vector<float> muon_ScaleCorr_Zpt_;
+    //std::vector<float> muon_ScaleCorr_Ewk_;
+    //std::vector<float> muon_ScaleCorr_deltaM_;
+    //std::vector<float> muon_ScaleCorr_Ewk2_;
+    //std::vector<float> muon_ScaleCorr_Total_;
+
+    unsigned int nTrack_;
+    std::vector<float> track_pt_;
+    std::vector<float> track_eta_;
+    std::vector<float> track_phi_;
+    std::vector<int> track_charge_;
+    std::vector<float> track_dx_;
+    std::vector<float> track_dy_;
+    std::vector<float> track_dz_;
+
+    std::vector<int> track_nPixelHits_;
+    std::vector<int> track_nTrackerLayers_;
+    std::vector<float> track_validFraction_;
+    std::vector<float> track_trackAlgo_;
+
+    std::vector<float> track_ScaleCorr_;
 };
 
 //
@@ -213,6 +256,7 @@ private:
 ZCountingAOD::ZCountingAOD(const edm::ParameterSet& iConfig):
     triggerResultsInputTag_(iConfig.getParameter<edm::InputTag>("TriggerResults")),
     muonCollection_  (consumes<std::vector<reco::Muon>> (iConfig.getParameter<edm::InputTag>("reco_muons"))),
+    trackCollection_  (consumes<std::vector<reco::Track>> (iConfig.getParameter<edm::InputTag>("reco_tracks"))),
     pvCollection_    (consumes<std::vector<reco::Vertex> > (iConfig.getParameter<edm::InputTag>("edmPVName"))),
     genZCollection_  (consumes<std::vector<GenZDecayProperties> > (iConfig.getParameter<edm::InputTag>("genZLeptonCollection"))),
     genTtEvent_  (consumes<TtGenEvent> (iConfig.getParameter<edm::InputTag>("genTtCollection"))),
@@ -232,22 +276,29 @@ ZCountingAOD::ZCountingAOD(const edm::ParameterSet& iConfig):
     v_genWeightIDs_ = iConfig.getParameter<std::vector<int>>("genWeights");
     v_pdfWeightIDs_ = iConfig.getParameter<std::vector<int>>("pdfWeights");
 
+    roccorFile = iConfig.getParameter<std::string>("roccorFile");
+
+    hltChanged_ = true;
+    emulateTrigger_ = iConfig.getUntrackedParameter<bool>("emulateTrigger");
+
     muonTriggerPatterns_ = iConfig.getParameter<std::vector<std::string>>("muon_trigger_patterns");
+    metTriggerPatterns_ = iConfig.getParameter<std::vector<std::string>>("met_trigger_patterns");
     
     DRMAX = iConfig.getUntrackedParameter<double>("muon_trigger_DRMAX");
 
-    hltChanged_ = true;
 
     triggers = new triggertool();
     triggers->setTriggerResultsToken(consumes<edm::TriggerResults>(triggerResultsInputTag_));
     triggers->setTriggerEventToken(consumes<trigger::TriggerEvent>(iConfig.getParameter<edm::InputTag>("TriggerEvent")));
     triggers->setDRMAX(DRMAX);
 
-    edm::LogVerbatim("TnPPairTreeProducer") << "getInput: set trigger names";
+    edm::LogVerbatim("ZCountingAOD") << "getInput: set trigger names";
     for(unsigned int i = 0; i < muonTriggerPatterns_.size(); ++i) {
         triggers->addTriggerRecord(muonTriggerPatterns_.at(i));
     }
-
+    for(unsigned int i = 0; i < metTriggerPatterns_.size(); ++i) {
+        triggers->addTriggerRecord(metTriggerPatterns_.at(i));
+    }
 
 }
 
@@ -270,10 +321,13 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     this->clearVariables();
 
     triggers->readEvent(iEvent);
+    
+    // take data events only if one of the required triggers has fired
+    if(iEvent.isRealData() && !(triggers->pass(metTriggerPatterns_) || triggers->pass(muonTriggerPatterns_))){
+        return;
+    }
 
     // Event info
-    runNumber_ = iEvent.id().run();
-    lumiBlock_ = iEvent.id().luminosityBlock();
     eventNumber_ = iEvent.id().event();
 
     const reco::GenParticle* genLepton = 0;
@@ -380,7 +434,7 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     const std::vector<reco::Vertex> *pvCol = pvCollection.product();
     reco::Vertex pv = *pvCol->begin();
     nPV_ = 0;
-    for (auto const& itVtx : *pvCol) {
+    for (const reco::Vertex &itVtx : *pvCol) {
         if(!isGoodPV(itVtx))
             continue;
         if (nPV_ == 0)
@@ -402,13 +456,17 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
         z_genMass_ = (genLepton->p4() + genAntiLepton->p4()).M();
     }
 
+    for(unsigned j = 0; j < metTriggerPatterns_.size(); ++j){
+        met_triggerBits_ += std::pow(2,j) * triggers->pass(metTriggerPatterns_.at(j));
+    }
+
     // --- store all reco muons
     LogDebug("ZCountingAOD") << "find reco muons";
     edm::Handle<std::vector<reco::Muon>> muonCollection;
     iEvent.getByToken(muonCollection_, muonCollection);
-    for (reco::Muon mu : *muonCollection){
+    for (const reco::Muon &mu : *muonCollection){
         if(std::abs(mu.eta()) > 2.4) continue;
-        if(mu.pt() < 15) continue;
+        if(mu.pt() < 20) continue;
 
         int match_value_ = -1;
         if(!iEvent.isRealData()){
@@ -427,11 +485,18 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
                 isPromptFinalState_gen, isDirectPromptTauDecayProductFinalState_gen);
         }
         muon_matchValue_.push_back(match_value_);
+        
+        // Look for the distance to (0,0,0)
+        muon_dx_.push_back(mu.muonBestTrack()->referencePoint().x());
+        muon_dy_.push_back(mu.muonBestTrack()->referencePoint().y());
+        muon_dz_.push_back(mu.muonBestTrack()->referencePoint().z());
 
-        muon_charge_.push_back(mu.charge());
         muon_pt_.push_back(mu.pt());
         muon_eta_.push_back(mu.eta());
         muon_phi_.push_back(mu.phi());
+        muon_charge_.push_back(mu.charge());
+        muon_tkRelIso_.push_back(getTkIso(mu));
+        muon_pfRelIso04_all_.push_back(getPFIso(mu));
         muon_ID_.push_back(getMuonID(mu, pv));
 
         muon_isMedium_.push_back(muon::isMediumMuon(mu));
@@ -448,11 +513,13 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
             muon_nPixelHits_.push_back(mu.innerTrack()->hitPattern().numberOfValidPixelHits());
             muon_nTrackerLayers_.push_back(mu.innerTrack()->hitPattern().trackerLayersWithMeasurement());
             muon_validFraction_.push_back(mu.innerTrack()->validFraction());
+            muon_trackAlgo_.push_back(mu.innerTrack()->originalAlgo());
         }
         else{
             muon_nPixelHits_.push_back(-1);
             muon_nTrackerLayers_.push_back(-1);
             muon_validFraction_.push_back(-1);
+            muon_trackAlgo_.push_back(-1);
         }
 
         if(mu.isGlobalMuon()){
@@ -463,18 +530,21 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
             muon_normChi2_.push_back(-1);
             muon_nTrackHits_.push_back(-1);
         }
-
-        muon_tkRelIso_.push_back(getTkIso(mu));
-        muon_pfRelIso04_all_.push_back(getPFIso(mu));
-        muon_dxy_.push_back(mu.muonBestTrack()->dxy());
-        muon_dz_.push_back(mu.muonBestTrack()->dz());
-
-        int bits_ = 0;
-        for(unsigned j = 0; j < muonTriggerPatterns_.size(); ++j){
-            bits_ += std::pow(2,j) * triggers->passObj(muonTriggerPatterns_.at(j), mu.eta(), mu.phi());
+        
+        int bits_ = 0;    
+        if(emulateTrigger_){
+            bits_ = isMuonTriggerObjEmulated(mu.eta(), mu.phi(), eventNumber_);
         }
-        muon_triggerBits_.push_back(bits_);
+        else{
+            for(unsigned j = 0; j < muonTriggerPatterns_.size(); ++j){
+                bits_ += std::pow(2,j) * triggers->passObj(muonTriggerPatterns_.at(j), mu.eta(), mu.phi());
+            }
+        }
+        muon_triggerBits_.push_back(bits_);            
+    
 
+
+        double roccorSF = 1.; // Rochester correction
         if(!iEvent.isRealData()){
 
             if(genLepton && mu.pdgId() == 13 && reco::deltaR(mu.eta(), mu.phi(), genLepton->eta(), genLepton->phi()) < 0.03){
@@ -484,39 +554,114 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
                 ){
                     // store index of reco match for the one with the closest pt in case of ambiguity
                     muon_genRecoObj_ = nMuon_;
+                    roccorSF = rc.kSpreadMC(mu.charge(), mu.pt(), mu.eta(), mu.phi(), muon_genPt_);
                 }
             }
 
-            if(genAntiLepton && mu.pdgId() == -13 && reco::deltaR(mu.eta(), mu.phi(), genAntiLepton->eta(), genAntiLepton->phi()) < 0.03){
+            else if(genAntiLepton && mu.pdgId() == -13 && reco::deltaR(mu.eta(), mu.phi(), genAntiLepton->eta(), genAntiLepton->phi()) < 0.03){
                 antiMuon_genRecoMatches_++;
                 if(antiMuon_genRecoObj_ == -1
                     || std::abs(mu.pt() - antiMuon_genPt_) < std::abs(muon_pt_[antiMuon_genRecoObj_] - antiMuon_genPt_)
                 ){
                     // store index of reco match for the one with the closest pt in case of ambiguity
                     antiMuon_genRecoObj_ = nMuon_;
+                    roccorSF = rc.kSpreadMC(mu.charge(), mu.pt(), mu.eta(), mu.phi(), antiMuon_genPt_);
                 }
+            }
+            else{
+                const int nl = mu.innerTrack().isNonnull() ? mu.innerTrack()->hitPattern().trackerLayersWithMeasurement() : 0;
+                roccorSF = rc.kSmearMC(mu.charge(), mu.pt(), mu.eta(), mu.phi(), nl, rand_.Rndm());
             }
 
             // store muon Rochester corrections and uncertainties
-            // v_muon_ScaleCorr_.push_back(mu.hasUserFloat("MuonEnergyCorr")                   ? mu.userFloat("MuonEnergyCorr")          : 1.0);
-            // v_muon_ScaleCorr_stat_RMS_.push_back(mu.hasUserFloat("MuonEnergyCorr_stat_RMS") ? mu.userFloat("MuonEnergyCorr_stat_RMS") : 0.0);
-            // v_muon_ScaleCorr_Zpt_.push_back(mu.hasUserFloat("MuonEnergyCorr_Zpt")           ? mu.userFloat("MuonEnergyCorr_Zpt")      : 0.0);
-            // v_muon_ScaleCorr_Ewk_.push_back(mu.hasUserFloat("MuonEnergyCorr_Ewk")           ? mu.userFloat("MuonEnergyCorr_Ewk")      : 0.0);
-            // v_muon_ScaleCorr_deltaM_.push_back(mu.hasUserFloat("MuonEnergyCorr_deltaM")     ? mu.userFloat("MuonEnergyCorr_deltaM")   : 0.0);
-            // v_muon_ScaleCorr_Ewk2_.push_back(mu.hasUserFloat("MuonEnergyCorr_Ewk2")         ? mu.userFloat("MuonEnergyCorr_Ewk2")     : 0.0);
-            // v_muon_ScaleCorr_Total_.push_back(mu.hasUserFloat("MuonEnergyCorr_Total")       ? mu.userFloat("MuonEnergyCorr_Total")    : 0.0);
+            
+            
+            // muon_ScaleCorr_.push_back(mu.hasUserFloat("MuonEnergyCorr")                   ? mu.userFloat("MuonEnergyCorr")          : 1.0);
+            // muon_ScaleCorr_stat_RMS_.push_back(mu.hasUserFloat("MuonEnergyCorr_stat_RMS") ? mu.userFloat("MuonEnergyCorr_stat_RMS") : 0.0);
+            // muon_ScaleCorr_Zpt_.push_back(mu.hasUserFloat("MuonEnergyCorr_Zpt")           ? mu.userFloat("MuonEnergyCorr_Zpt")      : 0.0);
+            // muon_ScaleCorr_Ewk_.push_back(mu.hasUserFloat("MuonEnergyCorr_Ewk")           ? mu.userFloat("MuonEnergyCorr_Ewk")      : 0.0);
+            // muon_ScaleCorr_deltaM_.push_back(mu.hasUserFloat("MuonEnergyCorr_deltaM")     ? mu.userFloat("MuonEnergyCorr_deltaM")   : 0.0);
+            // muon_ScaleCorr_Ewk2_.push_back(mu.hasUserFloat("MuonEnergyCorr_Ewk2")         ? mu.userFloat("MuonEnergyCorr_Ewk2")     : 0.0);
+            // muon_ScaleCorr_Total_.push_back(mu.hasUserFloat("MuonEnergyCorr_Total")       ? mu.userFloat("MuonEnergyCorr_Total")    : 0.0);
         }
+        else{
+            roccorSF = rc.kScaleDT(mu.charge(), mu.pt(), mu.eta(), mu.phi());
+        }
+        
+        // Rochester corrections 
+        muon_ScaleCorr_.push_back(roccorSF);
 
         nMuon_++;
-
     }
+    
+    // --- store all reco tracks
+    edm::Handle<std::vector<reco::Track>> trackCollection;
+    iEvent.getByToken(trackCollection_, trackCollection);
+    for (const reco::Track &trk : *trackCollection){        
+        if(std::abs(trk.eta()) > 2.4) continue;
+        if(trk.pt() < 20) continue;
+        
+        // Check track is not a muon
+        bool isMuon = false;
+        for (const reco::Muon &mu : *muonCollection){
+            if (mu.innerTrack().isNonnull() && mu.innerTrack().get() == &trk) {
+                isMuon = true;
+                break;
+            }
+        }
+        if (isMuon)
+            continue;
+        
+        track_pt_.push_back(trk.pt());
+        track_eta_.push_back(trk.eta());
+        track_phi_.push_back(trk.phi());
 
-    if(antiMuon_genRecoObj_ != -1 && muon_genRecoObj_ != -1){
-        vMuon.SetPtEtaPhiM(muon_pt_[muon_genRecoObj_], muon_eta_[muon_genRecoObj_], muon_phi_[muon_genRecoObj_], MUON_MASS);
-        vAntiMuon.SetPtEtaPhiM(muon_pt_[antiMuon_genRecoObj_], muon_eta_[antiMuon_genRecoObj_], muon_phi_[antiMuon_genRecoObj_], MUON_MASS);
+        track_charge_.push_back(trk.charge());
+        track_dx_.push_back(trk.referencePoint().x());
+        track_dy_.push_back(trk.referencePoint().y());
+        track_dz_.push_back(trk.referencePoint().z());
+        
+        track_nPixelHits_.push_back(trk.hitPattern().numberOfValidPixelHits());
+        track_nTrackerLayers_.push_back(trk.hitPattern().trackerLayersWithMeasurement());
+        track_validFraction_.push_back(trk.validFraction());
+        track_trackAlgo_.push_back(trk.originalAlgo());
 
-        z_recoMass_ = (vMuon + vAntiMuon).M();
-    }
+        double roccorSF = 1.; // Rochester correction
+        if(!iEvent.isRealData()){
+
+            if(genLepton && trk.charge() > 0 && reco::deltaR(trk.eta(), trk.phi(), genLepton->eta(), genLepton->phi()) < 0.03){
+                muon_genRecoTrackMatches_++;
+                if(muon_genRecoTrackObj_ == -1
+                    || std::abs(trk.pt() - muon_genPt_) < std::abs(muon_pt_[muon_genRecoTrackObj_] - muon_genPt_)
+                ){
+                    // store index of reco match for the one with the closest pt in case of ambiguity
+                    muon_genRecoTrackObj_ = nTrack_;
+                    roccorSF = rc.kSpreadMC(trk.charge(), trk.pt(), trk.eta(), trk.phi(), muon_genPt_);
+                }
+            }
+
+            else if(genAntiLepton && trk.charge() < 0 && reco::deltaR(trk.eta(), trk.phi(), genAntiLepton->eta(), genAntiLepton->phi()) < 0.03){
+                antiMuon_genRecoTrackMatches_++;
+                if(antiMuon_genRecoTrackObj_ == -1
+                    || std::abs(trk.pt() - antiMuon_genPt_) < std::abs(muon_pt_[antiMuon_genRecoTrackObj_] - antiMuon_genPt_)
+                ){
+                    // store index of reco match for the one with the closest pt in case of ambiguity
+                    antiMuon_genRecoTrackObj_ = nTrack_;
+                    roccorSF = rc.kSpreadMC(trk.charge(), trk.pt(), trk.eta(), trk.phi(), antiMuon_genPt_);
+                }
+            }
+            else{
+                roccorSF = rc.kSmearMC(trk.charge(), trk.pt(), trk.eta(), trk.phi(), trk.hitPattern().trackerLayersWithMeasurement(), rand_.Rndm());
+            }
+        }
+        else{
+            roccorSF = rc.kScaleDT(trk.charge(), trk.pt(), trk.eta(), trk.phi());
+        }
+
+        // Rochester corrections 
+        track_ScaleCorr_.push_back(roccorSF);            
+        nTrack_++;
+    }    
 
     if(!iEvent.isRealData()){
         edm::Handle<std::vector<PileupSummaryInfo> > pileupInfoCollection;
@@ -528,9 +673,36 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
                 nPU_ = puI->getTrueNumInteractions();
             }
         }
+
+        if(antiMuon_genRecoObj_ != -1 && muon_genRecoObj_ != -1){
+            vMuon.SetPtEtaPhiM(muon_pt_[muon_genRecoObj_], muon_eta_[muon_genRecoObj_], muon_phi_[muon_genRecoObj_], MUON_MASS);
+            vAntiMuon.SetPtEtaPhiM(muon_pt_[antiMuon_genRecoObj_], muon_eta_[antiMuon_genRecoObj_], muon_phi_[antiMuon_genRecoObj_], MUON_MASS);
+
+            z_recoMass_ = (vMuon + vAntiMuon).M();
+        }
     }
 
     tree_->Fill();
+}
+
+// ------------ method called once each new LS  ------------
+void
+ZCountingAOD::beginLuminosityBlock(const edm::LuminosityBlock& iLumi, const edm::EventSetup& iSetup)
+{
+    lumiBlock_ = iLumi.id().luminosityBlock();
+
+    std::cout<<"ZCountingAOD::beginLuminosityBlock --- now at LS "<< lumiBlock_ <<std::endl;
+
+    if(emulateTrigger_){
+        // find and open file with emulated HLT information
+        const std::string fNameHLT = getFilename(runNumber_, lumiBlock_);
+
+        if(_fileHLTEmulation != 0)
+            _fileHLTEmulation->Close();
+
+        _fileHLTEmulation = TFile::Open(("root://xrootd-cms.infn.it//"+fNameHLT).c_str());        
+        fs->cd();
+    }
 }
 
 // ------------ method called once each run just before starting event loop  ------------
@@ -538,20 +710,21 @@ void ZCountingAOD::beginRun(edm::Run const& iRun, edm::EventSetup const& iSetup)
 {
     // edm::LogVerbatim("ZCountingAOD") << "now at "<<iRun.id();
     std::cout<< "new run"<<std::endl;
+    runNumber_ = iRun.id().run();
     hltChanged_ = true;
 
     edm::LogVerbatim("ZCountingAOD") << "now at "<<iRun.id();
     
     if (hltConfigProvider_.init(iRun, iSetup, triggerResultsInputTag_.process(), hltChanged_)) {
-        edm::LogVerbatim("TnPPairTreeProducer")<<" [TriggerObjMatchValueMapsProducer::beginRun] HLTConfigProvider initialized [processName() = \""
+        edm::LogVerbatim("ZCountingAOD")<<" [TriggerObjMatchValueMapsProducer::beginRun] HLTConfigProvider initialized [processName() = \""
             << hltConfigProvider_.processName() << "\", tableName() = \"" << hltConfigProvider_.tableName()
             << "\", size() = " << hltConfigProvider_.size() << "]";
     } else {
-        edm::LogError("TnPPairTreeProducer") << "Initialization of HLTConfigProvider failed for Run=" << iRun.id() << " (process=\""
+        edm::LogError("ZCountingAOD") << "Initialization of HLTConfigProvider failed for Run=" << iRun.id() << " (process=\""
         << triggerResultsInputTag_.process() << "\") -> plugin will not produce outputs for this Run";
         return;
     }
-    edm::LogVerbatim("TnPPairTreeProducer") << "hlt: "<<hltChanged_;
+    edm::LogVerbatim("ZCountingAOD") << "hlt: "<<hltChanged_;
 
     triggers->initHLTObjects(hltConfigProvider_);
 
@@ -563,6 +736,10 @@ ZCountingAOD::beginJob()
 {
     LogDebug("ZCountingAOD")<<"beginJob()";
 
+    rc.init(edm::FileInPath(roccorFile).fullPath());
+    rand_ = TRandom3();
+    rand_.SetSeed(1);
+    
     if( !fs ){
         edm::LogError("ZCountingAOD") << "TFile Service is not registered in cfg file";
         return;
@@ -598,34 +775,41 @@ ZCountingAOD::beginJob()
         tree_->Branch("z_genMass", &z_genMass_,"z_genMass_/f");
         tree_->Branch("z_recoMass", &z_recoMass_,"z_recoMass_/f");
 
-        tree_->Branch("muon_genVtxToPV", &muon_genVtxToPV_,"muon_genVtxToPV_/f");
-        tree_->Branch("muon_genRecoMatches", &muon_genRecoMatches_,"muon_genRecoMatches_/i");
-        tree_->Branch("muon_genRecoObj", &muon_genRecoObj_,"muon_genRecoObj_/I");
         tree_->Branch("muon_genPt", &muon_genPt_,"muon_genPt_/f");
         tree_->Branch("muon_genEta", &muon_genEta_,"muon_genEta_/f");
         tree_->Branch("muon_genPhi", &muon_genPhi_,"muon_genPhi_/f");
+        tree_->Branch("muon_genRecoMatches", &muon_genRecoMatches_,"muon_genRecoMatches_/i");
+        tree_->Branch("muon_genRecoTrackMatches", &muon_genRecoTrackMatches_,"muon_genRecoTrackMatches_/i");
+        tree_->Branch("muon_genRecoObj", &muon_genRecoObj_,"muon_genRecoObj_/I");
+        tree_->Branch("muon_genRecoTrackObj", &muon_genRecoTrackObj_,"muon_genRecoTrackObj_/I");
 
-        tree_->Branch("antiMuon_genVtxToPV", &antiMuon_genVtxToPV_,"antiMuon_genVtxToPV_/f");
-        tree_->Branch("antiMuon_genRecoMatches", &antiMuon_genRecoMatches_,"antiMuon_genRecoMatches_/i");
-        tree_->Branch("antiMuon_genRecoObj", &antiMuon_genRecoObj_,"antiMuon_genRecoObj_/I");
         tree_->Branch("antiMuon_genPt", &antiMuon_genPt_,"antiMuon_genPt_/f");
         tree_->Branch("antiMuon_genEta", &antiMuon_genEta_,"antiMuon_genEta_/f");
         tree_->Branch("antiMuon_genPhi", &antiMuon_genPhi_,"antiMuon_genPhi_/f");
+        tree_->Branch("antiMuon_genRecoMatches", &antiMuon_genRecoMatches_,"antiMuon_genRecoMatches_/i");
+        tree_->Branch("antiMuon_genRecoTrackMatches", &antiMuon_genRecoTrackMatches_,"antiMuon_genRecoTrackMatches_/i");
+        tree_->Branch("antiMuon_genRecoObj", &antiMuon_genRecoObj_,"antiMuon_genRecoObj_/I");
+        tree_->Branch("antiMuon_genRecoTrackObj", &antiMuon_genRecoTrackObj_,"antiMuon_genRecoTrackObj_/I");
     }
 
     // reco level info
+    tree_->Branch("MET_triggerBits", &met_triggerBits_);
+
+    // muons
     tree_->Branch("nMuon", &nMuon_,"nMuon_/s");
-    tree_->Branch("Muon_matchValue", &muon_matchValue_);
+    tree_->Branch("Muon_pt", &muon_pt_);
+    tree_->Branch("Muon_eta", &muon_eta_);
+    tree_->Branch("Muon_phi", &muon_phi_);
     tree_->Branch("Muon_charge", &muon_charge_);
+    tree_->Branch("Muon_dx", &muon_dx_);
+    tree_->Branch("Muon_dy", &muon_dy_);
+    tree_->Branch("Muon_dz", &muon_dz_);
+    
+    tree_->Branch("Muon_matchValue", &muon_matchValue_);
     tree_->Branch("Muon_ID", &muon_ID_);
     tree_->Branch("Muon_tkRelIso", &muon_tkRelIso_);
     tree_->Branch("Muon_pfRelIso04_all", &muon_pfRelIso04_all_);
     tree_->Branch("Muon_triggerBits", &muon_triggerBits_);
-    tree_->Branch("Muon_dxy", &muon_dxy_);
-    tree_->Branch("Muon_dz", &muon_dz_);
-    tree_->Branch("Muon_pt", &muon_pt_);
-    tree_->Branch("Muon_eta", &muon_eta_);
-    tree_->Branch("Muon_phi", &muon_phi_);
 
     tree_->Branch("Muon_isMedium", &muon_isMedium_);
     tree_->Branch("Muon_isStandalone", &muon_isStandalone_);
@@ -641,17 +825,35 @@ ZCountingAOD::beginJob()
     tree_->Branch("Muon_trkKink", &muon_trkKink_);
     tree_->Branch("Muon_nPixelHits", &muon_nPixelHits_);
     tree_->Branch("Muon_nTrackerLayers", &muon_nTrackerLayers_);
+    tree_->Branch("Muon_trackAlgo", &muon_trackAlgo_);
 
-    if(!isData_){
-        //Roccester corrections
-        tree_->Branch("Muon_ScaleCorr",          &v_muon_ScaleCorr_);
-        tree_->Branch("Muon_ScaleCorr_stat_RMS", &v_muon_ScaleCorr_stat_RMS_);
-        tree_->Branch("Muon_ScaleCorr_Zpt",      &v_muon_ScaleCorr_Zpt_);
-        tree_->Branch("Muon_ScaleCorr_Ewk",      &v_muon_ScaleCorr_Ewk_);
-        tree_->Branch("Muon_ScaleCorr_deltaM",   &v_muon_ScaleCorr_deltaM_);
-        tree_->Branch("Muon_ScaleCorr_Ewk2",     &v_muon_ScaleCorr_Ewk2_);
-        tree_->Branch("Muon_ScaleCorr_Total",    &v_muon_ScaleCorr_Total_);
-    }
+    
+    //Roccester corrections
+    tree_->Branch("Muon_ScaleCorr",          &muon_ScaleCorr_);
+    // tree_->Branch("Muon_ScaleCorr_stat_RMS", &muon_ScaleCorr_stat_RMS_);
+    // tree_->Branch("Muon_ScaleCorr_Zpt",      &muon_ScaleCorr_Zpt_);
+    // tree_->Branch("Muon_ScaleCorr_Ewk",      &muon_ScaleCorr_Ewk_);
+    // tree_->Branch("Muon_ScaleCorr_deltaM",   &muon_ScaleCorr_deltaM_);
+    // tree_->Branch("Muon_ScaleCorr_Ewk2",     &muon_ScaleCorr_Ewk2_);
+    // tree_->Branch("Muon_ScaleCorr_Total",    &muon_ScaleCorr_Total_);
+    
+    // tracks
+    tree_->Branch("nTrack", &nTrack_,"nTrack_/s");
+    tree_->Branch("Track_pt", &track_pt_);
+    tree_->Branch("Track_eta", &track_eta_);
+    tree_->Branch("Track_phi", &track_phi_);
+    tree_->Branch("Track_charge", &track_charge_);
+    tree_->Branch("Track_dx", &track_dx_);
+    tree_->Branch("Track_dy", &track_dx_);
+    tree_->Branch("Track_dz", &track_dz_);
+    tree_->Branch("Track_nPixelHits", &track_nPixelHits_);
+    tree_->Branch("Track_nTrackerLayers", &track_nTrackerLayers_);
+    tree_->Branch("Track_validFraction", &track_validFraction_);
+    tree_->Branch("Track_trackAlgo", &track_trackAlgo_);
+
+    //Roccester corrections
+    tree_->Branch("Track_ScaleCorr", &track_ScaleCorr_);
+    
 }
 
 // ------------ method called once each job just after ending the event loop  ------------
@@ -675,8 +877,6 @@ void ZCountingAOD::clearVariables(){
     LogDebug("ZCountingAOD::clearVariables()");
 
     // Event info
-    runNumber_ = 0;
-    lumiBlock_ = 0;
     eventNumber_ = 0;
 
     eventweight_ = 0.;
@@ -689,32 +889,40 @@ void ZCountingAOD::clearVariables(){
     decayMode_ = 0;
     z_genMass_ = 0.;
     z_recoMass_ = 0;
+    
+    met_triggerBits_ = 0;
 
     muon_genPt_ = 0.;
     muon_genEta_ = 0.;
     muon_genPhi_ = 0.;
-    muon_genVtxToPV_ = -1;
     muon_genRecoMatches_ = 0;
     muon_genRecoObj_ = -1;
+    muon_genRecoTrackMatches_ = 0;
+    muon_genRecoTrackObj_ = -1;
 
     antiMuon_genPt_ = 0.;
     antiMuon_genEta_ = 0.;
     antiMuon_genPhi_ = 0.;
-    antiMuon_genVtxToPV_ = -1;
     antiMuon_genRecoMatches_ = 0;
     antiMuon_genRecoObj_ = -1;
+    antiMuon_genRecoTrackMatches_ = 0;
+    antiMuon_genRecoTrackObj_ = -1;
 
     nMuon_ = 0;
-    muon_matchValue_.clear();
-    muon_charge_.clear();
-    muon_ID_.clear();
-    muon_tkRelIso_.clear();
-    muon_pfRelIso04_all_.clear();
-    muon_dxy_.clear();
-    muon_dz_.clear();
     muon_pt_.clear();
     muon_eta_.clear();
-    muon_phi_.clear();
+    muon_phi_.clear();    
+    muon_charge_.clear();
+    muon_dx_.clear();
+    muon_dy_.clear();
+    muon_dz_.clear();
+    
+    muon_matchValue_.clear();
+    muon_tkRelIso_.clear();
+    muon_pfRelIso04_all_.clear();
+    muon_ID_.clear();
+    muon_triggerBits_.clear();
+    
     muon_isMedium_.clear();
     muon_isStandalone_.clear();
     muon_isTracker_.clear();
@@ -729,14 +937,32 @@ void ZCountingAOD::clearVariables(){
     muon_nPixelHits_.clear();
     muon_nTrackerLayers_.clear();
     muon_validFraction_.clear();
+    muon_trackAlgo_.clear();
 
-    v_muon_ScaleCorr_.clear();
-    v_muon_ScaleCorr_stat_RMS_.clear();
-    v_muon_ScaleCorr_Zpt_.clear();
-    v_muon_ScaleCorr_Ewk_.clear();
-    v_muon_ScaleCorr_deltaM_.clear();
-    v_muon_ScaleCorr_Ewk2_.clear();
-    v_muon_ScaleCorr_Total_.clear();
+    muon_ScaleCorr_.clear();
+    // muon_ScaleCorr_stat_RMS_.clear();
+    // muon_ScaleCorr_Zpt_.clear();
+    // muon_ScaleCorr_Ewk_.clear();
+    // muon_ScaleCorr_deltaM_.clear();
+    // muon_ScaleCorr_Ewk2_.clear();
+    // muon_ScaleCorr_Total_.clear();
+
+    nTrack_ = 0;
+    track_pt_.clear();
+    track_eta_.clear();
+    track_phi_.clear();
+    track_charge_.clear();
+    track_dx_.clear();
+    track_dy_.clear();
+    track_dz_.clear();
+
+    track_nPixelHits_.clear();
+    track_nTrackerLayers_.clear();
+    track_validFraction_.clear();
+    track_trackAlgo_.clear();
+
+    track_ScaleCorr_.clear();
+
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -769,6 +995,46 @@ int ZCountingAOD::getMuonID(const reco::Muon &mu, const reco::Vertex &vtx){
     if(mu.isStandAloneMuon()) return 2;
     if(isValidTrack(*(mu.innerTrack()))) return 1;
     return 0;
+}
+
+//--------------------------------------------------------------------------------------------------
+// For trigger emulation in the 2017H (low PU) dataset
+// We emulated the HLT_IsoMu24_v11 in separated samples and need to get the trigger objects from these separate samples
+
+bool ZCountingAOD::isMuonTriggerObjEmulated(const double eta, const double phi, const long long unsigned eventNumber) {
+
+    // filter tag for HLT_IsoMu24_v11:
+    const edm::InputTag filterTag("hltL3crIsoL1sSingleMu22L1f0L2f10QL3f24QL3trkIsoFiltered0p07", "", "HLTX");
+    
+    TTreeReader myReader("Events", _fileHLTEmulation);
+    TTreeReaderValue<edm::EventAuxiliary> eventAuxiliary_(myReader, "EventAuxiliary");
+    TTreeReaderValue<trigger::TriggerEvent> triggerEvent_(myReader, "triggerTriggerEvent_hltTriggerSummaryAOD__HLTX.obj");
+
+    // std::cout<<"Look for event "<< eventNumber <<std::endl;
+
+    while(myReader.Next()){
+        // find event
+        if(eventNumber != eventAuxiliary_->event())
+            continue;
+
+        // std::cout<<"Found event!"<<std::endl;
+        // look for trigger objects
+        if(triggerEvent_->filterIndex(filterTag) < triggerEvent_->sizeFilters()){
+            const trigger::Keys& trigKeys = triggerEvent_->filterKeys(triggerEvent_->filterIndex(filterTag));
+            const trigger::TriggerObjectCollection & trigObjColl(triggerEvent_->getObjects());
+            //now loop of the trigger objects passing filter
+            for(trigger::Keys::const_iterator keyIt=trigKeys.begin();keyIt!=trigKeys.end();++keyIt){
+                const trigger::TriggerObject& obj = trigObjColl[*keyIt];
+                // std::cout<<"Trigger object(pt | eta) = "<<obj.pt()<< " | "<<obj.eta()<<std::endl;
+                if (reco::deltaR(eta, phi, obj.eta(), obj.phi()) < DRMAX){
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    edm::LogWarning("isMuonTriggerObjEmulated")<<"Event was not found!"<<std::endl;
+    return false;
 }
 
 

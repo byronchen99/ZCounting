@@ -106,6 +106,33 @@ bool isGoodPV(const reco::Vertex &vtx){
 }
 
 //--------------------------------------------------------------------------------------------------
+double pointsDistance(const reco::Candidate::Point &p1, const reco::Candidate::Point &p2){
+    // computes the euclidean distance of two points
+    return std::sqrt(std::pow(p1.x() - p2.x(),2) + std::pow(p1.y() - p2.y(),2) + std::pow(p1.z() - p2.z(),2));
+}
+
+//--------------------------------------------------------------------------------------------------
+bool isPVClosestVertex(const std::vector<reco::Vertex> &vtxCol, const reco::Muon &mu){
+    reco::Vertex vtx = *vtxCol.begin();
+    double minDist = 999.;
+    int nPV = 0;
+    for (auto const& itVtx : vtxCol) {
+        if(!isGoodPV(itVtx))
+            continue;
+        const float dist = pointsDistance(itVtx.position(), mu.vertex());
+        if (dist < minDist){
+            vtx = itVtx;
+            minDist = dist;
+            if(nPV > 0)
+                return false;
+        }
+        nPV++;
+    }
+    return true;
+}
+
+
+//--------------------------------------------------------------------------------------------------
 bool isValidTrack(const reco::Track &trk){
     if(trk.hitPattern().trackerLayersWithMeasurement() >= 6 && trk.hitPattern().numberOfValidPixelHits() >= 1)
         return true;

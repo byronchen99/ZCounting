@@ -18,7 +18,7 @@
 #include "CommonTools/Utils/interface/PtComparator.h"
 #include "DataFormats/PatCandidates/interface/Muon.h"
 
-#include "../ext/src/RoccoR.cc"
+#include "../src/RoccoR.cc"
 
 #include "TRandom3.h"
 

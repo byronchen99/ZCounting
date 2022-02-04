@@ -6,6 +6,7 @@
 <use name="DataFormats/VertexReco"/>
 <use name="DataFormats/TrackReco"/>
 <use name="HLTrigger/HLTcore"/>
+<use name="rootcore"/>
 <export>
   <lib name="1"/>
 </export>

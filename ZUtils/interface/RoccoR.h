@@ -36,34 +36,34 @@ struct CrystalBall{
 	double fa = fabs(a);
 	double ex = exp(-fa*fa/2);
 	double A  = pow(n/fa, n) * ex;
-	double C1 = n/fa/(n-1) * ex;
+	double C1 = n/fa/(n-1) * ex; 
 	double D1 = 2 * sqrtPiOver2 * erf(fa/sqrt2);
 
 	B = n/fa-fa;
-	C = (D1+2*C1)/C1;
-	D = (D1+2*C1)/2;
+	C = (D1+2*C1)/C1;   
+	D = (D1+2*C1)/2;   
 
-	N = 1.0/s/(D1+2*C1);
-	k = 1.0/(n-1);
+	N = 1.0/s/(D1+2*C1); 
+	k = 1.0/(n-1);  
 
-	NA = N*A;
-	Ns = N*s;
-	NC = Ns*C1;
-	F = 1-fa*fa/n;
-	G = s*n/fa;
+	NA = N*A;       
+	Ns = N*s;       
+	NC = Ns*C1;     
+	F = 1-fa*fa/n; 
+	G = s*n/fa;    
 
 	cdfMa = cdf(m-a*s);
 	cdfPa = cdf(m+a*s);
     }
 
-    double pdf(double x) const{
+    double pdf(double x) const{ 
 	double d=(x-m)/s;
 	if(d<-a) return NA*pow(B-d, -n);
 	if(d>a) return NA*pow(B+d, -n);
 	return N*exp(-d*d/2);
     }
 
-    double pdf(double x, double ks, double dm) const{
+    double pdf(double x, double ks, double dm) const{ 
 	double d=(x-m-dm)/(s*ks);
 	if(d<-a) return NA/ks*pow(B-d, -n);
 	if(d>a) return NA/ks*pow(B+d, -n);
@@ -89,10 +89,10 @@ struct RocRes{
     enum TYPE {MC, Data, Extra};
 
     struct ResParams{
-	double eta;
-	double kRes[2];
-	std::vector<double> nTrk[2];
-	std::vector<double> rsPar[3];
+	double eta; 
+	double kRes[2]; 
+	std::vector<double> nTrk[2]; 
+	std::vector<double> rsPar[3]; 
 	std::vector<CrystalBall> cb;
 	ResParams():eta(0){for(auto& k: kRes) k=1;}
     };
@@ -122,13 +122,12 @@ struct RocRes{
 class RoccoR{
 
     private:
-	enum TYPE{MC, DT};
 	enum TVAR{Default, Replica, Symhes};
 
-	static const double MPHI;
+	static const double MPHI; 
 
 	int NETA;
-	int NPHI;
+	int NPHI; 
 	double DPHI;
 	std::vector<double> etabin;
 
@@ -148,11 +147,14 @@ class RoccoR{
 	template <typename T> double error(T f) const;
 
     public:
-	RoccoR();
-	RoccoR(std::string filename);
+	enum TYPE{MC, DT};
+
+	RoccoR(); 
+	RoccoR(std::string filename); 
+
 	void init(std::string filename);
 	void reset();
-
+	bool empty() const {return RC.empty();} 
 	const RocRes& getRes(int s=0, int m=0) const {return RC[s][m].RR;}
 	double getM(int T, int H, int F, int s=0, int m=0) const{return RC[s][m].CP[T][H][F].M;}
 	double getA(int T, int H, int F, int s=0, int m=0) const{return RC[s][m].CP[T][H][F].A;}
@@ -169,10 +171,10 @@ class RoccoR{
 	double kSmearMCerror(int Q, double pt, double eta, double phi, int n, double u) const;
 
 	//old, should only be used with 2017v0
-	double kScaleFromGenMC(int Q, double pt, double eta, double phi, int n, double gt, double w, int s=0, int m=0) const;
-	double kScaleAndSmearMC(int Q, double pt, double eta, double phi, int n, double u, double w, int s=0, int m=0) const;
-	double kScaleFromGenMCerror(int Q, double pt, double eta, double phi, int n, double gt, double w) const;
-	double kScaleAndSmearMCerror(int Q, double pt, double eta, double phi, int n, double u, double w) const;
+	double kScaleFromGenMC(int Q, double pt, double eta, double phi, int n, double gt, double w, int s=0, int m=0) const; 
+	double kScaleAndSmearMC(int Q, double pt, double eta, double phi, int n, double u, double w, int s=0, int m=0) const;  
+	double kScaleFromGenMCerror(int Q, double pt, double eta, double phi, int n, double gt, double w) const; 
+	double kScaleAndSmearMCerror(int Q, double pt, double eta, double phi, int n, double u, double w) const;  
 };
 
 #endif

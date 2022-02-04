@@ -40,7 +40,7 @@ double RocRes::Sigma(double pt, int H, int F) const{
 
 double RocRes::rndm(int H, int F, double w) const{
     const ResParams &rp = resol[H];
-    return rp.nTrk[MC][F]+(rp.nTrk[MC][F+1]-rp.nTrk[MC][F])*w;
+    return rp.nTrk[MC][F]+(rp.nTrk[MC][F+1]-rp.nTrk[MC][F])*w; 
 }
 
 double RocRes::kSpread(double gpt, double rpt, double eta, int n, double w) const{
@@ -50,7 +50,7 @@ double RocRes::kSpread(double gpt, double rpt, double eta, int n, double w) cons
     int D = trkBin(v, H, Data);
     double kold = gpt / rpt;
     const ResParams &rp = resol[H];
-    double u = rp.cb[F].cdf( (kold-1.0)/rp.kRes[MC]/Sigma(gpt,H,F) );
+    double u = rp.cb[F].cdf( (kold-1.0)/rp.kRes[MC]/Sigma(gpt,H,F) ); 
     double knew = 1.0 + rp.kRes[Data]*Sigma(gpt,H,D)*rp.cb[D].invcdf(u);
 
     if(knew<0) return 1.0;
@@ -67,7 +67,7 @@ double RocRes::kSpread(double gpt, double rpt, double eta) const{
 
 double RocRes::kSmear(double pt, double eta, TYPE type, double v, double u) const{
     int H = etaBin(fabs(eta));
-    int F = trkBin(v, H);
+    int F = trkBin(v, H); 
     const ResParams &rp = resol[H];
     double x = rp.kRes[type] * Sigma(pt, H, F) * rp.cb[F].invcdf(u);
     return 1.0/(1.0+x);
@@ -92,7 +92,7 @@ double RocRes::kExtra(double pt, double eta, int n, double u, double w) const{
     double RM = rp.kRes[MC]*Sigma(pt, H, F);
     double x = RD>RM ? sqrt(RD*RD-RM*RM)*rp.cb[F].invcdf(u) : 0;
     if(x<=-1) return 1.0;
-    return 1.0/(1.0 + x);
+    return 1.0/(1.0 + x); 
 }
 
 double RocRes::kExtra(double pt, double eta, int n, double u) const{
@@ -103,7 +103,7 @@ double RocRes::kExtra(double pt, double eta, int n, double u) const{
     double m = rp.kRes[MC];
     double x = d>m ? sqrt(d*d-m*m) * Sigma(pt, H, F) * rp.cb[F].invcdf(u) : 0;
     if(x<=-1) return 1.0;
-    return 1.0/(1.0 + x);
+    return 1.0/(1.0 + x); 
 }
 
 
@@ -132,10 +132,10 @@ void RoccoR::init(std::string filename){
     std::vector<double> BETA;
 
     std::string tag;
-    int type, sys, mem, var, bin;
+    int type, sys, mem, var, bin;	
     std::string s;
     while(std::getline(in, s)){
-	std::stringstream ss(s);
+	std::stringstream ss(s); 
 	std::string first4=s.substr(0,4);
 	if(first4=="NSET"){
 	    ss >> tag >> nset;
@@ -163,7 +163,7 @@ void RoccoR::init(std::string filename){
 
 	}
 	else if(first4=="CPHI") {
-	    ss >> tag >> NPHI;
+	    ss >> tag >> NPHI; 
 	    DPHI=2*CrystalBall::pi/NPHI;
 	}
 	else if(first4=="CETA")  {
@@ -171,9 +171,9 @@ void RoccoR::init(std::string filename){
 	    etabin.resize(NETA+1);
 	    for(auto& h: etabin) ss >> h;
 	}
-	else{
+	else{ 
 	    ss >> sys >> mem >> tag;
-	    auto &rc = RC[sys][mem];
+	    auto &rc = RC[sys][mem]; 
 	    rc.RR.NETA=RETA;
 	    rc.RR.NTRK=RTRK;
 	    rc.RR.NMIN=RMIN;
@@ -197,30 +197,30 @@ void RoccoR::init(std::string filename){
 	    }
 
 	    if(tag=="R"){
-		ss >> var >> bin;
+		ss >> var >> bin; 
 		for(int i=0; i<RTRK; ++i) {
 		    switch(var){
 			case 0: ss >> resol[bin].rsPar[var][i]; break;
 			case 1: ss >> resol[bin].rsPar[var][i]; break;
-			case 2: ss >> resol[bin].rsPar[var][i]; resol[bin].rsPar[var][i]/=100; break;
-			case 3: ss >> resol[bin].cb[i].s; break;
-			case 4: ss >> resol[bin].cb[i].a; break;
-			case 5: ss >> resol[bin].cb[i].n; break;
+			case 2: ss >> resol[bin].rsPar[var][i]; resol[bin].rsPar[var][i]/=100; break; 
+			case 3: ss >> resol[bin].cb[i].s; break; 
+			case 4: ss >> resol[bin].cb[i].a; break; 
+			case 5: ss >> resol[bin].cb[i].n; break; 
 			default: break;
 		    }
 		}
 	    }
 	    else if(tag=="T") {
-		ss >> type >> bin;
+		ss >> type >> bin; 
 		for(int i=0; i<RTRK+1; ++i) ss >> resol[bin].nTrk[type][i];
 	    }
 	    else if(tag=="F") {
-		ss >> type;
+		ss >> type; 
 		for(int i=0; i<RETA; ++i) ss >> resol[i].kRes[type];
 
 	    }
 	    else if(tag=="C") {
-		ss >> type >> var >> bin;
+		ss >> type >> var >> bin; 
 		for(int i=0; i<NPHI; ++i){
 		    auto &x = cp[type][bin][i];
 		    if(var==0) { ss >> x.M; x.M = 1.0+x.M/100;}
@@ -247,7 +247,7 @@ int RoccoR::etaBin(double x) const{
 
 int RoccoR::phiBin(double x) const{
     int ibin=(x-MPHI)/DPHI;
-    if(ibin<0) return 0;
+    if(ibin<0) return 0; 
     if(ibin>=NPHI) return NPHI-1;
     return ibin;
 }
@@ -298,6 +298,7 @@ double RoccoR::kScaleAndSmearMC(int Q, double pt, double eta, double phi, int n,
 }
 
 double RoccoR::kGenSmear(double pt, double eta, double v, double u, RocRes::TYPE TT, int s, int m) const{
+    if(empty()) return 1.0;
     return RC[s][m].RR.kSmear(pt, eta, TT, v, u);
 }
 
@@ -306,7 +307,7 @@ double RoccoR::error(T f) const{
     double sum=0;
     for(int s=0; s<nset; ++s){
 	for(int i=0; i<nmem[s]; ++i) {
-	    double d = f(s,i) - f(0,0);
+	    double d = f(s,i) - f(0,0); 
 	    sum += d*d/nmem[s];
 	}
     }
@@ -334,3 +335,4 @@ double RoccoR::kScaleAndSmearMCerror(int Q, double pt, double eta, double phi, i
 }
 
 #endif
+

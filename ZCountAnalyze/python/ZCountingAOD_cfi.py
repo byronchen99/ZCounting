@@ -10,9 +10,16 @@ zcounting = cms.EDAnalyzer('ZCountingAOD',
     # Muons - source
     reco_muons = cms.InputTag("muons","","RECO"),
 
+    roccorFile = cms.string(""),   
+
+    # Tracks - source
+    reco_tracks = cms.InputTag("generalTracks","","RECO"),
+
     # Trigger - sources
     TriggerEvent   = cms.InputTag('hltTriggerSummaryAOD', '', 'HLT'),
     TriggerResults = cms.InputTag('TriggerResults', '', 'HLT'),
+    
+    emulateTrigger = cms.untracked.bool(False),
 
     # Muon - triggers
     # 2^{x}
@@ -43,6 +50,42 @@ zcounting = cms.EDAnalyzer('ZCountingAOD',
     ),
     muon_trigger_DRMAX=cms.untracked.double(0.1),
 
+    # MET - triggers
+    # 2^{x}
+    met_trigger_patterns = cms.vstring(
+                                                            # x =
+        "HLT_MET200_v*",                                    #0
+        "HLT_MET250_v*",                                    #1
+        "HLT_MET300_v*",                                    #2
+        "HLT_PFMET90_PFMHT90_IDTight_v*",                   #3
+        "HLT_PFMET100_PFMHT100_IDTight_v*",                 #4
+        "HLT_PFMET100_PFMHT100_IDTight_PFHT60_v*",          #5
+        "HLT_PFMET100_PFMHT100_IDTight_CaloBTagCSV_3p1_v*", #6
+        "HLT_PFMET110_PFMHT110_IDTight_v*",                 #7
+        "HLT_PFMET110_PFMHT110_IDTight_CaloBTagCSV_3p1_v*", #8
+        "HLT_PFMET120_BTagCSV_p067_v*",                     #9
+        "HLT_PFMET120_PFMHT120_IDTight_v*",                 #10
+        "HLT_PFMET120_PFMHT120_IDTight_PFHT60_v*",          #11
+        "HLT_PFMET120_PFMHT120_IDTight_CaloBTagCSV_3p1_v*", #12
+        "HLT_PFMET130_PFMHT130_IDTight_v*",                 #13
+        "HLT_PFMET130_PFMHT130_IDTight_CaloBTagCSV_3p1_v*", #14
+        "HLT_PFMET140_PFMHT140_IDTight_v*",                 #15
+        "HLT_PFMET140_PFMHT140_IDTight_CaloBTagCSV_3p1_v*", #16
+        "HLT_PFMET170_NotCleaned_v*",                       #17
+        "HLT_PFMET170_HBHECleaned_v*",                      #18
+        "HLT_PFMET170_JetIdCleaned_v*",                     #19
+        "HLT_PFMET170_NoiseCleaned_v*",                     #20
+        "HLT_PFMET200_NotCleaned_v*",                       #21
+        "HLT_PFMET200_HBHECleaned_v*",                      #22
+        "HLT_PFMET200_HBHE_BeamHaloCleaned_v*",             #23
+        "HLT_PFMET250_HBHECleaned_v*",                      #24
+        "HLT_PFMET300_v*",                                  #25
+        "HLT_PFMET300_HBHECleaned_v*",                      #26
+        "HLT_PFMET400_v*",                                  #27
+        "HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_v*",         #28
+        "HLT_PFMETNoMu120_PFMHTNoMu120_IDTight_PFHT60_v*",  #29
+        "HLT_PFMETTypeOne110_PFMHT110_IDTight_v*"           #30
+    ),
 
     #Flags
     isData = cms.untracked.bool(False),

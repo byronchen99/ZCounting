@@ -19,6 +19,8 @@ float getPFIso(const reco::Muon& muon);
 float getTkIso(const reco::Muon& muon);
 bool isCustomTightMuon(const reco::Muon& muon);
 
+double pointsDistance(const reco::Candidate::Point &p1, const reco::Candidate::Point &p2);
+bool isPVClosestVertex(const std::vector<reco::Vertex> &vtxCol, const reco::Muon &mu);
 bool isGoodPV(const reco::Vertex &vtx);
 bool isValidTrack(const reco::Track &trk);    
 

@@ -1,0 +1,30 @@
+{
+    "DYJetsToMuMu_M_50_Fall17": {
+        "OutputSplitFiles": 1,
+        "crab3": {
+          "Data.inputDataset": "/DYJetsToMuMu_M-50_massWgtFix_TuneCP5_13TeV-powhegMiNNLO-pythia8-photos/RunIISummer20UL17MiniAOD-106X_mc2017_realistic_v6-v2/MINIAODSIM",
+          "Data.splitting": "FileBased",
+          "Data.unitsPerJob": 1,
+          "JobType.maxMemoryMB": 2500,
+          "JobType.pyCfgParams": [
+            "samplename=dy",
+            "year=2017",
+            "outputFile=DYJetsToMuMu_M_50_Fall17"
+          ]
+        }
+    },
+    "DYJetsToTauTau_M_50_Fall17": {
+        "OutputSplitFiles": 1,
+        "crab3": {
+          "Data.inputDataset": "/DYJetsToTauTau_M-50_AtLeastOneEorMuDecay_massWgtFix_TuneCP5_13TeV-powhegMiNNLO-pythia8-photos/RunIISummer20UL17MiniAOD-106X_mc2017_realistic_v6-v2/MINIAODSIM",
+          "Data.splitting": "FileBased",
+          "Data.unitsPerJob": 1,
+          "JobType.maxMemoryMB": 2500,
+          "JobType.pyCfgParams": [
+            "samplename=dy",
+            "year=2017",
+            "outputFile=DYJetsToTauTau_M_50_Fall17"
+          ]
+        }
+    }
+}

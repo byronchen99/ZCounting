@@ -1,0 +1,17 @@
+{
+"SingleMuon_Run2017H": {
+  "OutputSplitFiles": 1,
+  "crab3": {
+    "Data.inputDataset": "/SingleMuon/Run2017H-09Aug2019_UL2017_LowPU-v1/AOD",
+    "Data.lumiMask": "/afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions17/13TeV/Final/Cert_306896-307082_13TeV_PromptReco_Collisions17_JSON_MuonPhys_LowPU.txt",
+    "Data.splitting": "LumiBased",
+    "Data.unitsPerJob": 100,
+    "JobType.maxMemoryMB": 2500,
+    "JobType.pyCfgParams": [
+      "year=2017H",
+      "samplename=smu",
+      "outputFile=SingleMuon_Run2017H"
+    ]
+  }
+}
+}
