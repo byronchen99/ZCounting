@@ -12,6 +12,10 @@ zcounting = cms.EDAnalyzer('ZCountingAOD',
 
     roccorFile = cms.string(""),   
 
+    # Standalone muon tracks - source
+    reco_standalones = cms.InputTag("standAloneMuons","UpdatedAtVtx","RECO"),
+    # reco_standalones = cms.InputTag("standAloneMuons","","RECO"),
+    
     # Tracks - source
     reco_tracks = cms.InputTag("generalTracks","","RECO"),
 

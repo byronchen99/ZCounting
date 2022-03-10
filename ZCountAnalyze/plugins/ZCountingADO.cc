@@ -127,6 +127,7 @@ private:
     // --- input
     const edm::InputTag triggerResultsInputTag_;
     edm::EDGetTokenT<std::vector<reco::Muon>> muonCollection_;
+    edm::EDGetTokenT<std::vector<reco::Track>> standaloneCollection_;
     edm::EDGetTokenT<std::vector<reco::Track>> trackCollection_;
     edm::EDGetTokenT<std::vector<reco::Vertex>> pvCollection_;
     edm::EDGetTokenT<std::vector<GenZDecayProperties>> genZCollection_;
@@ -186,6 +187,12 @@ private:
     float muon_genEta_;
     float muon_genPhi_;
 
+    float muon_genVx_;
+    float muon_genVy_;
+    float muon_genVz_;
+    // float muon_genDxyError_;
+    // float muon_genDzError_;
+    
     int antiMuon_genRecoMatches_;
     int antiMuon_genRecoObj_;
     int antiMuon_genRecoTrackMatches_;
@@ -194,14 +201,34 @@ private:
     float antiMuon_genEta_;
     float antiMuon_genPhi_;
 
+    float antiMuon_genVx_;
+    float antiMuon_genVy_;
+    float antiMuon_genVz_;
+    // float antiMuon_genDxyError_;
+    // float antiMuon_genDzError_;
+    
     unsigned int nMuon_;
     std::vector<float> muon_pt_;
     std::vector<float> muon_eta_;
     std::vector<float> muon_phi_;
+    std::vector<float> muon_ptTrk_;
+    std::vector<float> muon_etaTrk_;
+    std::vector<float> muon_phiTrk_;
+    std::vector<float> muon_ptSta_;
+    std::vector<float> muon_etaSta_;
+    std::vector<float> muon_phiSta_;
     std::vector<int> muon_charge_;
+    // reference point position
     std::vector<float> muon_dx_;
     std::vector<float> muon_dy_;
     std::vector<float> muon_dz_;
+    // vertex position
+    std::vector<float> muon_vx_;
+    std::vector<float> muon_vy_;
+    std::vector<float> muon_vz_;
+    // uncertainties on position
+    std::vector<float> muon_DxyError_;
+    std::vector<float> muon_DzError_;
     
     std::vector<int> muon_matchValue_;
     std::vector<float> muon_tkRelIso_;
@@ -233,14 +260,39 @@ private:
     //std::vector<float> muon_ScaleCorr_Ewk2_;
     //std::vector<float> muon_ScaleCorr_Total_;
 
+    unsigned int nStandalone_;
+    std::vector<float> sta_pt_;
+    std::vector<float> sta_eta_;
+    std::vector<float> sta_phi_;
+    std::vector<int> sta_charge_;
+    
+    std::vector<float> sta_dx_;
+    std::vector<float> sta_dy_;
+    std::vector<float> sta_dz_;
+    std::vector<float> sta_DxyError_;
+    std::vector<float> sta_DzError_;
+    std::vector<float> sta_vx_;
+    std::vector<float> sta_vy_;
+    std::vector<float> sta_vz_;
+
+    std::vector<float> sta_trackAlgo_;
+
+    std::vector<float> sta_ScaleCorr_;
+
     unsigned int nTrack_;
     std::vector<float> track_pt_;
     std::vector<float> track_eta_;
     std::vector<float> track_phi_;
     std::vector<int> track_charge_;
+    
     std::vector<float> track_dx_;
     std::vector<float> track_dy_;
     std::vector<float> track_dz_;
+    std::vector<float> track_DxyError_;
+    std::vector<float> track_DzError_;
+    std::vector<float> track_vx_;
+    std::vector<float> track_vy_;
+    std::vector<float> track_vz_;
 
     std::vector<int> track_nPixelHits_;
     std::vector<int> track_nTrackerLayers_;
@@ -256,6 +308,7 @@ private:
 ZCountingAOD::ZCountingAOD(const edm::ParameterSet& iConfig):
     triggerResultsInputTag_(iConfig.getParameter<edm::InputTag>("TriggerResults")),
     muonCollection_  (consumes<std::vector<reco::Muon>> (iConfig.getParameter<edm::InputTag>("reco_muons"))),
+    standaloneCollection_  (consumes<std::vector<reco::Track>> (iConfig.getParameter<edm::InputTag>("reco_standalones"))),
     trackCollection_  (consumes<std::vector<reco::Track>> (iConfig.getParameter<edm::InputTag>("reco_tracks"))),
     pvCollection_    (consumes<std::vector<reco::Vertex> > (iConfig.getParameter<edm::InputTag>("edmPVName"))),
     genZCollection_  (consumes<std::vector<GenZDecayProperties> > (iConfig.getParameter<edm::InputTag>("genZLeptonCollection"))),
@@ -446,11 +499,25 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
         muon_genPt_ = genLepton->pt();
         muon_genEta_ = genLepton->eta();
         muon_genPhi_ = genLepton->phi();
+        
+        muon_genVx_ = genLepton->vx();
+        muon_genVy_ = genLepton->vy();
+        muon_genVz_ = genLepton->vz();
+        // muon_genDxyError_ = genLepton->dxyError();
+        // muon_genDzError_ = genLepton->dzError();
+
     }
     if(genAntiLepton){
         antiMuon_genPt_ = genAntiLepton->pt();
         antiMuon_genEta_ = genAntiLepton->eta();
         antiMuon_genPhi_ = genAntiLepton->phi();
+        
+        antiMuon_genVx_ = genAntiLepton->vx();
+        antiMuon_genVy_ = genAntiLepton->vy();
+        antiMuon_genVz_ = genAntiLepton->vz();
+        // antiMuon_genDxyError_ = genAntiLepton->dxyError();
+        // antiMuon_genDzError_ = genAntiLepton->dzError();        
+        
     }
     if(genLepton && genAntiLepton){
         z_genMass_ = (genLepton->p4() + genAntiLepton->p4()).M();
@@ -467,6 +534,8 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     for (const reco::Muon &mu : *muonCollection){
         if(std::abs(mu.eta()) > 2.4) continue;
         if(mu.pt() < 20) continue;
+        // // only keep global muons, standalone muons and tracks are stored in separate collections
+        // if(!mu.isGlobalMuon()) continue;
 
         int match_value_ = -1;
         if(!iEvent.isRealData()){
@@ -485,15 +554,22 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
                 isPromptFinalState_gen, isDirectPromptTauDecayProductFinalState_gen);
         }
         muon_matchValue_.push_back(match_value_);
-        
+                
         // Look for the distance to (0,0,0)
         muon_dx_.push_back(mu.muonBestTrack()->referencePoint().x());
         muon_dy_.push_back(mu.muonBestTrack()->referencePoint().y());
         muon_dz_.push_back(mu.muonBestTrack()->referencePoint().z());
+        // vertex position 
+        muon_vx_.push_back(mu.vx());
+        muon_vy_.push_back(mu.vy());
+        muon_vz_.push_back(mu.vz());
+        // uncertainty
+        muon_DxyError_.push_back(mu.dxyError());
+        muon_DzError_.push_back(mu.dzError());
 
         muon_pt_.push_back(mu.pt());
         muon_eta_.push_back(mu.eta());
-        muon_phi_.push_back(mu.phi());
+        muon_phi_.push_back(mu.phi());        
         muon_charge_.push_back(mu.charge());
         muon_tkRelIso_.push_back(getTkIso(mu));
         muon_pfRelIso04_all_.push_back(getPFIso(mu));
@@ -510,17 +586,36 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
         muon_trkKink_.push_back(mu.combinedQuality().trkKink);
 
         if(mu.innerTrack().isNonnull()){
+            muon_ptTrk_.push_back(mu.innerTrack()->pt());
+            muon_etaTrk_.push_back(mu.innerTrack()->eta());
+            muon_phiTrk_.push_back(mu.innerTrack()->phi());      
+            
             muon_nPixelHits_.push_back(mu.innerTrack()->hitPattern().numberOfValidPixelHits());
             muon_nTrackerLayers_.push_back(mu.innerTrack()->hitPattern().trackerLayersWithMeasurement());
             muon_validFraction_.push_back(mu.innerTrack()->validFraction());
             muon_trackAlgo_.push_back(mu.innerTrack()->originalAlgo());
         }
         else{
+            muon_ptTrk_.push_back(-1);
+            muon_etaTrk_.push_back(-1);
+            muon_phiTrk_.push_back(-1);    
+            
             muon_nPixelHits_.push_back(-1);
             muon_nTrackerLayers_.push_back(-1);
             muon_validFraction_.push_back(-1);
             muon_trackAlgo_.push_back(-1);
         }
+        if(mu.outerTrack().isNonnull()){
+            muon_ptSta_.push_back(mu.outerTrack()->pt());
+            muon_etaSta_.push_back(mu.outerTrack()->eta());
+            muon_phiSta_.push_back(mu.outerTrack()->phi());            
+        }
+        else{            
+            muon_ptSta_.push_back(-1);
+            muon_etaSta_.push_back(-1);
+            muon_phiSta_.push_back(-1);                 
+        }
+
 
         if(mu.isGlobalMuon()){
             muon_normChi2_.push_back(mu.globalTrack()->normalizedChi2());
@@ -598,19 +693,8 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     edm::Handle<std::vector<reco::Track>> trackCollection;
     iEvent.getByToken(trackCollection_, trackCollection);
     for (const reco::Track &trk : *trackCollection){        
-        if(std::abs(trk.eta()) > 2.4) continue;
-        if(trk.pt() < 20) continue;
-        
-        // Check track is not a muon
-        bool isMuon = false;
-        for (const reco::Muon &mu : *muonCollection){
-            if (mu.innerTrack().isNonnull() && mu.innerTrack().get() == &trk) {
-                isMuon = true;
-                break;
-            }
-        }
-        if (isMuon)
-            continue;
+        if(std::abs(trk.eta()) > 2.5) continue;
+        if(trk.pt() < 10) continue;
         
         track_pt_.push_back(trk.pt());
         track_eta_.push_back(trk.eta());
@@ -620,6 +704,14 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
         track_dx_.push_back(trk.referencePoint().x());
         track_dy_.push_back(trk.referencePoint().y());
         track_dz_.push_back(trk.referencePoint().z());
+
+        // vertex position 
+        track_vx_.push_back(trk.vx());
+        track_vy_.push_back(trk.vy());
+        track_vz_.push_back(trk.vz());
+        // uncertainty
+        track_DxyError_.push_back(trk.dxyError());
+        track_DzError_.push_back(trk.dzError());
         
         track_nPixelHits_.push_back(trk.hitPattern().numberOfValidPixelHits());
         track_nTrackerLayers_.push_back(trk.hitPattern().trackerLayersWithMeasurement());
@@ -662,6 +754,69 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
         track_ScaleCorr_.push_back(roccorSF);            
         nTrack_++;
     }    
+
+    // --- store all standalone tracks
+    edm::Handle<std::vector<reco::Track>> standaloneCollection;
+    iEvent.getByToken(standaloneCollection_, standaloneCollection);
+    for (const reco::Track &sta : *standaloneCollection){        
+        if(std::abs(sta.eta()) > 2.5) continue;
+        if(sta.pt() < 10) continue;
+        
+        sta_pt_.push_back(sta.pt());
+        sta_eta_.push_back(sta.eta());
+        sta_phi_.push_back(sta.phi());
+
+        sta_charge_.push_back(sta.charge());
+        sta_dx_.push_back(sta.referencePoint().x());
+        sta_dy_.push_back(sta.referencePoint().y());
+        sta_dz_.push_back(sta.referencePoint().z());
+
+        // vertex position 
+        sta_vx_.push_back(sta.vx());
+        sta_vy_.push_back(sta.vy());
+        sta_vz_.push_back(sta.vz());
+        // uncertainty
+        sta_DxyError_.push_back(sta.dxyError());
+        sta_DzError_.push_back(sta.dzError());
+        
+        sta_trackAlgo_.push_back(sta.originalAlgo());
+
+        double roccorSF = 1.; // Rochester correction
+        if(!iEvent.isRealData()){
+
+            if(genLepton && sta.charge() > 0 && reco::deltaR(sta.eta(), sta.phi(), genLepton->eta(), genLepton->phi()) < 0.03){
+                muon_genRecoTrackMatches_++;
+                if(muon_genRecoTrackObj_ == -1
+                    || std::abs(sta.pt() - muon_genPt_) < std::abs(muon_pt_[muon_genRecoTrackObj_] - muon_genPt_)
+                ){
+                    // store index of reco match for the one with the closest pt in case of ambiguity
+                    muon_genRecoTrackObj_ = nStandalone_;
+                    roccorSF = rc.kSpreadMC(sta.charge(), sta.pt(), sta.eta(), sta.phi(), muon_genPt_);
+                }
+            }
+
+            else if(genAntiLepton && sta.charge() < 0 && reco::deltaR(sta.eta(), sta.phi(), genAntiLepton->eta(), genAntiLepton->phi()) < 0.03){
+                antiMuon_genRecoTrackMatches_++;
+                if(antiMuon_genRecoTrackObj_ == -1
+                    || std::abs(sta.pt() - antiMuon_genPt_) < std::abs(muon_pt_[antiMuon_genRecoTrackObj_] - antiMuon_genPt_)
+                ){
+                    // store index of reco match for the one with the closest pt in case of ambiguity
+                    antiMuon_genRecoTrackObj_ = nStandalone_;
+                    roccorSF = rc.kSpreadMC(sta.charge(), sta.pt(), sta.eta(), sta.phi(), antiMuon_genPt_);
+                }
+            }
+            else{
+                roccorSF = rc.kSmearMC(sta.charge(), sta.pt(), sta.eta(), sta.phi(), sta.hitPattern().trackerLayersWithMeasurement(), rand_.Rndm());
+            }
+        }
+        else{
+            roccorSF = rc.kScaleDT(sta.charge(), sta.pt(), sta.eta(), sta.phi());
+        }
+
+        // Rochester corrections 
+        sta_ScaleCorr_.push_back(roccorSF);            
+        nStandalone_++;
+    }
 
     if(!iEvent.isRealData()){
         edm::Handle<std::vector<PileupSummaryInfo> > pileupInfoCollection;
@@ -778,6 +933,13 @@ ZCountingAOD::beginJob()
         tree_->Branch("muon_genPt", &muon_genPt_,"muon_genPt_/f");
         tree_->Branch("muon_genEta", &muon_genEta_,"muon_genEta_/f");
         tree_->Branch("muon_genPhi", &muon_genPhi_,"muon_genPhi_/f");
+        
+        tree_->Branch("muon_vx", &muon_genVx_,"muon_genVx_/f");
+        tree_->Branch("muon_vy", &muon_genVy_,"muon_genVy_/f");
+        tree_->Branch("muon_vz", &muon_genVz_,"muon_genVz_/f");
+        // tree_->Branch("muon_DxyError", &muon_genDxyError_,"muon_genDxyError_/f");
+        // tree_->Branch("muon_DzError", &muon_genDzError_,"muon_genDzError_/f"); 
+        
         tree_->Branch("muon_genRecoMatches", &muon_genRecoMatches_,"muon_genRecoMatches_/i");
         tree_->Branch("muon_genRecoTrackMatches", &muon_genRecoTrackMatches_,"muon_genRecoTrackMatches_/i");
         tree_->Branch("muon_genRecoObj", &muon_genRecoObj_,"muon_genRecoObj_/I");
@@ -786,6 +948,13 @@ ZCountingAOD::beginJob()
         tree_->Branch("antiMuon_genPt", &antiMuon_genPt_,"antiMuon_genPt_/f");
         tree_->Branch("antiMuon_genEta", &antiMuon_genEta_,"antiMuon_genEta_/f");
         tree_->Branch("antiMuon_genPhi", &antiMuon_genPhi_,"antiMuon_genPhi_/f");
+    
+        tree_->Branch("antiMuon_vx", &antiMuon_genVx_,"antiMuon_genVx_/f");
+        tree_->Branch("antiMuon_vy", &antiMuon_genVy_,"antiMuon_genVy_/f");
+        tree_->Branch("antiMuon_vz", &antiMuon_genVz_,"antiMuon_genVz_/f");        
+        // tree_->Branch("antiMuon_DxyError", &antiMuon_genDxyError_,"antiMuon_genDxyError_/f");
+        // tree_->Branch("antiMuon_DzError", &antiMuon_genDzError_,"antiMuon_genDzError_/f"); 
+        
         tree_->Branch("antiMuon_genRecoMatches", &antiMuon_genRecoMatches_,"antiMuon_genRecoMatches_/i");
         tree_->Branch("antiMuon_genRecoTrackMatches", &antiMuon_genRecoTrackMatches_,"antiMuon_genRecoTrackMatches_/i");
         tree_->Branch("antiMuon_genRecoObj", &antiMuon_genRecoObj_,"antiMuon_genRecoObj_/I");
@@ -800,10 +969,22 @@ ZCountingAOD::beginJob()
     tree_->Branch("Muon_pt", &muon_pt_);
     tree_->Branch("Muon_eta", &muon_eta_);
     tree_->Branch("Muon_phi", &muon_phi_);
+    tree_->Branch("Muon_ptTrk", &muon_ptTrk_);
+    tree_->Branch("Muon_etaTrk", &muon_etaTrk_);
+    tree_->Branch("Muon_phiTrk", &muon_phiTrk_);
+    tree_->Branch("Muon_ptSta", &muon_ptSta_);
+    tree_->Branch("Muon_etaSta", &muon_etaSta_);
+    tree_->Branch("Muon_phiSta", &muon_phiSta_);
     tree_->Branch("Muon_charge", &muon_charge_);
+    
     tree_->Branch("Muon_dx", &muon_dx_);
     tree_->Branch("Muon_dy", &muon_dy_);
     tree_->Branch("Muon_dz", &muon_dz_);
+    tree_->Branch("Muon_vx", &muon_vx_);
+    tree_->Branch("Muon_vy", &muon_vy_);
+    tree_->Branch("Muon_vz", &muon_vz_);
+    tree_->Branch("Muon_DxyError", &muon_DxyError_);
+    tree_->Branch("Muon_DzError", &muon_DzError_);
     
     tree_->Branch("Muon_matchValue", &muon_matchValue_);
     tree_->Branch("Muon_ID", &muon_ID_);
@@ -836,6 +1017,28 @@ ZCountingAOD::beginJob()
     // tree_->Branch("Muon_ScaleCorr_deltaM",   &muon_ScaleCorr_deltaM_);
     // tree_->Branch("Muon_ScaleCorr_Ewk2",     &muon_ScaleCorr_Ewk2_);
     // tree_->Branch("Muon_ScaleCorr_Total",    &muon_ScaleCorr_Total_);
+
+    // standalone muons
+    tree_->Branch("nStandalone", &nStandalone_,"nStandalone_/s");
+    tree_->Branch("Sta_pt", &sta_pt_);
+    tree_->Branch("Sta_eta", &sta_eta_);
+    tree_->Branch("Sta_phi", &sta_phi_);
+    tree_->Branch("Sta_charge", &sta_charge_);
+    
+    tree_->Branch("Sta_dx", &sta_dx_);
+    tree_->Branch("Sta_dy", &sta_dx_);
+    tree_->Branch("Sta_dz", &sta_dz_);
+    tree_->Branch("Sta_vx", &sta_vx_);
+    tree_->Branch("Sta_vy", &sta_vy_);
+    tree_->Branch("Sta_vz", &sta_vz_);
+    tree_->Branch("Sta_DxyError", &sta_DxyError_);
+    tree_->Branch("Sta_DzError",  &sta_DzError_);
+
+    tree_->Branch("Sta_trackAlgo", &sta_trackAlgo_);
+
+
+    //Roccester corrections
+    tree_->Branch("Track_ScaleCorr", &track_ScaleCorr_);
     
     // tracks
     tree_->Branch("nTrack", &nTrack_,"nTrack_/s");
@@ -843,9 +1046,16 @@ ZCountingAOD::beginJob()
     tree_->Branch("Track_eta", &track_eta_);
     tree_->Branch("Track_phi", &track_phi_);
     tree_->Branch("Track_charge", &track_charge_);
+    
     tree_->Branch("Track_dx", &track_dx_);
     tree_->Branch("Track_dy", &track_dx_);
     tree_->Branch("Track_dz", &track_dz_);
+    tree_->Branch("Track_vx", &track_vx_);
+    tree_->Branch("Track_vy", &track_vy_);
+    tree_->Branch("Track_vz", &track_vz_);
+    tree_->Branch("Track_DxyError", &track_DxyError_);
+    tree_->Branch("Track_DzError", &track_DzError_);
+
     tree_->Branch("Track_nPixelHits", &track_nPixelHits_);
     tree_->Branch("Track_nTrackerLayers", &track_nTrackerLayers_);
     tree_->Branch("Track_validFraction", &track_validFraction_);
@@ -895,6 +1105,13 @@ void ZCountingAOD::clearVariables(){
     muon_genPt_ = 0.;
     muon_genEta_ = 0.;
     muon_genPhi_ = 0.;
+
+    muon_genVx_ = 99.;
+    muon_genVy_ = 99.;
+    muon_genVz_ = 99.;
+    // muon_genDxyError_ = 99.;
+    // muon_genDzError_ = 99.;
+        
     muon_genRecoMatches_ = 0;
     muon_genRecoObj_ = -1;
     muon_genRecoTrackMatches_ = 0;
@@ -903,6 +1120,13 @@ void ZCountingAOD::clearVariables(){
     antiMuon_genPt_ = 0.;
     antiMuon_genEta_ = 0.;
     antiMuon_genPhi_ = 0.;
+
+    antiMuon_genVx_ = 99.;
+    antiMuon_genVy_ = 99.;
+    antiMuon_genVz_ = 99.;
+    // antiMuon_genDxyError_ = 99.;
+    // antiMuon_genDzError_ = 99.;
+        
     antiMuon_genRecoMatches_ = 0;
     antiMuon_genRecoObj_ = -1;
     antiMuon_genRecoTrackMatches_ = 0;
@@ -912,10 +1136,22 @@ void ZCountingAOD::clearVariables(){
     muon_pt_.clear();
     muon_eta_.clear();
     muon_phi_.clear();    
+    muon_ptTrk_.clear();
+    muon_etaTrk_.clear();
+    muon_phiTrk_.clear(); 
+    muon_ptSta_.clear();
+    muon_etaSta_.clear();
+    muon_phiSta_.clear();    
     muon_charge_.clear();
     muon_dx_.clear();
     muon_dy_.clear();
     muon_dz_.clear();
+
+    muon_vx_.clear();
+    muon_vy_.clear();
+    muon_vz_.clear();
+    muon_DxyError_.clear();
+    muon_DzError_.clear();    
     
     muon_matchValue_.clear();
     muon_tkRelIso_.clear();
@@ -947,6 +1183,24 @@ void ZCountingAOD::clearVariables(){
     // muon_ScaleCorr_Ewk2_.clear();
     // muon_ScaleCorr_Total_.clear();
 
+    nStandalone_ = 0;
+    sta_pt_.clear();
+    sta_eta_.clear();
+    sta_phi_.clear();
+    sta_charge_.clear();
+    sta_dx_.clear();
+    sta_dy_.clear();
+    sta_dz_.clear();
+    sta_vx_.clear();
+    sta_vy_.clear();
+    sta_vz_.clear();
+    sta_DxyError_.clear();
+    sta_DzError_.clear();  
+
+    sta_trackAlgo_.clear();
+
+    sta_ScaleCorr_.clear();
+
     nTrack_ = 0;
     track_pt_.clear();
     track_eta_.clear();
@@ -955,6 +1209,11 @@ void ZCountingAOD::clearVariables(){
     track_dx_.clear();
     track_dy_.clear();
     track_dz_.clear();
+    track_vx_.clear();
+    track_vy_.clear();
+    track_vz_.clear();
+    track_DxyError_.clear();
+    track_DzError_.clear();  
 
     track_nPixelHits_.clear();
     track_nTrackerLayers_.clear();
