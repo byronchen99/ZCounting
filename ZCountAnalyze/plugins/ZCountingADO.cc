@@ -376,7 +376,7 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     triggers->readEvent(iEvent);
     
     // take data events only if one of the required triggers has fired
-    if(iEvent.isRealData() && !(triggers->pass(metTriggerPatterns_) || triggers->pass(muonTriggerPatterns_))){
+    if(iEvent.isRealData() && !(emulateTrigger_ || triggers->pass(metTriggerPatterns_) || triggers->pass(muonTriggerPatterns_))){
         return;
     }
 
@@ -532,10 +532,37 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     edm::Handle<std::vector<reco::Muon>> muonCollection;
     iEvent.getByToken(muonCollection_, muonCollection);
     for (const reco::Muon &mu : *muonCollection){
-        if(std::abs(mu.eta()) > 2.4) continue;
-        if(mu.pt() < 20) continue;
-        // // only keep global muons, standalone muons and tracks are stored in separate collections
-        // if(!mu.isGlobalMuon()) continue;
+        // reject muons if best track, outer track, and inner track fail acceptance cuts
+        if (std::abs(mu.eta()) > 2.4
+            && (mu.outerTrack().isNull() || mu.outerTrack()->eta() > 2.4)
+            && (mu.innerTrack().isNull() || mu.innerTrack()->eta() > 2.4)        
+        ) {
+            continue;
+        }
+        if (mu.pt() < 20 
+            && (mu.outerTrack().isNull() || mu.outerTrack()->pt() < 20)
+            && (mu.innerTrack().isNull() || mu.innerTrack()->pt() < 20)
+        ) {
+            continue;
+        }
+
+        if (mu.outerTrack().isNonnull() && mu.outerTrack()->extra().isNonnull() && !(mu.isGlobalMuon())){
+            // Check if muon is twice in this collection, once as standAloneMuon and once as globalMuon
+            //    We want to keep the globalMuon doublicate, hence we only consider muons that are not global
+            bool isDoublicate = false;
+            for (const reco::Muon &mu2 : *muonCollection) {
+                if ((&mu2 == &mu) || mu2.outerTrack().isNull() || mu2.outerTrack()->extra().isNull())
+                    continue;
+                
+                if (mu2.outerTrack()->extra().get() == mu.outerTrack()->extra().get()) {
+                    isDoublicate = true;
+                    break;
+                }
+            }            
+            if(isDoublicate)
+                continue;
+        }
+
 
         int match_value_ = -1;
         if(!iEvent.isRealData()){
@@ -693,8 +720,19 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     edm::Handle<std::vector<reco::Track>> trackCollection;
     iEvent.getByToken(trackCollection_, trackCollection);
     for (const reco::Track &trk : *trackCollection){        
-        if(std::abs(trk.eta()) > 2.5) continue;
-        if(trk.pt() < 10) continue;
+        if(std::abs(trk.eta()) > 2.4) continue;
+        if(trk.pt() < 20) continue;
+
+        // Check if track is not a muon
+        bool isMuon = false;
+        for (const reco::Muon &mu : *muonCollection) {
+            if (mu.innerTrack().isNonnull() && mu.innerTrack().get() == &trk) {
+                isMuon = true;
+                break;
+            }
+        }
+        if(isMuon)
+            continue;
         
         track_pt_.push_back(trk.pt());
         track_eta_.push_back(trk.eta());
@@ -759,8 +797,25 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     edm::Handle<std::vector<reco::Track>> standaloneCollection;
     iEvent.getByToken(standaloneCollection_, standaloneCollection);
     for (const reco::Track &sta : *standaloneCollection){        
-        if(std::abs(sta.eta()) > 2.5) continue;
-        if(sta.pt() < 10) continue;
+        if(std::abs(sta.eta()) > 2.4) continue;
+        if(sta.pt() < 20) continue;
+
+        // Check if standalone muon is not a muon
+        bool isMuon = false;
+        for (const reco::Muon &mu : *muonCollection) {
+            if (mu.outerTrack().isNull())
+                continue;
+            if (mu.outerTrack().get() == &sta) {
+                isMuon = true;
+                break;
+            }
+            if (mu.outerTrack()->extra().isNonnull() && mu.outerTrack()->extra().get() == sta.extra().get()) {
+                isMuon = true;
+                break;                
+            }
+        }
+        if(isMuon)
+            continue;
         
         sta_pt_.push_back(sta.pt());
         sta_eta_.push_back(sta.eta());

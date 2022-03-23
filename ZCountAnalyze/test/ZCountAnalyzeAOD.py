@@ -70,10 +70,13 @@ process.source = cms.Source("PoolSource",
     fileNames=cms.untracked.vstring(
         # Data
         # Single Mu 2017 D UL-Reco
-        'file:/pnfs/desy.de/cms/tier2/store/data/Run2017E/SingleMuon/AOD/09Aug2019_UL2017-v1/260000/0005DF00-5EE0-C84E-9241-08FA62D9EFF7.root'
+        # 'file:/pnfs/desy.de/cms/tier2/store/data/Run2017E/SingleMuon/AOD/09Aug2019_UL2017-v1/260000/0005DF00-5EE0-C84E-9241-08FA62D9EFF7.root'
+        # "file:/pnfs/desy.de/cms/tier2/store/data/Run2017H/SingleMuon/AOD/09Aug2019_UL2017_LowPU-v1/10000/02FD55DE-EA02-FD4C-86D3-0E93C4E9E280.root"
 
         # AODSIM
-        # 'file:/pnfs/desy.de/cms/tier2/store/mc/RunIISummer20UL17RECO/DYJetsToLL_M-50_HT-100to200_TuneCP5_PSweights_13TeV-madgraphMLM-pythia8/AODSIM/106X_mc2017_realistic_v6-v1/00000/0C0FD46D-6DAE-6F45-B9F4-129A6ABC69C4.root'
+        'file:/pnfs/desy.de/cms/tier2/store/mc/RunIISummer20UL17RECO/DYJetsToLL_M-50_HT-100to200_TuneCP5_PSweights_13TeV-madgraphMLM-pythia8/AODSIM/106X_mc2017_realistic_v6-v1/00000/0C0FD46D-6DAE-6F45-B9F4-129A6ABC69C4.root'
+        # "/store/mc/RunIISummer20UL17RECO/DYJetsToLL_M-50_TuneCP5_13TeV-amcatnloFXFX-pythia8/AODSIM/106X_mc2017_realistic_v6-v1/130000/2678F234-2D42-AB4F-89E4-80AFDE9EFB82.root"
+        # "/store/mc/RunIISummer20UL17RECO/DYJetsToLL_M-50_HT-100to200_TuneCP5_PSweights_13TeV-madgraphMLM-pythia8/AODSIM/106X_mc2017_realistic_v6-v1/00000/0C0FD46D-6DAE-6F45-B9F4-129A6ABC69C4.root"
     )
 )
 
@@ -145,7 +148,7 @@ elif options.samplename in ('smu','met'):
 if options.year == '2017H':
     print("set 2017 Low PU configuration")
     # trigger emulation of HLT_IsoMu24
-    process.load("HLTrigger.Configuration.HLT_User_cff")
+    # process.load("HLTrigger.Configuration.HLT_User_cff")
     process.zcounting.muon_trigger_patterns = cms.vstring("HLT_IsoMu24_v*") #"HLT_HIMu17_v*"
     process.zcounting.emulateTrigger = cms.untracked.bool(True)
 
