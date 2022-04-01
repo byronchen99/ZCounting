@@ -184,7 +184,7 @@ CMCTemplate::CMCTemplate(RooRealVar &m, TH1D* hist, const Bool_t pass, const int
     sprintf(vname,"sig_dataHist%s",name);
     dataHist = new RooDataHist(vname,vname,RooArgSet(m),inHist);
     
-    sprintf(vname,"sig_histPdf%s",name);
+    sprintf(vname,"signal%s",name);
     model  = new RooHistPdf(vname,"MC",m,*dataHist,intOrder);
 
 }

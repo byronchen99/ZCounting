@@ -100,8 +100,7 @@ private:
     double dz(const pat::Muon&, const reco::Vertex&);
 
 
-    // ----------member data ---------------------------
-
+    // ----------member data ---------------------------    
     edm::Service<TFileService> fs;
     TTree *tree_;
 
@@ -743,6 +742,10 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
         nMuon_++;
 
     }
+    
+    // we don't need data events with less than two muons
+    if(iEvent.isRealData() && nMuon_ < 2)
+        return;
 
     if(antiMuon_genRecoObj_ != -1 && muon_genRecoObj_ != -1){
         vMuon.SetPtEtaPhiM(muon_pt_[muon_genRecoObj_], muon_eta_[muon_genRecoObj_], muon_phi_[muon_genRecoObj_], MUON_MASS);
@@ -762,7 +765,7 @@ ZCounting::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
             }
         }
     }
-
+    
     tree_->Fill();
 }
 
@@ -792,8 +795,8 @@ ZCounting::beginJob()
     tree_->Branch("lumiBlock", &lumiBlock_,"lumiBlock/i");
     tree_->Branch("eventNumber", &eventNumber_, "eventNumber/i");
 
-    tree_->Branch("MET_triggerBits",    &met_triggerBits_,      "met_triggerBits_/i");
-    tree_->Branch("MET_triggerBitsExt", &met_triggerBitsExt_,   "met_triggerBitsExt_/i");
+    tree_->Branch("MET_triggerBits",    &met_triggerBits_,      "met_triggerBits_/I");
+    tree_->Branch("MET_triggerBitsExt", &met_triggerBitsExt_,   "met_triggerBitsExt_/I");
     tree_->Branch("MET_PF_pt",    &met_PF_pt_,  "met_PF_pt_/f");
     tree_->Branch("MET_PF_phi",   &met_PF_phi_, "met_PF_phi_/f");
     tree_->Branch("MET_Puppi_pt",    &met_Puppi_pt_,  "met_Puppi_pt_/f");
@@ -909,6 +912,7 @@ ZCounting::beginJob()
 void
 ZCounting::endJob()
 {
+    
 }
 
 // ------------ method fills 'descriptions' with the allowed parameters for the module  ------------
@@ -1031,7 +1035,10 @@ ZCounting::get_muonTriggerObjects(const std::vector<pat::TriggerObjectStandAlone
     std::vector<pat::TriggerObjectStandAlone> muonTriggerObjects;
     for(pat::TriggerObjectStandAlone obj : tObjCol) {
         obj.unpackPathNames(names);
-        const std::vector<std::string> pathNamesAll = obj.pathNames(false);
+        // default: pathNames(pathLastFilterAccept=false, pathL3FilterAccept=true)
+        // this means also trigger objects that do not pass the last filter are obtained
+        // but we want only last filters
+        const std::vector<std::string> pathNamesAll = obj.pathNames(true, true);
 
         // bool passedTrigger = false;
         for(const std::string iPath: pathNamesAll) {

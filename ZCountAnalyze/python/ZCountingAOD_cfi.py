@@ -13,9 +13,9 @@ zcounting = cms.EDAnalyzer('ZCountingAOD',
     roccorFile = cms.string(""),   
 
     # Standalone muon tracks - source
-    # reco_standalones = cms.InputTag("standAloneMuons","UpdatedAtVtx","RECO"),
     reco_standalones = cms.InputTag("standAloneMuons","","RECO"),
-    
+    reco_standalonesUpdated = cms.InputTag("standAloneMuons","UpdatedAtVtx","RECO"),
+
     # Tracks - source
     reco_tracks = cms.InputTag("generalTracks","","RECO"),
 
@@ -29,12 +29,16 @@ zcounting = cms.EDAnalyzer('ZCountingAOD',
     # 2^{x}
     muon_trigger_patterns=cms.vstring(
                                 # x =
-        # "HLT_L1SingleMu18_v*",  # 0
-        # "HLT_L1SingleMu25_v*",  # 1
-        "HLT_IsoMu24_v*",       # 2
-        "HLT_IsoMu27_v*",       # 3
-        "HLT_IsoTkMu24_v*",     # 4
-        "HLT_IsoTkMu27_v*",     # 5
+        "HLT_IsoMu24_v*",       # 0
+        "HLT_IsoMu27_v*",       # 1
+        "HLT_IsoTkMu24_v*",     # 2
+        "HLT_IsoTkMu27_v*",     # 3
+        "HLT_Mu17_v*",          # 4
+        "HLT_Mu19_v*",          # 5
+        "HLT_Mu20_v*",          # 6
+        "HLT_Mu27_v*",          # 8
+        "HLT_L1SingleMu18_v*",  # 9
+        "HLT_L1SingleMu25_v*",  # 10
         # "HLT_IsoMu30_v*",       # 6
         # "HLT_IsoTkMu30_v*",     # 7
         # "HLT_Mu17_v*",          # 8
