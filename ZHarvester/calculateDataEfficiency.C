@@ -19,8 +19,6 @@
 
 #include "Utils/CPlot.hh"             // helper class for plots
 #include "Utils/MitStyleRemix.hh"         // style settings for drawing
-#include "Utils/CEffUser1D.hh"            // class for handling efficiency graphss
-#include "Utils/CEffUser2D.hh"            // class for handling efficiency tables
 
 #include "Utils/ZMMSignals.hh"
 #include "Utils/ZMMBackgrounds.hh"
@@ -908,6 +906,7 @@ Double_t make_plot(
     return resChi2;
 }
 
+/*
 //--------------------------------------------------------------------------------------------------
 // perform count for tag and probe efficiency
 std::vector<float> performCount(
@@ -981,6 +980,7 @@ std::vector<float> performCount(
 
     return resultEff;
 }
+*/
 
 //--------------------------------------------------------------------------------------------------
 // perform fit on one histogram to extract number of Z 
@@ -1196,13 +1196,13 @@ void getZyield(
 void calculateDataEfficiency(
         TH1D          *passHist,            // histogram with passing probes
         TH1D          *failHist,            // histogram with failing probes
-		const Int_t   iBin,                 // Label of measurement number in currect run
-		const TString effType,              // "HLT" or "Sel" or "Glo" or "Sta" or "Trk"
+        const Int_t   iBin,                 // Label of measurement number in currect run
+        const TString effType,              // "HLT" or "Sel" or "Glo" or "Sta" or "Trk"
         const TString etaRegion,            // Barrel "B", Endcap "E" or Inclusive "I"
-		const Int_t   sigpass,              // signal model for PASS sample
-		const Int_t   bkgpass,              // background model for PASS sample
-		const Int_t   sigfail,              // signal model for FAIL sample
-		const Int_t   bkgfail,              // background model for FAIL sample
+        const Int_t   sigpass,              // signal model for PASS sample
+        const Int_t   bkgpass,              // background model for PASS sample
+        const Int_t   sigfail,              // signal model for FAIL sample
+        const Int_t   bkgfail,              // background model for FAIL sample
         TH1D          *hPV=0,
         const TString mcfilename="",        // ROOT file containing MC events to generate templates from
         const TString bkgQCDFilename="",    // ROOT file containing bkg template
