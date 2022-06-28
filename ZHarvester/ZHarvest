@@ -3,11 +3,11 @@
 import argparse
 import ROOT
 import os
-import pdb
+import pdb # python debugger might be helpful (see https://docs.python.org/3/library/pdb.html)
 
 from python.utils import load_input_csv, load_histogram
 
-ROOT.gROOT.SetBatch(True) # disable root popups
+ROOT.gROOT.SetBatch(True) # disable root prompts
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-b", "--beginRun", help="First run to analyze [%(default)s]", type=int, default=272007)
@@ -104,6 +104,7 @@ for run, byLS_run in byLS_data.groupby('run'):
                 suffix="new")
 
         print("Load histograms ...")
+        h_mass_yield_Z = load("h_mass_yield_Z")
         
         h_HLT_pass = load("h_mass_HLT_pass_central")
         h_HLT_fail = load("h_mass_HLT_fail_central")
@@ -152,11 +153,11 @@ for run, byLS_run in byLS_data.groupby('run'):
         print("Load fit results ...")
         
         def load_from_workspace(type):
-            file_eff = f"{dirOutSub}/workspace_{efficiency}_{etaRegion}_{m}.root"
-            if not os.path.isfile(file_HLT):
+            file_eff = f"{dirOutSub}/workspace_{type}_{etaRegion}_{m}.root"
+            if not os.path.isfile(file_eff):
                 print("WARNING: fit result does not exist! exit")
                 exit()
-                fHLT = ROOT.TFile(file_HLT,"READ")
+                fHLT = ROOT.TFile(file_eff,"READ")
                 wHLT = fHLT.Get("workspace")
                 effHLT = wHLT.var("eff").getVal()
             return effHLT
@@ -167,6 +168,9 @@ for run, byLS_run in byLS_data.groupby('run'):
         
         # trigger efficiency that onmly one or both muons pass the trigger
         effTrigger = (1 - (1-effHLT)**2 )
+        
+        # reconstructed number of Zs, do not perform fit but assume 1% background
+        recoZ = h_mass_yield_Z.Integral() * 0.99
         
         # delivered number of Zs given by efficiency corrected number of reconstructed Zs
         delZ = recoZ / (effTrigger * effSIT**2 * effGLO**2)
