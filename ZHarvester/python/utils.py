@@ -1,5 +1,81 @@
 
 # ------------------------------------------------------------------------------
+## load input by lumisection CSV file, convert it and return the data 
+def load_input_csv(byLS_data):
+
+    import pandas as pd
+    
+    byLS_file = open(str(byLS_data))
+    byLS_lines = byLS_file.readlines()
+    byLS_data = pd.read_csv(byLS_data, sep=',', low_memory=False,
+        skiprows=lambda x: byLS_lines[x].startswith('#') and not byLS_lines[x].startswith('#run'))
+        
+    print(" formatting csv file...")    # formatting the csv
+    byLS_data[['run', 'fill']] = byLS_data['#run:fill'].str.split(':', expand=True).apply(pd.to_numeric)
+    byLS_data['ls'] = byLS_data['ls'].str.split(':', expand=True)[0].apply(pd.to_numeric)
+    byLS_data = byLS_data.drop(['#run:fill', 'hltpath', 'source'], axis=1)
+
+    if 'delivered(/ub)' in byLS_data.columns.tolist():  # convert to /pb
+        byLS_data['delivered(/ub)'] = byLS_data['delivered(/ub)'].apply(lambda x: x / 1000000.)
+        byLS_data['recorded(/ub)'] = byLS_data['recorded(/ub)'].apply(lambda x: x / 1000000.)
+        byLS_data = byLS_data.rename(index=str, columns={'delivered(/ub)': 'delivered(/pb)', 'recorded(/ub)': 'recorded(/pb)'})
+    elif 'delivered(/fb)' in byLS_data.columns.tolist():  # convert to /pb
+        byLS_data['delivered(/fb)'] = byLS_data['delivered(/fb)'].apply(lambda x: x * 1000.)
+        byLS_data['recorded(/fb)'] = byLS_data['recorded(/fb)'].apply(lambda x: x * 1000.)
+        byLS_data = byLS_data.rename(index=str, columns={'delivered(/fb)': 'delivered(/pb)', 'recorded(/fb)': 'recorded(/pb)'})
+
+    # if there are multiple entries of the same ls (for example from different triggers), 
+    #   only keep the one with the highest luminosity.
+    byLS_data = byLS_data.sort_values(['fill', 'run', 'ls', 'delivered(/pb)', 'recorded(/pb)'])
+    byLS_data = byLS_data.drop_duplicates(['fill', 'run', 'ls'])
+    
+    return byLS_data
+
+# ------------------------------------------------------------------------------
+def load_histogram(
+    name,      # name of the histogram to load
+    fileName,  # file where the histogram is stored
+    lumisections=[0,], # list of lumisections
+    run=0, 
+    prefix="", suffix="", 
+    MassBin=50, MassMin=66, MassMax=116, 
+    pileup=False
+):
+    import ROOT 
+    
+    file_ = ROOT.TFile(fileName)
+    
+    h_X_ls = file_.Get("{0}{1}".format(prefix, name)).Clone("{0}{1}{2}".format(prefix, name, suffix))
+    h_X_ls.SetDirectory(0)
+    h_X = h_X_ls.ProjectionY("h_tmp_{0}_{1}_{2}".format(name, run, suffix), lumisections[0], lumisections[0], "e")
+    
+    for ls in lumisections[1:]:
+        h_X.Add(h_X_ls.ProjectionY("h_tmp_{0}_{1}_{2}_{3}".format(name, run, ls, suffix), ls, ls, "e"))
+    
+    if pileup:
+        h_X.SetDirectory(0)
+        return h_X
+        
+    # create new histogram in correct bin range
+    hNew = ROOT.TH1D("h_mass_{0}_{1}_{2}_{3}".format(
+        name, run, lumisections[0], suffix), "",MassBin, MassMin, MassMax)
+    
+    for ibin in range(0, h_X.GetNbinsX()+1):
+        binCenter = h_X.GetBinCenter(ibin)
+        if binCenter < MassMin:
+            continue
+        elif binCenter > MassMax:
+            break
+        else:
+            content = h_X.GetBinContent(ibin)
+            newBin = hNew.FindBin(binCenter)
+            hNew.SetBinContent(newBin, hNew.GetBinContent(newBin) + content)
+        
+    hNew.SetDirectory(0)
+
+    return hNew
+
+# ------------------------------------------------------------------------------
 ## Collect "by LS" and "by measurement" csv files and write big csv file
 def writeSummaryCSV(outCSVDir, writeByLS=True):
     import logging as log
