@@ -75,7 +75,6 @@ for run, byLS_run in byLS_data.groupby('run'):
 
     print("Looping over measurements ...")
     m = -1
-    recLumi = 0
     while len(LSlist) > 0:  # begin next measurement "m"
         m += 1
         print(f"Now at measurement {m}")
@@ -83,6 +82,7 @@ for run, byLS_run in byLS_data.groupby('run'):
         # merge data to one measuement if remaining luminosity is too less for two measuements
         mergeMeasurements = sum(byLS_run.loc[byLS_run['ls'].isin(LSlist)]['recorded(/pb)'].values) < 1.5 * LumiPerMeasurement
 
+        recLumi = 0
         # produce goodLSlist with ls that are used for one measurement
         goodLSlist = []
         while len(LSlist) > 0:
@@ -178,5 +178,5 @@ for run, byLS_run in byLS_data.groupby('run'):
         print(f"Delivered number of Zs = {delZ}")
         
         # for testing exit after two measurements
-        if m >= 2:
+        if m >= 1:
             exit()
