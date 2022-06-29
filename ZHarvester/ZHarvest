@@ -152,19 +152,19 @@ for run, byLS_run in byLS_data.groupby('run'):
 
         print("Load fit results ...")
         
-        def load_from_workspace(type):
-            file_eff = f"{dirOutSub}/workspace_{type}_{etaRegion}_{m}.root"
-            if not os.path.isfile(file_eff):
-                print("WARNING: fit result does not exist! exit")
+        def load_from_workspace(type_eff):
+            filename_eff = f"{dirOutSub}/workspace_{type_eff}_{etaRegion}_{m}.root"
+            if not os.path.isfile(filename_eff):
+                print(f"WARNING: fit result {filename_eff} does not exist! exit")
                 exit()
-                fHLT = ROOT.TFile(file_eff,"READ")
-                wHLT = fHLT.Get("workspace")
-                effHLT = wHLT.var("eff").getVal()
-            return effHLT
+            tfile_eff = ROOT.TFile(filename_eff,"READ")
+            workspace = tfile_eff.Get("workspace")
+            eff = workspace.var("eff").getVal()
+            return eff
 
         effHLT = load_from_workspace("HLT")
         effSIT = load_from_workspace("SIT")
-        effGLO = load_from_workspace("GLO")
+        effGlo = load_from_workspace("Glo")
         
         # trigger efficiency that onmly one or both muons pass the trigger
         effTrigger = (1 - (1-effHLT)**2 )
@@ -173,7 +173,7 @@ for run, byLS_run in byLS_data.groupby('run'):
         recoZ = h_mass_yield_Z.Integral() * 0.99
         
         # delivered number of Zs given by efficiency corrected number of reconstructed Zs
-        delZ = recoZ / (effTrigger * effSIT**2 * effGLO**2)
+        delZ = recoZ / (effTrigger * effSIT**2 * effGlo**2)
 
         print(f"Delivered number of Zs = {delZ}")
         
