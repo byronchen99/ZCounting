@@ -9,6 +9,10 @@ import uncertainties as unc
 from scipy.optimize import curve_fit
 from scipy import stats
 
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import matplotlib.gridspec as gridspec
+
 sys.path.append(os.getcwd())
 print(os.getcwd())
 
@@ -22,9 +26,25 @@ pd.options.mode.chained_assignment = None
 ROOT.gROOT.SetBatch(True)
 ROOT.gStyle.SetCanvasPreferGL(1)
 
+textsize = 16
+markersize = 4.0
 
-latex = ROOT.TLatex()
-latex.SetNDC()
+plt.rcParams.update({
+    "text.usetex": True,
+    "font.family": "serif",
+    "font.serif": ["Palatino",],
+    "font.size": textsize,
+    'text.latex.preamble': [r"""\usepackage{bm}"""]
+})
+
+mpl.rcParams.update({
+    "legend.fontsize" : "medium",
+    "axes.labelsize" : "medium",
+    "axes.titlesize" : "medium",
+    "xtick.labelsize" : "medium",
+    "ytick.labelsize" : "medium",
+})
+colors = ["#e74c3c","#f1c40f","#16a085","#27ae60","#2980b9","#8e44ad"]
 
 parser = argparse.ArgumentParser()
 
@@ -37,18 +57,6 @@ args = parser.parse_args()
 outDir = args.saveDir
 if not os.path.isdir(outDir):
     os.mkdir(outDir)
-
-plot_lowPU = False
-if args.xsec:
-    plot_lowPU = True
-    # --- get Z xsec
-    data_xsec = pd.read_csv(str(args.xsec), sep=',',low_memory=False)#, skiprows=[1,2,3,4,5])
-    xsecBB = sum(data_xsec['zDelBB'])/sum(data_xsec['lumiRec'])
-    xsecBE = sum(data_xsec['zDelBE'])/sum(data_xsec['lumiRec'])
-    xsecEE = sum(data_xsec['zDelEE'])/sum(data_xsec['lumiRec'])
-    xsecI = sum(data_xsec['zDelI'])/sum(data_xsec['lumiRec'])
-
-textsize = 0.03
 
 # ------------------------------------------------------------------------------
 def make_plots(df,
@@ -96,8 +104,8 @@ def make_plots(df,
     if xAxis == 'lumi':
         xAxis = 'lumiRecInst'
         data[xAxis] = data['lumiRec'] / data['timewindow']
-        xTitle="instantaneous recorded luminosity [Hz/pb]"
-        x_step = 0.0005
+        xTitle="Inst. luminosity $[\\mathrm{nb}^{-1}\\mathrm{s}^{-1}]$"
+        x_step = 0.2
     elif xAxis == 'time':
         data['time'] = data['tdate_begin'] + (data['tdate_end'] - data['tdate_begin'])/2
         #data['time'] -= 7200
@@ -109,14 +117,15 @@ def make_plots(df,
         x_step = 2
     else:
         xTitle=xAxis
-        x_step = 0.0005
+        x_step = 0.2
 
     if yLabel == "sigma":
-        yLabel = "#sigma^{fid}_{Z} [pb]"
+        yLabel = "$\\sigma^{\\mathrm{fid}}_{\\mathrm{Z}}$\,[pb]"
 
         if normalized:
             data[yAxis] /= np.mean(data[yAxis].values)
-            yLabel = "#sigma^{fid}_{Z} / <#sigma^{fid}_{Z}>"
+            data[yAxis.replace("_mc","")] /= np.mean(data[yAxis.replace("_mc","")].values)
+            yLabel = "$\\sigma^{\\mathrm{fid}}_{\\mathrm{Z}} / \\langle \\sigma^{\\mathrm{fid}}_{\\mathrm{Z}} \\rangle$ "
 
     elif resource != "":
         # plot an efficiency on y axis - load necessery resources
@@ -164,6 +173,7 @@ def make_plots(df,
     data['y_Err'] = data[yAxis].apply(lambda x: x.s)
     data['y'] = data[yAxis].apply(lambda x: x.n)
     if yAxis.replace("_mc","") in data.keys():
+        print(">>> found uncorrected values")
         data['y0_Err'] = data[yAxis.replace("_mc","")].apply(lambda x: x.s)
         data['y0'] = data[yAxis.replace("_mc","")].apply(lambda x: x.n)
     else:
@@ -171,7 +181,6 @@ def make_plots(df,
         data['y0'] = data['y']
 
     data['relstat'] = data['y_Err'] / data['y']
-
 
     # print(">>> sort out {0} points with low statistic".format(len(data['relstat'] > 0.05)))
     # data = data.loc[data["relstat"] < 0.05]
@@ -185,30 +194,29 @@ def make_plots(df,
             subDir = outDir+"/PlotsXSec_"+str(fill)
             if not os.path.isdir(subDir):
                 os.mkdir(subDir)
+                
+            plt.clf()
+            fig = plt.figure()
+            ax1 = fig.add_subplot(111)
+            fig.subplots_adjust(left=0.15, right=0.99, top=0.99, bottom=0.125, hspace=0.0)
 
-            graphXsecL=ROOT.TGraphErrors(len(dFill),dFill[xAxis].values,dFill['y'].values,np.zeros(len(dFill)),data['y_Err'].values)
-            graphXsecL.SetName("graph_metaXsecAtlas")
-            graphXsecL.SetMarkerStyle(23)
-            graphXsecL.SetMarkerColor(ROOT.kAzure-4)
-            graphXsecL.SetTitle(title)
-            graphXsecL.GetXaxis().SetTitle(xTitle)
-            graphXsecL.GetYaxis().SetTitle(yLabel)
+            ax1.set_xlabel(xTitle)
+            ax1.set_ylabel(yLabel)
+            
+            ax1.errorbar(dFill[xAxis].values, dFill['y'].values, yerr=data['y_Err'].values, label="Measurement",
+                marker="o", linewidth=0, color=colors[0], ecolor=colors[0], elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
+                zorder=1)
 
-            graphXsecL.GetYaxis().SetTitleOffset(1.0)
+            leg = ax1.legend(loc="upper left", ncol=3,
+                frameon=True, framealpha=1.0, fancybox=False, edgecolor="black")
+            leg.get_frame().set_linewidth(0.8)
+            
+            # ax1.set_ylim([minY-yRange*0.05, maxY + yRange*0.5])
+            # ax1.set_xlim([xMin, xMax])
 
-            print(">>> cross sections for Fill "+str(fill))
-            print(">>> the simple average cross section is "+str(sum(dFill['y'].values)/len(dFill)))
-            graphXsecL.Fit("pol1","","",0.0,0.025)
-            c3=ROOT.TCanvas("c3","c3",1000,600)
-            c3.SetGrid()
-            graphXsecL.Draw("AP")
+            plt.savefig(subDir+"/"+yAxis+"_vs_"+xAxis+".png")
+            plt.close()
 
-            legend=ROOT.TLegend(0.2,0.8,0.4,0.9)
-            legend.AddEntry(graphXsecL,"Measurement (#pm stat.)","pe")
-            legend.Draw("same")
-
-            c3.SaveAs(subDir+"/"+yAxis+"_vs_"+xAxis+".png")
-            c3.Delete()
 
     if plot_all:
         print(">>> make plot all measurements")
@@ -217,134 +225,48 @@ def make_plots(df,
         else:
             xPoints = data[xAxis].values
 
-        graphXsecL=ROOT.TGraphErrors(len(data), xPoints, data['y'].values, np.zeros(len(data)), data['y_Err'].values)
-        graphXsecL.SetName("graph_metaXsecAtlas")
-        graphXsecL.SetMarkerStyle(33)
-        graphXsecL.SetMarkerColor(ROOT.kAzure-4)
-        graphXsecL.SetMarkerSize(1.)
-        graphXsecL.SetTitle(title)
-        graphXsecL.GetXaxis().SetTitle(xTitle)
-        graphXsecL.GetYaxis().SetTitle(yTitle)
-        graphXsecL.GetYaxis().SetTitleOffset(1.0)
+        plt.clf()
+        fig = plt.figure(figsize=(10.0,4.0))
+        ax1 = fig.add_subplot(111)
+        fig.subplots_adjust(left=0.1, right=0.99, top=0.99, bottom=0.15)
 
-        #graphXsecL.GetYaxis().SetRangeUser(500.,700.)
+        ax1.set_xlabel(xTitle)
+        ax1.set_ylabel(yLabel)
 
-        print(">>> Producing all cross sections")
-        print(">>> the simple average cross section is "+str(sum(data['y'].values)/len(data)))
-        c3=ROOT.TCanvas("c3","c3",1000,600)
-        c3.SetGrid()
+        ax1.errorbar(xPoints, data['y'].values, yerr=data['y_Err'].values, label="Measurements",
+            marker="o", linewidth=0, color=colors[0], ecolor=colors[0], elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
+            zorder=1)
 
-        xmin = graphXsecL.GetXaxis().GetXmin()
-        xmax = graphXsecL.GetXaxis().GetXmax()
+        leg = ax1.legend(loc="upper left", ncol=3,
+            frameon=True, framealpha=1.0, fancybox=False, edgecolor="black")
+        leg.get_frame().set_linewidth(0.8)
 
-        if plot_lowPU:
-            ref_line = ROOT.TLine(xmin,ref_xsec,xmax,ref_xsec)
-            ref_line.SetLineColor(ROOT.kRed)
-            ref_line.SetLineWidth(2)
-
-            ref_box_inner = ROOT.TBox(xmin,ref_xsec-ref_xsec_stat,xmax,ref_xsec+ref_xsec_stat)
-            ref_box_inner.SetFillColorAlpha(ROOT.kRed, 0.4)
-
-            ref_box_outer = ROOT.TBox(xmin,ref_xsec-ref_xsec_lumi,xmax,ref_xsec+ref_xsec_lumi)
-            ref_box_outer.SetFillColorAlpha(ROOT.kRed, 0.2)
-
-        fit = graphXsecL.Fit("pol1","0S","",xmin, xmax)
-        fit_a = fit.Value(0)
-        fit_a_err = fit.ParError(0)
-        fit_b = fit.Value(1)
-        fit_b_err = fit.ParError(1)
-
-        print("fit: ",fit_a, fit_b)
-
-        # line with statistical error
-        xx = np.linspace(xmin,xmax,50)
-        yy = fit_a + xx * fit_b
-        yy_err_up = fit_a+fit_a_err + xx * (fit_b+fit_b_err)
-        yy_err_down = fit_a-fit_a_err + xx * (fit_b-fit_b_err)
-        fit_line = ROOT.TGraphAsymmErrors(len(xx), xx, yy, np.zeros(len(xx)), np.zeros(len(xx)), yy - yy_err_down, yy_err_up - yy)
-        fit_line.SetFillColorAlpha(ROOT.kAzure-4,0.4)
-
-        # line with error from luminosity linearity
-        #lum_lin_err = 0.003 * 2 * abs(fit_b)
-        #yy_err = xx * lum_lin_err
-        #fit_line_lin = ROOT.TGraphErrors(len(xx), xx, yy, np.zeros(len(xx)), yy_err)
-        #fit_line_lin.SetFillColor(ROOT.kAzure-4)
-
-        if xAxis == 'time':
-            graphXsecL.GetXaxis().SetTimeDisplay(1)
-            fit_line.GetXaxis().SetTimeDisplay(1)
-
-        entry = ROOT.TLegendEntry()
-        entry.SetLabel("Measurement (#pm stat.))")
-        entry.SetOption("pel")
-        entry.SetTextSize(textsize)
-        entry.SetTextFont(42)
-        entry.SetMarkerStyle(33)
-        entry.SetMarkerSize(1)
-        entry.SetMarkerColor(ROOT.kAzure-4)
-        entry.SetLineColor(ROOT.kBlack)
-        entry.SetLineWidth(2)
-
-        entry.SetTextAlign(12)
-
-        entry2 = ROOT.TLegendEntry()
-        entry2.SetLabel("2017 Low PU (#pm stat.) (#pm lumi.)")
-        entry2.SetOption("fl")
-        entry2.SetTextSize(0.03)
-        entry2.SetTextFont(42)
-        entry2.SetLineColor(ROOT.kRed)
-        #entry2.SetLineWidth(2)
-        entry2.SetFillColorAlpha(ROOT.kRed, 0.4)
-        entry2.SetTextAlign(12)
-        entry2.SetMarkerSize(0)
-
-        legend=ROOT.TLegend(0.2,0.8,0.5,0.9)
-        legend.AddEntry(graphXsecL, "2017 High PU (#pm stat.)", "pe")
-        #legend.GetListOfPrimitives().Add(entry)
-        if plot_lowPU:
-            legend.GetListOfPrimitives().Add(entry2)
-        legend.SetTextSize(textsize)
-        legend.SetTextFont(42)
-
-        # --- Plot
-
-        graphXsecL.Draw("AP")
-
-        if args.xsec:
-            ref_line.Draw("same")
-            ref_box_inner.Draw("same")
-            ref_box_outer.Draw("same")
-
-        fit_line.Draw("3 same")
-        #fit_line_lin.Draw("3 same")
-
-        graphXsecL.Draw("PEsame")
-
-
-        latex.SetTextAlign(11)
-        latex.SetTextFont(42)
-        latex.SetTextSize(textsize)
-        latex.DrawLatex(0.7, 0.89, "Fit: y = a + b \cdot x")
-
-        from math import log10, floor
-        def round_sig(x, sig=2):
-            return round(x, sig-int(floor(log10(abs(x))))-1)
-
-
-        latex.DrawLatex(0.7, 0.85, "a =\ {0} \pm {1} (stat.)".format(round_sig(fit_a), round_sig(fit_a_err)))
-        latex.DrawLatex(0.7, 0.81, "b = {0} \pm {1} (stat.)".format(round_sig(fit_b), round_sig(fit_b_err)))
-
-        latex.DrawLatex(0.7, 0.77, "\chi^2 / ndf = {0}".format(round_sig(fit.Chi2() / len(data),3)))
-
-
-        legend.Draw("same")
+        # ax1.set_ylim([minY-yRange*0.05, maxY + yRange*0.5])
+        # ax1.set_xlim([xMin, xMax])
 
         outstring = "{0}/{1}_vs_{2}".format(outDir,yAxis,xAxis)
         if run_range:
             outstring += "_run{0}to{1}".format(*run_range)
 
-        c3.SaveAs(outstring+".png")
-        c3.Close()
+        plt.savefig(outstring+".png")
+        plt.close()
+
+
+        print(">>> Producing all cross sections")
+        print(">>> the simple average cross section is "+str(sum(data['y'].values)/len(data)))
+
+    # make fit taking into account all points
+    #print(">>> make fit")
+    #func = linear #pol2 #quad
+    #popt, pcov = curve_fit(func, data[xAxis], data['y'], sigma=data['y_Err'], absolute_sigma=True)
+
+    #perr = np.sqrt(np.diag(pcov))
+    #params = unc.correlated_values(popt, pcov)
+
+    #f = lambda x: func(x, *params)
+    #xMC = np.arange(0,100,0.5)
+    #yMC = np.array([f(x).n for x in xMC])
+    #yErrMC = np.array([f(x).s for x in xMC])
 
     print(">>> make plot and combine measurements into bins")
     xx = np.arange(data[xAxis].min()*(1./x_step)//1/(1./x_step),data[xAxis].max()*(1./x_step)//1/(1./x_step), x_step)
@@ -367,11 +289,11 @@ def make_plots(df,
         yy_avg = u_y.mean()
         yy0_avg = u_y0.mean()
 
-        # # 2) or weighted average
-        # yy_w = np.array([1./(y.s)**2 for y in u_y])
-        # yy_avg = sum(u_y * yy_w) / sum(yy_w)
-        # yy0_w = np.array([1./(y.s)**2 for y in u_y0])
-        # yy0_avg = sum(u_y0 * yy0_w) / sum(yy0_w)
+        # 2) or weighted average
+        yy_w = np.array([1./(y.s)**2 for y in u_y])
+        yy_avg = sum(u_y * yy_w) / sum(yy_w)
+        yy0_w = np.array([1./(y.s)**2 for y in u_y0])
+        yy0_avg = sum(u_y0 * yy0_w) / sum(yy0_w)
 
         yy_avg_err = yy_avg.s
         yy_avg = yy_avg.n
@@ -387,276 +309,180 @@ def make_plots(df,
         yy0.append(yy0_avg)
         yy0_err.append(yy0_avg_err)
 
-    graphXsecL=ROOT.TGraphErrors(len(xx_centers), np.array(xx_centers), np.array(yy),
-        np.ones(len(xx_centers))*x_step/2, np.array(yy_err))
-    graphXsecL.SetName("graph_metaXsecAtlas")
-    graphXsecL.SetMarkerStyle(33)
-    graphXsecL.SetMarkerColor(ROOT.kAzure-4)
-    graphXsecL.SetMarkerSize(1.)
-    graphXsecL.SetTitle("")
-    graphXsecL.GetXaxis().SetTitle(xTitle)
-    graphXsecL.GetYaxis().SetTitle(yLabel)
-    graphXsecL.GetYaxis().SetTitleOffset(1.2)
+    xx = np.array(xx_centers)
+    yy = np.array(yy)
+    yy_err = np.array(yy_err)
+    yy0 = np.array(yy0)
+    yy0_err = np.array(yy0_err)
 
-    if '_mc' in yAxis:
-        graphXsecL0=ROOT.TGraphErrors(len(xx_centers), np.array(xx_centers), np.array(yy0), np.ones(len(xx_centers))*x_step/2, np.array(yy0_err))
-        graphXsecL0.SetName("graph_metaXsecAtlas")
-        graphXsecL0.SetMarkerStyle(33)
-        graphXsecL0.SetMarkerColor(ROOT.kGray)
-        graphXsecL0.SetLineColor(ROOT.kGray)
-        graphXsecL0.SetMarkerSize(1.)
-        graphXsecL0.SetTitle("")
-        graphXsecL0.GetXaxis().SetTitle(xTitle)
-        graphXsecL0.GetYaxis().SetTitle(yLabel)
-        graphXsecL0.GetYaxis().SetTitleOffset(1.2)
+    print(">>> make fit")
+    func = linear #pol2 #quad
+    popt, pcov = curve_fit(func, xx, yy, sigma=yy_err, absolute_sigma=True)
 
-    xmin = min(xx_centers) - x_step
-    xmax = max(xx_centers) + x_step
-    ymin = min(np.array(yy)-np.array(yy_err))
-    xRange = (xmin, xmax)
+    perr = np.sqrt(np.diag(pcov))
+    params = unc.correlated_values(popt, pcov)
 
-    if "sigma" in yLabel:
-        graphXsecL.SetMarkerColor(ROOT.kAzure-4)
-        ymax = max(np.array(yy)+np.array(yy_err))
-        yRange = (ymin - 0.15*(ymax-ymin), ymax + 0.25*(ymax-ymin))
-    elif resource != "":
-        yTrue = iTrue[resource].values
-        yTrueErr = iTrue[resource+"_err"].values
-        xTrue = iTrue['center'].values
+    f = lambda x: func(x, *params)
+    xMC = np.arange(0,100,0.5)
+    yMC = np.array([f(x).n for x in xMC])
+    yErrMC = np.array([f(x).s for x in xMC])
 
-        yReco = iReco[resource].values
-        yRecoErr = iReco[resource+"_err"].values
-        xReco = iReco['center'].values
+    print(">>> make plots")
 
-        gTrue=ROOT.TGraphErrors(len(yTrue), xTrue, yTrue, np.ones(len(xTrue))*x_step/2, np.array(yRecoErr))
-        gTrue.SetLineColor(ROOT.kRed)
-        # gTrue.SetLineWidth(2)
-        # gTrue.SetLineStyle(1)
-        gTrue.SetMarkerColor(2)
-        gTrue.SetMarkerStyle(20)
-        gTrue.SetMarkerSize(0.5)
-        gTrue.SetTitle("")
+    xx_err = np.ones(len(xx_centers))*x_step/2
+    
+    plt.clf()
+    fig = plt.figure(figsize=(10.0,4.0))
+    ax1 = fig.add_subplot(111)
+    fig.subplots_adjust(left=0.1, right=0.99, top=0.99, bottom=0.16)
 
-        gReco=ROOT.TGraphErrors(len(xReco), xReco, yReco, np.ones(len(xReco))*x_step/2, np.array(yRecoErr))
+    ax1.set_xlabel(xTitle)
+    ax1.set_ylabel(yLabel)
+    ax1.text(0.74, 0.97, "\\bf{CMS}", verticalalignment='top', transform=ax1.transAxes, weight="bold")
+    ax1.text(0.81, 0.97, "\\emph{Work in progress}", verticalalignment='top', transform=ax1.transAxes,style='italic')    
+    ax1.text(0.74, 0.89, year, verticalalignment='top', transform=ax1.transAxes,style='italic')    
+    
+    xMin = min(xx_centers) - x_step/2
+    xMax = max(xx_centers) + x_step/2
+    xRange = abs(xMin - xMax)
 
-        gReco.SetLineColor(ROOT.kOrange)
-        # gReco.SetLineWidth(2)
-        # gReco.SetLineStyle(2)
-        gReco.SetMarkerColor(ROOT.kOrange)
-        gReco.SetMarkerStyle(21)
-        gReco.SetMarkerSize(0.5)
-        gReco.SetTitle("")
+    yMin = 0.95#min(yy - yy_err)
+    yMax = 1.05#max(yy + yy_err)
+    yRange = abs(yMax - yMin)    
 
-        yMax = max(max(yTrue), max(yReco))
-        ymax = max(max(np.array(yy)+np.array(yy_err)),yMax)
-        yRange = (ymin - 0.15*(ymax-ymin), ymax + 0.35*(ymax-ymin))
+    p4 = ax1.errorbar(xx, yy0, xerr=xx_err, yerr=yy0_err, label="Measurements unc.",
+        marker="o", linewidth=0, color="grey", ecolor="grey", elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
+        zorder=1)
+    
+    p3 = ax1.errorbar(xx, yy, xerr=xx_err, yerr=yy_err, label="Measurements",
+        marker="o", linewidth=0, color="black", ecolor="black", elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
+        zorder=1)
+        
+    ax1.plot(np.array([xMin-xRange*0.02,xMax+xRange*0.02]),np.array([1.,1.]), "k--", linewidth=1)
+    
+    p2 = ax1.plot(xMC, yMC, color=colors[0],linestyle="solid",  label="Linear fit", linewidth=1)
+    
+    p1 = ax1.fill_between(xMC, yMC - yErrMC, yMC + yErrMC,
+                     color='grey', alpha=0.2, zorder=1) 
+    p1 = ax1.fill(np.NaN, np.NaN, color='grey', alpha=0.2, linewidth=0.)    
 
-        graphXsecL.SetMarkerColor(1)
+    leg_styles = [p4, p3, (p2[0], p1[0])]
+    leg_labels = ['Measurements unc.','Measurements', 'Linear fit']
+    
+    leg = ax1.legend(leg_styles, leg_labels, loc="lower left", ncol=3,
+        frameon=True, framealpha=1.0, fancybox=False, edgecolor="black")
+    leg.get_frame().set_linewidth(0.8)
 
-
-    graphXsecL.GetXaxis().SetRangeUser(*xRange)
-    graphXsecL.GetYaxis().SetRangeUser(*yRange)
-
-    def fit(func):
-        popt, pcov = curve_fit(func, np.array(xx_centers), np.array(yy), sigma=np.array(yy_err))
-        perr = np.sqrt(np.diag(pcov))
-
-        params = unc.correlated_values(popt, pcov)
-        yyFit = func(np.array(xx_centers), *params)
-        yyFit_err = np.array([iy.s for iy in yyFit])
-        yyFit_val = np.array([iy.n for iy in yyFit])
-
-        chi2 = sum(((yy - yyFit_val) / yyFit_err)**2)
-        ndf = len(xx_centers) - len(popt)
-
-        p_chi2 = stats.distributions.chi2.sf(chi2, ndf)
-        return p_chi2, params, func
-
-    lChi2, params, func = fit(linear)
-    funcname = "Linear fit"
-    # qChi2, qParams, qFunc = fit(quad)
-    # if lChi2 > qChi2:
-    #     funcname = "Linear fit"
-    #     params = lParams
-    #     func = lFunc
-    # else:
-    #     funcname = "Quadratic fit"
-    #     params = qParams
-    #     func = qFunc
-
-    # line with statistical error
-    xx_fit = np.linspace(xmin,xmax,50)
-    yy_fit = np.array([x.n for x in func(xx_fit, *params)])
-    yy_fit_err_up   = np.array([x.s for x in func(xx_fit, *params)])
-    yy_fit_err_down = np.array([x.s for x in func(xx_fit, *params)])
-    fit_line = ROOT.TGraphAsymmErrors(len(xx_fit), xx_fit, yy_fit, np.zeros(len(xx_fit)), np.zeros(len(xx_fit)), yy_fit_err_down, yy_fit_err_up)
-    fit_line.SetFillColorAlpha(ROOT.kAzure-4,0.4)
-    fit_line.SetLineColor(ROOT.kBlack)
-
-    canvas=ROOT.TCanvas("canvas","canvas",1000,600)
-    canvas.SetLeftMargin(0.12)
-    canvas.SetRightMargin(0.03)
-    canvas.SetTopMargin(0.015)
-    canvas.SetBottomMargin(0.15)
-    canvas.SetGrid()
-
-    textsize = 24./(canvas.GetWh()*canvas.GetAbsHNDC())
-
-    graphXsecL.GetYaxis().SetTitleFont(42)
-    graphXsecL.GetYaxis().SetTitleSize(textsize*1.2)
-    graphXsecL.GetYaxis().SetLabelFont(42)
-    graphXsecL.GetYaxis().SetLabelSize(textsize*1.2)
-    graphXsecL.GetXaxis().SetTitleFont(42)
-    graphXsecL.GetXaxis().SetTitleSize(textsize*1.2)
-    graphXsecL.GetXaxis().SetLabelFont(42)
-    graphXsecL.GetXaxis().SetLabelSize(textsize*1.2)
-
-    entry = ROOT.TLegendEntry()
-    entry.SetLabel("{0} (#pm stat.)".format(funcname))
-    entry.SetOption("fl")
-    entry.SetTextSize(textsize)
-    entry.SetTextFont(42)
-    entry.SetLineColor(ROOT.kBlack)
-    #entry.SetLineWidth(2)
-    entry.SetFillColorAlpha(ROOT.kAzure-4,0.4)
-    entry.SetTextAlign(12)
-    entry.SetMarkerSize(0)
-
-    if "sigma" in yLabel:
-        legend=ROOT.TLegend(0.72,0.82,0.97,0.97)
-        legend.GetListOfPrimitives().Add(entry)
-    else:
-        legend=ROOT.TLegend(0.72,0.82,0.97,0.97)
-        legend.AddEntry(gReco, "MC (T&P)", "pe")
-        legend.AddEntry(gTrue, "MC (true)", "pe")
-
-    graphXsecL.Draw("AP")
-
-    if '_mc' in yAxis:
-        graphXsecL0.Draw("pe same")
-        legend.AddEntry(graphXsecL0, "Measurements w/o correction", "pe")
-
-    legend.AddEntry(graphXsecL, "Measurements", "pe")
-    legend.SetTextSize(textsize)
-    legend.SetTextFont(42)
-
-
-    if "sigma" in yLabel:
-        fit_line.Draw("3L same")
-    else:
-        gReco.Draw("pe same")
-        gTrue.Draw("pe same")
-
-    legend.Draw("same")
-    # latex.SetTextAlign(31)
-
-    # latex.DrawLatex(0.97, 0.95, "2017")
-    latex.SetTextFont(42)
-
-    if region == 'BB':
-        str = "barrel-barrel"
-    elif region == 'BE':
-        str = "barrel-endcap"
-    elif region == 'EE':
-        str = "endcap-endcap"
-    elif region == "B":
-        str = "barrel"
-    elif region == "E":
-        str = "endcap"
-    else:
-        str = "inclusive"
-
-    latex.SetTextSize(textsize)
-    latex.DrawLatex(0.15, 0.23, year)
-    latex.DrawLatex(0.15, 0.18, str)
-    # latex.DrawLatex(0.12, 0.95, title)
-
-    cms(x=0.15, y=0.93, textsize=textsize)
-    workinprogress(x=0.23, y=0.93, textsize=textsize)
+    ax1.set_ylim([yMin-yRange*0.05, yMax+yRange*0.05])
+    ax1.set_xlim([xMin-xRange*0.02, xMax+xRange*0.02])
 
     outstring = "{0}/{1}_vs_{2}".format(outDir,yAxis,xAxis)
     outstring += year.replace(" ","_")
 
-    # if run_range:
-    #     outstring += "_run{0}to{1}".format(*run_range)
+    plt.savefig(outstring+".png")
+    plt.savefig(outstring+".pdf")
+    plt.close()
 
-    canvas.SaveAs(outstring+".png")
-    canvas.SaveAs(outstring+".pdf")
-    canvas.Close()
+# ------------------------------------------------------------------------------
+
+plot_lowPU = False
+if args.xsec:
+    print(">>> load low pileup data")
+    plot_lowPU = True
+    # --- get Z xsec
+    data_xsec = pd.read_csv(str(args.xsec), sep=',',low_memory=False)#, skiprows=[1,2,3,4,5])
+    # xsecBB = sum(data_xsec['zDelBB'])/sum(data_xsec['lumiRec'])
+    # xsecBE = sum(data_xsec['zDelBE'])/sum(data_xsec['lumiRec'])
+    # xsecEE = sum(data_xsec['zDelEE'])/sum(data_xsec['lumiRec'])
+    # xsecI = sum(data_xsec['zDelI'])/sum(data_xsec['lumiRec'])
+
+    data_xsec['zDelI'] = data_xsec['zDel'].apply(lambda x: unc.ufloat_fromstr(x).n)
+
+    apply_muon_prefire(data_xsec)
+    apply_ECAL_prefire(data_xsec)
+    
+    xsec = sum(data_xsec['zDelI'])/sum(data_xsec['lumiRec'])
+
+    
 
 # ------------------------------------------------------------------------------
 print(">>> load csv file in dataframe")
 
-data_rates = pd.read_csv(args.rates, sep=',')[
-    ['fill','run','lumiRec','timewindow','pileUp','tdate_begin','tdate_end',
-    'zDelBB_mc','zDelBE_mc','zDelEE_mc', 
-    'zDelI_mc',
-    'zDelBB','zDelBE','zDelEE', 
-    'zDelI',
-    'ZBBeff','ZBEeff','ZEEeff', 
-    'ZIeff',
-    'HLTeffBB', 'HLTeffBE', 'HLTeffEE', 
-    'HLTeffI',
-    'SeleffB', 'SeleffE', 
-    'SeleffI',
-    'GloeffB', 'GloeffE', 
-    'GloeffI',
-    'TrkeffB', 'TrkeffE', 
-    'TrkeffI',
-    'StaeffB', 'StaeffE', 
-    'StaeffI',
-    # 'ZBBeff_mc','ZBEeff_mc','ZEEeff_mc',
-    ]]
+data_rates = pd.read_csv(args.rates, sep=',')
+
+invalid_runs = {
+    275657, 275658, 275659, # Outliers in all those runs of 2016. HFOC was used -> problem there?
+    278017, 278018          # More outliers, not clear from where
+}
+for run in invalid_runs:
+    data_rates = data_rates.loc[data_rates['run'] != run]
+
+data_rates['lumiRec'] = data_rates['lumiRec'] * 1000    # convert into /nb
 
 # convert to uncertainties
-data_rates['HLTeffBB'] = data_rates['HLTeffBB'].apply(lambda x: unc.ufloat_fromstr(x))
-data_rates['HLTeffBE'] = data_rates['HLTeffBE'].apply(lambda x: unc.ufloat_fromstr(x))
-data_rates['HLTeffEE'] = data_rates['HLTeffEE'].apply(lambda x: unc.ufloat_fromstr(x))
-data_rates['HLTeffI'] = data_rates['HLTeffI'].apply(lambda x: unc.ufloat_fromstr(x))
-data_rates['SeleffB'] = data_rates['SeleffB'].apply(lambda x: unc.ufloat_fromstr(x))
-data_rates['SeleffE'] = data_rates['SeleffE'].apply(lambda x: unc.ufloat_fromstr(x))
-data_rates['SeleffI'] = data_rates['SeleffI'].apply(lambda x: unc.ufloat_fromstr(x))
-data_rates['TrkeffB'] = data_rates['TrkeffB'].apply(lambda x: unc.ufloat_fromstr(x))
-data_rates['TrkeffE'] = data_rates['TrkeffE'].apply(lambda x: unc.ufloat_fromstr(x))
-data_rates['TrkeffI'] = data_rates['TrkeffI'].apply(lambda x: unc.ufloat_fromstr(x))
-data_rates['StaeffB'] = data_rates['StaeffB'].apply(lambda x: unc.ufloat_fromstr(x))
-data_rates['StaeffE'] = data_rates['StaeffE'].apply(lambda x: unc.ufloat_fromstr(x))
-data_rates['StaeffI'] = data_rates['StaeffI'].apply(lambda x: unc.ufloat_fromstr(x))
-data_rates['GloeffB'] = data_rates['GloeffB'].apply(lambda x: unc.ufloat_fromstr(x))
-data_rates['GloeffE'] = data_rates['GloeffE'].apply(lambda x: unc.ufloat_fromstr(x))
-data_rates['GloeffI'] = data_rates['GloeffI'].apply(lambda x: unc.ufloat_fromstr(x))
+# data_rates['HLTeffBB'] = data_rates['HLTeffBB'].apply(lambda x: unc.ufloat_fromstr(x))
+# data_rates['HLTeffBE'] = data_rates['HLTeffBE'].apply(lambda x: unc.ufloat_fromstr(x))
+# data_rates['HLTeffEE'] = data_rates['HLTeffEE'].apply(lambda x: unc.ufloat_fromstr(x))
+data_rates['HLTeffI'] = data_rates['HLTeff'].apply(lambda x: unc.ufloat_fromstr(x))
+# data_rates['SeleffB'] = data_rates['SeleffB'].apply(lambda x: unc.ufloat_fromstr(x))
+# data_rates['SeleffE'] = data_rates['SeleffE'].apply(lambda x: unc.ufloat_fromstr(x))
+data_rates['SeleffI'] = data_rates['Seleff'].apply(lambda x: unc.ufloat_fromstr(x))
+# data_rates['TrkeffB'] = data_rates['TrkeffB'].apply(lambda x: unc.ufloat_fromstr(x))
+# data_rates['TrkeffE'] = data_rates['TrkeffE'].apply(lambda x: unc.ufloat_fromstr(x))
+# data_rates['TrkeffI'] = data_rates['Trkeff'].apply(lambda x: unc.ufloat_fromstr(x))
+# data_rates['StaeffB'] = data_rates['StaeffB'].apply(lambda x: unc.ufloat_fromstr(x))
+# data_rates['StaeffE'] = data_rates['StaeffE'].apply(lambda x: unc.ufloat_fromstr(x))
+data_rates['StaeffI'] = data_rates['Staeff'].apply(lambda x: unc.ufloat_fromstr(x))
+# data_rates['GloeffB'] = data_rates['GloeffB'].apply(lambda x: unc.ufloat_fromstr(x))
+# data_rates['GloeffE'] = data_rates['GloeffE'].apply(lambda x: unc.ufloat_fromstr(x))
+# data_rates['GloeffI'] = data_rates['GloeffI'].apply(lambda x: unc.ufloat_fromstr(x))
 
-data_rates['ZBBeff'] = data_rates['ZBBeff'].apply(lambda x: unc.ufloat_fromstr(x))
-data_rates['ZBEeff'] = data_rates['ZBEeff'].apply(lambda x: unc.ufloat_fromstr(x))
-data_rates['ZEEeff'] = data_rates['ZEEeff'].apply(lambda x: unc.ufloat_fromstr(x))
-data_rates['ZIeff'] = data_rates['ZIeff'].apply(lambda x: unc.ufloat_fromstr(x))
+# data_rates['ZBBeff'] = data_rates['ZBBeff'].apply(lambda x: unc.ufloat_fromstr(x))
+# data_rates['ZBEeff'] = data_rates['ZBEeff'].apply(lambda x: unc.ufloat_fromstr(x))
+# data_rates['ZEEeff'] = data_rates['ZEEeff'].apply(lambda x: unc.ufloat_fromstr(x))
+# data_rates['ZIeff'] = data_rates['ZIeff'].apply(lambda x: unc.ufloat_fromstr(x))
+# 
+# # take uncertainties from uncorrected zDel
+# data_rates['zDelBB_mc'] = data_rates['zDelBB_mc'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
+# data_rates['zDelBE_mc'] = data_rates['zDelBE_mc'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
+# data_rates['zDelEE_mc'] = data_rates['zDelEE_mc'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
+# data_rates['zDelI_mc'] = data_rates['zDelI_mc'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
+# 
+# data_rates['zDelBB'] = data_rates['zDelBB'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
+# data_rates['zDelBE'] = data_rates['zDelBE'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
+# data_rates['zDelEE'] = data_rates['zDelEE'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
+# data_rates['zDelI'] = data_rates['zDel'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
 
-# take uncertainties from uncorrected zDel
-data_rates['zDelBB_mc'] = data_rates['zDelBB'].apply(lambda x: unc.ufloat_fromstr(x)/unc.ufloat_fromstr(x).n) * data_rates['zDelBB_mc']
-data_rates['zDelBE_mc'] = data_rates['zDelBE'].apply(lambda x: unc.ufloat_fromstr(x)/unc.ufloat_fromstr(x).n) * data_rates['zDelBE_mc']
-data_rates['zDelEE_mc'] = data_rates['zDelEE'].apply(lambda x: unc.ufloat_fromstr(x)/unc.ufloat_fromstr(x).n) * data_rates['zDelEE_mc']
-data_rates['zDelI_mc'] = data_rates['zDelI'].apply(lambda x: unc.ufloat_fromstr(x)/unc.ufloat_fromstr(x).n) * data_rates['zDelI_mc']
+data_rates['zDelI'] = data_rates['zDel'].apply(lambda x: unc.ufloat_fromstr(x))
 
 apply_muon_prefire(data_rates)
 apply_ECAL_prefire(data_rates)
 # apply_pileup_correction(data_rates)
+# data_rates['xsecBB_mc'] = data_rates['zDelBB_mc'] / data_rates['lumiRec']
+# data_rates['xsecBE_mc'] = data_rates['zDelBE_mc'] / data_rates['lumiRec']
+# data_rates['xsecEE_mc'] = data_rates['zDelEE_mc'] / data_rates['lumiRec']
+# data_rates['xsecI_mc'] = data_rates['zDelI_mc'] / data_rates['lumiRec']
+# data_rates['xsec_mc'] = data_rates['xsecBB_mc'] + data_rates['xsecBE_mc'] + data_rates['xsecEE_mc']
 
-data_rates['xsecBB'] = data_rates['zDelBB_mc'] / data_rates['lumiRec']
-data_rates['xsecBE'] = data_rates['zDelBE_mc'] / data_rates['lumiRec']
-data_rates['xsecEE'] = data_rates['zDelEE_mc'] / data_rates['lumiRec']
-data_rates['xsecI'] = data_rates['zDelI_mc'] / data_rates['lumiRec']
-data_rates['xsec'] = data_rates['xsecBB'] + data_rates['xsecBE'] + data_rates['xsecEE']
+# data_rates['xsecBB'] = data_rates['zDelBB'] / data_rates['lumiRec']
+# data_rates['xsecBE'] = data_rates['zDelBE'] / data_rates['lumiRec']
+# data_rates['xsecEE'] = data_rates['zDelEE'] / data_rates['lumiRec']
+data_rates['xsecI_mc'] = data_rates['zDelI'] / data_rates['lumiRec']
+# data_rates['xsec'] = data_rates['xsecBB'] + data_rates['xsecBE'] + data_rates['xsecEE']
+
+data_rates['xsecI'] = data_rates['zDelI'] / data_rates['cIO']**2 / data_rates['lumiRec']
 
 for yy, ylabel, region, mcRes in (
     # ("xsec", "sigma", "", ""),
     # ("xsecBB", "sigma", "BB", ""),
-    ("xsecBE", "sigma", "BE", ""),
-    ("xsecEE", "sigma", "EE", ""),
-    # ("xsecI", "sigma", "I", ""),
+    # ("xsecBE", "sigma", "BE", ""),
+    # ("xsecEE", "sigma", "EE", ""),
+    ("xsecI_mc", "sigma", "I", ""),
     # # ("xsec_mc", "sigma", "", ""),
-    # # ("xsecBB_mc", "sigma", "BB", ""),
-    # # ("xsecBE_mc", "sigma", "BE", ""),
-    # # ("xsecEE_mc", "sigma", "EE", ""),
+    # ("xsecBB_mc", "sigma", "BB", ""),
+    # ("xsecBE_mc", "sigma", "BE", ""),
+    # ("xsecEE_mc", "sigma", "EE", ""),
+    # ("xsecI_mc", "sigma", "I", ""),
     # ("ZBBeff", "Z efficiency","BB", "effBB"),
     # ("ZBEeff", "Z efficiency","BE", "effBE"),
     # ("ZEEeff", "Z efficiency","EE", "effEE"),
@@ -677,33 +503,35 @@ for yy, ylabel, region, mcRes in (
     # ('StaeffE' ,'Muon standalone efficiency', "E", "StaE"),
     # ('StaeffI' ,'Muon standalone efficiency', "I", "Sta"),
 ):
-    # # single eras
+    # # # single eras
     # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 B", run_range=(272007,275376), normalized=False)
     # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 C", run_range=(275657,276283), normalized=False)
     # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 D", run_range=(276315,276811), normalized=False)
     # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 E", run_range=(276831,277420), normalized=False)
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 F", run_range=(277772,278808), normalized=False)
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 G", run_range=(278820,280385), normalized=False)
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 H", run_range=(280919,284044), normalized=False)
-    # 
-    # # 2017
+    # # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 F", run_range=(277772,278808), normalized=False)
+    # # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 G", run_range=(278820,280385), normalized=False)
+    # # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 H", run_range=(280919,284044), normalized=False)
+    # # 
+    # # # 2017
     # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 B", title="corrected", run_range=(297046,299329), normalized=False)
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 C", title="corrected", run_range=(299368,302029), normalized=False)
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 D", title="corrected", run_range=(302030,303434), normalized=False)
+    # # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 C", title="corrected", run_range=(299368,302029), normalized=False)
+    # # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 D", title="corrected", run_range=(302030,303434), normalized=False)
     # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 E", title="corrected", run_range=(303434,304797), normalized=False)
     # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 F", title="corrected", run_range=(305040,306462), normalized=False)
-    # 
-    # # ## 2018
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 A", run_range=(315252,316995), normalized=False)
+    # # 
+    # # # ## 2018
+    # # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 A", run_range=(315252,316995), normalized=False)
     # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 B", run_range=(317080,319310), normalized=False)
     # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 C", run_range=(319337,320065), normalized=False)
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 D", run_range=(320673,325175), normalized=False)
+    # # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 D", run_range=(320673,325175), normalized=False)
 
+    # # # total 2016
+    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016", run_range=(272007,294645), normalized=True)
     # # total 2016 pre VFP
     make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 pre VFP", run_range=(272007,278769), normalized=True)
-    # # total 2016 post VFP
+    # total 2016 post VFP
     make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 post VFP", run_range=(278769,294645), normalized=True)
-    # total 2017
+    # # total 2017
     make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2017", run_range=(297046,306462), normalized=True)
-    # ## total 2018
+    # # ## total 2018
     make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018", run_range=(315252,325175), normalized=True)

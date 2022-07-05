@@ -140,6 +140,10 @@ std::vector<double> preFit(TH1 *failHist);
 // Signal Model:
 // 	    1: Breit-Wigner convolved with Crystal Ball function
 // 	    2: MC template convolved with Gaussian
+//      3: Breit-Wigner
+//      4: MC template
+//      5: Breit-Wigner convolved with Gaussian
+
 Int_t set_signal_model(
     Int_t model_type,
     CSignalModel *&model,
@@ -162,6 +166,9 @@ Int_t set_signal_model(
         case 4:
             model = new CMCTemplate(param_mass, hist, pass, ibin);
             return 0;
+        case 5:
+            model = new CBreitWignerConvGaussian(param_mass, pass, ibin);
+            return 2;
     }
     return 0;
 }
@@ -2924,16 +2931,15 @@ std::vector<double> preFit(TH1* failHist){
 
     //  std::vector<float> v = {1.,0.,1.,0.,1.,0.};return v;
     TH1D *h = new TH1D("h", "", massBin, massLo, massHi);
-    TF1 *fq = new TF1("fq", "[0]+[1]*x+[2]*x*x", massLo, massHi);
-    TF1 *fl = new TF1("fl", "[0]+[1]*x", massLo, massHi);
-
-    const int binwidth = (massHi-massLo)/massBin;
-
-    for(int i = 0; i < (int)(81-massLo)/binwidth; i++){
+    TF1 *fq = new TF1("fq", "[0]+[1]*x+[2]*x*x", massLo, massHi);   // quadratic
+    TF1 *fl = new TF1("fl", "[0]+[1]*x", massLo, massHi);   // linear
+    
+    // define sideband region
+    for(int i = 0; i < (int)((81-massLo)/binwidth); i++){
         h->SetBinContent(i+1, failHist->GetBinContent(i+1));
         h->SetBinError(i+1, failHist->GetBinError(i+1));
     }
-    for(int i = (int)(massHi-101)/binwidth; i < massBin; i++){
+    for(int i = (int)((massHi-101)/binwidth); i < massBin; i++){
         h->SetBinContent(i+1, failHist->GetBinContent(i+1));
         h->SetBinError(i+1, failHist->GetBinError(i+1));
     }
