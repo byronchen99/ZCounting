@@ -143,6 +143,7 @@ std::vector<double> preFit(TH1 *failHist);
 //      3: Breit-Wigner
 //      4: MC template
 //      5: Breit-Wigner convolved with Gaussian
+//      6: MC template convolved with Crystal Ball function
 
 Int_t set_signal_model(
     Int_t model_type,
@@ -169,6 +170,9 @@ Int_t set_signal_model(
         case 5:
             model = new CBreitWignerConvGaussian(param_mass, pass, ibin);
             return 2;
+        case 6:
+            model = new CMCTemplateConvCrystalBall(param_mass, hist, pass, ibin);
+            return 4;
     }
     return 0;
 }
@@ -1233,7 +1237,7 @@ void calculateDataEfficiency(
         RooFit::Import("Fail",*dataFail));
 
     TFile *histfile = 0;
-    if(sigpass==2 || sigfail==2 || sigpass==4 || sigfail==4) {
+    if(sigpass%2 == 0 || sigfail%2 == 0) {
         histfile = generateTemplate(mcfilename, effType, 0);
         assert(histfile);
     }
@@ -1290,7 +1294,7 @@ void calculateDataEfficiency(
     Int_t nflpass=0, nflfail=0;
 
     TH1D *hPass=0;
-    if(sigpass==2 || sigpass==4) {
+    if(sigpass%2 == 0) {
         hPass = (TH1D*)histfile->Get(Form("h_mass_pass_%s", etaRegion.Data()));
         hPass->SetDirectory(0);
     }
@@ -1299,7 +1303,7 @@ void calculateDataEfficiency(
     nflpass += set_background_model(bkgpass, bkgPass, m, kTRUE, 0, hbkgQCDPass);
 
     TH1D *hFail=0;
-    if(sigfail==2 || sigfail==4) {
+    if(sigfail%2 == 0) {
         hFail = (TH1D*)histfile->Get(Form("h_mass_fail_%s", etaRegion.Data()));
         hFail->SetDirectory(0);
     }
@@ -1613,7 +1617,7 @@ void calculateHLTEfficiencyAndYield(
         RooFit::Import("Fail",*dataFail));
 
     TFile *histfile = 0;
-    if(sigpass==2 || sigfail==2 || sigpass==4 || sigfail==4) {
+    if(sigpass%2 == 0 || sigfail%2 == 0) {
         histfile = generateTemplate_ZYield(mcfilename, 0, iBin);
         assert(histfile);
     }
@@ -1649,7 +1653,7 @@ void calculateHLTEfficiencyAndYield(
     Int_t nflpass=0, nflfail=0;
 
     TH1D *hPass=0;
-    if(sigpass==2 || sigpass==4) {
+    if(sigpass%2 == 0) {
         // set signal templates of fail histograms
         hPass = (TH1D*)histfile->Get("h_mass_2hlt_"+ etaRegion);
         hPass->SetDirectory(0);
@@ -1659,7 +1663,7 @@ void calculateHLTEfficiencyAndYield(
     nflpass += set_background_model(bkgpass, bkgPass, m, kTRUE, 2, hbkgQCDPass);
 
     TH1D *hFail=0;
-    if(sigfail==2 || sigfail==4) {
+    if(sigfail%2 == 0) {
         // set signal templates of pass histograms
         hFail = (TH1D*)histfile->Get("h_mass_1hlt_"+ etaRegion);
         hFail->SetDirectory(0);
@@ -2009,7 +2013,7 @@ void calculateEfficienciesAndYield(
     TH1D *hHLT1=0;
     TH1D *hHLT2=0;
     TH1D *hSelFail=0;
-    if(sig==2 || sig==4) {
+    if(sig%2==0) {
         TFile *histfileHLT = generateTemplate_ZYield(mcfilename, 0, iBin);
         TFile *histfileSel = generateTemplate(mcfilename, "Sel", 0);
         assert(histfileHLT);
@@ -2493,7 +2497,7 @@ void calculateHLTCorrelation(
     TH1D *h0=0;
     TH1D *h1=0;
     TH1D *h2=0;
-    if(sig==2 || sig==4) {
+    if(sig%2 == 0) {
         TFile *histfile = generateTemplate_ZYield(mcfilename, 0, iBin);
         assert(histfile);
         // set signal templates of fail histograms
@@ -2935,11 +2939,11 @@ std::vector<double> preFit(TH1* failHist){
     TF1 *fl = new TF1("fl", "[0]+[1]*x", massLo, massHi);   // linear
     
     // define sideband region
-    for(int i = 0; i < (int)((81-massLo)/binwidth); i++){
+    for(int i = 0; i < (int)((81-massLo)/massWidth); i++){
         h->SetBinContent(i+1, failHist->GetBinContent(i+1));
         h->SetBinError(i+1, failHist->GetBinError(i+1));
     }
-    for(int i = (int)((massHi-101)/binwidth); i < massBin; i++){
+    for(int i = (int)((massHi-101)/massWidth); i < massBin; i++){
         h->SetBinContent(i+1, failHist->GetBinContent(i+1));
         h->SetBinError(i+1, failHist->GetBinError(i+1));
     }
