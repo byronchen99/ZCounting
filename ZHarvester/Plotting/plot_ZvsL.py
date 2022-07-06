@@ -84,23 +84,12 @@ def make_plots(df,
     else:
         data = df
 
-    data['y_Err'] = data[yAxis].apply(lambda x: x.s)
-    data['y'] = data[yAxis].apply(lambda x: x.n)
-    if yAxis.replace("_mc","") in data.keys():
-        data['y0_Err'] = data[yAxis.replace("_mc","")].apply(lambda x: x.s)
-        data['y0'] = data[yAxis.replace("_mc","")].apply(lambda x: x.n)
-    else:
-        data['y0_Err'] = data['y_Err']
-        data['y0'] = data['y']
-
-    if sum(data['y'].isnull()) > 0:
+    if sum(data[yAxis].isnull()) > 0:
         print(">>> sort out {0} points with nan".format(sum(data['y'].isnull())))
-        data = data.loc[~data['y'].isnull()]
+        data = data.loc[~data[yAxis].isnull()]
 
-    data['relstat'] = data['y_Err'] / data['y']
 
     # x_step: intervall in which the measurements are collected in one point
-
     if xAxis == 'lumi':
         xAxis = 'lumiRecInst'
         data[xAxis] = data['lumiRec'] / data['timewindow']
@@ -170,26 +159,14 @@ def make_plots(df,
         iReco.reset_index(drop=True)
         iTrue.reset_index(drop=True)
 
-    data['y_Err'] = data[yAxis].apply(lambda x: x.s)
-    data['y'] = data[yAxis].apply(lambda x: x.n)
-    if yAxis.replace("_mc","") in data.keys():
-        print(">>> found uncorrected values")
-        data['y0_Err'] = data[yAxis.replace("_mc","")].apply(lambda x: x.s)
-        data['y0'] = data[yAxis.replace("_mc","")].apply(lambda x: x.n)
-    else:
-        data['y0_Err'] = data['y_Err']
-        data['y0'] = data['y']
-
-    data['relstat'] = data['y_Err'] / data['y']
-
+    # data['relstat'] = data[yAxis].apply(lambda x: x.s / x.n)    
     # print(">>> sort out {0} points with low statistic".format(len(data['relstat'] > 0.05)))
     # data = data.loc[data["relstat"] < 0.05]
 
     if plot_fills:
         print(">>> make plots for each fill")
         # For each Fill
-        for fill in data.drop_duplicates('fill')['fill'].values:
-            dFill = data.loc[data['fill'] == fill]
+        for fill, data_fill in data.groupby('fill'):
 
             subDir = outDir+"/PlotsXSec_"+str(fill)
             if not os.path.isdir(subDir):
@@ -203,7 +180,10 @@ def make_plots(df,
             ax1.set_xlabel(xTitle)
             ax1.set_ylabel(yLabel)
             
-            ax1.errorbar(dFill[xAxis].values, dFill['y'].values, yerr=data['y_Err'].values, label="Measurement",
+            ax1.errorbar(data_fill[xAxis].values, 
+                data_fill[yAxis].apply(lambda x: x.n).values, 
+                data_fill[yAxis].apply(lambda x: x.s).values, 
+                label="Measurement",
                 marker="o", linewidth=0, color=colors[0], ecolor=colors[0], elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
                 zorder=1)
 
@@ -219,7 +199,7 @@ def make_plots(df,
 
 
     if plot_all:
-        print(">>> make plot all measurements")
+        print(">>> make plot for all measurements")
         if xAxis == 'measurement':
             xPoints = np.arange(0,len(data),1.)
         else:
@@ -233,7 +213,10 @@ def make_plots(df,
         ax1.set_xlabel(xTitle)
         ax1.set_ylabel(yLabel)
 
-        ax1.errorbar(xPoints, data['y'].values, yerr=data['y_Err'].values, label="Measurements",
+        ax1.errorbar(xPoints, 
+            data[yAxis].apply(lambda x: x.n).values, 
+            data[yAxis].apply(lambda x: x.s).values, 
+            label="Measurements",
             marker="o", linewidth=0, color=colors[0], ecolor=colors[0], elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
             zorder=1)
 
@@ -269,51 +252,44 @@ def make_plots(df,
     #yErrMC = np.array([f(x).s for x in xMC])
 
     print(">>> make plot and combine measurements into bins")
-    xx = np.arange(data[xAxis].min()*(1./x_step)//1/(1./x_step),data[xAxis].max()*(1./x_step)//1/(1./x_step), x_step)
+    xx = np.arange(data[xAxis].min()*(1./x_step)//1/(1./x_step), data[xAxis].max()*(1./x_step)//1/(1./x_step), x_step)
     xx = np.append(xx, xx[-1]+x_step)
     xx_centers = []
     yy = []
-    yy_err = []
     yy0 = []
-    yy0_err = []
     for i in range(0,len(xx)-1):
-        dyy = data.loc[(data[xAxis] < xx[i+1]) & (data[xAxis] >= xx[i])][[xAxis, 'y', 'y_Err', 'y0', 'y0_Err']]
+        dyy = data.loc[(data[xAxis] < xx[i+1]) & (data[xAxis] >= xx[i])]
 
         if len(dyy)==0:
             continue
 
-        u_y = np.array([unc.ufloat(y,y_err) for y,y_err in dyy[['y','y_Err']].values])
-        u_y0 = np.array([unc.ufloat(y,y_err) for y,y_err in dyy[['y0','y0_Err']].values])
-
+        u_y = dyy[yAxis].values
+        u_y0 = dyy[yAxis.replace("_mc","")].values 
+        
         # 1) simple mean
         yy_avg = u_y.mean()
         yy0_avg = u_y0.mean()
 
-        # 2) or weighted average
-        yy_w = np.array([1./(y.s)**2 for y in u_y])
-        yy_avg = sum(u_y * yy_w) / sum(yy_w)
-        yy0_w = np.array([1./(y.s)**2 for y in u_y0])
-        yy0_avg = sum(u_y0 * yy0_w) / sum(yy0_w)
-
-        yy_avg_err = yy_avg.s
-        yy_avg = yy_avg.n
-        yy0_avg_err = yy0_avg.s
-        yy0_avg = yy0_avg.n
+        # # 2) or weighted average
+        # yy_w = np.array([1./(y.s)**2 for y in u_y])
+        # yy_avg = sum(u_y * yy_w) / sum(yy_w)
+        # yy0_w = np.array([1./(y.s)**2 for y in u_y0])
+        # yy0_avg = sum(u_y0 * yy0_w) / sum(yy0_w)
         
-        if yy_avg == 0 or yy_avg_err/yy_avg > 0.05:
+        # sort out data points with large uncertainty
+        if yy_avg == 0 or yy_avg.s/yy_avg.n > 0.05:
             continue
 
         xx_centers.append((xx[i] + (xx[i+1] - xx[i]) / 2.))
         yy.append(yy_avg)
-        yy_err.append(yy_avg_err)
         yy0.append(yy0_avg)
-        yy0_err.append(yy0_avg_err)
 
     xx = np.array(xx_centers)
-    yy = np.array(yy)
-    yy_err = np.array(yy_err)
-    yy0 = np.array(yy0)
-    yy0_err = np.array(yy0_err)
+    
+    yy_err = np.array([y.s for y in yy])
+    yy = np.array([y.n for y in yy])
+    yy0_err = np.array([y.s for y in yy0])
+    yy0 = np.array([y.n for y in yy0])
 
     print(">>> make fit")
     func = linear #pol2 #quad
@@ -350,7 +326,7 @@ def make_plots(df,
     yMax = 1.05#max(yy + yy_err)
     yRange = abs(yMax - yMin)    
 
-    p4 = ax1.errorbar(xx, yy0, xerr=xx_err, yerr=yy0_err, label="Measurements unc.",
+    p4 = ax1.errorbar(xx, yy0, xerr=xx_err, yerr=yy0_err, label="Measurements uncorrected",
         marker="o", linewidth=0, color="grey", ecolor="grey", elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
         zorder=1)
     
@@ -408,69 +384,123 @@ if args.xsec:
 # ------------------------------------------------------------------------------
 print(">>> load csv file in dataframe")
 
-data_rates = pd.read_csv(args.rates, sep=',')
+rates = pd.read_csv(args.rates, sep=',')
 
 invalid_runs = {
     275657, 275658, 275659, # Outliers in all those runs of 2016. HFOC was used -> problem there?
     278017, 278018          # More outliers, not clear from where
 }
 for run in invalid_runs:
-    data_rates = data_rates.loc[data_rates['run'] != run]
+    rates = rates.loc[rates['run'] != run]
 
-data_rates['lumiRec'] = data_rates['lumiRec'] * 1000    # convert into /nb
+rates['lumiRec'] = rates['lumiRec'] * 1000    # convert into /nb
 
 # convert to uncertainties
-# data_rates['HLTeffBB'] = data_rates['HLTeffBB'].apply(lambda x: unc.ufloat_fromstr(x))
-# data_rates['HLTeffBE'] = data_rates['HLTeffBE'].apply(lambda x: unc.ufloat_fromstr(x))
-# data_rates['HLTeffEE'] = data_rates['HLTeffEE'].apply(lambda x: unc.ufloat_fromstr(x))
-data_rates['HLTeffI'] = data_rates['HLTeff'].apply(lambda x: unc.ufloat_fromstr(x))
-# data_rates['SeleffB'] = data_rates['SeleffB'].apply(lambda x: unc.ufloat_fromstr(x))
-# data_rates['SeleffE'] = data_rates['SeleffE'].apply(lambda x: unc.ufloat_fromstr(x))
-data_rates['SeleffI'] = data_rates['Seleff'].apply(lambda x: unc.ufloat_fromstr(x))
-# data_rates['TrkeffB'] = data_rates['TrkeffB'].apply(lambda x: unc.ufloat_fromstr(x))
-# data_rates['TrkeffE'] = data_rates['TrkeffE'].apply(lambda x: unc.ufloat_fromstr(x))
-# data_rates['TrkeffI'] = data_rates['Trkeff'].apply(lambda x: unc.ufloat_fromstr(x))
-# data_rates['StaeffB'] = data_rates['StaeffB'].apply(lambda x: unc.ufloat_fromstr(x))
-# data_rates['StaeffE'] = data_rates['StaeffE'].apply(lambda x: unc.ufloat_fromstr(x))
-data_rates['StaeffI'] = data_rates['Staeff'].apply(lambda x: unc.ufloat_fromstr(x))
-# data_rates['GloeffB'] = data_rates['GloeffB'].apply(lambda x: unc.ufloat_fromstr(x))
-# data_rates['GloeffE'] = data_rates['GloeffE'].apply(lambda x: unc.ufloat_fromstr(x))
-# data_rates['GloeffI'] = data_rates['GloeffI'].apply(lambda x: unc.ufloat_fromstr(x))
+# rates['HLTeffBB'] = rates['HLTeffBB'].apply(lambda x: unc.ufloat_fromstr(x))
+# rates['HLTeffBE'] = rates['HLTeffBE'].apply(lambda x: unc.ufloat_fromstr(x))
+# rates['HLTeffEE'] = rates['HLTeffEE'].apply(lambda x: unc.ufloat_fromstr(x))
+# rates['HLTeffI'] = rates['HLTeff'].apply(lambda x: unc.ufloat_fromstr(x))
+# rates['SeleffB'] = rates['SeleffB'].apply(lambda x: unc.ufloat_fromstr(x))
+# rates['SeleffE'] = rates['SeleffE'].apply(lambda x: unc.ufloat_fromstr(x))
+# rates['SeleffI'] = rates['Seleff'].apply(lambda x: unc.ufloat_fromstr(x))
+# rates['TrkeffB'] = rates['TrkeffB'].apply(lambda x: unc.ufloat_fromstr(x))
+# rates['TrkeffE'] = rates['TrkeffE'].apply(lambda x: unc.ufloat_fromstr(x))
+# rates['TrkeffI'] = rates['Trkeff'].apply(lambda x: unc.ufloat_fromstr(x))
+# rates['StaeffB'] = rates['StaeffB'].apply(lambda x: unc.ufloat_fromstr(x))
+# rates['StaeffE'] = rates['StaeffE'].apply(lambda x: unc.ufloat_fromstr(x))
+# rates['StaeffI'] = rates['Staeff'].apply(lambda x: unc.ufloat_fromstr(x))
+# rates['GloeffB'] = rates['GloeffB'].apply(lambda x: unc.ufloat_fromstr(x))
+# rates['GloeffE'] = rates['GloeffE'].apply(lambda x: unc.ufloat_fromstr(x))
+# rates['GloeffI'] = rates['GloeffI'].apply(lambda x: unc.ufloat_fromstr(x))
 
-# data_rates['ZBBeff'] = data_rates['ZBBeff'].apply(lambda x: unc.ufloat_fromstr(x))
-# data_rates['ZBEeff'] = data_rates['ZBEeff'].apply(lambda x: unc.ufloat_fromstr(x))
-# data_rates['ZEEeff'] = data_rates['ZEEeff'].apply(lambda x: unc.ufloat_fromstr(x))
-# data_rates['ZIeff'] = data_rates['ZIeff'].apply(lambda x: unc.ufloat_fromstr(x))
+# rates['ZBBeff'] = rates['ZBBeff'].apply(lambda x: unc.ufloat_fromstr(x))
+# rates['ZBEeff'] = rates['ZBEeff'].apply(lambda x: unc.ufloat_fromstr(x))
+# rates['ZEEeff'] = rates['ZEEeff'].apply(lambda x: unc.ufloat_fromstr(x))
+# rates['ZIeff'] = rates['ZIeff'].apply(lambda x: unc.ufloat_fromstr(x))
 # 
 # # take uncertainties from uncorrected zDel
-# data_rates['zDelBB_mc'] = data_rates['zDelBB_mc'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
-# data_rates['zDelBE_mc'] = data_rates['zDelBE_mc'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
-# data_rates['zDelEE_mc'] = data_rates['zDelEE_mc'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
-# data_rates['zDelI_mc'] = data_rates['zDelI_mc'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
+# rates['zDelBB_mc'] = rates['zDelBB_mc'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
+# rates['zDelBE_mc'] = rates['zDelBE_mc'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
+# rates['zDelEE_mc'] = rates['zDelEE_mc'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
+# rates['zDelI_mc'] = rates['zDelI_mc'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
 # 
-# data_rates['zDelBB'] = data_rates['zDelBB'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
-# data_rates['zDelBE'] = data_rates['zDelBE'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
-# data_rates['zDelEE'] = data_rates['zDelEE'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
-# data_rates['zDelI'] = data_rates['zDel'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
+# rates['zDelBB'] = rates['zDelBB'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
+# rates['zDelBE'] = rates['zDelBE'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
+# rates['zDelEE'] = rates['zDelEE'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
+# rates['zDelI'] = rates['zDel'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
+# rates['zDelI'] = rates['zDel'].apply(lambda x: unc.ufloat_fromstr(x))
 
-data_rates['zDelI'] = data_rates['zDel'].apply(lambda x: unc.ufloat_fromstr(x))
+rates['HLTeff']      = rates['HLTeff'].apply(lambda x: unc.ufloat_fromstr(x).n)
+rates['Seleff']      = rates['Seleff'].apply(lambda x: unc.ufloat_fromstr(x).n)
+rates['Staeff']      = rates['Staeff'].apply(lambda x: unc.ufloat_fromstr(x).n)
+rates['Gloeff']      = rates['Gloeff'].apply(lambda x: unc.ufloat_fromstr(x).n)
 
-apply_muon_prefire(data_rates)
-apply_ECAL_prefire(data_rates)
-# apply_pileup_correction(data_rates)
-# data_rates['xsecBB_mc'] = data_rates['zDelBB_mc'] / data_rates['lumiRec']
-# data_rates['xsecBE_mc'] = data_rates['zDelBE_mc'] / data_rates['lumiRec']
-# data_rates['xsecEE_mc'] = data_rates['zDelEE_mc'] / data_rates['lumiRec']
-# data_rates['xsecI_mc'] = data_rates['zDelI_mc'] / data_rates['lumiRec']
-# data_rates['xsec_mc'] = data_rates['xsecBB_mc'] + data_rates['xsecBE_mc'] + data_rates['xsecEE_mc']
+# calculate correct statistical uncertainties - before HLT selection
+rates['NZ']       = rates['zReco'].apply(lambda x: unc.ufloat_fromstr(x).n)
+rates['NbkgHLTFail'] = rates['NbkgHLTFail'].apply(lambda x: unc.ufloat_fromstr(x).n)
+rates['NbkgHLTPass'] = rates['NbkgHLTPass'].apply(lambda x: unc.ufloat_fromstr(x).n)
 
-# data_rates['xsecBB'] = data_rates['zDelBB'] / data_rates['lumiRec']
-# data_rates['xsecBE'] = data_rates['zDelBE'] / data_rates['lumiRec']
-# data_rates['xsecEE'] = data_rates['zDelEE'] / data_rates['lumiRec']
-data_rates['xsecI_mc'] = data_rates['zDelI'] / data_rates['lumiRec']
-# data_rates['xsec'] = data_rates['xsecBB'] + data_rates['xsecBE'] + data_rates['xsecEE']
+rates['N1'] = 2*rates['HLTeff']*(1-rates['cHLT']*rates['HLTeff'])*rates['NZ'] + rates['NbkgHLTFail']
+rates['N2'] = rates['HLTeff']**2 * rates['cHLT'] * rates['NZ'] + rates['NbkgHLTPass']
 
-data_rates['xsecI'] = data_rates['zDelI'] / data_rates['cIO']**2 / data_rates['lumiRec']
+rates['N1'] = rates['N1'].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
+rates['N2'] = rates['N2'].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
+rates['N1bkg'] = rates['NbkgHLTFail'].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
+rates['N2bkg'] = rates['NbkgHLTPass'].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
+
+rates['N1sig'] = rates['N1'] - rates['N1bkg']
+rates['N2sig'] = rates['N2'] - rates['N2bkg']
+
+rates['HLTeff'] = (2 * rates['N2sig']) / (2 * rates['N2sig'] + rates['N1sig'])
+
+rates['zRecI'] = (rates['N2sig'] + 0.5*rates['N1sig'])**2/rates['N2sig'] * rates['cHLT']
+
+# calculate correct statistical uncertainty for ID selection efficiency
+for eff in ("Sel","Glo","Sta"):
+    rates['Nsig{0}'.format(eff)]     = rates['Nsig{0}'.format(eff)].apply(lambda x: unc.ufloat_fromstr(x).n)
+    rates['Nbkg{0}Pass'.format(eff)] = rates['Nbkg{0}Pass'.format(eff)].apply(lambda x: unc.ufloat_fromstr(x).n)
+    rates['Nbkg{0}Fail'.format(eff)] = rates['Nbkg{0}Fail'.format(eff)].apply(lambda x: unc.ufloat_fromstr(x).n)
+
+    rates['N{0}Pass'.format(eff)] = rates['Nsig{0}'.format(eff)]*rates['{0}eff'.format(eff)] + rates['Nbkg{0}Pass'.format(eff)]
+    rates['N{0}Fail'.format(eff)] = rates['Nsig{0}'.format(eff)]*(1-rates['{0}eff'.format(eff)]) + rates['Nbkg{0}Fail'.format(eff)]
+
+    rates['N{0}Pass'.format(eff)] = rates['N{0}Pass'.format(eff)].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
+    rates['N{0}Fail'.format(eff)] = rates['N{0}Fail'.format(eff)].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
+    rates['Nbkg{0}Pass'.format(eff)] = rates['Nbkg{0}Pass'.format(eff)].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
+    rates['Nbkg{0}Fail'.format(eff)] = rates['Nbkg{0}Fail'.format(eff)].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
+
+    rates['Nsig{0}Pass'.format(eff)] = rates['N{0}Pass'.format(eff)] - rates['Nbkg{0}Pass'.format(eff)]
+    rates['Nsig{0}Fail'.format(eff)] = rates['N{0}Fail'.format(eff)] - rates['Nbkg{0}Fail'.format(eff)]
+
+rates['Seleff'] = (2 * rates['N2sig'] + rates['N1sig']) / (2 * rates['N2sig'] + rates['N1sig'] + rates['NsigSelFail'])
+rates['Gloeff'] = rates["NsigGloPass"] / (rates["NsigGloPass"]+rates["NsigGloFail"])
+rates['Staeff'] = rates["NsigStaPass"] / (rates["NsigStaPass"]+rates["NsigStaFail"])
+
+# calculate correct statistical uncertainty for number of events before selection
+rates['zDelI'] = rates['zRecI'] / (
+    (2 * rates['N2sig'] + rates['N1sig']) / (2 * rates['N2sig'] + rates['N1sig'] + rates['NsigSelFail']) 
+    * rates['Staeff']*rates['Gloeff'])**2
+
+apply_muon_prefire(rates)
+apply_ECAL_prefire(rates)
+# apply_pileup_correction(rates)
+# rates['xsecBB_mc'] = rates['zDelBB_mc'] / rates['lumiRec']
+# rates['xsecBE_mc'] = rates['zDelBE_mc'] / rates['lumiRec']
+# rates['xsecEE_mc'] = rates['zDelEE_mc'] / rates['lumiRec']
+# rates['xsecI_mc'] = rates['zDelI_mc'] / rates['lumiRec']
+# rates['xsec_mc'] = rates['xsecBB_mc'] + rates['xsecBE_mc'] + rates['xsecEE_mc']
+
+# rates['xsecBB'] = rates['zDelBB'] / rates['lumiRec']
+# rates['xsecBE'] = rates['zDelBE'] / rates['lumiRec']
+# rates['xsecEE'] = rates['zDelEE'] / rates['lumiRec']
+# rates['xsec'] = rates['xsecBB'] + rates['xsecBE'] + rates['xsecEE']
+
+rates['xsecI'] = rates['zDelI'] / rates['lumiRec']
+
+rates['xsecI_mc'] = rates['xsecI'] * rates['cIO']**2 
+
+# only keep necessary data
+rates = rates[["xsecI_mc","xsecI", "lumiRec", "timewindow", "run"]]
 
 for yy, ylabel, region, mcRes in (
     # ("xsec", "sigma", "", ""),
@@ -504,34 +534,34 @@ for yy, ylabel, region, mcRes in (
     # ('StaeffI' ,'Muon standalone efficiency', "I", "Sta"),
 ):
     # # # single eras
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 B", run_range=(272007,275376), normalized=False)
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 C", run_range=(275657,276283), normalized=False)
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 D", run_range=(276315,276811), normalized=False)
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 E", run_range=(276831,277420), normalized=False)
-    # # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 F", run_range=(277772,278808), normalized=False)
-    # # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 G", run_range=(278820,280385), normalized=False)
-    # # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 H", run_range=(280919,284044), normalized=False)
+    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 B", run_range=(272007,275376), normalized=False)
+    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 C", run_range=(275657,276283), normalized=False)
+    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 D", run_range=(276315,276811), normalized=False)
+    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 E", run_range=(276831,277420), normalized=False)
+    # # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 F", run_range=(277772,278808), normalized=False)
+    # # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 G", run_range=(278820,280385), normalized=False)
+    # # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 H", run_range=(280919,284044), normalized=False)
     # # 
     # # # 2017
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 B", title="corrected", run_range=(297046,299329), normalized=False)
-    # # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 C", title="corrected", run_range=(299368,302029), normalized=False)
-    # # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 D", title="corrected", run_range=(302030,303434), normalized=False)
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 E", title="corrected", run_range=(303434,304797), normalized=False)
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 F", title="corrected", run_range=(305040,306462), normalized=False)
+    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 B", title="corrected", run_range=(297046,299329), normalized=False)
+    # # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 C", title="corrected", run_range=(299368,302029), normalized=False)
+    # # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 D", title="corrected", run_range=(302030,303434), normalized=False)
+    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 E", title="corrected", run_range=(303434,304797), normalized=False)
+    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, year="2017 F", title="corrected", run_range=(305040,306462), normalized=False)
     # # 
     # # # ## 2018
-    # # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 A", run_range=(315252,316995), normalized=False)
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 B", run_range=(317080,319310), normalized=False)
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 C", run_range=(319337,320065), normalized=False)
-    # # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 D", run_range=(320673,325175), normalized=False)
+    # # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 A", run_range=(315252,316995), normalized=False)
+    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 B", run_range=(317080,319310), normalized=False)
+    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 C", run_range=(319337,320065), normalized=False)
+    # # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 D", run_range=(320673,325175), normalized=False)
 
     # # # total 2016
-    # make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016", run_range=(272007,294645), normalized=True)
+    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016", run_range=(272007,294645), normalized=True)
     # # total 2016 pre VFP
-    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 pre VFP", run_range=(272007,278769), normalized=True)
+    make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 pre VFP", run_range=(272007,278769), normalized=True)
     # total 2016 post VFP
-    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 post VFP", run_range=(278769,294645), normalized=True)
+    make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 post VFP", run_range=(278769,294645), normalized=True)
     # # total 2017
-    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2017", run_range=(297046,306462), normalized=True)
+    make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2017", run_range=(297046,306462), normalized=True)
     # # ## total 2018
-    make_plots(data_rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018", run_range=(315252,325175), normalized=True)
+    make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018", run_range=(315252,325175), normalized=True)

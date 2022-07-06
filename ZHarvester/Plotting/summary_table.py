@@ -23,15 +23,15 @@ labels = [{
     "2016postVFP": "$\delta\NZ_{\mathrm{2016 postVFP}}$",
     "2016H": "$\delta\NZ_{\mathrm{2016 H}}$",
     "2017": "$\delta\NZ_{\mathrm{2017}}$",
-    "2017H": "$\delta\NZ_{\mathrm{2017H}}$",
+    "2017H": "$\delta\NZ_\lowPU$",
     "2018": "$\delta\NZ_{\mathrm{2018}}$"
 },
 {
-    "2016preVFP": r"$\delta \frac{\NZ_\mathrm{2016 preVFP}}{\NZ_{\mathrm{2017H}}}$ }",
-    "2016postVFP": r"$\delta \frac{\NZ_\mathrm{2016 postVFP}}{\NZ_{\mathrm{2017H}}}$ }",
-    "2016H": r"$\delta \frac{\NZ_\mathrm{2016 H}}{\NZ_{\mathrm{2017H}}}$ }",
-    "2017": r"$\delta \frac{\NZ_\mathrm{2017}}{\NZ_{\mathrm{2017H}}}$ }",
-    "2018": r"$\delta \frac{\NZ_\mathrm{2018}}{\NZ_{\mathrm{2017H}}}$ }"    
+    "2016preVFP": r"$\delta \frac{\NZ_\mathrm{2016 preVFP}}{\NZ_\lowPU}$ }",
+    "2016postVFP": r"$\delta \frac{\NZ_\mathrm{2016 postVFP}}{\NZ_\lowPU}$ }",
+    "2016H": r"$\delta \frac{\NZ_\mathrm{2016 H}}{\NZ_\lowPU}$ }",
+    "2017": r"$\delta \frac{\NZ_\mathrm{2017}}{\NZ_\lowPU}$ }",
+    "2018": r"$\delta \frac{\NZ_\mathrm{2018}}{\NZ_\lowPU}$ }"    
 }]
 
 # factor = 0 means we get total uncertainty on each period
@@ -41,17 +41,31 @@ for factor in (0, 1):
     keys = []
     nominal = []
     stat = []           # statistical uncertainty
-    mcUp = []             # pileup dependent MC correction
-    mcDown = []           # pileup dependent MC correction
+    bkgUp = []          # background subtraction
+    bkgDown = []
+    cHLTUp = []             # pileup dependent di-muon HLT MC correction
+    cHLTDown = []           # pileup dependent di-muon HLT MC correction
+    cIOUp = []              # pileup dependent muon inner/outer track MC correction
+    cIODown = []            # pileup dependent muon inner/outer track MC correction
     prefireStatUp = []
     prefireStatDown = []
     prefireSystUp = []
     prefireSystDown = []
     prefireECALUp = []
     prefireECALDown = []
-
-    # variations from alternative fits
-    altSig = []
+    
+    base = "/".join(args.input.split("/")[:-2])
+    suffix = args.input.split("/")[-1]
+    def load(name):
+        if not os.path.isfile(base+name+suffix):
+            return None
+        with open(base+name+suffix, "r") as file_info:
+            info = json.load(file_info)
+        return info
+        
+    # ---  variations from alternative fits
+    altSig1 = [] 
+    altSig2 = []
     altBkg = []
     lumiUp = []
     lumiDown = []
@@ -59,40 +73,55 @@ for factor in (0, 1):
     massDown = []
     binWidthUp = []
     binWidthDown = []
-    base = "/nfs/dust/cms/user/dwalter/data/Lumi/V13_05/"
-    with open(base+"/summary_v2_altSig/"+args.input.split("/")[-1], "r") as file_info:
-        info_altSig = json.load(file_info)
-    with open(base+"/summary_v2_altBkg/"+args.input.split("/")[-1], "r") as file_info:
-        info_altBkg = json.load(file_info)
-    with open(base+"/summary_v2_lumiUp/"+args.input.split("/")[-1], "r") as file_info:
-        info_lumiUp = json.load(file_info)
-    with open(base+"/summary_v2_lumiDown/"+args.input.split("/")[-1], "r") as file_info:
-        info_lumiDown = json.load(file_info)
-    # with open(base+"/summary_massUp_v2/"+args.input.split("/")[-1], "r") as file_info:
-    #     info_massUp = json.load(file_info)
-    # with open(base+"/summary_massDown_v2/"+args.input.split("/")[-1], "r") as file_info:
-    #     info_massDown = json.load(file_info)
-    with open(base+"/summary_v2_binWidthUp/"+args.input.split("/")[-1], "r") as file_info:
-        info_binWidthUp = json.load(file_info)
-    with open(base+"/summary_v2_binWidthDown/"+args.input.split("/")[-1], "r") as file_info:
-        info_binWidthDown = json.load(file_info)
+    
+    # load alternative infos
+    info_altSig1      = load("/summary_altSigMCxCB/")
+    info_altSig2      = load("/summary_altSigMC/")
+    info_altBkg       = load("/summary_altBkg/")
+    info_lumiUp       = load("/summary_lumi30/")
+    info_lumiDown     = load("/summary_lumi15/")
+    info_massUp       = load("/summary_massUp/")
+    info_massDown     = load("/summary_massDown/")
+    info_binWidthUp   = load("/summary_binWidth1/")
+    info_binWidthDown = load("/summary_binWidth025/")
 
-    sortdict = {"2016preVFP":1, "2016postVFP":2, "2016H":3, "2017":4, "2017H":5, "2018":6}
+    # sortdict = {"2016preVFP":1, "2016postVFP":2, "2016H":3, "2017":4, "2017H":5, "2018":6}
+    sortdict = {"2016preVFP":1, "2016postVFP":2, "2017":4, "2017H":5, "2018":6}
+    
+    items = filter(lambda (x, y): x in sortdict.keys(), info.items())
 
-    for key, iEra in sorted(info.items(), key=lambda item: sortdict[item[0]]):
+    # for alternative signal - only take the effect on the efficiency
+    # info_altSig['2017H']['zDel'] = info_altSig['2017H']['zDel'] / info_altSig['2017H']['zRec'] * info['2017H']['zRec']
+    
+    for key, iEra in sorted(items, key=lambda item: sortdict[item[0]]):
+        # in case of empty info, continue
+        if iEra['zDel'] == 0:
+            continue
+        # if we compute the ratio with 2017H, we don't do it for 2017H :)
         if factor and key == "2017H":
             continue
             
         keys.append(key)
         # nominal.append(iEra['prefECAL_nominal'])
-        stat.append(np.sqrt(1./iEra['zRec_mc'] 
-            + factor*1./info['2017H']['zRec_mc']) )
-        mcUp.append( 0.5*(iEra['mcUp']-iEra['mc'])/iEra['mc'] 
-            - factor*0.5*(info['2017H']['mcUp']-info['2017H']['mc'])/info['2017H']['mc'] )  # 50% uncertainty on HLT correlation
-        # mcDown.append((iEra['mcDown']-iEra['mc'])/iEra['mc'] 
-        #     - factor*(info['2017H']['mcDown']-info['2017H']['mc'])/info['2017H']['mc'])
+        stat.append( 1./iEra['zDel'] 
+            + factor*1./info['2017H']['zDel'] )
+        # stat.append((iEra['zDel_err']/iEra['zDel'] )**2
+        #     + factor * (info['2017H']['zDel_err']/info['2017H']['zDel'])**2 )
+        # bkgUp.append( (iEra['zRec_bkgUp']-iEra['zRec'])/iEra['zRec'] 
+        #     - factor*(info['2017H']['zRec_bkgUp']-info['2017H']['zRec'])/info['2017H']['zRec'] )  # uncertainty on background subtraction
+        # bkgDown.append( (iEra['zRec_bkgDown']-iEra['zRec'])/iEra['zRec'] 
+        #     - factor*(info['2017H']['zRec_bkgDown']-info['2017H']['zRec'])/info['2017H']['zRec'] )
 
-        # Muon prefire corrections    
+        cHLTUp.append( (iEra['zDel_cHLTUp']-iEra['zDel'])/iEra['zDel'] 
+            - factor*(info['2017H']['zDel_cHLTUp']-info['2017H']['zDel'])/info['2017H']['zDel'] )  # uncertainty on HLT correlation
+        cHLTDown.append( (iEra['zDel_cHLTDown']-iEra['zDel'])/iEra['zDel'] 
+            - factor*(info['2017H']['zDel_cHLTDown']-info['2017H']['zDel'])/info['2017H']['zDel'] )
+        cIOUp.append( (iEra['zDel_cIOUp']-iEra['zDel'])/iEra['zDel'] 
+            - factor*(info['2017H']['zDel_cIOUp']-info['2017H']['zDel'])/info['2017H']['zDel'] )  # uncertainty on HLT correlation
+        cIODown.append( (iEra['zDel_cIODown']-iEra['zDel'])/iEra['zDel'] 
+            - factor*(info['2017H']['zDel_cIODown']-info['2017H']['zDel'])/info['2017H']['zDel'] )
+
+        # --- Muon prefire corrections    
         # correlated between 2017 and 2017H because it's the same statistics used in the measurement of the prefire correction
         if key == "2017": 
             prefireStatUp.append((iEra['prefMuon_StatUp']-iEra['prefMuon_nominal'])/iEra['prefMuon_nominal']
@@ -117,22 +146,39 @@ for factor in (0, 1):
         prefireECALDown.append((iEra['prefECAL_Down']-iEra['prefECAL_nominal'])/iEra['prefECAL_nominal']
             - factor*(info['2017H']['prefECAL_Down']-info['2017H']['prefECAL_nominal'])/info['2017H']['prefECAL_nominal']
         )
-        altSig.append((info_altSig[key]['mc']-iEra['mc'])/iEra['mc']
-            - factor*(info_altSig['2017H']['mc']-info['2017H']['mc'])/info['2017H']['mc'])
-        altBkg.append((info_altBkg[key]['mc']-iEra['mc'])/iEra['mc']
-            - factor*(info_altBkg['2017H']['mc']-info['2017H']['mc'])/info['2017H']['mc'])
-        lumiUp.append((info_lumiUp[key]['mc']-iEra['mc'])/iEra['mc']
-            - factor*(info_lumiUp['2017H']['mc']-info['2017H']['mc'])/info['2017H']['mc'])
-        lumiDown.append((info_lumiDown[key]['mc']-iEra['mc'])/iEra['mc']
-            - factor*(info_lumiDown['2017H']['mc']-info['2017H']['mc'])/info['2017H']['mc'])
-        # massUp.append((info_massUp[key]['mc']-iEra['mc'])/iEra['mc']
-            # -factor*)
-        # massDown.append((info_massDown[key]['mc']-iEra['mc'])/iEra['mc']
-            # -factor*)
-        binWidthUp.append((info_binWidthUp[key]['mc']-iEra['mc'])/iEra['mc']
-            - factor*(info_binWidthUp['2017H']['mc']-info['2017H']['mc'])/info['2017H']['mc'])
-        binWidthDown.append((info_binWidthDown[key]['mc']-iEra['mc'])/iEra['mc']
-            - factor*(info_binWidthDown['2017H']['mc']-info['2017H']['mc'])/info['2017H']['mc'])
+        
+        # --- from alternative sources
+        # --- alternative signal
+        # only take effect on efficiency
+        # info_altSig1[key]['zDel'] = info_altSig1[key]['zDel'] / info_altSig1[key]['zRec'] * info[key]['zRec']
+        # info_altSig2[key]['zDel'] = info_altSig2[key]['zDel'] / info_altSig2[key]['zRec'] * info[key]['zRec']
+        if info_altSig1:
+            altSig1.append((info_altSig1[key]['zDel']-info[key]['zDel'])/info[key]['zDel']
+                - factor*(info_altSig1['2017H']['zDel']-info['2017H']['zDel'])/info['2017H']['zDel'])
+        if info_altSig2:
+            altSig2.append((info_altSig2[key]['zDel']-info[key]['zDel'])/info[key]['zDel']
+                - factor*(info_altSig2['2017H']['zDel']-info['2017H']['zDel'])/info['2017H']['zDel'])
+        if info_altBkg:                        
+            altBkg.append((info_altBkg[key]['zDel']-info[key]['zDel'])/info[key]['zDel']
+                - factor*(info_altBkg['2017H']['zDel']-info['2017H']['zDel'])/info['2017H']['zDel'])
+        if info_lumiUp:
+            lumiUp.append((info_lumiUp[key]['zDel']-info[key]['zDel'])/info[key]['zDel']
+                - factor*(info_lumiUp['2017H']['zDel']-info['2017H']['zDel'])/info['2017H']['zDel'])
+        if info_lumiDown:
+            lumiDown.append((info_lumiDown[key]['zDel']-info[key]['zDel'])/info[key]['zDel']
+                - factor*(info_lumiDown['2017H']['zDel']-info['2017H']['zDel'])/info['2017H']['zDel'])
+        # if info_massUp:
+            # massUp.append((info_massUp[key]['zDel']-info[key]['zDel'])/info[key]['zDel']
+                # -factor*)
+        # if info_massDown:
+            # massDown.append((info_massDown[key]['zDel']-info[key]['zDel'])/info[key]['zDel']
+                # -factor*)
+        if info_binWidthUp:
+            binWidthUp.append((info_binWidthUp[key]['zDel']-info[key]['zDel'])/info[key]['zDel']
+                - factor*(info_binWidthUp['2017H']['zDel']-info['2017H']['zDel'])/info['2017H']['zDel'])
+        if info_binWidthDown:
+            binWidthDown.append((info_binWidthDown[key]['zDel']-info[key]['zDel'])/info[key]['zDel']
+                - factor*(info_binWidthDown['2017H']['zDel']-info['2017H']['zDel'])/info['2017H']['zDel'])
 
     suffix = "_ratio" if factor==1 else ""
 
@@ -141,9 +187,8 @@ for factor in (0, 1):
     # ---- make latex table with variations:
     with open(outDir+"/"+outname, "w") as outfile:
 
-
         columns = "l|"
-        columns += "".join(["c" for c in info.keys()])
+        columns += "".join(["c" for c in range(len(sortdict.keys()) - factor)])
         outfile.write(r"\begin{tabular}{"+columns+"}"+"\n")
         
         if factor:
@@ -159,48 +204,65 @@ for factor in (0, 1):
         #
         # outfile.write(r" \hline "+"\n")
         
-        totalsUp = [0 for x in stat]
-        totalsDown = [0 for x in stat]
+        sysUp = [0 for x in stat]
+        sysDown = [0 for x in stat]
         for name, values, connector in (
-            ("Statistical            ", stat, r" & $\pm "),
-            ("HLT correlation        ", mcUp, r" & $\pm "),
-            # ("HLT correlation       ", mcDown, r" & $ "),
-            ("Alt. bkg. model        ", altBkg,   r" & $"),
-            ("Alt. sig. model        ", altSig,   r" & $"),
-            ("Lumi slice up          ", lumiUp,   r" & $"),
-            ("Lumi slice down        ", lumiDown,   r" & $"),
-            # ("Mass range up          ", massUp,   r" & $"),
-            # ("Mass range down        ", massDown,   r" & $"),
-            ("Bin width up           ", binWidthUp,   r" & $"),
-            ("Bin width down         ", binWidthDown,   r" & $"),
+            ("Correlation \CHLT      ", cHLTUp,          r" & $\pm "),
+            ("Correlation \CGlo      ", cIOUp,           r" & $\pm "),
+            ("Background subtr.      ", bkgUp,   r" & $\pm "),
             ("Muon pref. up (stat.)  ", prefireStatUp,   r" & $"),
             ("Muon pref. down (stat.)", prefireStatDown, r" & $"),
             ("Muon pref. up (syst.)  ", prefireSystUp,   r" & $"),
             ("Muon pref. down (syst.)", prefireSystDown, r" & $"),
             ("ECAL pref. up          ", prefireECALUp,   r" & $"),
-            ("ECAL pref. down        ", prefireECALDown, r" & $")
+            ("ECAL pref. down        ", prefireECALDown, r" & $"),
+            ("Alt. sig. model (MCxCB) ", altSig1,          r" & $"),
+            ("Alt. sig. model (MC)    ", altSig2,          r" & $"),
+            ("Alt. bkg. model        ", altBkg,          r" & $"),
+            ("Lumi slice up          ", lumiUp,          r" & $"),
+            ("Lumi slice down        ", lumiDown,        r" & $"),
+            ("Mass range up          ", massUp,        r" & $"),
+            ("Mass range down        ", massDown,      r" & $"),
+            ("Bin width up           ", binWidthUp,      r" & $"),
+            ("Bin width down         ", binWidthDown,    r" & $"),
+
         ):
+            if len(values) == 0:
+                continue
+                
             entries = []
             for i, x in enumerate(values):
                 if "\pm" in connector:
                     entries.append(str(round(abs(x)*100,2))+"$" )
-                    totalsUp[i] += x**2
-                    totalsDown[i] += x**2
+                    sysUp[i] += x**2
+                    sysDown[i] += x**2
                 elif round(x*100,2) > 0:
                     entries.append("+"+str(round(x*100,2))+"$" )
-                    totalsUp[i] += x**2
+                    sysUp[i] += x**2
                 elif round(x*100,2) < 0:
                     entries.append(str(round(x*100,2))+"$" )
-                    totalsDown[i] += x**2
+                    sysDown[i] += x**2
                 else:
                     entries.append("\NA $")
             outfile.write(name + connector + connector.join(entries) + r" \\"+"\n")
         outfile.write(r" \hline "+"\n")
+
+        entries = [str(round(abs(np.sqrt(x))*100,2))+"$" for x in stat]
+        outfile.write("Statistical             & $\pm "+" & $\pm ".join(entries) + r" \\"+"\n")
+
+        entries = [str(round(abs(np.sqrt(x))*100,2))+"$" for x in sysUp]
+        outfile.write("Systematic up           & $+"+" & $+".join(entries) + r" \\"+"\n")
         
-        entries = [str(round(abs(np.sqrt(x))*100,2))+"$" for x in totalsUp]
-        outfile.write("TotalUp                 & $+"+" & $+".join(entries) + r" \\"+"\n")
+        entries = [str(round(abs(np.sqrt(x))*100,2))+"$" for x in sysDown]
+        outfile.write("Systematic down         & $-"+" & $-".join(entries) + r" \\"+"\n")
+
+        outfile.write(r" \hline "+"\n")
+        outfile.write(r" \hline "+"\n")
         
-        entries = [str(round(abs(np.sqrt(x))*100,2))+"$" for x in totalsDown]
-        outfile.write("TotalDown               & $-"+" & $-".join(entries) + r" \\"+"\n")
+        entries = [str(round(abs(np.sqrt(x + y))*100,2))+"$" for x, y in zip(stat, sysUp)]
+        outfile.write("Total up                & $+"+" & $+".join(entries) + r" \\"+"\n")
+        
+        entries = [str(round(abs(np.sqrt(x + y))*100,2))+"$" for x, y in zip(stat, sysDown)]
+        outfile.write("Total down              & $-"+" & $-".join(entries) + r" \\"+"\n")
 
         outfile.write(r"\end{tabular}"+"\n")

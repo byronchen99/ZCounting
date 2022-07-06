@@ -49,17 +49,97 @@ data_xsec = pd.read_csv(str(args.xsec), sep=',',low_memory=False)
 print("get Z luminosity")
 data = pd.concat([pd.read_csv(csv, sep=',',low_memory=False) for csv in args.rates] +[data_xsec,], ignore_index=True, sort=False)
 
-data['zRec_mc'] = data['zRecBB_mc'] + data['zRecBE_mc'] + data['zRecEE_mc']
-data['zDel_mc'] = data['zDelBB_mc'] + data['zDelBE_mc'] + data['zDelEE_mc']
-data['zDel_mcUp'] = data['zDelBB_mcUp'] + data['zDelBE_mcUp'] + data['zDelEE_mcUp']
-# data['zDel_mcDown'] = data['zDelBB_mcDown'] + data['zDelBE_mcDown'] + data['zDelEE_mcDown']
+# data['zRec'] = data['zRecBB'] + data['zRecBE'] + data['zRecEE']
+# data['zDelI'] = data['zDel'] #data['zDelBB'] + data['zDelBE'] + data['zDelEE']
+# data['zDelUp'] = data['zDelBBUp'] + data['zDelBEUp'] + data['zDelEEUp']
+# data['zDelDown'] = data['zDelBBDown'] + data['zDelBEDown'] + data['zDelEEDown']
 
+
+data['HLTeff']      = data['HLTeff'].apply(lambda x: unc.ufloat_fromstr(x).n)
+data['Seleff']      = data['Seleff'].apply(lambda x: unc.ufloat_fromstr(x).n)
+data['Staeff']      = data['Staeff'].apply(lambda x: unc.ufloat_fromstr(x).n)
+data['Gloeff']      = data['Gloeff'].apply(lambda x: unc.ufloat_fromstr(x).n)
+
+# calculate correct statistical uncertainties - before HLT selection
+data['NZ']       = data['zReco'].apply(lambda x: unc.ufloat_fromstr(x).n)
+data['NbkgHLTFail'] = data['NbkgHLTFail'].apply(lambda x: unc.ufloat_fromstr(x).n)
+data['NbkgHLTPass'] = data['NbkgHLTPass'].apply(lambda x: unc.ufloat_fromstr(x).n)
+
+data['N1'] = 2*data['HLTeff']*(1-data['cHLT']*data['HLTeff'])*data['NZ'] + data['NbkgHLTFail']
+data['N2'] = data['HLTeff']**2 * data['cHLT'] * data['NZ'] + data['NbkgHLTPass']
+
+data['N1'] = data['N1'].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
+data['N2'] = data['N2'].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
+data['N1bkg'] = data['NbkgHLTFail'].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
+data['N2bkg'] = data['NbkgHLTPass'].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
+
+data['N1sig'] = data['N1'] - data['N1bkg']
+data['N2sig'] = data['N2'] - data['N2bkg']
+
+data['HLTeff'] = (2 * data['N2sig']) / (2 * data['N2sig'] + data['N1sig'])
+
+# calculate correct statistical uncertainty for ID selection efficiency
+for eff in ("Sel","Glo","Sta"):
+    data['Nsig{0}'.format(eff)]     = data['Nsig{0}'.format(eff)].apply(lambda x: unc.ufloat_fromstr(x).n)
+    data['Nbkg{0}Pass'.format(eff)] = data['Nbkg{0}Pass'.format(eff)].apply(lambda x: unc.ufloat_fromstr(x).n)
+    data['Nbkg{0}Fail'.format(eff)] = data['Nbkg{0}Fail'.format(eff)].apply(lambda x: unc.ufloat_fromstr(x).n)
+
+    data['N{0}Pass'.format(eff)] = data['Nsig{0}'.format(eff)]*data['{0}eff'.format(eff)] + data['Nbkg{0}Pass'.format(eff)]
+    data['N{0}Fail'.format(eff)] = data['Nsig{0}'.format(eff)]*(1-data['{0}eff'.format(eff)]) + data['Nbkg{0}Fail'.format(eff)]
+
+    data['N{0}Pass'.format(eff)] = data['N{0}Pass'.format(eff)].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
+    data['N{0}Fail'.format(eff)] = data['N{0}Fail'.format(eff)].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
+    data['Nbkg{0}Pass'.format(eff)] = data['Nbkg{0}Pass'.format(eff)].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
+    data['Nbkg{0}Fail'.format(eff)] = data['Nbkg{0}Fail'.format(eff)].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
+
+    data['Nsig{0}Pass'.format(eff)] = data['N{0}Pass'.format(eff)] - data['Nbkg{0}Pass'.format(eff)]
+    data['Nsig{0}Fail'.format(eff)] = data['N{0}Fail'.format(eff)] - data['Nbkg{0}Fail'.format(eff)]
+
+data['Seleff'] = (2 * data['N2sig'] + data['N1sig']) / (2 * data['N2sig'] + data['N1sig'] + data['NsigSelFail'])
+# data['Gloeff'] = data["NsigSelPass"] / (data["NsigSelPass"]+data["NsigSelFail"])
+# data['Gloeff'] = data["NsigGloPass"] / (data["NsigGloPass"]+data["NsigGloFail"])
+# data['Staeff'] = data["NsigStaPass"] / (data["NsigStaPass"]+data["NsigStaFail"])
+
+# ad-hoc uncertainties for background subtraction: vary background contribution by 50%
+data['N1sig_Up'] = data['N1'] - 0.5*data['N1bkg']
+data['N2sig_Up'] = data['N2'] - 0.5*data['N2bkg']
+
+data['N1sig_Down'] = data['N1'] - 1.5*data['N1bkg']
+data['N2sig_Down'] = data['N2'] - 1.5*data['N2bkg']
+
+data['zRecI_bkgDown'] = (data['N2sig_Up'] + 0.5*data['N1sig_Up'])**2/data['N2sig_Up'] * data['cHLT']
+data['zRecI_bkgDown'] = data['zRecI_bkgDown'].apply(lambda x: x.n)
+
+data['zRecI_bkgUp'] = (data['N2sig_Down'] + 0.5*data['N1sig_Down'])**2/data['N2sig_Down'] * data['cHLT']
+data['zRecI_bkgUp'] = data['zRecI_bkgUp'].apply(lambda x: x.n)
+
+data['zRecI'] = (data['N2sig'] + 0.5*data['N1sig'])**2/data['N2sig'] * data['cHLT']
+data['zDelI'] = (data['N2sig'] + 0.5*data['N1sig'])**2/data['N2sig'] * data['cHLT'] / (
+    (2 * data['N2sig'] + data['N1sig']) / (2 * data['N2sig'] + data['N1sig'] + data['NsigSelFail'])*
+    data['Staeff']*data['Gloeff']/data['cIO']
+    )**2
+data['zDelI_err'] = data['zDelI'].apply(lambda x: x.s)
+data['zDelI'] = data['zDelI'].apply(lambda x: x.n)
+data['zRecI'] = data['zRecI'].apply(lambda x: x.n)
+
+# data['zRecI'] = data['zReco'].apply(lambda x: unc.ufloat_fromstr(x).n)
+# data['zDelI'] = data['zDel'].apply(lambda x: unc.ufloat_fromstr(x).n)
+# data['zDelI_err'] = data['zDel'].apply(lambda x: unc.ufloat_fromstr(x).s)
+
+data['zDelI_cHLTUp'] = data['zDelI'] / data['cHLT'] * ((data['cHLT'] - 1)*1.5 + 1)
+data['zDelI_cHLTDown'] = data['zDelI'] / data['cHLT'] * ((data['cHLT'] - 1)*0.5 + 1)
+
+data['zDelI_cIOUp'] = data['zDelI'] / (data['cIO']**2) * ((data['cIO'] - 1)*2.0 + 1)**2
+data['zDelI_cIODown'] = data['zDelI'] / (data['cIO']**2) * ((data['cIO'] - 1)*0.0 + 1)**2
+
+
+regions = ("I",) #("","BB","BE","EE","I")
 # --->>> prefire corrections
 print("apply muon prefire corrections")
 for var in prefire_variations_Muon:
-    for region in ("BB","BE","EE","I"):
+    for region in regions:
 
-        data['zDel{0}_mc_prefMuon_{1}'.format(region,var)] = data['zDel{0}_mc'.format(region)]
+        data['zDel{0}_prefMuon_{1}'.format(region,var)] = data['zDel{0}'.format(region)]
 
         for lo, hi, era in (
             (272007, 278769, "2016preVFP"),
@@ -69,20 +149,23 @@ for var in prefire_variations_Muon:
             (306828, 307083, "2017"),   # 2017H
             (315252, 325274, "2018"),
         ):
-            factor = float(res_prefire[era]["prefMuon"][region][var])
             loc = (data['run'] >= lo) & (data['run'] < hi)
-            data.loc[loc,'zDel{0}_mc_prefMuon_{1}'.format(region,var)] *= factor
+            if len(loc) == 0:
+                continue
+                
+            factor = float(res_prefire[era]["prefMuon"][region][var])
+            data.loc[loc,'zDel{0}_prefMuon_{1}'.format(region,var)] *= factor
 
-    data['zDel_mc_prefMuon_'+var] = data['zDelBB_mc_prefMuon_'+var] \
-        + data['zDelBE_mc_prefMuon_'+var] \
-        + data['zDelEE_mc_prefMuon_'+var]
+    # data['zDel_prefMuon_'+var] = data['zDelBB_prefMuon_'+var] \
+    #     + data['zDelBE_prefMuon_'+var] \
+    #     + data['zDelEE_prefMuon_'+var]
 
 print("apply ECAL prefire corrections")
 
 for var in prefire_variations_ECAL:
-    for region in ("BB","BE","EE","I"):
+    for region in regions:
 
-        data['zDel{0}_mc_prefECAL_{1}'.format(region,var)] = data['zDel{0}_mc_prefMuon_nominal'.format(region)]
+        data['zDel{0}_prefECAL_{1}'.format(region,var)] = data['zDel{0}_prefMuon_nominal'.format(region)]
 
         for lo, hi, era, func in (
             (272007, 278769, "2016preVFP", pexp),
@@ -90,38 +173,54 @@ for var in prefire_variations_ECAL:
             (297020, 306463, "2017", pexp),
             (306828, 307083, "2017H", pquad),   # 2017H
         ):
-            params = res_prefire[era]["prefECAL"][region][var]
             loc = (data['run'] >= lo) & (data['run'] < hi)
-            data.loc[loc, 'zDel{0}_mc_prefECAL_{1}'.format(region,var)] *= func(data.loc[loc,'pileUp'], *params)
+        
+            if len(loc) == 0:
+                continue
 
-    data['zDel_mc_prefECAL_'+var] = data['zDelBB_mc_prefECAL_'+var] \
-        + data['zDelBE_mc_prefECAL_'+var] \
-        + data['zDelEE_mc_prefECAL_'+var]
+            params = res_prefire[era]["prefECAL"][region][var]
+
+            data.loc[loc, 'zDel{0}_prefECAL_{1}'.format(region,var)] *= func(data.loc[loc,'pileUp'], *params)
+
+    # data['zDel_prefECAL_'+var] = data['zDelBB_prefECAL_'+var] \
+    #     + data['zDelBE_prefECAL_'+var] \
+    #     + data['zDelEE_prefECAL_'+var]
 
 print("apply prefire corrections - done")
 # <<<---
 
-for region in ("","BB","BE","EE","I"):
+for region in regions:
     info = {}
 
     for lo, hi, era in (
         (272007, 278769, "2016preVFP"),
-        (278769, 280919, "2016postVFP"),
+        (278769, 284045, "2016postVFP"),
+        (278769, 280919, "2016G"),
         (280919, 284045, "2016H"),
         (297020, 306463, "2017"),
         (306828, 307083, "2017H"),   # 2017H
         (315252, 325274, "2018"),
     ):
-        info[era] = {}
-        info[era]['zRec_mc'] = sum(data.loc[(data['run'] >= lo) & (data['run'] < hi),'zRec{0}_mc'.format(region)])
-        # info[era]['raw'] = sum(data.loc[(data['run'] >= lo) & (data['run'] < hi),'zDel'])
-        info[era]['mc'] = sum(data.loc[(data['run'] >= lo) & (data['run'] < hi),'zDel{0}_mc'.format(region)])
-        info[era]['mcUp'] = sum(data.loc[(data['run'] >= lo) & (data['run'] < hi),'zDel{0}_mcUp'.format(region)])
-        # info[era]['mcDown'] = sum(data.loc[(data['run'] >= lo) & (data['run'] < hi),'zDel{0}_mcDown'.format(region)])
+        loc = (data['run'] >= lo) & (data['run'] < hi)
+
+        if len(loc) == 0:
+            continue
+
+        info[era] = {}        
+        info[era]['zRec'] = sum(data.loc[loc,'zRec{0}'.format(region)])
+        info[era]['zRec_bkgDown'] = sum(data.loc[loc,'zRec{0}_bkgDown'.format(region)])
+        info[era]['zRec_bkgUp'] = sum(data.loc[loc,'zRec{0}_bkgUp'.format(region)])
+        info[era]['zDel'] = sum(data.loc[loc,'zDel{0}'.format(region)])
+        info[era]['zDel_err'] = np.sqrt(sum(data.loc[loc,'zDel{0}_err'.format(region)]**2))
+        info[era]['zDel_cHLTUp']   = sum(data.loc[loc,'zDel{0}_cHLTUp'.format(region)])
+        info[era]['zDel_cHLTDown'] = sum(data.loc[loc,'zDel{0}_cHLTDown'.format(region)])
+        info[era]['zDel_cIOUp']    = sum(data.loc[loc,'zDel{0}_cIOUp'.format(region)])
+        info[era]['zDel_cIODown']  = sum(data.loc[loc,'zDel{0}_cIODown'.format(region)])
+
         for var in prefire_variations_Muon:
-            info[era]["prefMuon_"+var] = sum(data.loc[(data['run'] >= lo) & (data['run'] < hi),'zDel{0}_mc_prefMuon_{1}'.format(region, var)])
+            info[era]["prefMuon_"+var] = sum(data.loc[loc,'zDel{0}_prefMuon_{1}'.format(region, var)])
         for var in prefire_variations_ECAL:
-            info[era]["prefECAL_"+var] = sum(data.loc[(data['run'] >= lo) & (data['run'] < hi),'zDel{0}_mc_prefECAL_{1}'.format(region, var)])
+            info[era]["prefECAL_"+var] = sum(data.loc[loc,'zDel{0}_prefECAL_{1}'.format(region, var)])
 
     with open(outDir+"/info{0}.json".format(region),"w") as outfile:
         json.dump(info, outfile, indent=4, sort_keys=True)
@@ -132,25 +231,25 @@ exit()
 
 # save corrected MergedCSVperLS
 print("store data - Muon prefiring")
-data = data[['zDelBB_mc_prefMuon_nominal','zDelBE_mc_prefMuon_nominal','zDelEE_mc_prefMuon_nominal',
-    'zDelBB_mc_prefECAL_nominal','zDelBE_mc_prefECAL_nominal','zDelEE_mc_prefECAL_nominal',
+data = data[['zDelBB_prefMuon_nominal','zDelBE_prefMuon_nominal','zDelEE_prefMuon_nominal',
+    'zDelBB_prefECAL_nominal','zDelBE_prefECAL_nominal','zDelEE_prefECAL_nominal',
     u'recorded(/pb)', 'ls', 'time', 'run', 'measurement', 'fill', 'pileUp']]
 
-data['zDelBB_mc'] = data['zDelBB_mc_prefMuon_nominal']
-data['zDelBE_mc'] = data['zDelBE_mc_prefMuon_nominal']
-data['zDelEE_mc'] = data['zDelEE_mc_prefMuon_nominal']
-# data['zDelI_mc'] = data['zDelI_mc_prefMuon_nominal']
+data['zDelBB'] = data['zDelBB_prefMuon_nominal']
+data['zDelBE'] = data['zDelBE_prefMuon_nominal']
+data['zDelEE'] = data['zDelEE_prefMuon_nominal']
+# data['zDelI'] = data['zDelI_prefMuon_nominal']
 
 data_store = data[['ls', u'time', u'run', u'measurement', u'fill', u'pileUp',
        # u'delivered(/pb)',
        u'recorded(/pb)',
-       # u'effBB_mc', u'RecBB', u'zRecBB', u'zDelBB',
-       u'zDelBB_mc',
-       # u'effBE_mc', u'RecBE', u'zRecBE', u'zDelBE',
-       u'zDelBE_mc',
-       # u'effEE_mc', u'RecEE', u'zRecEE', u'zDelEE',
-       u'zDelEE_mc',
-       # u'zDelI_mc',
+       # u'effBB', u'RecBB', u'zRecBB', u'zDelBB',
+       u'zDelBB',
+       # u'effBE', u'RecBE', u'zRecBE', u'zDelBE',
+       u'zDelBE',
+       # u'effEE', u'RecEE', u'zRecEE', u'zDelEE',
+       u'zDelEE',
+       # u'zDelI',
        ]]
 
 with open(outDir + '/Mergedcsvfile_perLS_corrMuonPrefire.csv', 'w') as file:
@@ -158,21 +257,21 @@ with open(outDir + '/Mergedcsvfile_perLS_corrMuonPrefire.csv', 'w') as file:
 
 print("store data - ECAL prefiring")
 
-data['zDelBB_mc'] = data['zDelBB_mc_prefECAL_nominal']
-data['zDelBE_mc'] = data['zDelBE_mc_prefECAL_nominal']
-data['zDelEE_mc'] = data['zDelEE_mc_prefECAL_nominal']
-# data['zDelI_mc'] = data['zDelI_mc_prefECAL_nominal']
+data['zDelBB'] = data['zDelBB_prefECAL_nominal']
+data['zDelBE'] = data['zDelBE_prefECAL_nominal']
+data['zDelEE'] = data['zDelEE_prefECAL_nominal']
+# data['zDelI'] = data['zDelI_prefECAL_nominal']
 
 data_store = data[['ls', u'time', u'run', u'measurement', u'fill', u'pileUp',
        # u'delivered(/pb)',
        u'recorded(/pb)',
-       # u'effBB_mc', u'RecBB', u'zRecBB', u'zDelBB',
-       u'zDelBB_mc',
-       # u'effBE_mc', u'RecBE', u'zRecBE', u'zDelBE',
-       u'zDelBE_mc',
-       # u'effEE_mc', u'RecEE', u'zRecEE', u'zDelEE',
-       u'zDelEE_mc',
-       # u'zDelI_mc',       
+       # u'effBB', u'RecBB', u'zRecBB', u'zDelBB',
+       u'zDelBB',
+       # u'effBE', u'RecBE', u'zRecBE', u'zDelBE',
+       u'zDelBE',
+       # u'effEE', u'RecEE', u'zRecEE', u'zDelEE',
+       u'zDelEE',
+       # u'zDelI',       
        ]]
 
 with open(outDir + '/Mergedcsvfile_perLS_corrECALPrefire.csv', 'w') as file:
