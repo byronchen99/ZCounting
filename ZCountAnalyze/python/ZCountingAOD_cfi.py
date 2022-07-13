@@ -19,6 +19,10 @@ zcounting = cms.EDAnalyzer('ZCountingAOD',
     # Tracks - source
     reco_tracks = cms.InputTag("generalTracks","","RECO"),
 
+    # Electrons - source
+    reco_electrons = cms.InputTag("gedGsfElectrons","","RECO"),
+    reco_superclusters = cms.InputTag("particleFlowEGamma","","RECO"),
+
     # Trigger - sources
     TriggerEvent   = cms.InputTag('hltTriggerSummaryAOD', '', 'HLT'),
     TriggerResults = cms.InputTag('TriggerResults', '', 'HLT'),
@@ -95,10 +99,28 @@ zcounting = cms.EDAnalyzer('ZCountingAOD',
         "HLT_PFMETTypeOne110_PFMHT110_IDTight_v*"           #30
     ),
 
+    # Electron - triggers
+    # 2^{x}
+    electron_trigger_patterns=cms.vstring(
+                                # x =
+        "HLT_Ele27_WPTight_Gsf_v*",      # 0   lowest unprescaled in 2016
+        "HLT_Ele32_WPTight_Gsf_v*"       # 1   exists in 2017 (But must be emulated https://twiki.cern.ch/twiki/bin/view/CMS/EgHLTRunIISummary#Emulation_of_HLT_Ele32_WPTight_G) and 2018
+
+    ),
+
+    # Electrons - 
+    effAreasConfigFile = cms.FileInPath("RecoEgamma/ElectronIdentification/data/Summer16/effAreaElectrons_cone03_pfNeuHadronsAndPhotons_80X.txt"),
+    beamspotName = cms.InputTag('offlineBeamSpot'),
+    conversionsName = cms.InputTag('conversions'),
+    rhoName = cms.InputTag('fixedGridRhoFastjetAll'),
+
     #Flags
     isData = cms.untracked.bool(False),
     hasGenZ = cms.untracked.bool(False),
     hasGenTt = cms.untracked.bool(False),
+
+    store_muons = cms.untracked.bool(True),
+    store_electrons = cms.untracked.bool(True),    
 
     # For MC only
     genParticles         = cms.InputTag("genParticles"),
