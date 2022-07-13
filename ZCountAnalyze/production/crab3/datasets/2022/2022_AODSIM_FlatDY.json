@@ -1,0 +1,16 @@
+{
+"DYJetsToLL_M_50_LO_FlatPU0to70_Run3Winter22": {
+    "OutputSplitFiles": 1,
+    "crab3": {
+      "Data.inputDataset": "/DYJetsToLL_M-50_TuneCP5_13p6TeV-madgraphMLM-pythia8/Run3Winter22DR-FlatPU0to70_122X_mcRun3_2021_realistic_v9_ext1-v2/AODSIM",
+      "Data.splitting": "FileBased",
+      "Data.unitsPerJob": 1,
+      "JobType.maxMemoryMB": 2500,
+      "JobType.pyCfgParams": [
+        "samplename=dy",
+        "year=2022",
+        "outputFile=DYJetsToLL_M_50_LO_FlatPU0to70_Run3Winter2022"
+      ]
+    }
+}
+}

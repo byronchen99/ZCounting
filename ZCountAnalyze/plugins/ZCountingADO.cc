@@ -758,38 +758,43 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
                     }
                 }
                 muon_triggerBits_.push_back(bits_);   
-
-                double roccorSF = 1.; // Rochester correction
-                if(!iEvent.isRealData()){
                 
-                    if(genLepton && mu->pdgId() == 13 && reco::deltaR(mu->eta(), mu->phi(), genLepton->eta(), genLepton->phi()) < 0.03){
-                        roccorSF = rc.kSpreadMC(mu->charge(), mu->pt(), mu->eta(), mu->phi(), lepton_genPt_);
-                    }
-                    else if(genAntiLepton && mu->pdgId() == -13 && reco::deltaR(mu->eta(), mu->phi(), genAntiLepton->eta(), genAntiLepton->phi()) < 0.03){
-                        roccorSF = rc.kSpreadMC(mu->charge(), mu->pt(), mu->eta(), mu->phi(), antiLepton_genPt_);
+                if(roccorFile != "None"){
+                    double roccorSF = 1.; // Rochester correction
+                    if(!iEvent.isRealData()){
+                
+                        if(genLepton && mu->pdgId() == 13 && reco::deltaR(mu->eta(), mu->phi(), genLepton->eta(), genLepton->phi()) < 0.03){
+                            roccorSF = rc.kSpreadMC(mu->charge(), mu->pt(), mu->eta(), mu->phi(), lepton_genPt_);
+                        }
+                        else if(genAntiLepton && mu->pdgId() == -13 && reco::deltaR(mu->eta(), mu->phi(), genAntiLepton->eta(), genAntiLepton->phi()) < 0.03){
+                            roccorSF = rc.kSpreadMC(mu->charge(), mu->pt(), mu->eta(), mu->phi(), antiLepton_genPt_);
+                        }
+                        else{
+                            const int nl = mu->innerTrack().isNonnull() ? mu->innerTrack()->hitPattern().trackerLayersWithMeasurement() : 0;
+                            roccorSF = rc.kSmearMC(mu->charge(), mu->pt(), mu->eta(), mu->phi(), nl, rand_.Rndm());
+                        }
+                
+                        // store muon Rochester corrections and uncertainties
+                
+                
+                        // muon_ScaleCorr_.push_back(mu->hasUserFloat("MuonEnergyCorr")                   ? mu->userFloat("MuonEnergyCorr")          : 1.0);
+                        // muon_ScaleCorr_stat_RMS_.push_back(mu->hasUserFloat("MuonEnergyCorr_stat_RMS") ? mu->userFloat("MuonEnergyCorr_stat_RMS") : 0.0);
+                        // muon_ScaleCorr_Zpt_.push_back(mu->hasUserFloat("MuonEnergyCorr_Zpt")           ? mu->userFloat("MuonEnergyCorr_Zpt")      : 0.0);
+                        // muon_ScaleCorr_Ewk_.push_back(mu->hasUserFloat("MuonEnergyCorr_Ewk")           ? mu->userFloat("MuonEnergyCorr_Ewk")      : 0.0);
+                        // muon_ScaleCorr_deltaM_.push_back(mu->hasUserFloat("MuonEnergyCorr_deltaM")     ? mu->userFloat("MuonEnergyCorr_deltaM")   : 0.0);
+                        // muon_ScaleCorr_Ewk2_.push_back(mu->hasUserFloat("MuonEnergyCorr_Ewk2")         ? mu->userFloat("MuonEnergyCorr_Ewk2")     : 0.0);
+                        // muon_ScaleCorr_Total_.push_back(mu->hasUserFloat("MuonEnergyCorr_Total")       ? mu->userFloat("MuonEnergyCorr_Total")    : 0.0);
                     }
                     else{
-                        const int nl = mu->innerTrack().isNonnull() ? mu->innerTrack()->hitPattern().trackerLayersWithMeasurement() : 0;
-                        roccorSF = rc.kSmearMC(mu->charge(), mu->pt(), mu->eta(), mu->phi(), nl, rand_.Rndm());
+                        roccorSF = rc.kScaleDT(mu->charge(), mu->pt(), mu->eta(), mu->phi());
                     }
                 
-                    // store muon Rochester corrections and uncertainties
-                
-                
-                    // muon_ScaleCorr_.push_back(mu->hasUserFloat("MuonEnergyCorr")                   ? mu->userFloat("MuonEnergyCorr")          : 1.0);
-                    // muon_ScaleCorr_stat_RMS_.push_back(mu->hasUserFloat("MuonEnergyCorr_stat_RMS") ? mu->userFloat("MuonEnergyCorr_stat_RMS") : 0.0);
-                    // muon_ScaleCorr_Zpt_.push_back(mu->hasUserFloat("MuonEnergyCorr_Zpt")           ? mu->userFloat("MuonEnergyCorr_Zpt")      : 0.0);
-                    // muon_ScaleCorr_Ewk_.push_back(mu->hasUserFloat("MuonEnergyCorr_Ewk")           ? mu->userFloat("MuonEnergyCorr_Ewk")      : 0.0);
-                    // muon_ScaleCorr_deltaM_.push_back(mu->hasUserFloat("MuonEnergyCorr_deltaM")     ? mu->userFloat("MuonEnergyCorr_deltaM")   : 0.0);
-                    // muon_ScaleCorr_Ewk2_.push_back(mu->hasUserFloat("MuonEnergyCorr_Ewk2")         ? mu->userFloat("MuonEnergyCorr_Ewk2")     : 0.0);
-                    // muon_ScaleCorr_Total_.push_back(mu->hasUserFloat("MuonEnergyCorr_Total")       ? mu->userFloat("MuonEnergyCorr_Total")    : 0.0);
+                    // Rochester corrections 
+                    muon_ScaleCorr_.push_back(roccorSF);
                 }
                 else{
-                    roccorSF = rc.kScaleDT(mu->charge(), mu->pt(), mu->eta(), mu->phi());
+                    muon_ScaleCorr_.push_back(1.0);
                 }
-                
-                // Rochester corrections 
-                muon_ScaleCorr_.push_back(roccorSF);
             }
             else{
                 // if no muon candidate was reconstructed, use the parameters of the standalone muon that was considered
@@ -911,27 +916,32 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
             track_nTrackerLayers_.push_back(trk.hitPattern().trackerLayersWithMeasurement());
             track_validFraction_.push_back(trk.validFraction());
             track_trackAlgo_.push_back(trk.originalAlgo());
+            
+            if(roccorFile != "None"){
+                double roccorSF = 1.; // Rochester correction
+                if(!iEvent.isRealData()){
         
-            double roccorSF = 1.; // Rochester correction
-            if(!iEvent.isRealData()){
+                    if(genLepton && trk.charge() > 0 && reco::deltaR(trk.eta(), trk.phi(), genLepton->eta(), genLepton->phi()) < 0.03){
+                        roccorSF = rc.kSpreadMC(trk.charge(), trk.pt(), trk.eta(), trk.phi(), lepton_genPt_);
+                    }
         
-                if(genLepton && trk.charge() > 0 && reco::deltaR(trk.eta(), trk.phi(), genLepton->eta(), genLepton->phi()) < 0.03){
-                    roccorSF = rc.kSpreadMC(trk.charge(), trk.pt(), trk.eta(), trk.phi(), lepton_genPt_);
-                }
-        
-                else if(genAntiLepton && trk.charge() < 0 && reco::deltaR(trk.eta(), trk.phi(), genAntiLepton->eta(), genAntiLepton->phi()) < 0.03){
-                    roccorSF = rc.kSpreadMC(trk.charge(), trk.pt(), trk.eta(), trk.phi(), antiLepton_genPt_);
+                    else if(genAntiLepton && trk.charge() < 0 && reco::deltaR(trk.eta(), trk.phi(), genAntiLepton->eta(), genAntiLepton->phi()) < 0.03){
+                        roccorSF = rc.kSpreadMC(trk.charge(), trk.pt(), trk.eta(), trk.phi(), antiLepton_genPt_);
+                    }
+                    else{
+                        roccorSF = rc.kSmearMC(trk.charge(), trk.pt(), trk.eta(), trk.phi(), trk.hitPattern().trackerLayersWithMeasurement(), rand_.Rndm());
+                    }
                 }
                 else{
-                    roccorSF = rc.kSmearMC(trk.charge(), trk.pt(), trk.eta(), trk.phi(), trk.hitPattern().trackerLayersWithMeasurement(), rand_.Rndm());
+                    roccorSF = rc.kScaleDT(trk.charge(), trk.pt(), trk.eta(), trk.phi());
                 }
+            
+                // Rochester corrections 
+                track_ScaleCorr_.push_back(roccorSF);            
             }
             else{
-                roccorSF = rc.kScaleDT(trk.charge(), trk.pt(), trk.eta(), trk.phi());
+                track_ScaleCorr_.push_back(1.0);
             }
-        
-            // Rochester corrections 
-            track_ScaleCorr_.push_back(roccorSF);            
             nTrack_++;
         }    
 
@@ -1117,8 +1127,9 @@ void
 ZCountingAOD::beginJob()
 {
     LogDebug("ZCountingAOD")<<"beginJob()";
-
-    rc.init(edm::FileInPath(roccorFile).fullPath());
+    if(roccorFile != "None"){
+        rc.init(edm::FileInPath(roccorFile).fullPath());
+    }
     rand_ = TRandom3();
     rand_.SetSeed(1);
     
