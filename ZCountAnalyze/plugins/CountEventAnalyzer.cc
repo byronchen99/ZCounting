@@ -1,5 +1,5 @@
 #include <iostream>
-#include "FWCore/Framework/interface/EDAnalyzer.h"
+#include "FWCore/Framework/interface/one/EDAnalyzer.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
@@ -12,13 +12,13 @@
 #include <TH1I.h>
 #include <TH1D.h>
 
-class CountEventAnalyzer : public edm::EDAnalyzer
+class CountEventAnalyzer : public edm::one::EDAnalyzer<>
 {
 
 public:
 
     CountEventAnalyzer(const edm::ParameterSet&);
-    ~CountEventAnalyzer();
+    ~CountEventAnalyzer() override = default;
 
 protected:
     void beginJob();
@@ -34,9 +34,6 @@ private:
 
 CountEventAnalyzer::CountEventAnalyzer(const edm::ParameterSet& iConfig):
     genEventInfo_(consumes<GenEventInfoProduct>(iConfig.getParameter<edm::InputTag>("genEventInfo")))
-{}
-
-CountEventAnalyzer::~CountEventAnalyzer()
 {}
 
 void CountEventAnalyzer::beginJob()

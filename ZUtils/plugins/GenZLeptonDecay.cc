@@ -22,7 +22,7 @@
 
 // user include files
 #include "FWCore/Framework/interface/Frameworkfwd.h"
-#include "FWCore/Framework/interface/EDProducer.h"
+#include "FWCore/Framework/interface/one/EDProducer.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
@@ -37,11 +37,11 @@
 // class declaration
 //
 
-class GenZLeptonDecay : public edm::EDProducer
+class GenZLeptonDecay : public edm::one::EDProducer<>
 {
 public:
     explicit GenZLeptonDecay(const edm::ParameterSet&);
-    ~GenZLeptonDecay();
+    ~GenZLeptonDecay() = default;
 
     static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
 
@@ -79,12 +79,6 @@ genParticlesToken_(consumes<reco::GenParticleCollection>(iConfig.getParameter<ed
 {
     produces<std::vector<GenZDecayProperties> >();
 }
-
-
-
-GenZLeptonDecay::~GenZLeptonDecay()
-{}
-
 
 
 //

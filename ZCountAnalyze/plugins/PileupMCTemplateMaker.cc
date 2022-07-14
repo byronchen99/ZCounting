@@ -17,7 +17,7 @@ class PileupMCTemplateMaker : public edm::one::EDAnalyzer<edm::one::SharedResour
 {
  public:
   explicit PileupMCTemplateMaker(const edm::ParameterSet&);
-  virtual ~PileupMCTemplateMaker() {}
+  virtual ~PileupMCTemplateMaker() override = default;
 
  protected:
   edm::EDGetTokenT<std::vector<PileupSummaryInfo> > src_pileupInfo_;

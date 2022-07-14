@@ -9,7 +9,7 @@
 #include <string>
 
 #include "FWCore/Framework/interface/Event.h"
-#include "FWCore/Framework/interface/EDProducer.h"
+#include "FWCore/Framework/interface/one/EDProducer.h"
 #include "FWCore/Utilities/interface/InputTag.h"
 #include "FWCore/Utilities/interface/EDMException.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
@@ -22,12 +22,13 @@
 
 #include "TRandom3.h"
 
-class MuonPATUserDataRochesterCorrectionAdder : public edm::EDProducer {
+class MuonPATUserDataRochesterCorrectionAdder : public edm::one::EDProducer<> 
+{
 
  public:
 
   explicit MuonPATUserDataRochesterCorrectionAdder(const edm::ParameterSet&);
-  ~MuonPATUserDataRochesterCorrectionAdder() {}
+  ~MuonPATUserDataRochesterCorrectionAdder() override = default;
 
   static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
 

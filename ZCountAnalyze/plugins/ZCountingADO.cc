@@ -52,7 +52,7 @@
 #include "DataFormats/EgammaReco/interface/SuperCluster.h"
 
 #include "FWCore/Common/interface/TriggerNames.h"
-#include "FWCore/Framework/interface/EDAnalyzer.h"
+#include "FWCore/Framework/interface/one/EDAnalyzer.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/Frameworkfwd.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
@@ -86,19 +86,18 @@
 //
 
 
-class ZCountingAOD : //public edm::one::EDAnalyzer<edm::one::SharedResources>
-    public edm::EDAnalyzer
+class ZCountingAOD : public edm::one::EDAnalyzer<>
 {
 public:
     explicit ZCountingAOD(const edm::ParameterSet&);
-    ~ZCountingAOD();
+    ~ZCountingAOD() override = default;
 
-     static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
+    static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
 
 
 private:
-    void beginRun(const edm::Run&, const edm::EventSetup&) override;
-    void beginLuminosityBlock(const edm::LuminosityBlock&, const edm::EventSetup&) override;
+    void beginRun(const edm::Run&, const edm::EventSetup&);
+    void beginLuminosityBlock(const edm::LuminosityBlock&, const edm::EventSetup&);
     virtual void beginJob() override;
     virtual void analyze(const edm::Event&, const edm::EventSetup&) override;
     virtual void endJob() override;
@@ -403,12 +402,6 @@ ZCountingAOD::ZCountingAOD(const edm::ParameterSet& iConfig):
     }
 
 }
-
-
-ZCountingAOD::~ZCountingAOD()
-{
-}
-
 
 //
 // member functions

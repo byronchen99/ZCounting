@@ -27,7 +27,7 @@
 
 // user include files
 #include "FWCore/Framework/interface/Frameworkfwd.h"
-#include "FWCore/Framework/interface/EDProducer.h"
+#include "FWCore/Framework/interface/one/EDProducer.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
@@ -39,11 +39,11 @@
 // class declaration
 //
 
-class GenZDecay : public edm::EDProducer
+class GenZDecay : public edm::one::EDProducer<>
 {
 public:
     explicit GenZDecay(const edm::ParameterSet&);
-    ~GenZDecay();
+    ~GenZDecay() = default;
 
     static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
 
@@ -91,15 +91,10 @@ private:
 // constructors and destructor
 //
 GenZDecay::GenZDecay(const edm::ParameterSet& iConfig):
-genParticlesToken_(consumes<reco::GenParticleCollection>(iConfig.getParameter<edm::InputTag>("src")))
+    genParticlesToken_(consumes<reco::GenParticleCollection>(iConfig.getParameter<edm::InputTag>("src")))
 {
     produces<std::vector<GenZDecayProperties> >();
 }
-
-
-GenZDecay::~GenZDecay()
-{}
-
 
 //
 // member functions
@@ -280,11 +275,11 @@ GenZDecay::endLuminosityBlock(edm::LuminosityBlock&, edm::EventSetup const&)
 void
 GenZDecay::fillDescriptions(edm::ConfigurationDescriptions& descriptions)
 {
-  //The following says we do not know what parameters are allowed so do no validation
-  // Please change this to state exactly what you do use, even if it is no parameters
-  edm::ParameterSetDescription desc;
-  desc.setUnknown();
-  descriptions.addDefault(desc);
+    //The following says we do not know what parameters are allowed so do no validation
+    // Please change this to state exactly what you do use, even if it is no parameters
+    edm::ParameterSetDescription desc;
+    desc.setUnknown();
+    descriptions.addDefault(desc);
 }
 
 

@@ -12,10 +12,10 @@ public:
     GenZDecayProperties();
     /// Default constructor
     GenZDecayProperties(const reco::GenParticle*,
-                   const reco::GenParticle*, const reco::GenParticle*,
-                   const reco::GenParticle*, const reco::GenParticle*,
-                   const int
-                  );
+        const reco::GenParticle*, const reco::GenParticle*,
+        const reco::GenParticle*, const reco::GenParticle*,
+        const int
+    );
     /// Default destructor
     virtual ~GenZDecayProperties(){};
 

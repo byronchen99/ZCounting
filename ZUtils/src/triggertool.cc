@@ -188,7 +188,7 @@ void triggertool::initPathNames(const std::vector<std::string>& triggerNames) {
 //--------------------------------------------------------------------------------------------------
 TriggerObjectBits triggertool::matchHLT(const double eta, const double phi) const {
 
-    TriggerObjectBits matchBits;
+    TriggerObjectBits matchBits;    // creates a bitset with all bits set to 0
     for (unsigned int i = 0; i < records.size(); i++) {
         const std::string& filterName = records.at(i).hltObjName;
         const unsigned int filterBit = i;

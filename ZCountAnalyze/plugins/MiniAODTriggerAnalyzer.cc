@@ -4,7 +4,7 @@
 
 // user include files
 #include "FWCore/Framework/interface/Frameworkfwd.h"
-#include "FWCore/Framework/interface/EDAnalyzer.h"
+#include "FWCore/Framework/interface/one/EDAnalyzer.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
@@ -15,17 +15,18 @@
 #include "DataFormats/PatCandidates/interface/TriggerObjectStandAlone.h"
 #include "DataFormats/PatCandidates/interface/PackedTriggerPrescales.h"
 
-class MiniAODTriggerAnalyzer : public edm::EDAnalyzer {
-   public:
-      explicit MiniAODTriggerAnalyzer (const edm::ParameterSet&);
-      ~MiniAODTriggerAnalyzer() {}
+class MiniAODTriggerAnalyzer : public edm::one::EDAnalyzer<>
+{
+public:
+    explicit MiniAODTriggerAnalyzer (const edm::ParameterSet&);
+    ~MiniAODTriggerAnalyzer() override = default;
 
-   private:
-      virtual void analyze(const edm::Event&, const edm::EventSetup&) override;
+private:
+    virtual void analyze(const edm::Event&, const edm::EventSetup&) override;
 
-      edm::EDGetTokenT<edm::TriggerResults> triggerBits_;
-      edm::EDGetTokenT<std::vector<pat::TriggerObjectStandAlone> > triggerObjects_;
-      edm::EDGetTokenT<pat::PackedTriggerPrescales> triggerPrescales_;
+    edm::EDGetTokenT<edm::TriggerResults> triggerBits_;
+    edm::EDGetTokenT<std::vector<pat::TriggerObjectStandAlone> > triggerObjects_;
+    edm::EDGetTokenT<pat::PackedTriggerPrescales> triggerPrescales_;
 };
 
 MiniAODTriggerAnalyzer::MiniAODTriggerAnalyzer(const edm::ParameterSet& iConfig):

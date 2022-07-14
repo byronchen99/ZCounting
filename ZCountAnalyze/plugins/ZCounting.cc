@@ -43,7 +43,7 @@
 #include "DataFormats/VertexReco/interface/Vertex.h"
 
 #include "FWCore/Common/interface/TriggerNames.h"
-#include "FWCore/Framework/interface/EDAnalyzer.h"
+#include "FWCore/Framework/interface/one/EDAnalyzer.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/Frameworkfwd.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
@@ -70,18 +70,17 @@
 //
 
 
-class ZCounting : //public edm::one::EDAnalyzer<edm::one::SharedResources>
-    public edm::EDAnalyzer
+class ZCounting : public edm::one::EDAnalyzer<>
 {
 public:
     explicit ZCounting(const edm::ParameterSet&);
-    ~ZCounting();
+    ~ZCounting() override = default;
 
-     static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
+    static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
 
 
 private:
-    void beginRun(const edm::Run&, const edm::EventSetup&) override;
+    void beginRun(const edm::Run&, const edm::EventSetup&);
     virtual void beginJob() override;
     virtual void analyze(const edm::Event&, const edm::EventSetup&) override;
     virtual void endJob() override;
@@ -342,10 +341,6 @@ ZCounting::ZCounting(const edm::ParameterSet& iConfig):
 
 }
 
-
-ZCounting::~ZCounting()
-{
-}
 
 
 //
