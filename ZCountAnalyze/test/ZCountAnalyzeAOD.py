@@ -22,7 +22,7 @@ options.register('maxEvents', -1,
     )
 options.register('samplename', '',
     VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.string,
-    "specify sample name ('dy', 'tt', 'w', 'qcd', 'zz', 'wz', 'ww', 't', 'ttz', 'ttw', 'met', 'smu') "
+    "specify sample name ('dy', 'tt', 'w', 'qcd', 'zz', 'wz', 'ww', 't', 'ttz', 'ttw', 'met', 'smu', 'se') "
     )
 options.register('year', '2017',
     VarParsing.VarParsing.multiplicity.singleton, VarParsing.VarParsing.varType.string,
@@ -33,7 +33,7 @@ options.parseArguments()
 
 if options.samplename == '':
     raise RuntimeError('ZCountAnalyze.py: cannot run without specifying a samplename')
-elif options.samplename not in ('dy', 'tt', 'w', 'qcd', 'zz', 'wz', 'ww', 't', 'ttz', 'ttw', 'met', 'smu'):
+elif options.samplename not in ('dy', 'tt', 'w', 'qcd', 'zz', 'wz', 'ww', 't', 'ttz', 'ttw', 'met', 'smu', 'se'):
     raise RuntimeError('ZCountAnalyze.py: unknown samplename '+options.samplename)
 
 if options.year not in ("2016preVFP", "2016postVFP", "2017", "2017H", "2018", "2022"):
@@ -72,11 +72,12 @@ process.source = cms.Source("PoolSource",
         # Single Mu 2017 D UL-Reco
         # 'file:/pnfs/desy.de/cms/tier2/store/data/Run2017E/SingleMuon/AOD/09Aug2019_UL2017-v1/260000/0005DF00-5EE0-C84E-9241-08FA62D9EFF7.root'
         # "file:/pnfs/desy.de/cms/tier2/store/data/Run2017H/SingleMuon/AOD/09Aug2019_UL2017_LowPU-v1/10000/02FD55DE-EA02-FD4C-86D3-0E93C4E9E280.root"
-        # AODSIM
-        'file:/pnfs/desy.de/cms/tier2/store/mc/RunIISummer20UL17RECO/DYJetsToLL_M-50_HT-100to200_TuneCP5_PSweights_13TeV-madgraphMLM-pythia8/AODSIM/106X_mc2017_realistic_v6-v1/00000/0C0FD46D-6DAE-6F45-B9F4-129A6ABC69C4.root'
+        #'file:/eos/cms/store/data/Run2018D/SingleMuon/AOD/12Nov2019_UL2018-v6/230000/1217FEF3-168A-7C46-96EA-F5D8B6C6BC4A.root'
+        # SIMULATION: AODSIM
+        #'file:/pnfs/desy.de/cms/tier2/store/mc/RunIISummer20UL17RECO/DYJetsToLL_M-50_HT-100to200_TuneCP5_PSweights_13TeV-madgraphMLM-pythia8/AODSIM/106X_mc2017_realistic_v6-v1/00000/0C0FD46D-6DAE-6F45-B9F4-129A6ABC69C4.root'
         # "/store/mc/RunIISummer20UL17RECO/DYJetsToLL_M-50_TuneCP5_13TeV-amcatnloFXFX-pythia8/AODSIM/106X_mc2017_realistic_v6-v1/130000/2678F234-2D42-AB4F-89E4-80AFDE9EFB82.root"
         # "/store/mc/RunIISummer20UL17RECO/DYJetsToLL_M-50_HT-100to200_TuneCP5_PSweights_13TeV-madgraphMLM-pythia8/AODSIM/106X_mc2017_realistic_v6-v1/00000/0C0FD46D-6DAE-6F45-B9F4-129A6ABC69C4.root"
-        # '/store/mc/Run3Winter22DR/DYJetsToLL_M-50_TuneCP5_13p6TeV-madgraphMLM-pythia8/AODSIM/FlatPU0to70_122X_mcRun3_2021_realistic_v9_ext1-v2/2520000/002de84f-b906-4509-8cb6-872ee0cf4029.root'
+        '/store/mc/Run3Winter22DR/DYJetsToLL_M-50_TuneCP5_13p6TeV-madgraphMLM-pythia8/AODSIM/FlatPU0to70_122X_mcRun3_2021_realistic_v9_ext1-v2/2520000/002de84f-b906-4509-8cb6-872ee0cf4029.root'
     )
 )
 
@@ -105,6 +106,8 @@ elif options.year == "2022":
     l1PrefireECAL = "None"
     l1PrefireMuon = "None"
     roccoFile = "None"
+
+# TODO: prefiring is currently not working in AOD... need to setup
 
 if options.samplename in ('smu','met'):
     globalTag = '106X_dataRun2_v32'
@@ -145,11 +148,18 @@ if options.samplename in ('dy', 'zz', 'wz', 'ttz'):
     tasks.add(process.genZLeptonDecay)
     process.zcounting.hasGenZ = True
     process.zcounting.genZLeptonCollection = cms.InputTag("genZLeptonDecay")
-elif options.samplename in ('smu','met'):
+elif options.samplename in ('smu','se','met'):
+    # only store necessary information for data
     process.zcounting.isData = True
-    if options.samplename == "smu":
+    if options.samplename in ('smu', 'se'):
         process.zcounting.met_trigger_patterns = cms.vstring()
-    
+        if options.samplename in ('smu',):
+            process.zcounting.electron_trigger_patterns = cms.vstring()
+            process.zcounting.store_electrons = False
+        elif options.samplename in ('se',):
+            process.zcounting.muon_trigger_patterns = cms.vstring()
+            process.zcounting.store_muons = False
+
 if options.year == '2017H':
     print("set 2017 Low PU configuration")
     # trigger emulation of HLT_IsoMu24
