@@ -1,17 +1,5 @@
-<use name="CommonTools/Utils"/>
-<use name="FWCore/Common"/>
-<use name="FWCore/Framework"/>
-<use name="FWCore/MessageLogger"/>
-<use name="DataFormats/HLTReco"/>
-<use name="DataFormats/Common"/>
-<use name="DataFormats/MuonReco"/>
-<use name="DataFormats/EgammaReco"/>
-<use name="DataFormats/EgammaCandidates"/>
-<use name="RecoEgamma/ElectronIdentification"/>
-<use name="HLTrigger/HLTcore"/>
-<use name="TrackingTools/IPTools"/>
 <use name="boost"/>
 <use name="rootcore"/>
 <export>
-  <lib   name="1"/>
+  <lib name="1"/>
 </export>

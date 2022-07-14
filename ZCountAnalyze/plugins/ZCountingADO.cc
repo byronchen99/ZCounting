@@ -10,11 +10,11 @@
      ZCountingAODAOD.cc is derived from ZCountingAOD.cc but adapted for AOD
 
      Select events which have:
-        - a decay of Z to mu mu
-        - available generator level information of both muons
+        - a decay of Z to mu mu or e e
+        - available generator level information of both leptons
      Store:
-        - information of the gen muons
-        - information of the corresponding reco muons (if given)
+        - information of the gen leptons
+        - information of the corresponding reco muons, tracks, electrons, and superclusters (if given)
 
 
 
@@ -34,11 +34,12 @@
 
 // CMSSW includes
 #include "CommonTools/UtilAlgos/interface/TFileService.h"
-#include "RecoEgamma/EgammaTools/interface/EffectiveAreas.h"
-#include "RecoEgamma/EgammaTools/interface/ConversionTools.h"
-// For CMSSW_12_X: 
-// #include "CommonTools/Egamma/interface/ConversionTools.h"
-// #include "CommonTools/Egamma/interface/EffectiveAreas.h"
+// For < CMSSW_12 (also change BuildFile.xml):
+//#include "RecoEgamma/EgammaTools/interface/EffectiveAreas.h"
+//#include "RecoEgamma/EgammaTools/interface/ConversionTools.h"
+// For >= CMSSW_12 (also change BuildFile.xml): 
+#include "CommonTools/Egamma/interface/ConversionTools.h"
+#include "CommonTools/Egamma/interface/EffectiveAreas.h"
 
 #include "DataFormats/Common/interface/TriggerResults.h"
 #include "DataFormats/HepMCCandidate/interface/GenParticle.h"
@@ -168,6 +169,8 @@ private:
     bool isData_;
     bool hasGenZ_;
     bool hasGenTt_;
+
+    bool store_roccor_;
     
     bool store_muons_;
     bool store_electrons_;
@@ -374,6 +377,14 @@ ZCountingAOD::ZCountingAOD(const edm::ParameterSet& iConfig):
     v_pdfWeightIDs_ = iConfig.getParameter<std::vector<int>>("pdfWeights");
 
     roccorFile = iConfig.getParameter<std::string>("roccorFile");
+    if(roccorFile == "None"){
+        edm::LogVerbatim("ZCountingAOD") << "No valid file for Rochester corrections, continue without";
+        store_roccor_ = false;
+    }
+    else{
+        edm::LogVerbatim("ZCountingAOD") << "Use following file for Rochester corrections:"<<roccorFile;
+        store_roccor_ = true;
+    }
 
     hltChanged_ = true;
     emulateTrigger_ = iConfig.getUntrackedParameter<bool>("emulateTrigger");
@@ -752,7 +763,7 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
                 }
                 muon_triggerBits_.push_back(bits_);   
                 
-                if(roccorFile != "None"){
+                if(store_roccor_){
                     double roccorSF = 1.; // Rochester correction
                     if(!iEvent.isRealData()){
                 
@@ -784,9 +795,6 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
                 
                     // Rochester corrections 
                     muon_ScaleCorr_.push_back(roccorSF);
-                }
-                else{
-                    muon_ScaleCorr_.push_back(1.0);
                 }
             }
             else{
@@ -910,7 +918,7 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
             track_validFraction_.push_back(trk.validFraction());
             track_trackAlgo_.push_back(trk.originalAlgo());
             
-            if(roccorFile != "None"){
+            if(store_roccor_){
                 double roccorSF = 1.; // Rochester correction
                 if(!iEvent.isRealData()){
         
@@ -932,9 +940,7 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
                 // Rochester corrections 
                 track_ScaleCorr_.push_back(roccorSF);            
             }
-            else{
-                track_ScaleCorr_.push_back(1.0);
-            }
+
             nTrack_++;
         }    
 
@@ -1120,11 +1126,11 @@ void
 ZCountingAOD::beginJob()
 {
     LogDebug("ZCountingAOD")<<"beginJob()";
-    if(roccorFile != "None"){
+    if(store_roccor_){
         rc.init(edm::FileInPath(roccorFile).fullPath());
+        rand_ = TRandom3();
+        rand_.SetSeed(1);
     }
-    rand_ = TRandom3();
-    rand_.SetSeed(1);
     
     if( !fs ){
         edm::LogError("ZCountingAOD") << "TFile Service is not registered in cfg file";
@@ -1244,13 +1250,43 @@ ZCountingAOD::beginJob()
 
 
         //Roccester corrections
-        tree_->Branch("Muon_ScaleCorr",          &muon_ScaleCorr_);
-        // tree_->Branch("Muon_ScaleCorr_stat_RMS", &muon_ScaleCorr_stat_RMS_);
-        // tree_->Branch("Muon_ScaleCorr_Zpt",      &muon_ScaleCorr_Zpt_);
-        // tree_->Branch("Muon_ScaleCorr_Ewk",      &muon_ScaleCorr_Ewk_);
-        // tree_->Branch("Muon_ScaleCorr_deltaM",   &muon_ScaleCorr_deltaM_);
-        // tree_->Branch("Muon_ScaleCorr_Ewk2",     &muon_ScaleCorr_Ewk2_);
-        // tree_->Branch("Muon_ScaleCorr_Total",    &muon_ScaleCorr_Total_);        
+        if(store_roccor_){
+            tree_->Branch("Muon_ScaleCorr",          &muon_ScaleCorr_);
+            // tree_->Branch("Muon_ScaleCorr_stat_RMS", &muon_ScaleCorr_stat_RMS_);
+            // tree_->Branch("Muon_ScaleCorr_Zpt",      &muon_ScaleCorr_Zpt_);
+            // tree_->Branch("Muon_ScaleCorr_Ewk",      &muon_ScaleCorr_Ewk_);
+            // tree_->Branch("Muon_ScaleCorr_deltaM",   &muon_ScaleCorr_deltaM_);
+            // tree_->Branch("Muon_ScaleCorr_Ewk2",     &muon_ScaleCorr_Ewk2_);
+            // tree_->Branch("Muon_ScaleCorr_Total",    &muon_ScaleCorr_Total_);         
+        }
+
+        // tracks
+        tree_->Branch("nTrack", &nTrack_,"nTrack_/s");
+        tree_->Branch("Track_pt", &track_pt_);
+        tree_->Branch("Track_eta", &track_eta_);
+        tree_->Branch("Track_phi", &track_phi_);
+        tree_->Branch("Track_charge", &track_charge_);
+        
+        tree_->Branch("Track_dxyPV", &track_dxyPV_);
+        tree_->Branch("Track_dzPV", &track_dzPV_);       
+        tree_->Branch("Track_dxyPVmin", &track_dxyPVmin_);  
+        tree_->Branch("Track_dzPVmin", &track_dzPVmin_);  
+        
+        tree_->Branch("Track_dx", &track_dx_);
+        tree_->Branch("Track_dy", &track_dy_);
+        tree_->Branch("Track_dz", &track_dz_);
+        tree_->Branch("Track_DxyError", &track_DxyError_);
+        tree_->Branch("Track_DzError", &track_DzError_);
+
+        tree_->Branch("Track_nPixelHits", &track_nPixelHits_);
+        tree_->Branch("Track_nTrackerLayers", &track_nTrackerLayers_);
+        tree_->Branch("Track_validFraction", &track_validFraction_);
+        tree_->Branch("Track_trackAlgo", &track_trackAlgo_);
+
+        //Roccester corrections
+        if(store_roccor_){
+            tree_->Branch("Track_ScaleCorr", &track_ScaleCorr_);
+        }
     }
 
     if(store_electrons_){
@@ -1287,33 +1323,6 @@ ZCountingAOD::beginJob()
         tree_->Branch("Supercluster_eta", &supercluster_eta_);
         tree_->Branch("Supercluster_phi", &supercluster_phi_);
     }
-    
-    // tracks
-    tree_->Branch("nTrack", &nTrack_,"nTrack_/s");
-    tree_->Branch("Track_pt", &track_pt_);
-    tree_->Branch("Track_eta", &track_eta_);
-    tree_->Branch("Track_phi", &track_phi_);
-    tree_->Branch("Track_charge", &track_charge_);
-    
-    tree_->Branch("Track_dxyPV", &track_dxyPV_);
-    tree_->Branch("Track_dzPV", &track_dzPV_);       
-    tree_->Branch("Track_dxyPVmin", &track_dxyPVmin_);  
-    tree_->Branch("Track_dzPVmin", &track_dzPVmin_);  
-    
-    tree_->Branch("Track_dx", &track_dx_);
-    tree_->Branch("Track_dy", &track_dy_);
-    tree_->Branch("Track_dz", &track_dz_);
-    tree_->Branch("Track_DxyError", &track_DxyError_);
-    tree_->Branch("Track_DzError", &track_DzError_);
-
-    tree_->Branch("Track_nPixelHits", &track_nPixelHits_);
-    tree_->Branch("Track_nTrackerLayers", &track_nTrackerLayers_);
-    tree_->Branch("Track_validFraction", &track_validFraction_);
-    tree_->Branch("Track_trackAlgo", &track_trackAlgo_);
-
-    //Roccester corrections
-    tree_->Branch("Track_ScaleCorr", &track_ScaleCorr_);
-    
 }
 
 // ------------ method called once each job just after ending the event loop  ------------

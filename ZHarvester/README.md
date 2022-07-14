@@ -38,9 +38,3 @@ The script submit\_ZCounting can be used to run ZCounting.py on HTCondor.
 
 ## Plotting
 The script cronMakePlots can be used to produce nice plots. The csv files from ZCounting.py output (and the ones from ATLAS) have to be specified. 
-
-
-## Useful Links
-- https://jsalfeld.web.cern.ch/jsalfeld/Z-Counting/
-- https://dwalter.web.cern.ch/dwalter/ZCounting/
-- https://indico.cern.ch/event/807367/contributions/3360470/attachments/1814586/2965226/ZCounting.pdf
