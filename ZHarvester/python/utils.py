@@ -1,7 +1,14 @@
 
 # ------------------------------------------------------------------------------
-## load input by lumisection CSV file, convert it and return the data 
 def load_input_csv(byLS_data):
+    """
+    load input by lumisection CSV file, convert it and return the data 
+    
+    Parameters
+    ----------
+    byLS_data : str
+        path to the file by lumisection CSV file
+    """
 
     import pandas as pd
     
@@ -32,15 +39,67 @@ def load_input_csv(byLS_data):
     return byLS_data
 
 # ------------------------------------------------------------------------------
+def getFileName(directory, run):
+    """
+    Get root file with histograms
+    
+    Parameters
+    ----------
+    directory : str
+        directory where the root files are stored
+    run : integer
+        run number for the rootfile to load
+    """
+    import glob
+    
+    # check if run was processed already
+    eosFileList = glob.glob(directory + '/*' + str(run) + '*.root')
+    if not len(eosFileList) > 0:
+        # look one level deeper
+        eosFileList = glob.glob(directory + '/*/*' + str(run) + '*.root')
+    if not len(eosFileList) > 0:
+        print(" The file does not (yet) exist for run: " + str(run))
+        return None
+        
+    elif len(eosFileList) > 1:
+        print(" Multiple files found for run: " + str(run))
+        return None
+    else:
+        return eosFileList[0]
+
+# ------------------------------------------------------------------------------
 def load_histogram(
-    name,      # name of the histogram to load
-    fileName,  # file where the histogram is stored
-    lumisections=[0,], # list of lumisections
+    name,
+    fileName,
+    lumisections=[0,],
     run=0, 
     prefix="", suffix="", 
     MassBin=50, MassMin=66, MassMax=116, 
     pileup=False
 ):
+    """
+    load 2D histograms, project the specified lumisections to the mass axis: 
+    - if pileup=False with (mass, lumisections); rebinning possible
+    - if pileup=True, (PU, lumisections)
+    
+    Parameters
+    ----------
+    name : str
+        name of the histogram to load
+    fileName : str
+        file where the histogram is stored
+    lumisections : list
+        list of lumisections that are taken from the histogram
+    run : integer
+        run number 
+    prefix/suffix : str
+        prefix for naming         
+    MassBin/MassMin/MassMax : int
+        For rebinning, Number of bins / Lower bound / Upper bound 
+    pileup : Boolean
+        If the pileup histogram is to be returned
+    """
+
     import ROOT 
     
     file_ = ROOT.TFile(fileName)
@@ -76,8 +135,80 @@ def load_histogram(
     return hNew
 
 # ------------------------------------------------------------------------------
-## Collect "by LS" and "by measurement" csv files and write big csv file
+def get_ls_for_next_measurement(lumisections, luminosities=None, lumiPerMeasurement=20, lsPerMeasurement=100):
+    """
+    generator that takes the set of lumisections that are process 
+    and yields slizes of lists of these lumisections 
+    that should be used in the next measurement. 
+    It can be run in two modes: 
+    - If the parameter `luminosities` is not specified, the number of lsPerMeasurement is taken as criteria
+    - If the parameter `luminosities` is specified, the amount of lumiPerMeasurementis taken as criteria
+    
+    Parameters
+    ----------
+    lumisections : list
+        The list of lumisections that are going to be processed
+    luminosities : list, optional
+        The list of luminosity in \pb for each lumisection. 
+    lumiPerMeasurement : float, optional
+        The amount of luminosity in \pb required for a measurement
+    lsPerMeasurement : int, optional
+        The number of lumisections required for a measurement
+    """
+            
+    lumisections = [l for l in lumisections]
+    
+    if luminosities is None:
+        # make measurement based on number of lumisections
+        lumibased=False
+    else:
+        lumibased=True
+        luminosities = [l for l in luminosities]
+        if len(lumisections) != len(luminosities):
+            print("ERROR, same length of lumisections and luminosities is required!")
+        
+    while len(lumisections) > 0:
+        
+        # merge data to one measuement if remaining luminosity is too less for two measuements
+        if lumibased:
+            mergeMeasurements_ = sum(luminosities) < 1.5 * lumiPerMeasurement
+        else:
+            mergeMeasurements_ = len(lumisections) < 1.5 * lsPerMeasurement        
+        
+        recLumi_ = 0
+        # produce list_good_ls_ with lumisections that are used for one measurement
+        list_good_ls_ = []
+        while len(lumisections) > 0:
+            list_good_ls_.append(lumisections[0])
+            del lumisections[0]
+
+            if lumibased:
+                recLumi_ += luminosities[0]
+                del luminosities[0]
+                
+                # if we have collected enough luminosity
+                if not mergeMeasurements_ and recLumi_ >= lumiPerMeasurement:
+                    break
+            else:
+                # if we have collected enough luminosity sections
+                if not mergeMeasurements_ and len(list_good_ls_) >= lsPerMeasurement:
+                    break
+                
+        yield list_good_ls_
+
+# ------------------------------------------------------------------------------
 def writeSummaryCSV(outCSVDir, writeByLS=True):
+    """
+    Collect "by LS" (and "by measurement") csv files and write one big csv file
+    
+    Parameters
+    ----------
+    outCSVDir : str
+        Directory where the csv files of each run are located
+    writeByLS : boolean, optional
+        Boolean if a summary should be created for csv files that contain the Z rates for each lumisection
+    """
+
     import logging as log
     import pandas as pd
     import glob
@@ -106,6 +237,58 @@ def writeSummaryCSV(outCSVDir, writeByLS=True):
 
         with open(outCSVDir + '/Mergedcsvfile_perLS.csv', 'w') as file:
             df_merged.to_csv(file, index=False)
+
+# ------------------------------------------------------------------------------
+def getEra(run):        
+    """
+    return the era for a given run number
+    
+    Parameters
+    ----------
+    run : int
+        Drun number
+    """
+
+    if run <= 271658:
+        return "Run2016A"
+    if run <= 275376:
+        return "Run2016B"        
+    if run <= 276283:
+        return "Run2016C"
+    if run <= 276811:
+        return "Run2016D"
+    if run <= 277420:
+        return "Run2016E"
+    if run <= 278808:
+        return "Run2016F"        
+    if run <= 280385:
+        return "Run2016G"
+    if run <= 284044:
+        return "Run2016H"        
+    if run <= 297019:
+        return "Run2017A"
+    if run <= 299329:
+        return "Run2017B"        
+    if run <= 302029:
+        return "Run2017C"
+    if run <= 303434:
+        return "Run2017D"
+    if run <= 304826:
+        return "Run2017E"
+    if run <= 306462:
+        return "Run2017F"        
+    if run <= 306826:
+        return "Run2017G"
+    if run <= 307082:
+        return "Run2017H"           
+    if run <= 316995:
+        return "Run2018A"
+    if run <= 319312:
+        return "Run2018B"        
+    if run <= 320393:
+        return "Run2018C"
+    if run <= 325273:
+        return "Run2018D"        
 
 # ------------------------------------------------------------------------------
 def chart_to_js(_chart, _name, _data="data.csv"):

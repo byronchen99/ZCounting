@@ -9,7 +9,7 @@ import pdb
 import uncertainties as unc
 import gc
 
-from python.utils import writeSummaryCSV
+from python.utils import writeSummaryCSV, getEra, getFileName, load_input_csv
 
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
 from ZUtils.python.utils import to_RootTime, getMCCorrection, unorm, pquad, plinear
@@ -123,97 +123,7 @@ def extract_results(directory, m, cIO):
     res["zDel"] = res["zReco"] * cIO**2 / (res["Seleff"] * res["Gloeff"] * res["Staeff"])**2
 
     return res
-
-
-# ------------------------------------------------------------------------------
-## Get root file with histograms
-def getFileName(directory, run):
-    # check if run was processed already
-    log.info(" ===Checking input DQMIO.root file...")
-    eosFileList = glob.glob(directory + '/*/*' + str(run) + '*root')
-    if not len(eosFileList) > 0:
-        log.info(" The file does not yet exist for run: " + str(run))
-        return None
-    elif len(eosFileList) > 1:
-        log.info(" Multiple files found for run: " + str(run))
-        return None
-    else:
-        return eosFileList[0]
-
-def getEra(run):        
-    if run <= 271658:
-        return "Run2016A"
-    if run <= 275376:
-        return "Run2016B"        
-    if run <= 276283:
-        return "Run2016C"
-    if run <= 276811:
-        return "Run2016D"
-    if run <= 277420:
-        return "Run2016E"
-    if run <= 278808:
-        return "Run2016F"        
-    if run <= 280385:
-        return "Run2016G"
-    if run <= 284044:
-        return "Run2016H"        
-    if run <= 297019:
-        return "Run2017A"
-    if run <= 299329:
-        return "Run2017B"        
-    if run <= 302029:
-        return "Run2017C"
-    if run <= 303434:
-        return "Run2017D"
-    if run <= 304826:
-        return "Run2017E"
-    if run <= 306462:
-        return "Run2017F"        
-    if run <= 306826:
-        return "Run2017G"
-    if run <= 307082:
-        return "Run2017H"           
-    if run <= 316995:
-        return "Run2018A"
-    if run <= 319312:
-        return "Run2018B"        
-    if run <= 320393:
-        return "Run2018C"
-    if run <= 325273:
-        return "Run2018D"        
         
-        
-        
-        
-# ------------------------------------------------------------------------------
-## load input by lumisection CSV file, convert it and return the data 
-def load_input_csv(byLS_data):
-    log.info(" Loading input byls csv...")
-    byLS_file = open(str(byLS_filename))
-    byLS_lines = byLS_file.readlines()
-    byLS_data = pd.read_csv(byLS_filename, sep=',', low_memory=False,
-        skiprows=lambda x: byLS_lines[x].startswith('#') and not byLS_lines[x].startswith('#run'))
-        
-    log.info(" formatting csv file...")    # formatting the csv
-    byLS_data[['run', 'fill']] = byLS_data['#run:fill'].str.split(':', expand=True).apply(pd.to_numeric)
-    byLS_data['ls'] = byLS_data['ls'].str.split(':', expand=True)[0].apply(pd.to_numeric)
-    byLS_data = byLS_data.drop(['#run:fill', 'hltpath', 'source'], axis=1)
-
-    if 'delivered(/ub)' in byLS_data.columns.tolist():  # convert to /pb
-        byLS_data['delivered(/ub)'] = byLS_data['delivered(/ub)'].apply(lambda x: x / 1000000.)
-        byLS_data['recorded(/ub)'] = byLS_data['recorded(/ub)'].apply(lambda x: x / 1000000.)
-        byLS_data = byLS_data.rename(index=str, columns={'delivered(/ub)': 'delivered(/pb)', 'recorded(/ub)': 'recorded(/pb)'})
-    elif 'delivered(/fb)' in byLS_data.columns.tolist():  # convert to /pb
-        byLS_data['delivered(/fb)'] = byLS_data['delivered(/fb)'].apply(lambda x: x * 1000.)
-        byLS_data['recorded(/fb)'] = byLS_data['recorded(/fb)'].apply(lambda x: x * 1000.)
-        byLS_data = byLS_data.rename(index=str, columns={'delivered(/fb)': 'delivered(/pb)', 'recorded(/fb)': 'recorded(/pb)'})
-
-    # if there are multiple entries of the same ls (for example from different triggers), 
-    #   only keep the one with the highest luminosity.
-    byLS_data = byLS_data.sort_values(['fill', 'run', 'ls', 'delivered(/pb)', 'recorded(/pb)'])
-    byLS_data = byLS_data.drop_duplicates(['fill', 'run', 'ls'])
-    
-    return byLS_data
 
 ################################################################################
 if __name__ == '__main__':
