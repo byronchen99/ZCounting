@@ -21,7 +21,7 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--production-json', dest='production_json', action='store', default='', required=False,
                         help='path to input production .json file (necessary only when running with --hadd)')
 
-    parser.add_argument('--Tier2-prepath', dest='Tier2_prepath', action='store', default='/pnfs/desy.de/cms/tier2',
+    parser.add_argument('--Tier2-prepath', dest='Tier2_prepath', action='store', default='/eos/cms',
                         help='path to /store/ directory on local Tier-2')
 
     parser.add_argument('--repeat', dest='repeat', action='store_true', default=False,
