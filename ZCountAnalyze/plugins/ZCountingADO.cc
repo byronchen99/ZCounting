@@ -110,7 +110,7 @@ private:
     float getMinDxy(const reco::Track &trk, const std::vector<reco::Vertex> &pvCol);
     float getMinDz(const reco::Track &trk, const std::vector<reco::Vertex> &pvCol);
 
-    int getMuonID(const reco::Muon&, const reco::Vertex&);
+    int getMuonID(const reco::Muon*, const reco::Vertex*);
         
     bool isMuonTriggerObjEmulated(const double eta, const double phi, const long long unsigned eventNumber);
 
@@ -573,7 +573,7 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     edm::Handle<std::vector<reco::Vertex> > pvCollection;
     iEvent.getByToken(pvCollection_, pvCollection);
     const std::vector<reco::Vertex> *pvCol = pvCollection.product();
-    const reco::Vertex *pv = 0;
+    const reco::Vertex *pv = NULL;
     nPV_ = 0;
     for (const reco::Vertex &itVtx : *pvCol) {
         if(!isGoodPV(itVtx))
@@ -731,7 +731,7 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
                 
                 muon_tkRelIso_.push_back(getTkIso(*mu));
                 muon_pfRelIso04_all_.push_back(getPFIso(*mu));
-                muon_ID_.push_back(getMuonID(*mu, *pv));
+                muon_ID_.push_back(getMuonID(mu, pv));
                 
                 muon_isMedium_.push_back(muon::isMediumMuon(*mu));
                 muon_isTracker_.push_back(mu->isTrackerMuon());
@@ -1545,12 +1545,12 @@ float ZCountingAOD::getMinDz(const reco::Track &trk, const std::vector<reco::Ver
 }
 
 //--------------------------------------------------------------------------------------------------
-int ZCountingAOD::getMuonID(const reco::Muon &mu, const reco::Vertex &vtx){
-    if(muon::isTightMuon(mu, vtx) ) return 5;
-    if(isCustomTightMuon(mu)) return 4;
-    if(mu.isGlobalMuon()) return 3;
-    if(mu.isStandAloneMuon()) return 2;
-    if(isValidTrack(*(mu.innerTrack()))) return 1;
+int ZCountingAOD::getMuonID(const reco::Muon *mu, const reco::Vertex *vtx){
+    if(vtx!=nullptr && muon::isTightMuon(*mu, *vtx) ) return 5;
+    if(isCustomTightMuon(*mu)) return 4;
+    if(mu->isGlobalMuon()) return 3;
+    if(mu->isStandAloneMuon()) return 2;
+    if(isValidTrack(*(mu->innerTrack()))) return 1;
     return 0;
 }
 
