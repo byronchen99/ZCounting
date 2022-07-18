@@ -9,7 +9,7 @@ import pdb
 import uncertainties as unc
 import gc
 
-from python.utils import writeSummaryCSV, getEra, getFileName, load_input_csv
+from python.utils import writeSummaryCSV, getEra, getFileName, load_input_csv, get_ls_for_next_measurement
 
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
 from ZUtils.python.utils import to_RootTime, getMCCorrection, unorm, pquad, plinear
@@ -317,7 +317,7 @@ if __name__ == '__main__':
     results = []
     mergeNextRun=False
     log.info(" === Looping over runs... {0} to {1}".format(int(args.beginRun), int(args.endRun)))
-    for run, data_run in byLS_data.groupby('run'):
+    for run, byLS_run in byLS_data.groupby('run'):
 
         if run < int(args.beginRun) or run >= int(args.endRun):
             continue
@@ -327,8 +327,8 @@ if __name__ == '__main__':
             firstRun = run
         lastRun = run
 
-        fill = data_run.drop_duplicates('fill')['fill'].values[0]
-        LSlist = data_run['ls'].values.tolist()
+        fill = byLS_run.drop_duplicates('fill')['fill'].values[0]
+        LSlist = byLS_run['ls'].values.tolist()
 
         log.info(" === Running Fill {0}".format(fill))
         log.info(" === Running Run {0}".format(run))
@@ -341,20 +341,27 @@ if __name__ == '__main__':
             log.warning(" === No file or more than one was found! - continue")
             log.warning(" === Was looking for: {}".format(eosFile))            
             continue
+        file_ = ROOT.TFile(eosFile,"READ")
 
+        # trees with muon pairs
+        tHLT = file_.Get("HLT")
+        tSel = file_.Get("Sel")
+        tGlo = file_.Get("Glo")
+        tSta = file_.Get("Sta")
+
+        Lumilist = byLS_run.loc[byLS_run['ls'].isin(LSlist)]['recorded(/pb)'].values.tolist()
+        ZCountlist = [tHLT.GetEntries("lumiBlock=={0}".format(l))
+            + tSel.GetEntries("lumiBlock=={0}".format(l)) 
+            + tSta.GetEntries("lumiBlock=={0}".format(l)) for l in LSlist]
+
+        log.debug(" === Have lumi secion list {0}".format(LSlist))        
         log.info(" === Looping over measurements...")
-        m = 0
-        while len(LSlist) > 0:  # begin next measurement "m"
-            log.debug(" === Have lumi secion list {0}".format(LSlist))
-            
-            # trees with muon pairs
-            file_ = ROOT.TFile(eosFile,"READ")
+        for m, goodLSlist in enumerate(
+            get_ls_for_next_measurement(lumisections=LSlist, luminosities=Lumilist, zcounts=ZCountlist, 
+                lumiPerMeasurement=LumiPerMeasurement)
+        ):
+            log.debug(" === Selected lumi secion list {0}".format(goodLSlist))
 
-            tHLT = file_.Get("HLT")
-            tSel = file_.Get("Sel")
-            tGlo = file_.Get("Glo")
-            tSta = file_.Get("Sta")
-            
             # histograms need to be in same directory so that they can get filled
             hPV.SetDirectory(file_)
             h2HLT.SetDirectory(file_)
@@ -368,46 +375,16 @@ if __name__ == '__main__':
             
             hStapass.SetDirectory(file_)
             hStafail.SetDirectory(file_)
-
-            # merge data to one measuement if remaining luminosity is too less for two measuements
-            mergeMeasurements = sum(
-                data_run.loc[data_run['ls'].isin(LSlist)]['recorded(/pb)'].values) < 1.5 * LumiPerMeasurement
-
-            # produce goodLSlist with ls that are used for one measurement
-            goodLSlist = []
-            while len(LSlist) > 0:
-                iLumi = (data_run[data_run['ls'] == LSlist[0]]['recorded(/pb)'].values)[0]
-
-                # consider lumisections where we would expect to have at least any count 
-                #   (for lumi > 0.01 /pb we expect 0.01*500 = 5 Z bosons, the probability to find 0 is < 1%)
-                #   (for lumi > 0.02 /pb we expect 0.02*500 = 10 Z bosons, the probability to find 0 is < 0.01%)
-                # sort out lumisections without any Z candidate (maybe trigger was off)
-                if iLumi > 0.02 and (tHLT.GetEntries("lumiBlock=={0}".format(LSlist[0])) # 
-                    +tSel.GetEntries("lumiBlock=={0}".format(LSlist[0]))
-                    # +tTrk.GetEntries("lumiBlock=={0}".format(LSlist[0]))
-                    +tSta.GetEntries("lumiBlock=={0}".format(LSlist[0]))) == 0:
-                    log.warning(" === Zero Z boson candidates found while we would expect {0} -> skip run|lumi section {1}|{2}".format(iLumi*500, run, LSlist[0]))
-                    del LSlist[0]
-                    continue
-
-                goodLSlist.append(LSlist[0])
-                recLumi += iLumi
-                del LSlist[0]
-                # if we have enough collected lumisections
-                if not mergeMeasurements and recLumi >= LumiPerMeasurement:
-                    break            
-
-            # create dataframe with one entry per LS
-            new_df = data_run.loc[data_run['ls'].isin(goodLSlist)]
-
-            log.debug(" === Selected lumi secion list {0}".format(goodLSlist))
-
+                    
+            # create datafram byLS for measurement
+            byLS_m = byLS_run.loc[byLS_run['ls'].isin(goodLSlist)]
+            
             ### fill histograms
 
             # define acceptance cuts
             acceptance = " && mass>={0} && mass<{1} && ptTag > {2} && ptProbe > {2}".format(MassMin_, MassMax_, args.ptCut)
 
-            log.info(" === Fill histograms...")                        
+            log.info(" === Fill histograms for measurement {0} ...".format(m))                        
             for iLS in goodLSlist:
                     
                 tHLT.Draw("nPV>>+h_PV","lumiBlock=={0}".format(iLS))
@@ -434,15 +411,18 @@ if __name__ == '__main__':
                 n2 = n2After - n2Before
                 n1 = n1After - n1Before
 
-                new_df.loc[new_df['ls'] == iLS, 'N2HLT'] = n2
-                new_df.loc[new_df['ls'] == iLS, 'N1HLT'] = n1                    
+                byLS_m.loc[byLS_m['ls'] == iLS, 'N2HLT'] = n2
+                byLS_m.loc[byLS_m['ls'] == iLS, 'N1HLT'] = n1                    
 
             if df is None:
-                df = new_df
+                df = byLS_m
             else:
-                df = df.append(new_df, sort=False)
+                df = df.append(byLS_m, sort=False)
+            
+            recLumi = df['recorded(/pb)'].sum()
 
-            print("have now {0} | {1} events".format(df['N2HLT'].sum(), h2HLT.Integral()))
+            log.info(" === Have now recorded lumi = {0}".format(recLumi))            
+            log.info(" === Have now {0} | {1} events".format(df['N2HLT'].sum(), h2HLT.Integral()))
             log.info(" === Histograms filled ...")  
             
             # check if upcoming runs make enough data for a measurement
@@ -462,8 +442,6 @@ if __name__ == '__main__':
                     break
             
             mergeNextRun = nextRun < int(args.endRun) and (mergeNextRun or recLumi < 0.5 * LumiPerMeasurement or args.inclusive)            
-            
-            log.info(" === Have now recorded lumi = {0} | {1}".format(recLumi, df['recorded(/pb)'].sum()))
 
             if mergeNextRun:
                 continue
@@ -516,10 +494,10 @@ if __name__ == '__main__':
             hPV.Reset()
             
             result = extract_results(outSubDir, m, cIO)
-
+            
             if result:
                 df['time'] = df['time'].apply(lambda x: to_RootTime(x, currentYear))
-
+            
                 result.update({
                     "fill": fill,
                     "run": run,
@@ -531,28 +509,26 @@ if __name__ == '__main__':
                     "timewindow": len(df) * secPerLS,
                     "pileUp": df['avgpu'].mean()
                 })
-
+            
                 results.append(result)
             else:
                 log.info(" === No result - continue")
             
             # prepare for next measurement
-            recLumi = 0     # reset lumi count
             df=None
-            m += 1
 
         if mergeNextRun:
             continue
+        
+        if measurement is None or measurement == m:
+            ## Write per measurement csv file - one per run
+            log.info(" === Writing per Run CSV file")
+            results = pd.concat([pd.DataFrame([result]) for result in results], ignore_index=True, sort=False)
+
+            with open(outCSVDir + '/csvfile{0}.csv'.format(run), 'w') as file:
+                results.to_csv(file, index=False)
 
         firstRun = 0
-
-        ## Write per measurement csv file - one per run
-        log.info(" === Writing per Run CSV file")
-        results = pd.concat([pd.DataFrame([result]) for result in results], ignore_index=True, sort=False)
-
-        with open(outCSVDir + '/csvfile{0}.csv'.format(run), 'w') as file:
-            results.to_csv(file, index=False)
-
         results = []
 
 

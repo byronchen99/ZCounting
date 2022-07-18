@@ -17,7 +17,7 @@ def load_input_csv(byLS_data):
     byLS_data = pd.read_csv(byLS_data, sep=',', low_memory=False,
         skiprows=lambda x: byLS_lines[x].startswith('#') and not byLS_lines[x].startswith('#run'))
         
-    print(" formatting csv file...")    # formatting the csv
+    print("INFO:  === formatting csv file...")    # formatting the csv
     byLS_data[['run', 'fill']] = byLS_data['#run:fill'].str.split(':', expand=True).apply(pd.to_numeric)
     byLS_data['ls'] = byLS_data['ls'].str.split(':', expand=True)[0].apply(pd.to_numeric)
     byLS_data = byLS_data.drop(['#run:fill', 'hltpath', 'source'], axis=1)
@@ -58,11 +58,11 @@ def getFileName(directory, run):
         # look one level deeper
         eosFileList = glob.glob(directory + '/*/*' + str(run) + '*.root')
     if not len(eosFileList) > 0:
-        print(" The file does not (yet) exist for run: " + str(run))
+        print("WARNING: === The file does not (yet) exist for run: " + str(run))
         return None
         
     elif len(eosFileList) > 1:
-        print(" Multiple files found for run: " + str(run))
+        print("WARNING: === Multiple files found for run: " + str(run))
         return None
     else:
         return eosFileList[0]
@@ -135,7 +135,11 @@ def load_histogram(
     return hNew
 
 # ------------------------------------------------------------------------------
-def get_ls_for_next_measurement(lumisections, luminosities=None, lumiPerMeasurement=20, lsPerMeasurement=100):
+def get_ls_for_next_measurement(
+    lumisections, luminosities=None, zcounts=None, 
+    lumiPerMeasurement=20, lsPerMeasurement=100, 
+    threshold = 0.02
+):
     """
     generator that takes the set of lumisections that are process 
     and yields slizes of lists of these lumisections 
@@ -150,27 +154,27 @@ def get_ls_for_next_measurement(lumisections, luminosities=None, lumiPerMeasurem
         The list of lumisections that are going to be processed
     luminosities : list, optional
         The list of luminosity in \pb for each lumisection. 
+    zcounts : list, optional
+        The list of z boson counts for each lumisection.     
     lumiPerMeasurement : float, optional
         The amount of luminosity in \pb required for a measurement
     lsPerMeasurement : int, optional
         The number of lumisections required for a measurement
+    threshold : float, optional
+        If the luminosity in one lumisection is above this value and the number z counts is zero, the ls is skipped 
     """
-            
-    lumisections = [l for l in lumisections]
     
-    if luminosities is None:
+    
+    
+    if luminosities:
         # make measurement based on number of lumisections
-        lumibased=False
-    else:
-        lumibased=True
-        luminosities = [l for l in luminosities]
         if len(lumisections) != len(luminosities):
-            print("ERROR, same length of lumisections and luminosities is required!")
+            print("ERROR:  === Same length of lumisections and luminosities is required!")
         
     while len(lumisections) > 0:
         
         # merge data to one measuement if remaining luminosity is too less for two measuements
-        if lumibased:
+        if luminosities:
             mergeMeasurements_ = sum(luminosities) < 1.5 * lumiPerMeasurement
         else:
             mergeMeasurements_ = len(lumisections) < 1.5 * lsPerMeasurement        
@@ -179,12 +183,29 @@ def get_ls_for_next_measurement(lumisections, luminosities=None, lumiPerMeasurem
         # produce list_good_ls_ with lumisections that are used for one measurement
         list_good_ls_ = []
         while len(lumisections) > 0:
+            
+            if luminosities and zcounts:
+                # consider lumisections where we would expect to have at least any z count 
+                #   (for lumi > 0.01 /pb we expect 0.01*500 = 5 Z bosons, the probability to find 0 is < 1%)
+                #   (for lumi > 0.02 /pb we expect 0.02*500 = 10 Z bosons, the probability to find 0 is < 0.01%)
+                # sort out lumisections without any Z candidate (maybe trigger was off)
+                if luminosities[0] > threshold and zcounts[0] == 0:
+                    print("WARNING:  === Zero Z boson candidates found {0}/pb while we would expect {1} -> skip lumi section {2}".format(luminosities[0], luminosities[0]*500, lumisections[0]))
+                    del lumisections[0]
+                    del luminosities[0]
+                    del zcounts[0]
+                    continue
+
             list_good_ls_.append(lumisections[0])
             del lumisections[0]
-
-            if lumibased:
+            
+            if zcounts:
+                del zcounts[0]
+                
+            if luminosities:
                 recLumi_ += luminosities[0]
                 del luminosities[0]
+
                 
                 # if we have collected enough luminosity
                 if not mergeMeasurements_ and recLumi_ >= lumiPerMeasurement:
@@ -213,7 +234,7 @@ def writeSummaryCSV(outCSVDir, writeByLS=True):
     import pandas as pd
     import glob
     
-    print(" ===Writing overall CSV file")
+    print("INFO:  === Writing overall CSV file")
     rateFileList = sorted(glob.glob(outCSVDir + '/csvfile??????.csv'))
     df_merged = pd.concat([pd.read_csv(m) for m in rateFileList], ignore_index=True, sort=False)
 
@@ -221,7 +242,7 @@ def writeSummaryCSV(outCSVDir, writeByLS=True):
         df_merged.to_csv(file, index=False)
 
     if writeByLS:
-        print(" ===Writing overall CSV file per LS")
+        print("INFO:  ===Writing overall CSV file per LS")
         rateFileList = sorted(glob.glob(outCSVDir + '/csvfile*_*.csv'))
         csvList = []
         # add measurement label to the csv list
