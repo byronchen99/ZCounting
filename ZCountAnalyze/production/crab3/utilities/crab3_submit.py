@@ -118,7 +118,7 @@ if __name__ == '__main__':
 
                cfgf.write("\n")
                cfgf.write("config.section_('Site')\n")
-               cfgf.write("config.Site.storageSite = 'T2_DE_DESY'\n")
+               cfgf.write("config.Site.storageSite = 'T2_CH_CERN'\n")
 #               cfgf.write("config.Site.blacklist   = []\n")
 
                for i_key in crab3_conf:

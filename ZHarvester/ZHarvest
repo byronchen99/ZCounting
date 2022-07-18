@@ -5,7 +5,7 @@ import ROOT
 import os
 import pdb # python debugger might be helpful (see https://docs.python.org/3/library/pdb.html)
 
-from python.utils import load_input_csv, load_histogram
+from python.utils import load_input_csv, getFileName, get_ls_for_next_measurement, load_histogram
 
 ROOT.gROOT.SetBatch(True) # disable root prompts
 
@@ -59,72 +59,58 @@ for run, byLS_run in byLS_data.groupby('run'):
         continue
     
     fill = byLS_run.drop_duplicates('fill')['fill'].values[0]
-    LSlist = byLS_run.query('ls <= {0}'.format(maximumLS))['ls'].values.tolist()
+    LSlist = byLS_run.query(f'ls <= {maximumLS}')['ls'].values.tolist()
 
     # Consider only runs with a minimum number of LS
     if len(LSlist) <= minLSperRun:
-        print(f"Skip run {run} since it only has {len(LSlist)} LS".format(run, len(LSlist)))
+        print(f"Skip run {run} since it only has {len(LSlist)} lumisections")
         continue
     
     print(f"Now at run {run}")
-    fileName = dirDQM+f"/DQM_V0001_R000{run}__SingleMuon__Run2018D-12Nov2019_UL2018-v4__DQMIO.root"
-    
-    if not os.path.isfile(fileName):
-        print("WARNING: no DQM file found! continue with next run")
-        continue
+    fileName = getFileName(dirDQM,run)
 
-    print("Looping over measurements ...")
-    m = -1
-    while len(LSlist) > 0:  # begin next measurement "m"
-        m += 1
-        print(f"Now at measurement {m}")
-        
-        # merge data to one measuement if remaining luminosity is too less for two measuements
-        mergeMeasurements = sum(byLS_run.loc[byLS_run['ls'].isin(LSlist)]['recorded(/pb)'].values) < 1.5 * LumiPerMeasurement
+    Lumilist = byLS_run.loc[byLS_run['ls'].isin(LSlist)]['recorded(/pb)'].values.tolist()
 
-        recLumi = 0
-        # produce goodLSlist with ls that are used for one measurement
-        goodLSlist = []
-        while len(LSlist) > 0:
-            goodLSlist.append(LSlist[0])
-            recLumi += (byLS_run[byLS_run['ls'] == LSlist[0]]['recorded(/pb)'].values)[0]
-            del LSlist[0]
-            # if we have enough collected lumisections
-            if not mergeMeasurements and recLumi >= LumiPerMeasurement:# or len(goodLSlist) >= LSperMeasurement):
-                break
-        
+    print("Looping over measurements ...")    
+    for m, goodLSlist in enumerate(
+        get_ls_for_next_measurement(lumisections=LSlist, luminosities=Lumilist, lumiPerMeasurement=LumiPerMeasurement)
+    ):
+                
         # create datafram byLS for measurement
         byLS_m = byLS_run.loc[byLS_run['ls'].isin(goodLSlist)]
-        
+        recLumi = byLS_m['recorded(/pb)'].sum()
+
+        print(f"Measurement {m} with {recLumi}/pb lumi from {len(goodLSlist)} lumisections")
+            
         # get histograms from good lumisections
         def load(name_):
             return load_histogram(name_, fileName, goodLSlist, run=run, 
                 MassBin=nBinsMass, MassMin=massLo, MassMax=massHi, 
                 prefix=f"DQMData/Run {run}/ZCounting/Run summary/Histograms/", 
                 suffix="new")
-
+        
         print("Load histograms ...")
         h_mass_yield_Z = load("h_mass_yield_Z")
         
         h_HLT_pass = load("h_mass_HLT_pass_central")
         h_HLT_fail = load("h_mass_HLT_fail_central")
-
+        
         h_SIT_pass = load("h_mass_SIT_pass_central")
         h_SIT_fail = load("h_mass_SIT_fail_central")
-
+        
         h_Glo_pass = load("h_mass_Glo_pass_central")
         h_Glo_fail = load("h_mass_Glo_fail_central")
-
+        
         if etaRegion == "I":
             h_HLT_pass.Add(load("h_mass_HLT_pass_forward"))
             h_HLT_fail.Add(load("h_mass_HLT_fail_forward"))
-
+        
             h_SIT_pass.Add(load("h_mass_SIT_pass_forward"))
             h_SIT_fail.Add(load("h_mass_SIT_fail_forward"))
-
+        
             h_Glo_pass.Add(load("h_mass_Glo_pass_forward"))
             h_Glo_fail.Add(load("h_mass_Glo_fail_forward"))
-
+        
         if h_HLT_pass.Integral() == 0:
             print("WARNING: no Z candidates found! continue with next run")
             continue
@@ -133,23 +119,23 @@ for run, byLS_run in byLS_data.groupby('run'):
         if not os.path.isdir(dirOutSub):
             print(f"create output directory {dirOutSub}")
             os.mkdir(dirOutSub)
-            
+        
         ROOT.set_output(dirOutSub)
         ROOT.set_luminosity(recLumi)
-
+        
         print("Perform fits to calculate efficiencies")
         ROOT.calculateDataEfficiency(
             h_HLT_pass, h_HLT_fail,
             m, "HLT", etaRegion, 1, 6, 1, 6)
-
+        
         ROOT.calculateDataEfficiency(
             h_SIT_pass, h_SIT_fail,
             m, "SIT", etaRegion, 1, 6, 1, 6)
-
+        
         ROOT.calculateDataEfficiency(
             h_Glo_pass, h_Glo_fail,
             m, "Glo", etaRegion, 1, 6, 1, 6)            
-
+        
         print("Load fit results ...")
         
         def load_from_workspace(type_eff):
@@ -161,7 +147,7 @@ for run, byLS_run in byLS_data.groupby('run'):
             workspace = tfile_eff.Get("workspace")
             eff = workspace.var("eff").getVal()
             return eff
-
+        
         effHLT = load_from_workspace("HLT")
         effSIT = load_from_workspace("SIT")
         effGlo = load_from_workspace("Glo")
@@ -174,7 +160,7 @@ for run, byLS_run in byLS_data.groupby('run'):
         
         # delivered number of Zs given by efficiency corrected number of reconstructed Zs
         delZ = recoZ / (effTrigger * effSIT**2 * effGlo**2)
-
+        
         print(f"Delivered number of Zs = {delZ}")
         
         # for testing exit after two measurements
