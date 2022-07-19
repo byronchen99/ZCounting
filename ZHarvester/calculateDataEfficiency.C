@@ -1519,7 +1519,7 @@ void calculateDataEfficiency(
 
         i++;
 
-    } while(i < 4); // && best_chi2 > 2);
+    } while(i < 4 && best_chi2 > 2);
 
     // load best fit values into workspace
     w->loadSnapshot(("snapshot_"+std::to_string(best_fit)).c_str());

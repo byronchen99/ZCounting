@@ -218,7 +218,7 @@ def get_ls_for_next_measurement(
         yield list_good_ls_
 
 # ------------------------------------------------------------------------------
-def writeSummaryCSV(outCSVDir, writeByLS=True):
+def writeSummaryCSV(outCSVDir, outName="Mergedcsvfile", writeByLS=True, keys=None):
     """
     Collect "by LS" (and "by measurement") csv files and write one big csv file
     
@@ -237,8 +237,11 @@ def writeSummaryCSV(outCSVDir, writeByLS=True):
     print("INFO:  === Writing overall CSV file")
     rateFileList = sorted(glob.glob(outCSVDir + '/csvfile??????.csv'))
     df_merged = pd.concat([pd.read_csv(m) for m in rateFileList], ignore_index=True, sort=False)
-
-    with open(outCSVDir + '/Mergedcsvfile_perMeasurement.csv', 'w') as file:
+    
+    if keys:
+        df_merged = df_merged[keys]
+    
+    with open(outCSVDir + '/' + outName + '_perMeasurement.csv', 'w') as file:
         df_merged.to_csv(file, index=False)
 
     if writeByLS:
@@ -256,7 +259,7 @@ def writeSummaryCSV(outCSVDir, writeByLS=True):
 
         # df_merged = pd.concat([pd.read_csv(m) for m in rateFileList], ignore_index=True)
 
-        with open(outCSVDir + '/Mergedcsvfile_perLS.csv', 'w') as file:
+        with open(outCSVDir + '/' + outName + '_perLS.csv', 'w') as file:
             df_merged.to_csv(file, index=False)
 
 # ------------------------------------------------------------------------------

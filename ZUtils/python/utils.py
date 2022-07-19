@@ -81,7 +81,7 @@ def to_RootTime(time, currentYear):
     time =  time.split(" ")
     return ROOT.TDatime(currentYear, int(time[0].split("/")[0]),
                          int(time[0].split("/")[1]), int(time[1].split(":")[0]),
-                         int(time[1].split(":")[1]), int(time[1].split(":")[2])).Convert() + 7200
+                         int(time[1].split(":")[1]), int(time[1].split(":")[2])).Convert()
 
 def getMCCorrection(fIn):
     # input file has to be a picked dictionary with
