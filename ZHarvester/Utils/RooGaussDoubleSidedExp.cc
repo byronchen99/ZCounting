@@ -17,36 +17,43 @@
 #include "TMath.h" 
 #include "Math/ProbFuncMathCore.h"
 
-//ClassImp(RooGaussDoubleSidedExp) 
+ClassImp(RooGaussDoubleSidedExp);
 
 
 //_____________________________________________________________________________
-RooGaussDoubleSidedExp::RooGaussDoubleSidedExp(const char *name, const char *title, 
-					       RooAbsReal& _m,
-					       RooAbsReal& _m0,
-					       RooAbsReal& _sigma,
-					       RooAbsReal& _alphaLo,
-					       RooAbsReal& _alphaHi
-					       ) :
-  RooAbsPdf(name,title), 
-  m("m","m",this,_m),
-  m0("m0","m0",this,_m0),
-  sigma("sigma","sigma",this,_sigma),
-  alphaLo("alphaLo","alphaLo",this,_alphaLo),
-  alphaHi("alphaHi","alphaHi",this,_alphaHi)
-{ 
+RooGaussDoubleSidedExp::RooGaussDoubleSidedExp(
+    const char *name, 
+    const char *title, 
+    RooAbsReal& _m,
+    RooAbsReal& _m0,
+    RooAbsReal& _sigma,
+    RooAbsReal& _alphaLo,
+    RooAbsReal& _alphaHi
+):
+    RooAbsPdf(name,title), 
+    m("m","m",this,_m),
+    m0("m0","m0",this,_m0),
+    sigma("sigma","sigma",this,_sigma),
+    alphaLo("alphaLo","alphaLo",this,_alphaLo),
+    alphaHi("alphaHi","alphaHi",this,_alphaHi)
+{
+    std::cout<<"make RooGaussDoubleSidedExp 1"<<std::endl;
 } 
 
 
 //_____________________________________________________________________________
-RooGaussDoubleSidedExp::RooGaussDoubleSidedExp(const RooGaussDoubleSidedExp& other, const char* name) :  
-  RooAbsPdf(other,name), 
-  m("m",this,other.m),
-  m0("m0",this,other.m0),
-  sigma("sigma",this,other.sigma),
-  alphaLo("alphaLo",this,other.alphaLo),
-  alphaHi("alphaHi",this,other.alphaHi)
+RooGaussDoubleSidedExp::RooGaussDoubleSidedExp(
+    const RooGaussDoubleSidedExp& other, 
+    const char* name
+) :  
+    RooAbsPdf(other,name), 
+    m("m",this,other.m),
+    m0("m0",this,other.m0),
+    sigma("sigma",this,other.sigma),
+    alphaLo("alphaLo",this,other.alphaLo),
+    alphaHi("alphaHi",this,other.alphaHi)
 { 
+    std::cout<<"make RooGaussDoubleSidedExp 2"<<std::endl;
 } 
 
 

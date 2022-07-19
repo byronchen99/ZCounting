@@ -22,7 +22,7 @@ class RooGaussDoubleSidedExp : public RooAbsPdf {
 			 RooAbsReal& _alphaHi
 			 );
   RooGaussDoubleSidedExp(const RooGaussDoubleSidedExp& other, const char* name=0) ;
-  TObject* clone(const char* newname) const override { return new RooGaussDoubleSidedExp(*this,newname); }
+  inline TObject* clone(const char* newname) const override { return new RooGaussDoubleSidedExp(*this,newname); }
 
   inline ~RooGaussDoubleSidedExp() override { }
 

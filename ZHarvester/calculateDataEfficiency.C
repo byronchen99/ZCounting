@@ -17,9 +17,6 @@
 #include <TPad.h>
 #include <TLatex.h>
 
-#include "Utils/CPlot.hh"             // helper class for plots
-#include "Utils/MitStyleRemix.hh"         // style settings for drawing
-
 #include "Utils/ZMMSignals.hh"
 #include "Utils/ZMMBackgrounds.hh"
 #include "Utils/RooGaussDoubleSidedExp.h"
@@ -37,6 +34,9 @@
 #include "RooAddPdf.h"
 #include "RooFitResult.h"
 #include "RooExtendPdf.h"
+
+#include "RooPlot.h"
+#include "RooGlobalFunc.h"
 
 // constants
 
@@ -58,6 +58,9 @@ Float_t etaBound    = 0.9;
 
 Float_t ptCutTag = 30.;
 Float_t ptCutProbe = 30.;
+
+Float_t energy = 13.0;
+Float_t luminosity = 0.0;
 
 TString outputDir="";
 
@@ -104,9 +107,29 @@ void set_output(TString dir_){
     std::cout<<"Set output directory to "<<outputDir<<std::endl;
 }
 
-void set_luminosity(Float_t lumi_){
-    sprintf(lumitext,"%.1f pb^{-1}  at  #sqrt{s} = 13 TeV",lumi_);
+void set_lumienergy(Float_t lumi_, Float_t energy_){
+    energy = energy_;
+    luminosity = lumi_; 
+
+    if (static_cast<int>(energy) == energy) {
+        // int value
+        sprintf(lumitext,"%.1f pb^{-1}  at  #sqrt{s} = %i TeV", luminosity, static_cast<int>(energy));
+    }
+    else {
+        // non-integer value
+        sprintf(lumitext,"%.1f pb^{-1}  at  #sqrt{s} = %.1f TeV", luminosity, energy);
+    }    
 }
+
+void set_luminosity(Float_t lumi_){
+    set_lumienergy(lumi_, energy);
+}
+
+void set_energy(Float_t energy_){
+    set_lumienergy(luminosity, energy_);
+}
+
+
 
 //--------------------------------------------------------------------------------------------------
 // generate template for extraction of muon efficiency in barrel or endcap region
@@ -680,7 +703,7 @@ Double_t make_plot(
     //     bkgmodstr+= "_2";        
     // }
     // else 
-    if(effType == "HLT"){
+    if(effType == "yield"){
         // passstr = "HLT"+correlationFit;
         sigmodstr += "_"+std::to_string(passRegion);
         bkgmodstr += "_"+std::to_string(passRegion);
@@ -695,7 +718,7 @@ Double_t make_plot(
     else sprintf(binlabelx, "|#eta| < %.1f", etaCutTag);
 
 
-    if(effType == "HLT"){
+    if(effType == "yield"){
         sprintf(pname,"%s_%s_%s_%d", effType.Data(), etaRegion.Data(), std::to_string(passRegion).c_str(), iBin);
         sprintf(ctitle,"%s %s (%d) ", effType.Data(), std::to_string(passRegion).c_str(), iBin);
     }
@@ -705,11 +728,14 @@ Double_t make_plot(
     }
     
     if(eff != 0){
-        if(effType == "HLT")
-            sprintf(effstr,"#varepsilon^{#mu}_{HLT} = %.4f_{ -%.4f}^{ +%.4f}",eff->getVal(),std::abs(eff->getErrorLo()),eff->getErrorHi());
-        else
-            sprintf(effstr,"#varepsilon = %.4f_{ -%.4f}^{ +%.4f}",eff->getVal(),std::abs(eff->getErrorLo()),eff->getErrorHi());
-        
+        if(effType == "yield"){
+            sprintf(effstr,"#varepsilon^{#mu}_{HLT} = %.4f_{ -%.4f}^{ +%.4f}",
+                eff->getVal(),std::abs(eff->getErrorLo()),eff->getErrorHi());
+        }
+        else {
+            sprintf(effstr,"#varepsilon^{#mu}_{%s} = %.4f_{ -%.4f}^{ +%.4f}", 
+                effType.Data(), eff->getVal(), std::abs(eff->getErrorLo()), eff->getErrorHi());
+        }
     }
     if(corr != 0){
         if(corr->getErrorLo() == 0 || corr->getErrorHi() == 0)
@@ -726,11 +752,11 @@ Double_t make_plot(
     TCanvas *canvas = 0;
     TPad *pad1 = 0;
     if(plot_ratio){
-        canvas = MakeCanvas(pname, ctitle,800,800);
+        canvas = new TCanvas(pname, ctitle, 800,800);
         pad1 = new TPad("pad1", "pad1", 0., 0.35, 1, 1.0);
     }
     else{
-        canvas = MakeCanvas(pname, ctitle,800,540);
+        canvas = new TCanvas(pname, ctitle, 800, 540);
         pad1 = new TPad("pad1", "pad1", 0., 0.0, 1, 1.0);       
     }
 
@@ -748,6 +774,7 @@ Double_t make_plot(
 
     TLegend *legend = new TLegend(margin_left+0.04, 0.47, margin_left+0.36, 0.79);
     legend->SetNColumns(1);
+    legend->SetBorderSize(0);
 
     TLegendEntry *entry1 = new TLegendEntry();
     entry1->SetTextSize(textsize1);
@@ -755,6 +782,7 @@ Double_t make_plot(
     entry1->SetOption("PE");
     entry1->SetMarkerStyle(kFullCircle);
     entry1->SetMarkerColor(kBlack);
+    entry1->SetTextFont(42);
     entry1->SetTextAlign(12);
     legend->GetListOfPrimitives()->Add(entry1);
 
@@ -764,6 +792,7 @@ Double_t make_plot(
     entry4->SetOption("l");
     entry4->SetLineColor(2);
     entry4->SetLineWidth(2);
+    entry4->SetTextFont(42);
     entry4->SetTextAlign(12);
     legend->GetListOfPrimitives()->Add(entry4);
 
@@ -773,6 +802,7 @@ Double_t make_plot(
     entry2->SetOption("l");
     entry2->SetLineColor(8);
     entry2->SetLineWidth(2);
+    entry2->SetTextFont(42);
     entry2->SetTextAlign(12);
     legend->GetListOfPrimitives()->Add(entry2);
 
@@ -782,14 +812,15 @@ Double_t make_plot(
     entry3->SetOption("l");
     entry3->SetLineColor(9);
     entry3->SetLineWidth(2);
+    entry3->SetTextFont(42);
     entry3->SetTextAlign(12);
     legend->GetListOfPrimitives()->Add(entry3);
 
-    RooPlot *mframe = param_mass.frame(Bins(massBin));
-    data->plotOn(mframe, MarkerStyle(kFullCircle),MarkerSize(0.8),DrawOption("ZP"));
-    modelPdf->plotOn(mframe, Components(bkgmodstr), LineColor(8));
-    modelPdf->plotOn(mframe, Components(sigmodstr), LineColor(9));
-    modelPdf->plotOn(mframe, LineColor(kRed));
+    RooPlot *mframe = param_mass.frame(RooFit::Bins(massBin));
+    data->plotOn(mframe, RooFit::MarkerStyle(kFullCircle), RooFit::MarkerSize(0.8), RooFit::DrawOption("ZP"));
+    modelPdf->plotOn(mframe, RooFit::Components(bkgmodstr), RooFit::LineColor(8));
+    modelPdf->plotOn(mframe, RooFit::Components(sigmodstr), RooFit::LineColor(9));
+    modelPdf->plotOn(mframe, RooFit::LineColor(kRed));
 
     // Construct a histogram with the pulls of the data w.r.t the curve
     RooHist *hpull = mframe->pullHist();
@@ -884,7 +915,7 @@ Double_t make_plot(
 
         const double textsize2 = 28./(pad2->GetWh()*pad2->GetAbsHNDC());
 
-        RooPlot *rframe = param_mass.frame(Bins(massBin));
+        RooPlot *rframe = param_mass.frame(RooFit::Bins(massBin));
 
         rframe->SetTitle("");
         rframe->addPlotable(hpull, "PX");
@@ -916,82 +947,6 @@ Double_t make_plot(
     
     return resChi2;
 }
-
-/*
-//--------------------------------------------------------------------------------------------------
-// perform count for tag and probe efficiency
-std::vector<float> performCount(
-	TH1D *passHist,
-    TH1D *failHist,
-	const TString effType,
-    const TString etaRegion,
-    const Int_t iBin
-){
-
-    const Double_t npass  = passHist->Integral();
-    const Double_t ntotal = failHist->Integral() + npass;
-    const Double_t resEff  = (ntotal>0) ? npass/ntotal : 0;
-
-    // Calculate the boundaries for the frequentist Clopper-Pearson interval
-    const Double_t resErrl = resEff - TEfficiency::ClopperPearson((UInt_t)ntotal, (UInt_t)npass, 0.68269, kFALSE);
-    const Double_t resErrh = TEfficiency::ClopperPearson((UInt_t)ntotal, (UInt_t)npass, 0.68269, kTRUE) - resEff;
-
-    // Plot tag and passing- and failing- probe mass distribution
-    char binlabelx[100];
-    char binlabely[100];
-    char effstr[100];
-    char ylabel[50];
-    char pname[50];
-    char yield[50];
-
-    if(etaRegion=="B") sprintf(binlabelx, "0.0 < |#eta| < %.1f", etaCutTag);
-    else if(etaRegion=="E") sprintf(binlabelx, "%.1f < |#eta| < %.1f", etaBound, etaCutTag);
-    else sprintf(binlabelx, "|#eta| < %.1f", etaCutTag);
-
-    sprintf(binlabely, "p_{T} > %i GeV/c",(Int_t)ptCutProbe);
-    sprintf(effstr,"#varepsilon = %.4f_{ -%.4f}^{ +%.4f}",resEff,resErrl,resErrh);
-    sprintf(ylabel,"Events / 1 GeV/c^{2}");
-
-    TCanvas *cpass = MakeCanvas("cpass","cpass",720,540);
-    cpass->SetWindowPosition(cpass->GetWindowTopX()+cpass->GetBorderSize()+800,0);
-
-    sprintf(pname,"%s_%s_pass_%d", effType.Data(), etaRegion.Data(), iBin);
-    sprintf(yield,"%i Events",(UInt_t)npass);
-    CPlot plotPass(pname,"Passing probes","tag-probe mass [GeV/c^{2}]",ylabel);
-    plotPass.AddHist1D(passHist,"E");
-    plotPass.AddTextBox(binlabelx,0.21,0.78,0.51,0.83,0,kBlack,-1);
-    plotPass.AddTextBox(binlabely,0.21,0.73,0.51,0.78,0,kBlack,-1);
-    plotPass.AddTextBox(yield,0.21,0.69,0.51,0.73,0,kBlack,-1);
-    plotPass.AddTextBox(effstr,0.70,0.85,0.95,0.90,0,kBlack,-1);
-    plotPass.AddTextBox("#bf{CMS} Work in progress",0.19,0.83,0.54,0.89,0);
-    plotPass.AddTextBox(lumitext,0.62,0.92,0.94,0.99,0,kBlack,-1);
-    plotPass.Draw(cpass,kTRUE,"png");
-
-    TCanvas *cfail = MakeCanvas("cfail","cfail",720,540);
-    cfail->SetWindowPosition(cfail->GetWindowTopX()+cfail->GetBorderSize()+800,0);
-
-    sprintf(pname,"%s_%s_fail_%d", effType.Data(), etaRegion.Data(), iBin);
-    sprintf(yield,"%i Events",(UInt_t)(ntotal-npass));
-    CPlot plotFail(pname,"Failing probes","tag-probe mass [GeV/c^{2}]",ylabel);
-    plotFail.AddHist1D(failHist,"E");
-    plotFail.AddTextBox(binlabelx,0.21,0.78,0.51,0.83,0,kBlack,-1);
-    plotFail.AddTextBox(binlabely,0.21,0.73,0.51,0.78,0,kBlack,-1);
-    plotFail.AddTextBox(yield,0.21,0.69,0.51,0.73,0,kBlack,-1);
-    plotFail.AddTextBox(effstr,0.70,0.85,0.95,0.90,0,kBlack,-1);
-    plotFail.AddTextBox("#bf{CMS} Work in progress",0.19,0.83,0.54,0.89,0);
-    plotFail.AddTextBox(lumitext,0.62,0.92,0.94,0.99,0,kBlack,-1);
-
-    plotFail.Draw(cfail,kTRUE,"png");
-
-    std::vector<float> resultEff = {};
-
-    resultEff.push_back(resEff);
-    resultEff.push_back(resErrl);
-    resultEff.push_back(resErrh);
-
-    return resultEff;
-}
-*/
 
 //--------------------------------------------------------------------------------------------------
 // perform fit on one histogram to extract number of Z 
@@ -1920,7 +1875,7 @@ void calculateHLTEfficiencyAndYield(
         NsigP, 
         (RooRealVar*)best_fitResult->floatParsFinal().find("NbkgPass"),
         iBin, (RooRealVar*)best_fitResult->floatParsFinal().find("eff"), 
-        (RooRealVar*)&c, "HLT", etaRegion.Data(), 2);
+        (RooRealVar*)&c, "yield", etaRegion.Data(), 2);
 
     const Double_t chi2fail = make_plot(nflfail, m, dataFail,
         sigFail, bkgFail, 
@@ -1929,7 +1884,7 @@ void calculateHLTEfficiencyAndYield(
         NsigF, 
         (RooRealVar*)best_fitResult->floatParsFinal().find("NbkgFail"),
         iBin, (RooRealVar*)best_fitResult->floatParsFinal().find("eff"), 
-        (RooRealVar*)&c, "HLT", etaRegion.Data(), 1);
+        (RooRealVar*)&c, "yield", etaRegion.Data(), 1);
 
     std::cout<<"---------------------------------------"<<std::endl;
     std::cout<<"------ chi2pass = " << chi2pass <<std::endl;
@@ -2387,7 +2342,7 @@ void calculateEfficienciesAndYield(
         NsHLT2, 
         (RooRealVar*)best_fitResult->floatParsFinal().find("NbkgHLT2"),
         iBin, (RooRealVar*)best_fitResult->floatParsFinal().find("effHLT"), 
-        (RooRealVar*)&cHLT, "HLT", etaRegion.Data(), 2);
+        (RooRealVar*)&cHLT, "yield", etaRegion.Data(), 2);
 
     const Double_t chi2hlt1 = make_plot(nflHLT1, m, dataHLT1,
         sigHLT1, bkgHLT1, 
@@ -2396,7 +2351,7 @@ void calculateEfficienciesAndYield(
         NsHLT1, 
         (RooRealVar*)best_fitResult->floatParsFinal().find("NbkgHLT1"),
         iBin, (RooRealVar*)best_fitResult->floatParsFinal().find("effHLT"), 
-        (RooRealVar*)&cHLT, "HLT", etaRegion.Data(), 1);
+        (RooRealVar*)&cHLT, "yield", etaRegion.Data(), 1);
 
     const Double_t chi2fail = make_plot(nflSelFail, m, dataSelFail,
         sigSelFail, bkgSelFail, 
@@ -2822,7 +2777,7 @@ void calculateHLTCorrelation(
         iBin, 
         (RooRealVar*)best_fitResult->floatParsFinal().find("eff"), 
         (RooRealVar*)best_fitResult->floatParsFinal().find("c"), 
-        "HLT", etaRegion.Data(), 0);
+        "yield", etaRegion.Data(), 0);
 
     const Double_t chi2hlt1 = make_plot(nfl1, m, dataHLT1,
         sig1, bkg1, 
@@ -2833,7 +2788,7 @@ void calculateHLTCorrelation(
         iBin, 
         (RooRealVar*)best_fitResult->floatParsFinal().find("eff"), 
         (RooRealVar*)best_fitResult->floatParsFinal().find("c"), 
-        "HLT", etaRegion.Data(), 1);
+        "yield", etaRegion.Data(), 1);
 
     const Double_t chi2hlt2 = make_plot(nfl2, m, dataHLT2,
         sig2, bkg2, 
@@ -2844,7 +2799,7 @@ void calculateHLTCorrelation(
         iBin, 
         (RooRealVar*)best_fitResult->floatParsFinal().find("eff"), 
         (RooRealVar*)best_fitResult->floatParsFinal().find("c"), 
-        "HLT", etaRegion.Data(), 2);
+        "yield", etaRegion.Data(), 2);
 
     std::cout<<"---------------------------------------"<<std::endl;
     std::cout<<"------ chi2hlt0 = " << chi2hlt0 <<std::endl;
