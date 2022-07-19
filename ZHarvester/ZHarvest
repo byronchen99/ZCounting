@@ -213,9 +213,9 @@ for run, byLS_run in byLS_data.groupby('run'):
         }
         results.append(result)
         
-        # for testing exit after two measurements
-        if m >= 0:
-            break
+        # # for testing exit after two measurements
+        # if m >= 1:
+        #     break
 
     # make one dataframe with information of the measurements
     df_results = pd.concat([pd.DataFrame([result]) for result in results], ignore_index=True, sort=False)
