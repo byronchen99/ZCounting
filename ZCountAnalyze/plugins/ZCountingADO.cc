@@ -43,6 +43,7 @@
 
 #include "DataFormats/Common/interface/TriggerResults.h"
 #include "DataFormats/HepMCCandidate/interface/GenParticle.h"
+#include "DataFormats/JetReco/interface/GenJet.h"
 #include "DataFormats/Math/interface/deltaR.h"
 #include "DataFormats/VertexReco/interface/Vertex.h"
 #include "DataFormats/TrackReco/interface/Track.h"
@@ -63,6 +64,7 @@
 
 #include "SimDataFormats/PileupSummaryInfo/interface/PileupSummaryInfo.h"
 #include "SimDataFormats/GeneratorProducts/interface/GenEventInfoProduct.h"
+#include "SimDataFormats/GeneratorProducts/interface/LHERunInfoProduct.h"
 #include "SimDataFormats/GeneratorProducts/interface/LHEEventProduct.h"
 
 // local framework includes
@@ -87,20 +89,22 @@
 //
 
 
-class ZCountingAOD : public edm::one::EDAnalyzer<>
+class ZCountingAOD : public edm::one::EDAnalyzer<edm::one::WatchRuns, edm::one::WatchLuminosityBlocks>
 {
 public:
     explicit ZCountingAOD(const edm::ParameterSet&);
-    ~ZCountingAOD() override = default;
+    virtual ~ZCountingAOD() {};
 
     static void fillDescriptions(edm::ConfigurationDescriptions& descriptions);
 
 
 private:
-    void beginRun(const edm::Run&, const edm::EventSetup&);
-    void beginLuminosityBlock(const edm::LuminosityBlock&, const edm::EventSetup&);
-    virtual void beginJob() override;
     virtual void analyze(const edm::Event&, const edm::EventSetup&) override;
+    virtual void beginRun(const edm::Run&, const edm::EventSetup&) override;
+    virtual void endRun(const edm::Run&, const edm::EventSetup&) override;
+    virtual void beginLuminosityBlock(const edm::LuminosityBlock&, const edm::EventSetup&) override;
+    virtual void endLuminosityBlock(const edm::LuminosityBlock&, const edm::EventSetup&) override;
+    virtual void beginJob() override;
     virtual void endJob() override;
 
     void clearVariables();
@@ -148,8 +152,12 @@ private:
     edm::EDGetTokenT<std::vector<PileupSummaryInfo>> pileupInfoCollection_;
     edm::EDGetTokenT<GenEventInfoProduct> genEventInfo_;
     edm::EDGetTokenT<LHEEventProduct> lheEventInfo_;
+    edm::EDGetTokenT<LHERunInfoProduct> lheRunInfo_;
     edm::EDGetTokenT<std::vector<reco::GenParticle>> genParticleCollection_;
-
+    edm::EDGetTokenT<std::vector<reco::GenJet>> genParticleLevelLeptonCollection_;
+    
+    bool printLHE_;
+    
     // Effective area constants
     EffectiveAreas effectiveAreas_;
 
@@ -213,6 +221,14 @@ private:
     float antiLepton_genVx_;
     float antiLepton_genVy_;
     float antiLepton_genVz_;
+
+    // particle level gen info
+    std::vector<float> v_GenDressedLepton_pt_;
+    std::vector<float> v_GenDressedLepton_eta_;
+    std::vector<float> v_GenDressedLepton_phi_;
+    std::vector<float> v_GenDressedLepton_mass_;
+    std::vector<int> v_GenDressedLepton_pdgId_;
+
     
     unsigned int nMuon_;
     std::vector<float> muon_pt_;
@@ -359,7 +375,10 @@ ZCountingAOD::ZCountingAOD(const edm::ParameterSet& iConfig):
     pileupInfoCollection_  (consumes<std::vector<PileupSummaryInfo> >(iConfig.getParameter<edm::InputTag>("pileupSummaryInfoCollection"))),
     genEventInfo_(consumes<GenEventInfoProduct>(iConfig.getParameter<edm::InputTag>("genEventInfo"))),
     lheEventInfo_(consumes<LHEEventProduct>(iConfig.getParameter<edm::InputTag>("lheEventInfo"))),
+    lheRunInfo_(consumes<LHERunInfoProduct,edm::InRun>(iConfig.getParameter<edm::InputTag>("lheRunInfo"))),
     genParticleCollection_(consumes<std::vector<reco::GenParticle>>(iConfig.getParameter<edm::InputTag>("genParticles"))),
+    genParticleLevelLeptonCollection_(consumes<std::vector<reco::GenJet>>(iConfig.getParameter<edm::InputTag>("particleLevelLeptonCollection"))),
+    printLHE_(iConfig.getParameter<bool>("printLHE")),
     effectiveAreas_((iConfig.getParameter<edm::FileInPath>("effAreasConfigFile")).fullPath())
 {
     LogDebug("ZCountingAOD")<<"ZCountingAOD(...)";
@@ -455,13 +474,19 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
             // ME variations
             int pdf_begin=-2;
             int pdf_end=-2;
+            
+            for(unsigned int i=0; i< v_genWeightIDs_.size(); i++){
+                v_meWeight_.push_back(1.0);
+            }
+            
             for(size_t iwgt=0; iwgt<lhe_info->weights().size(); ++iwgt){
         		const LHEEventProduct::WGT& wgt = lhe_info->weights().at(iwgt);
                 // check if weight is in the list of meWeightIDs
-                bool exists = std::find(std::begin(v_genWeightIDs_), std::end(v_genWeightIDs_), std::stoi(wgt.id)) != std::end(v_genWeightIDs_);
-                if(exists){
-        		    v_meWeight_.push_back((float) (wgt.wgt/lhe_info->originalXWGTUP()));
-        		}
+                auto it_ = std::find(std::begin(v_genWeightIDs_), std::end(v_genWeightIDs_), std::stoi(wgt.id));
+                int index_ = std::distance(v_genWeightIDs_.begin(), it_);
+                if(it_ != std::end(v_genWeightIDs_)){
+                    v_meWeight_[index_] = (float) (wgt.wgt/lhe_info->originalXWGTUP());
+                }
 
                 // store indices of pdf weights
                 if(wgt.id == v_pdfWeightIDs_.at(0)){
@@ -567,6 +592,17 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
         if(genLepton && genAntiLepton){
             z_genMass_ = (genLepton->p4() + genAntiLepton->p4()).M();
         }
+
+        edm::Handle<std::vector<reco::GenJet> > particleLevelLeptons;
+        iEvent.getByToken(genParticleLevelLeptonCollection_, particleLevelLeptons);
+
+        for(auto const& i_lep: *particleLevelLeptons){
+            v_GenDressedLepton_pt_.push_back(i_lep.pt());
+            v_GenDressedLepton_eta_.push_back(i_lep.eta());
+            v_GenDressedLepton_phi_.push_back(i_lep.phi());
+            v_GenDressedLepton_mass_.push_back(i_lep.mass());
+            v_GenDressedLepton_pdgId_.push_back(i_lep.pdgId());
+        }        
     }
 
     // --- PV selection
@@ -661,12 +697,7 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
             muon_phiStaReg_.push_back(StaReg.phi());     
             muon_chargeStaReg_.push_back(StaReg.charge());
 
-            muon_nStationsStaReg_.push_back(StaReg.hitPattern().muonStationsWithValidHits());
-            
-            if(StaUpd != 0 && StaReg.hitPattern().muonStationsWithValidHits() != StaUpd->hitPattern().muonStationsWithValidHits()){
-                std::cout<< StaReg.hitPattern().muonStationsWithValidHits() <<" | "<< StaUpd->hitPattern().muonStationsWithValidHits() <<std::endl;
-            }
-            
+            muon_nStationsStaReg_.push_back(StaReg.hitPattern().muonStationsWithValidHits());            
             muon_useUpdated_.push_back(useUpdated);
 
             if(StaUpd != 0){
@@ -1096,11 +1127,18 @@ ZCountingAOD::beginLuminosityBlock(const edm::LuminosityBlock& iLumi, const edm:
     }
 }
 
+// ------------ method called once each new LS  ------------
+void
+ZCountingAOD::endLuminosityBlock(const edm::LuminosityBlock& iLumi, const edm::EventSetup& iSetup)
+{
+    std::cout<<"ZCountingAOD::endLuminosityBlock --- at LS "<< lumiBlock_ <<std::endl;
+}
+
 // ------------ method called once each run just before starting event loop  ------------
 void ZCountingAOD::beginRun(edm::Run const& iRun, edm::EventSetup const& iSetup)
 {
     // edm::LogVerbatim("ZCountingAOD") << "now at "<<iRun.id();
-    std::cout<< "new run"<<std::endl;
+    std::cout<< "=== New run ==="<<std::endl;
     runNumber_ = iRun.id().run();
     hltChanged_ = true;
 
@@ -1121,10 +1159,45 @@ void ZCountingAOD::beginRun(edm::Run const& iRun, edm::EventSetup const& iSetup)
 
 }
 
+// ------------ method called once each run just after event loop  ------------
+void ZCountingAOD::endRun(const edm::Run &iRun, const edm::EventSetup &iSetup)
+{
+    std::cout<<"=== ZCountingAOD::endRun ==="<<std::endl;
+
+
+    if(!printLHE_) 
+        return;
+    
+    // print generator level information 
+    std::cout<<"=== Print LHE info ==="<<std::endl;
+    edm::Handle<LHERunInfoProduct> lheRunInfo;
+    typedef std::vector<LHERunInfoProduct::Header>::const_iterator headers_const_iterator;
+    try {iRun.getByToken(lheRunInfo_, lheRunInfo);}
+    catch (...) {;}
+
+    const std::string weightTagStr = "initrwgt";
+    if(lheRunInfo.isValid()){
+        for (headers_const_iterator it = lheRunInfo->headers_begin(); it != lheRunInfo->headers_end(); it++) {
+            //std::cout <<" --------" << it->tag() << std::endl;
+            if (it->tag() != weightTagStr) //Skip parts of printout not related to LHE weights
+                continue;
+            const std::vector<std::string> lines = it->lines();
+            //for (size_t i = 0; i < 15; i++){
+            for (unsigned int i = 0; i<lines.size(); i++){
+                std::cout<<i<<": "<<lines[i]<<std::endl;
+            }
+        }
+    }
+    else{
+	    edm::LogWarning ("EventWeightMCSystematic") << "Can't get LHE header!" ;
+    }
+}
+
 // ------------ method called once each job just before starting event loop  ------------
 void
 ZCountingAOD::beginJob()
-{
+{   
+    std::cout<<"BeginJob()"<<std::endl;
     LogDebug("ZCountingAOD")<<"beginJob()";
     if(store_roccor_){
         rc.init(edm::FileInPath(roccorFile).fullPath());
@@ -1183,6 +1256,13 @@ ZCountingAOD::beginJob()
         tree_->Branch("antiLepton_vx", &antiLepton_genVx_, "antiLepton_genVx_/f");
         tree_->Branch("antiLepton_vy", &antiLepton_genVy_, "antiLepton_genVy_/f");
         tree_->Branch("antiLepton_vz", &antiLepton_genVz_, "antiLepton_genVz_/f");        
+
+        tree_->Branch("GenDressedLepton_pt", &v_GenDressedLepton_pt_);
+        tree_->Branch("GenDressedLepton_eta", &v_GenDressedLepton_eta_);
+        tree_->Branch("GenDressedLepton_phi", &v_GenDressedLepton_phi_);
+        tree_->Branch("GenDressedLepton_mass", &v_GenDressedLepton_mass_);
+        tree_->Branch("GenDressedLepton_pdgId", &v_GenDressedLepton_pdgId_);
+
     }
 
     // reco level info
@@ -1376,6 +1456,14 @@ void ZCountingAOD::clearVariables(){
     antiLepton_genVx_ = 99.;
     antiLepton_genVy_ = 99.;
     antiLepton_genVz_ = 99.;
+
+    // particle level
+    v_GenDressedLepton_pt_.clear();
+    v_GenDressedLepton_eta_.clear();
+    v_GenDressedLepton_phi_.clear();
+    v_GenDressedLepton_mass_.clear();
+    v_GenDressedLepton_pdgId_.clear();
+
 
     nMuon_ = 0;
     muon_pt_.clear();

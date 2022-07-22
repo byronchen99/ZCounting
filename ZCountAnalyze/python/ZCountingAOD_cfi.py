@@ -126,10 +126,15 @@ zcounting = cms.EDAnalyzer('ZCountingAOD',
     genParticles         = cms.InputTag("genParticles"),
     genEventInfo         = cms.InputTag('generator'),
     lheEventInfo         = cms.InputTag('externalLHEProducer'),
+    lheRunInfo           = cms.InputTag('externalLHEProducer'),
     genZLeptonCollection = cms.InputTag(''),
     genTtCollection = cms.InputTag(''),
-
+    
+    particleLevelLeptonCollection = cms.InputTag("particleLevel:leptons"),
+    printLHE = cms.bool(False),
+    
     # settings of UL aMC@NLO
+    # (muRmuF up, muRmuF down, muR up, muR down, muF up, muF down)
     genWeights = cms.vint32(1005, 1009, 1004, 1007, 1002, 1003),
     pdfWeights = cms.vint32(1214, 1316)
 

@@ -77,9 +77,12 @@ process.source = cms.Source("PoolSource",
         # "/store/mc/RunIISummer20UL17RECO/DYJetsToLL_M-50_TuneCP5_13TeV-amcatnloFXFX-pythia8/AODSIM/106X_mc2017_realistic_v6-v1/130000/2678F234-2D42-AB4F-89E4-80AFDE9EFB82.root"
         # "/store/mc/RunIISummer20UL17RECO/DYJetsToLL_M-50_HT-100to200_TuneCP5_PSweights_13TeV-madgraphMLM-pythia8/AODSIM/106X_mc2017_realistic_v6-v1/00000/0C0FD46D-6DAE-6F45-B9F4-129A6ABC69C4.root"
         # '/store/mc/Run3Winter22DR/DYJetsToLL_M-50_TuneCP5_13p6TeV-madgraphMLM-pythia8/AODSIM/FlatPU0to70_122X_mcRun3_2021_realistic_v9_ext1-v2/2520000/002de84f-b906-4509-8cb6-872ee0cf4029.root'
-        'file:/eos/home-d/dwalter/Lumi/ZCounting_Standalone/CMSSW_12_4_2/src/ZCounting/ZCountAnalyze/002de84f-b906-4509-8cb6-872ee0cf4029.root'
+        'file:/eos/home-d/dwalter/Lumi/ZCounting_Standalone/CMSSW_12_4_3/src/ZCounting/ZCountAnalyze/002de84f-b906-4509-8cb6-872ee0cf4029.root'
     )
 )
+
+genWeights = cms.vint32(1005, 1009, 1004, 1007, 1002, 1003),
+pdfWeights = cms.vint32(1252, 1354)
 
 if options.year == "2016preVFP":
     globalTag = '106X_mcRun2_asymptotic_preVFP_v11'
@@ -103,6 +106,8 @@ elif options.year == "2018":
     roccoFile = 'ZCounting/ZUtils/data/RoccoR2018UL.txt'
 elif options.year == "2022":
     globalTag = '112X_mcRun3_2021_realistic_v16'
+    genWeights = cms.vint32(1021, 1041, 1006, 1011, 1016, 1031)
+    pdfWeights = cms.vint32(1252, 1354)
     l1PrefireECAL = "None"
     l1PrefireMuon = "None"
     roccoFile = "None"
@@ -110,7 +115,13 @@ elif options.year == "2022":
 # TODO: prefiring is currently not working in AOD... need to setup
 
 if options.samplename in ('smu','met'):
-    globalTag = '106X_dataRun2_v32'
+# set global tag (INFO: https://twiki.cern.ch/twiki/bin/view/CMSPublic/SWGuideFrontierConditions?redirectedfrom=CMS.SWGuideFrontierConditions)
+    if options.year in ('2016', '2017', '2018'):
+        globalTag = '106X_dataRun2_v32'
+    elif options.year in ('2022', ):
+        globalTag = '123X_dataRun3_Prompt_v12'
+    else:
+        globalTag = '124X_dataRun3_Prompt_v4'
 
 # ## Geometry and Detector Conditions
 process.load("Configuration.Geometry.GeometryDB_cff")
@@ -148,6 +159,20 @@ if options.samplename in ('dy', 'zz', 'wz', 'ttz'):
     tasks.add(process.genZLeptonDecay)
     process.zcounting.hasGenZ = True
     process.zcounting.genZLeptonCollection = cms.InputTag("genZLeptonDecay")
+    
+    process.zcounting.genWeights = genWeights
+    process.zcounting.pdfWeights = pdfWeights
+    process.zcounting.printLHE = True
+    
+    ### particle level definition of gen events
+    from GeneratorInterface.RivetInterface.genParticles2HepMC_cfi import genParticles2HepMC
+    process.genParticles2HepMC = genParticles2HepMC.clone()
+    tasks.add(process.genParticles2HepMC)
+
+    from GeneratorInterface.RivetInterface.particleLevel_cfi import particleLevel
+    process.particleLevel = particleLevel.clone()
+    tasks.add(process.particleLevel)
+    
 elif options.samplename in ('smu','se','met'):
     # only store necessary information for data
     process.zcounting.isData = True
