@@ -37,7 +37,7 @@ secPerLS = 23.3
 
 currentYear = 2022
 
-etaRegion = "B" # define eta region. Currently supported are "B" (Barrel) and "I" (Inclusive)
+etaRegion = "I" # define eta region. Currently supported are "B" (Barrel) and "I" (Inclusive)
 
 nBinsMass = 50  # number of bins in histograms to fit
 massLo = 66     # lower boundary for fit range
@@ -89,7 +89,8 @@ for run, byLS_run in byLS_data.groupby('run'):
     
     log.info(f"Now at run {run}")
     fileName = getFileName(dirDQM,run)
-
+    
+    log.info(f"Found file `{fileName}`")
 
     dirOutSub = f"{dirOut}/Run{run}"
     if not os.path.isdir(dirOutSub):
@@ -115,61 +116,61 @@ for run, byLS_run in byLS_data.groupby('run'):
         def load(name_):
             return load_histogram(name_, fileName, goodLSlist, run=run, 
                 MassBin=nBinsMass, MassMin=massLo, MassMax=massHi, 
-                prefix=f"DQMData/Run {run}/ZCounting/Run summary/Histograms/", 
+                # prefix=f"DQMData/Run {run}/ZCounting/Run summary/Histograms/", 
+                prefix="", 
                 suffix="new")
         
         log.info("Load histograms ...")
-        h_mass_yield_Z = load("h_mass_yield_Z")
-
-        if h_mass_yield_Z.Integral() == 0:
-            log.warning("no Z candidates found! continue with next run")
-            continue    
         
-        def fit_efficiency(eff):
-            
-            # check if the fit results are already there
-            filename_eff = f"{dirOutSub}/workspace_{eff}_{etaRegion}_{m}.root"
-            if not os.path.isfile(filename_eff):
+        h_hlt2 = load(f"h_mass_hlt2")
+        h_hlt1 = load(f"h_mass_hlt1")
+        
+        ROOT.calculateHLTEfficiencyAndYield(h_hlt2, h_hlt1, m, etaRegion, 1, 6, 1, 6)
 
-                h_pass = load(f"h_mass_{eff}_pass_central")
-                h_fail = load(f"h_mass_{eff}_fail_central")
-                if etaRegion == "I":
-                    h_pass.Add(load(f"h_mass_{eff}_pass_forward"))
-                    h_fail.Add(load(f"h_mass_{eff}_fail_forward"))
-                        
-                log.info("Perform fits to calculate efficiencies")
-                ROOT.calculateDataEfficiency(
-                    h_pass, h_fail,
-                    m, eff, etaRegion, 1, 6, 1, 6)
-
-        fit_efficiency("HLT")
-        fit_efficiency("SIT")        
-        fit_efficiency("Glo")
+        
+        h_sel_fail = load(f"h_mass_sel_fail")
+        
+        h_sel_pass = h_hlt2.Clone()
+        h_sel_pass.Scale(2)
+        h_sel_pass.Add(h_hlt1)
+        
+        ROOT.calculateDataEfficiency(h_sel_pass, h_sel_fail, m, "SIT", etaRegion, 1, 6, 1, 6)
        
         log.info("Load fit results ...")
         
         def load_from_workspace(type_eff):
-            filename_eff = f"{dirOutSub}/workspace_{type_eff}_{etaRegion}_{m}.root"
+            if type_eff == "yield":
+                filename_eff = f"{dirOutSub}/workspace_{etaRegion}_{m}.root"
+            else:
+                filename_eff = f"{dirOutSub}/workspace_{type_eff}_{etaRegion}_{m}.root"
+                
             if not os.path.isfile(filename_eff):
                 log.warning(f"fit result {filename_eff} does not exist! exit")
                 return None
+                
             tfile_eff = ROOT.TFile(filename_eff,"READ")
             workspace = tfile_eff.Get("workspace")
             eff = workspace.var("eff").getVal()
-            return eff
+                        
+            if type_eff != "yield":
+                return eff
+            else:
+                nsig = workspace.var("Nsig").getVal()
+                return nsig, eff
+                
         
-        effHLT = load_from_workspace("HLT")
+        recoZ, effHLT = load_from_workspace("yield")
         effSIT = load_from_workspace("SIT")
-        effGlo = load_from_workspace("Glo")
+        # effGlo = load_from_workspace("Glo")
         
         # trigger efficiency that at least one muon passes the trigger
-        effTrigger = (1 - (1-effHLT)**2 )
-        
+        # effTrigger = (1 - (1-effHLT)**2 )
         # reconstructed number of Zs, do not perform fit but assume 1% background
-        recoZ = h_mass_yield_Z.Integral() * 0.99
-        
+        # recoZ = h_mass_yield_Z.Integral() * 0.99
         # delivered number of Zs given by efficiency corrected number of reconstructed Zs
-        delZ = recoZ / (effTrigger * effSIT**2 * effGlo**2)
+        # delZ = recoZ / (effTrigger * effSIT**2 * effGlo**2)
+        
+        delZ = recoZ / effSIT**2
 
         log.info(f"Delivered number of Zs = {delZ}")
 
@@ -204,7 +205,7 @@ for run, byLS_run in byLS_data.groupby('run'):
             "pileUp": byLS_m['avgpu'].mean(),
             "effHLT": effHLT,
             "effSel": effSIT,
-            "effGlo": effGlo,
+            # "effGlo": effGlo,
             # delivered Z rate (corrected for deadtime and extrapolatet to the total time window)
             "delZCount": delZ / deadtime * (totaltimewindow / timewindow),    
             # instantaneous delivered Z rate (corrected for deadtime)

@@ -20,7 +20,8 @@ def load_input_csv(byLS_data):
     print("INFO:  === formatting csv file...")    # formatting the csv
     byLS_data[['run', 'fill']] = byLS_data['#run:fill'].str.split(':', expand=True).apply(pd.to_numeric)
     byLS_data['ls'] = byLS_data['ls'].str.split(':', expand=True)[0].apply(pd.to_numeric)
-    byLS_data = byLS_data.drop(['#run:fill', 'hltpath', 'source'], axis=1)
+    byLS_data = byLS_data.drop(['#run:fill', 'source'], axis=1)
+    
 
     if 'delivered(/ub)' in byLS_data.columns.tolist():  # convert to /pb
         byLS_data['delivered(/ub)'] = byLS_data['delivered(/ub)'].apply(lambda x: x / 1000000.)
