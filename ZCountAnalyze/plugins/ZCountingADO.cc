@@ -448,7 +448,12 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     triggers->readEvent(iEvent);
     
     // take data events only if one of the required triggers has fired
-    if(iEvent.isRealData() && !(emulateTrigger_ || triggers->pass(metTriggerPatterns_) || triggers->pass(muonTriggerPatterns_))){
+    if(iEvent.isRealData() 
+        && !(emulateTrigger_ 
+            || triggers->pass(metTriggerPatterns_) 
+            || (store_muons_ && triggers->pass(muonTriggerPatterns_))
+            || (store_electrons_ && triggers->pass(electronTriggerPatterns_))
+        )){
         return;
     }
 
@@ -626,6 +631,7 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
     // -------------------------------------------------------------------------
     // Muons
     if(store_muons_){
+        
         // --- store all standAloneMuons
         LogDebug("ZCountingAOD") << "find reco muons";
         edm::Handle<std::vector<reco::Muon>> muonCollection;
@@ -663,25 +669,41 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
             //    otherwise the track from standAloneMuons is used
             const reco::Muon *mu = 0;
             for (const reco::Muon &muon : *muonCollection) {
-                if (muon.outerTrack().isNull())
+                if (!muon.isGlobalMuon())
                     continue;
 
                 if (useUpdated && muon.outerTrack().get() == StaUpd) {
-                    // we found the corresponding candidate through common TrackExtra from standAloneMuons:UpdatedAtVtx
+                    // we found the corresponding candidate through direct link to standAloneMuons:UpdatedAtVtx
                     mu = &muon;
                     break;                
-                }      
+                }
                 else if (!useUpdated && muon.outerTrack().get() == &StaReg) {
                     // we found the corresponding candidate through direct link to standAloneMuons
                     mu = &muon;
                     break;    
-                }           
-            }    
+                }                
+            }
+            
+            if(mu==0){
+                // standalone muons that are not global muons can still be matched to inner tracks via the tracker muons
+                //    in this case the logic is different
+                //    we compare the extratrack reference of the muon outer track with the extratrack reference of the standalone track
+                for (const reco::Muon &muon : *muonCollection) {
+                    if (!muon.isStandAloneMuon() || muon.isGlobalMuon())
+                        continue;                
+
+                    if(muon.outerTrack()->extra().get() == StaReg.extra().get() ){
+                        mu = &muon;
+                        break;
+                    }
+                }
+            }
             
             // inner track of muon
             const reco::Track *trk = 0;
-            if (mu!=0 && mu->innerTrack().isNonnull())
+            if (mu!=0 && mu->innerTrack().isNonnull()){
                 trk = mu->innerTrack().get();
+            }
             
             // reject muons only if best track, both outer tracks, and inner track fail acceptance cuts
             if (   (             std::abs(StaReg.eta()) > 2.4  || StaReg.pt() < 20)
@@ -705,9 +727,8 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
                 muon_etaStaUpd_.push_back(StaUpd->eta());
                 muon_phiStaUpd_.push_back(StaUpd->phi());            
                 muon_chargeStaUpd_.push_back(StaUpd->charge());
-
             }
-            else{            
+            else{
                 muon_ptStaUpd_.push_back(-1);
                 muon_etaStaUpd_.push_back(-1);
                 muon_phiStaUpd_.push_back(-1);                 
@@ -719,7 +740,7 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
                 muon_etaTrk_.push_back(trk->eta());
                 muon_phiTrk_.push_back(trk->phi());               
                 muon_chargeTrk_.push_back(trk->charge());
-            
+                
                 muon_nPixelHits_.push_back(trk->hitPattern().numberOfValidPixelHits());
                 muon_nTrackerLayers_.push_back(trk->hitPattern().trackerLayersWithMeasurement());
                 muon_validFraction_.push_back(trk->validFraction());
@@ -730,7 +751,7 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
                 muon_etaTrk_.push_back(-1);
                 muon_phiTrk_.push_back(-1);    
                 muon_chargeTrk_.push_back(0);
-        
+                
                 muon_nPixelHits_.push_back(-1);
                 muon_nTrackerLayers_.push_back(-1);
                 muon_validFraction_.push_back(-1);
@@ -829,55 +850,31 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
                 }
             }
             else{
-                // if no muon candidate was reconstructed, use the parameters of the standalone muon that was considered
-                if(useUpdated){
-                    muon_pt_.push_back(StaUpd->pt());
-                    muon_eta_.push_back(StaUpd->eta());
-                    muon_phi_.push_back(StaUpd->phi());     
-                    muon_charge_.push_back(StaUpd->charge());  
-                    
-                    // Look for distance to first good primary vertex
-                    muon_dxyPV_.push_back(pv != nullptr ? StaUpd->dxy(pv->position()) : 999);          
-                    muon_dzPV_.push_back(pv != nullptr ? StaUpd->dz(pv->position()) : 999);          
+                // no muon candidate was reconstructed, this can happen for regular standAloneMuons
+                muon_pt_.push_back(StaReg.pt());
+                muon_eta_.push_back(StaReg.eta());
+                muon_phi_.push_back(StaReg.phi());     
+                muon_charge_.push_back(StaReg.charge());
 
-                    // Look for the distance to the first good primary vertex
-                    muon_dxyPVmin_.push_back(getMinDxy(*StaUpd, *pvCol));
-                    muon_dzPVmin_.push_back(getMinDz(*StaUpd, *pvCol));
+                // Look for distance to first good primary vertex
+                muon_dxyPV_.push_back(pv != nullptr ? StaReg.dxy(pv->position()): 999);          
+                muon_dzPV_.push_back(pv != nullptr ? StaReg.dz(pv->position()): 999);    
 
-                    // Look for the distance to (0,0,0)
-                    muon_dx_.push_back(StaUpd->referencePoint().x());
-                    muon_dy_.push_back(StaUpd->referencePoint().y());
-                    muon_dz_.push_back(StaUpd->referencePoint().z());
-                    // uncertainty
-                    muon_DxyError_.push_back(StaUpd->dxyError());
-                    muon_DzError_.push_back(StaUpd->dzError());
-                }
-                else{
-                    muon_pt_.push_back(StaReg.pt());
-                    muon_eta_.push_back(StaReg.eta());
-                    muon_phi_.push_back(StaReg.phi());     
-                    muon_charge_.push_back(StaReg.charge());
+                // Look for the distance to the first good primary vertex
+                muon_dxyPVmin_.push_back(getMinDxy(StaReg, *pvCol));
+                muon_dzPVmin_.push_back(getMinDz(StaReg, *pvCol));
 
-                    // Look for distance to first good primary vertex
-                    muon_dxyPV_.push_back(pv != nullptr ? StaReg.dxy(pv->position()): 999);          
-                    muon_dzPV_.push_back(pv != nullptr ? StaReg.dz(pv->position()): 999);    
-
-                    // Look for the distance to the first good primary vertex
-                    muon_dxyPVmin_.push_back(getMinDxy(StaReg, *pvCol));
-                    muon_dzPVmin_.push_back(getMinDz(StaReg, *pvCol));
-
-                    // Look for the distance to (0,0,0)
-                    muon_dx_.push_back(StaReg.referencePoint().x());
-                    muon_dy_.push_back(StaReg.referencePoint().y());
-                    muon_dz_.push_back(StaReg.referencePoint().z());
-                    // uncertainty
-                    muon_DxyError_.push_back(StaReg.dxyError());
-                    muon_DzError_.push_back(StaReg.dzError());
-                }
+                // Look for the distance to (0,0,0)
+                muon_dx_.push_back(StaReg.referencePoint().x());
+                muon_dy_.push_back(StaReg.referencePoint().y());
+                muon_dz_.push_back(StaReg.referencePoint().z());
+                // uncertainty
+                muon_DxyError_.push_back(StaReg.dxyError());
+                muon_DzError_.push_back(StaReg.dzError());
             
                 muon_tkRelIso_.push_back(-1);
                 muon_pfRelIso04_all_.push_back(-1);
-                muon_ID_.push_back(-1);
+                muon_ID_.push_back(2);
                 
                 muon_isMedium_.push_back(0);
                 muon_isTracker_.push_back(0);
@@ -909,15 +906,11 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
         
             // Check if track is already in muons
             bool isMuon = false;
-            for (const reco::Muon &mu : *muonCollection) {
-                // only standalone muons are in muon collection
-                if(!mu.isStandAloneMuon())
-                    continue;
-                    
-                if (mu.innerTrack().isNonnull() && mu.innerTrack().get() == &trk) {
+            for (unsigned int i=0; i < muon_ptTrk_.size(); i++){                    
+                if ((muon_ptTrk_[i] == (float)trk.pt()) && (muon_etaTrk_[i] == (float)trk.eta())) {
                     isMuon = true;
                     break;
-                }
+                }                
             }
             if(isMuon)
                 continue;
