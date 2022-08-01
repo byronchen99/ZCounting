@@ -2839,6 +2839,9 @@ void calculateHLTCorrelation(
 //--------------------------------------------------------------------------------------------------
 double extractCorrelation_HLT(const TString mcfilename, TH1D *hPV, const TString etaRegion){
     
+    if(mcfilename == "")
+        return 1.0;
+    
     TFile* histfile = generateTemplate_cHLT(mcfilename);
     
     TH1D* h0 = (TH1D*)histfile->Get("h_npv_0hlt_"+etaRegion);        
