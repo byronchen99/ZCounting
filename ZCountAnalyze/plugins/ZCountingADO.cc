@@ -1218,7 +1218,7 @@ ZCountingAOD::beginJob()
     // weights
     // ME weight
     if(!isData_){
-        tree_->Branch("eventweight", &eventweight_, "eventweight_/f");
+        tree_->Branch("eventweight", &eventweight_, "eventweight_/F");
         tree_->Branch("MEWeight",  &v_meWeight_);
         tree_->Branch("PDFWeight", &v_pdfWeight_);
 
@@ -1229,26 +1229,26 @@ ZCountingAOD::beginJob()
     if(!isData_){
         // gen level info
         tree_->Branch("decayMode",  &decayMode_,  "decayMode_/i");
-        tree_->Branch("z_genMass",  &z_genMass_,  "z_genMass_/f");
-        tree_->Branch("z_recoMass", &z_recoMass_, "z_recoMass_/f");
+        tree_->Branch("z_genMass",  &z_genMass_,  "z_genMass_/F");
+        tree_->Branch("z_recoMass", &z_recoMass_, "z_recoMass_/F");
         
         // muon
-        tree_->Branch("lepton_genPt",  &lepton_genPt_,  "lepton_genPt_/f");
-        tree_->Branch("lepton_genEta", &lepton_genEta_, "lepton_genEta_/f");
-        tree_->Branch("lepton_genPhi", &lepton_genPhi_, "lepton_genPhi_/f");
+        tree_->Branch("lepton_genPt",  &lepton_genPt_,  "lepton_genPt_/F");
+        tree_->Branch("lepton_genEta", &lepton_genEta_, "lepton_genEta_/F");
+        tree_->Branch("lepton_genPhi", &lepton_genPhi_, "lepton_genPhi_/F");
         
-        tree_->Branch("lepton_vx", &lepton_genVx_, "lepton_genVx_/f");
-        tree_->Branch("lepton_vy", &lepton_genVy_, "lepton_genVy_/f");
-        tree_->Branch("lepton_vz", &lepton_genVz_, "lepton_genVz_/f");
+        tree_->Branch("lepton_vx", &lepton_genVx_, "lepton_genVx_/F");
+        tree_->Branch("lepton_vy", &lepton_genVy_, "lepton_genVy_/F");
+        tree_->Branch("lepton_vz", &lepton_genVz_, "lepton_genVz_/F");
 
         // anti muon
-        tree_->Branch("antiLepton_genPt",  &antiLepton_genPt_,  "antiLepton_genPt_/f");
-        tree_->Branch("antiLepton_genEta", &antiLepton_genEta_, "antiLepton_genEta_/f");
-        tree_->Branch("antiLepton_genPhi", &antiLepton_genPhi_, "antiLepton_genPhi_/f");
+        tree_->Branch("antiLepton_genPt",  &antiLepton_genPt_,  "antiLepton_genPt_/F");
+        tree_->Branch("antiLepton_genEta", &antiLepton_genEta_, "antiLepton_genEta_/F");
+        tree_->Branch("antiLepton_genPhi", &antiLepton_genPhi_, "antiLepton_genPhi_/F");
     
-        tree_->Branch("antiLepton_vx", &antiLepton_genVx_, "antiLepton_genVx_/f");
-        tree_->Branch("antiLepton_vy", &antiLepton_genVy_, "antiLepton_genVy_/f");
-        tree_->Branch("antiLepton_vz", &antiLepton_genVz_, "antiLepton_genVz_/f");        
+        tree_->Branch("antiLepton_vx", &antiLepton_genVx_, "antiLepton_genVx_/F");
+        tree_->Branch("antiLepton_vy", &antiLepton_genVy_, "antiLepton_genVy_/F");
+        tree_->Branch("antiLepton_vz", &antiLepton_genVz_, "antiLepton_genVz_/F");        
 
         tree_->Branch("GenDressedLepton_pt", &v_GenDressedLepton_pt_);
         tree_->Branch("GenDressedLepton_eta", &v_GenDressedLepton_eta_);
