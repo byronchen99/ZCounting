@@ -222,7 +222,7 @@ CBreitWignerConvGaussian::CBreitWignerConvGaussian(RooRealVar &m, const Bool_t p
     bw = new RooBreitWigner(vname,vname,m,*mass,*width);
 
     sprintf(vname,"sig_mean%s",name);  mean  = new RooRealVar(vname,vname,0,-2.5,2.5);
-    sprintf(vname,"sig_sigma%s",name); sigma = new RooRealVar(vname,vname,2,0,5);
+    sprintf(vname,"sig_sigma%s",name); sigma = new RooRealVar(vname,vname,2,0.1,5);
     sprintf(vname,"sig_gaus%s",name);  gaus  = new RooGaussian(vname,vname,m,*mean,*sigma);
 
     sprintf(vname,"signal%s",name);
@@ -284,7 +284,7 @@ CMCTemplateConvGaussian::CMCTemplateConvGaussian(RooRealVar &m, TH1D* hist, cons
     char vname[50];
 
     sprintf(vname,"sig_mean%s",name);  mean  = new RooRealVar(vname,vname,0,-2.5,2.5);
-    sprintf(vname,"sig_sigma%s",name); sigma = new RooRealVar(vname,vname,2,0,5);
+    sprintf(vname,"sig_sigma%s",name); sigma = new RooRealVar(vname,vname,2,0.1,5);
     sprintf(vname,"sig_gaus%s",name);  gaus  = new RooGaussian(vname,vname,m,*mean,*sigma);
 
     sprintf(vname,"sig_inHist_%s",hist->GetName());
@@ -368,7 +368,7 @@ CMCStackConvGaussian::CMCStackConvGaussian(RooRealVar &m, TH1D* hist_dy, TH1D* h
     char vname[50];
 
     sprintf(vname,"sig_mean%s",name);  mean  = new RooRealVar(vname,vname,0,-2.5,2.5);
-    sprintf(vname,"sig_sigma%s",name); sigma = new RooRealVar(vname,vname,2,0,5);
+    sprintf(vname,"sig_sigma%s",name); sigma = new RooRealVar(vname,vname,2,0.1,5);
     sprintf(vname,"sig_gaus%s",name);  gaus  = new RooGaussian(vname,vname,m,*mean,*sigma);
 
     sprintf(vname,"sig_inHist_dy_%s",hist_dy->GetName()); inHist_dy = (TH1D*)hist_dy->Clone(vname);
