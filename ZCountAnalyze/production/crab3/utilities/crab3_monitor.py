@@ -217,8 +217,7 @@ if __name__ == '__main__':
                print ' '.join(printout_lines)
 
                # output to Tier-2
-               if OutputPrePath_str.startswith(opts.Tier2_prepath):
-
+               if False: #OutputPrePath_str.startswith(opts.Tier2_prepath):
                   if not os.path.isdir(os.path.dirname(hadd_output_file)):
                      WARNING(log_prx+'target Tier-2 directory for output file does not exist: '+os.path.dirname(hadd_output_file))
                      continue
@@ -265,7 +264,6 @@ if __name__ == '__main__':
                       EXE('rm'        +' '+exp_output_files_tmp[i_tmp], verbose=opts.verbose)
 
                else:
-
                   if not os.path.isdir(os.path.dirname(hadd_output_file)):
                        EXE('mkdir -p '+os.path.dirname(hadd_output_file), verbose=opts.verbose)
 

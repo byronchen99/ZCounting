@@ -76,8 +76,9 @@ process.source = cms.Source("PoolSource",
         #'file:/pnfs/desy.de/cms/tier2/store/mc/RunIISummer20UL17RECO/DYJetsToLL_M-50_HT-100to200_TuneCP5_PSweights_13TeV-madgraphMLM-pythia8/AODSIM/106X_mc2017_realistic_v6-v1/00000/0C0FD46D-6DAE-6F45-B9F4-129A6ABC69C4.root'
         # "/store/mc/RunIISummer20UL17RECO/DYJetsToLL_M-50_TuneCP5_13TeV-amcatnloFXFX-pythia8/AODSIM/106X_mc2017_realistic_v6-v1/130000/2678F234-2D42-AB4F-89E4-80AFDE9EFB82.root"
         # "/store/mc/RunIISummer20UL17RECO/DYJetsToLL_M-50_HT-100to200_TuneCP5_PSweights_13TeV-madgraphMLM-pythia8/AODSIM/106X_mc2017_realistic_v6-v1/00000/0C0FD46D-6DAE-6F45-B9F4-129A6ABC69C4.root"
-        # '/store/mc/Run3Winter22DR/DYJetsToLL_M-50_TuneCP5_13p6TeV-madgraphMLM-pythia8/AODSIM/FlatPU0to70_122X_mcRun3_2021_realistic_v9_ext1-v2/2520000/002de84f-b906-4509-8cb6-872ee0cf4029.root'
-        'file:/eos/home-d/dwalter/Lumi/ZCounting_Standalone/CMSSW_12_4_3/src/ZCounting/ZCountAnalyze/002de84f-b906-4509-8cb6-872ee0cf4029.root'
+        #'/store/mc/Run3Winter22DR/DYJetsToLL_M-50_TuneCP5_13p6TeV-madgraphMLM-pythia8/AODSIM/FlatPU0to70_122X_mcRun3_2021_realistic_v9_ext1-v2/2520000/002de84f-b906-4509-8cb6-872ee0cf4029.root'
+        # 'file:/eos/home-d/dwalter/Lumi/ZCounting_Standalone/CMSSW_12_4_3/src/ZCounting/ZCountAnalyze/002de84f-b906-4509-8cb6-872ee0cf4029.root'
+        'file:/eos/home-d/dwalter/Lumi/ZCounting_Standalone/CMSSW_12_4_3/src/ZCounting/ZCountAnalyze/production/crab3/655c9af9-8470-4625-94c9-24ab6555ffa8.root'
     )
 )
 
@@ -119,8 +120,6 @@ if options.samplename in ('smu','met'):
     if options.year in ('2016', '2017', '2018'):
         globalTag = '106X_dataRun2_v32'
     elif options.year in ('2022', ):
-        globalTag = '123X_dataRun3_Prompt_v12'
-    else:
         globalTag = '124X_dataRun3_Prompt_v4'
 
 # ## Geometry and Detector Conditions
@@ -162,7 +161,7 @@ if options.samplename in ('dy', 'zz', 'wz', 'ttz'):
     
     process.zcounting.genWeights = genWeights
     process.zcounting.pdfWeights = pdfWeights
-    process.zcounting.printLHE = True
+    process.zcounting.printLHE = False
     
     ### particle level definition of gen events
     from GeneratorInterface.RivetInterface.genParticles2HepMC_cfi import genParticles2HepMC

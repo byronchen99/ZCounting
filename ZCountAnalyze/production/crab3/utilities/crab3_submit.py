@@ -157,4 +157,4 @@ if __name__ == '__main__':
            EXE('crab submit -c '+crab3_cfgfile, verbose=opts.verbose, dry_run=opts.dry_run)
 
            EXE('mv '+crab3_cfgfile+' crab_'+crab3_tag, verbose=opts.verbose, dry_run=opts.dry_run)
-           EXE('rm '+crab3_cfgfile.replace('.py', '.pyc'), verbose=opts.verbose, dry_run=opts.dry_run)
+           #EXE('rm '+crab3_cfgfile.replace('.py', '.pyc'), verbose=opts.verbose, dry_run=opts.dry_run)
