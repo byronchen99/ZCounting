@@ -227,7 +227,7 @@ if __name__ == '__main__':
     
     if args.sigTemplates == "default":
         sigModel = 2 # MC, folding with gauss
-    if args.sigTemplates == "MC":
+    elif args.sigTemplates == "MC":
         sigModel = 4 # MC, no folding
     elif args.sigTemplates == "BW":
         sigModel = 3 # BW, no folding
@@ -236,7 +236,7 @@ if __name__ == '__main__':
     elif args.sigTemplates == "BWxGaus":
         sigModel = 5 # BW, folding with gauss
     elif args.sigTemplates == "MCxCB":
-        sigModel = 6
+        sigModel = 6 # MC, folding with crystal ball
         
     if args.bkgTemplates == "None":
         bkgModel = 6

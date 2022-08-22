@@ -52,6 +52,10 @@ Float_t massHi  = 116.;
 UInt_t  massBin = (UInt_t)(massHi-massLo);
 Float_t massWidth = 1.0;
 
+Float_t npvLo = -0.5;
+Float_t npvHi = 74.5;
+UInt_t npvBin = (UInt_t)(npvHi-npvLo);
+
 Float_t etaCutTag   = 2.4;
 Float_t etaCutProbe = 2.4;
 Float_t etaBound    = 0.9;
@@ -81,7 +85,14 @@ void set_massRange(Float_t massLo_, Float_t massHi_, UInt_t nBins=0){
     massWidth = (massHi-massLo)/massBin;
 
     std::cout<<"Set mass range to ["<<massLo_<<","<<massHi_<<"] with "<<massBin<<" bins."<<std::endl;
+}
 
+void set_npvRange(Float_t npvLo_, Float_t npvHi_){
+    npvLo = npvLo_;
+    npvHi = npvHi_;
+    npvBin = (UInt_t)(npvHi-npvLo);
+
+    std::cout<<"Set npv range to ["<<npvLo_<<","<<npvHi_<<"] with "<<npvBin<<" bins."<<std::endl;
 }
 
 void set_ptCut(Float_t pt_){
@@ -272,8 +283,10 @@ TFile* generateTemplate(
     TTree *eventTree = (TTree*)infile->Get(effType);
     TH1D *hPVtemplate = (TH1D*)infile->Get("hPV");
 
-    if(hPV)
+    if(hPV){
+        std::cout<<"PV reweighting with <PV> = "<<hPV->GetMean()<<std::endl;       
         hPV->Divide(hPVtemplate);
+    }
 
     Double_t mass, ptTag, etaTag, ptProbe, etaProbe;
     Double_t wgt;
@@ -542,10 +555,6 @@ TFile* generateTemplate_cHLT(
     eventTree->SetBranchAddress("match1",       &match1);
     eventTree->SetBranchAddress("match2",     &match2);    
     eventTree->SetBranchAddress("eventWeight",    &wgt);
-    
-    const int npvBin = 75;
-    const double npvLo = -0.5;
-    const double npvHi = 74.5;
     
     TH1D *h_npv_0hlt_BB = new TH1D("h_npv_0hlt_BB", "", npvBin, npvLo, npvHi);
     TH1D *h_npv_0hlt_BE = new TH1D("h_npv_0hlt_BE", "", npvBin, npvLo, npvHi);
@@ -1898,7 +1907,7 @@ void calculateHLTEfficiencyAndYield(
     w->import(chi2p);
     w->import(chi2f);
     w->import(chi2);
-    w->import(c);
+    // w->import(c);
     w->Write();
 
     best_fitResult->Write("fitResult");

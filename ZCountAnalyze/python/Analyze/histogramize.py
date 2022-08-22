@@ -43,8 +43,11 @@ lumi_nBins = 2500
 lumi_lo = 0.5
 lumi_hi = 2500.5
 
-muonMass = 0.105658369
+pv_nBins = 100
+pv_lo = 0.5
+pv_hi = 100.5
 
+muonMass = 0.105658369
 
 ### resources
 treename = "zcounting/tree"
@@ -58,7 +61,7 @@ if not os.path.isdir(dirOut):
 
 
 branches_muon = ["Muon_pt", "Muon_eta", "Muon_phi", "Muon_ID", "Muon_charge", "Muon_triggerBits"]
-branches_event = ["lumiBlock", "runNumber"]
+branches_event = ["lumiBlock", "runNumber", "nPV"]
 aliases = {
 
 }
@@ -87,9 +90,20 @@ for run in runs:
             continue
         print(f"Have a batch with {len(batch)} events")    
         
-        muons = batch[branches_muon]
         events = batch[branches_event]
+
+        # histograms with number of primary vertices vs lumisection
+        xx = events["lumiBlock"].to_numpy()
+        yy = events["nPV"].to_numpy()
         
+        hist = np.histogram2d(xx, yy, bins=[lumi_nBins, pv_nBins], range=((lumi_lo,lumi_hi), (pv_lo, pv_hi)))
+        if "h_npv" in hists.keys():
+            hists["h_npv"] = (hist[0] + hists["h_npv"][0], hist[1], hist[2])
+        else:
+            hists["h_npv"] = hist
+
+        muons = batch[branches_muon]
+
         # select muons within the acceptance
         muons = muons[(muons["Muon_pt"] > ptCut) & (abs(muons["Muon_eta"]) < etaCut)]
 
@@ -122,9 +136,9 @@ for run in runs:
         
         # loop over pair collections with names to store them in dictionary
         for name, pair in ( 
-            ("hlt1", p_hlt1),
-            ("hlt2", p_hlt2), 
-            ("sel_fail", p_sel_fail) 
+            ("1HLT", p_hlt1),
+            ("2HLT", p_hlt2), 
+            ("SIT_fail", p_sel_fail) 
         ):
             # get masses for each pair    
             events[f"m_{name}"] = get_masses(pair, mass_lo, mass_hi)
