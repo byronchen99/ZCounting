@@ -254,7 +254,7 @@ Int_t set_background_model(
             model = new CDasPlusExp(param_mass, pass, ibin);
             return 6;
         case 6:
-            model = new CRooCMSShape(param_mass, pass, ibin, 56., 116.);
+            model = new CRooCMSShape(param_mass, pass, ibin);
             return 3;
         case 7:
             model = new CQCD(param_mass, hist, pass, ibin);

@@ -87,7 +87,7 @@ public:
 class CRooCMSShape: public CBackgroundModel
 {
 public:
-    CRooCMSShape(RooRealVar &m, const Bool_t pass, const Int_t ibin, const Double_t massLo, const Double_t massHi);
+    CRooCMSShape(RooRealVar &m, const Bool_t pass, const Int_t ibin, const Double_t massLo=30, const Double_t massHi=300);
     RooRealVar *alpha,*beta,*gamma,*peak;
     ~CRooCMSShape();
     void freeze_all_parameters();

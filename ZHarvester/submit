@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 def zmonitoring(
     dirDQM,
@@ -13,7 +13,8 @@ def zmonitoring(
     test,
     runlist = None,
     beginRun=0,
-    endRun=400000
+    endRun=400000,
+    longQueue=False # submit on the long queue
 ):
     import os
     import pandas as pd
@@ -51,12 +52,21 @@ def zmonitoring(
     #cs_file.write("+JobFlavour =\"testmatch\" \n") # only works at lxplus
     #cs_file.write("+RequestRuntime = 43200 \n")  # only works at naf(desy) 43200s = 12h
     #cs_file.write("RequestMemory = 19999 \n")
+    # if longQueue:
+    #     # long queue
+    #     cs_file.write("+RequestRuntime = 43200 \n")  # only works at naf(desy) 43200s = 12h
+    #     cs_file.write("RequestMemory = 19999 \n") 
+    # else:
+    #     # short queue: with memory < 2GB -> request 1999MB and time < 3h -> request 10799s
+    #     cs_file.write("+RequestRuntime = 10799 \n")  # only works at naf(desy) 43200s = 12h
+    #     cs_file.write("RequestMemory = 1999 \n") 
 
     runs = []
     for run in runlist:
         if int(run) < beginRun or int(run) > endRun:
             continue
-        if len(glob.glob(dirDQM+"/000*/*{0}*.root".format(run))) == 0:
+        # if len(glob.glob(dirDQM+"/000*/*{0}*.root".format(run))) == 0:
+        if len(glob.glob(dirDQM+"/*Muon_{0}*.root".format(run))) == 0:
             continue
         runs.append(run)
         cs_file.write("arguments  = {0} {1} {2} {3} {4} {5} {6} {7} {8} {9} {10} {11} {12}\n".format(
@@ -120,7 +130,7 @@ def check(projectdir, resubmit=False, collect=False):
 
     if collect:
         from python.utils import writeSummaryCSV     
-        writeSummaryCSV(projectdir+"/csvFiles/", writeByLS=True)
+        writeSummaryCSV(projectdir+"/csvFiles/", writeByLS=False)
 
     with open(projectdir+'/jobinfo.json', 'r') as f:
         ji = json.load(f)
@@ -166,7 +176,8 @@ def check(projectdir, resubmit=False, collect=False):
 
                 zmonitoring(ji['dirDQM'], ji['dirOut'], ji['byLsCSV'], ji['mcCorrections'], ji['sigTemplates'], ji['bkgTemplates'], ji['ptCut'],
                     (ji['mass_lo'], ji['mass_hi'], ji['mass_bins']), ji['luminosity'], False,
-                    runlist=[ji['runs'][i] for i in unfinished_jobs])
+                    runlist=[ji['runs'][i] for i in unfinished_jobs],
+                    longQueue=longQueue)
 
 # ------------------------------------------------------------------------------
 # parse command line arguments
@@ -210,7 +221,7 @@ if __name__ == '__main__':
         help='specify amount of luminosity per measurement in pb-1'
     )
     parserA.add_argument(
-        '--mass', nargs=3, metavar=('LOW', 'HIGH', 'NBINS'), default=(70, 250, 360),
+        '--mass', nargs=3, metavar=('LOW', 'HIGH', 'NBINS'), default=(60, 120, 120),
         help='specify mass range for tag and probe muon pairs'
     )
     parserA.add_argument(
@@ -218,7 +229,7 @@ if __name__ == '__main__':
         help='specify byLsCSV to select specific lumi sections'
     )
     parserA.add_argument(
-        '--ptCut', type=float, default=30.,
+        '--ptCut', type=float, default=25.,
         help='specify lower pt cut on tag and probe muons'
     )
     parserA.add_argument(
@@ -228,6 +239,10 @@ if __name__ == '__main__':
     parserA.add_argument(
         '-t', '--test', default=False, action="store_true",
         help='test without submitting, just create the submit script'
+    )
+    parserA.add_argument(
+        '--longQueue', default=False, action="store_true",
+        help='submit on the long queue'
     )
 
     # command line arguments: check
@@ -247,6 +262,10 @@ if __name__ == '__main__':
         '--collect', default=False, action="store_true",
         help='Merge result csv files of finished jobs'
     )
+    parserC.add_argument(
+        '--longQueue', default=False, action="store_true",
+        help='submit on the long queue'
+    )
 
 
     # parse arguments and call subparser
@@ -264,8 +283,13 @@ if __name__ == '__main__':
             args.LumiPerMeasurement,
             args.test,
             beginRun=args.beginRun,
-            endRun=args.endRun)
+            endRun=args.endRun,
+            longQueue=args.longQueue)
     if args.subparser == 'check':
-        check(args.project, args.resubmit, args.collect)
+        check(
+            args.project, 
+            args.resubmit, 
+            args.collect,
+            longQueue=args.longQueue)
      
     
