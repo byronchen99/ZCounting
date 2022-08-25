@@ -165,12 +165,14 @@ for run, byLS_run in byLS_data.groupby('run'):
                 # prefix=f"DQMData/Run {run}/ZCounting/Run summary/Histograms/", 
                 prefix="", 
                 suffix="new")
-        
+
+        # load histograms for hlt efficiency and Z yield
         h_hlt2 = load(f"h_mass_2HLT")
         h_hlt1 = load(f"h_mass_1HLT")
         
         ROOT.calculateHLTEfficiencyAndYield(h_hlt2, h_hlt1, m, etaRegion, sigModel, bkgModel, sigModel, bkgModel, hPV, sigTemplates)
-
+        
+        # load histograms for selection efficiency
         h_sel_fail = load(f"h_mass_SIT_fail")
         
         h_sel_pass = h_hlt2.Clone()
@@ -178,7 +180,20 @@ for run, byLS_run in byLS_data.groupby('run'):
         h_sel_pass.Add(h_hlt1)
         
         ROOT.calculateDataEfficiency(h_sel_pass, h_sel_fail, m, "Sel", etaRegion, sigModel, bkgModel, sigModel, bkgModel, hPV, sigTemplates)
-       
+
+        # load histograms for global muon efficiency
+        h_glo_pass = load(f"h_mass_Glo_pass")
+        h_glo_fail = load(f"h_mass_Glo_fail")
+
+        ROOT.calculateDataEfficiency(h_glo_pass, h_glo_fail, m, "Glo", etaRegion, sigModel, bkgModel, sigModel, bkgModel, hPV, sigTemplates)
+
+        # load histograms for standalone muon efficiency
+        h_sta_pass = load(f"h_mass_Sta_pass")
+        h_sta_fail = load(f"h_mass_Sta_fail")
+
+        ROOT.calculateDataEfficiency(h_sta_pass, h_sta_fail, m, "Sta", etaRegion, sigModel, bkgModel, sigModel, bkgModel, hPV, sigTemplates)
+
+        
         log.info("Load fit results ...")
         
         def load_from_workspace(type_eff):
@@ -204,7 +219,8 @@ for run, byLS_run in byLS_data.groupby('run'):
         
         recoZ, effHLT = load_from_workspace("yield")
         effSel = load_from_workspace("Sel")
-        # effGlo = load_from_workspace("Glo")
+        effGlo = load_from_workspace("Glo")
+        effSta = load_from_workspace("Sta")
         
         # trigger efficiency that at least one muon passes the trigger
         # effTrigger = (1 - (1-effHLT)**2 )
@@ -213,7 +229,7 @@ for run, byLS_run in byLS_data.groupby('run'):
         # delivered number of Zs given by efficiency corrected number of reconstructed Zs
         # delZ = recoZ / (effTrigger * effSel**2 * effGlo**2)
         
-        delZ = recoZ / effSel**2
+        delZ = recoZ / (effSel**2 * effGlo**2 * effSta**2)
 
         log.info(f"Delivered number of Zs = {delZ}")
 
@@ -248,7 +264,8 @@ for run, byLS_run in byLS_data.groupby('run'):
             "pileUp": byLS_m['avgpu'].mean(),
             "effHLT": effHLT,
             "effSel": effSel,
-            # "effGlo": effGlo,
+            "effGlo": effGlo,
+            "effSta": effSta,
             # delivered Z rate (corrected for deadtime and extrapolatet to the total time window)
             "delZCount": delZ / deadtime * (totaltimewindow / timewindow),    
             # instantaneous delivered Z rate (corrected for deadtime)
@@ -256,10 +273,6 @@ for run, byLS_run in byLS_data.groupby('run'):
             
         }
         results.append(result)
-        
-        # # for testing exit after two measurements
-        # if m >= 1:
-        #     break
 
     # make one dataframe with information of the measurements
     df_results = pd.concat([pd.DataFrame([result]) for result in results], ignore_index=True, sort=False)
