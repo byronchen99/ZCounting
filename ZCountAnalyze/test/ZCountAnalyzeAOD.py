@@ -119,8 +119,11 @@ if options.samplename in ('smu','met'):
 # set global tag (INFO: https://twiki.cern.ch/twiki/bin/view/CMSPublic/SWGuideFrontierConditions?redirectedfrom=CMS.SWGuideFrontierConditions)
     if options.year in ('2016', '2017', '2018'):
         globalTag = '106X_dataRun2_v32'
+    elif options.year in ('2022B', ):
+        globalTag = '123X_dataRun3_HLT_v14'
     elif options.year in ('2022', ):
         globalTag = '124X_dataRun3_Prompt_v4'
+
 
 # ## Geometry and Detector Conditions
 process.load("Configuration.Geometry.GeometryDB_cff")
@@ -148,7 +151,6 @@ process.load("ZCounting.ZCountAnalyze.CountEventAnalyzer_cfi")
 process.load("ZCounting.ZCountAnalyze.PileupMCTemplateMaker_cfi")
 process.pileupMCTemplateMaker.src = cms.InputTag('addPileupInfo')
 
-process.zcounting.era = options.year
 process.zcounting.roccorFile = cms.string(roccoFile)
 
 # if no good Z candidate is found. E.g. if gamma is found instead

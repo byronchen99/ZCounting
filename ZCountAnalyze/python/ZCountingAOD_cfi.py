@@ -3,7 +3,6 @@ import FWCore.ParameterSet.Config as cms
 zcounting = cms.EDAnalyzer('ZCountingAOD',
     pileupSummaryInfoCollection=cms.InputTag("addPileupInfo"),
 
-    era = cms.string("None"),
     # Primary vertex - source
     edmPVName = cms.InputTag("offlinePrimaryVertices"),
     

@@ -161,8 +161,6 @@ private:
     // Effective area constants
     EffectiveAreas effectiveAreas_;
 
-    std::string era_;
-
     // Triggers
     bool hltChanged_;
 
@@ -382,8 +380,6 @@ ZCountingAOD::ZCountingAOD(const edm::ParameterSet& iConfig):
     effectiveAreas_((iConfig.getParameter<edm::FileInPath>("effAreasConfigFile")).fullPath())
 {
     LogDebug("ZCountingAOD")<<"ZCountingAOD(...)";
-
-    era_ = iConfig.getParameter<std::string>("era");
 
     isData_ = iConfig.getUntrackedParameter<bool>("isData");
     hasGenZ_ = iConfig.getUntrackedParameter<bool>("hasGenZ");
