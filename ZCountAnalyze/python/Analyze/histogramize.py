@@ -34,22 +34,28 @@ args = parser.parse_args()
 ### settings
 mode = "LUM-21-001" # "LUM-21-001" to create histograms as done in LUM-21-001 or "cmssw" to create the histograms done in the cmssw plugin
 
-### acceptance cuts
+# acceptance cuts
 ptCut = 27
 etaCut = 2.4
-mass_lo = 66
-mass_hi = 116
-mass_nBins = (int)(mass_hi - mass_lo)
 
+# mass binning
+mass_lo = 60
+mass_hi = 120
+mass_nBins = 4*(int)(mass_hi - mass_lo)
+
+# lumisection binning
 lumi_nBins = 2500
 lumi_lo = 0.5
 lumi_hi = 2500.5
 
+# binning for histogram of number of primary vertices (needed for correlation factor)
 pv_nBins = 100
 pv_lo = 0.5
 pv_hi = 100.5
 
 muonMass = 0.105658369
+
+etaBound = 0.9  # below this value is barrel (B) above is endcap (E)
 
 ### resources
 treename = "zcounting/tree"
@@ -70,7 +76,8 @@ branches_muon = [
 branches_standalones = [
     "Muon_ptStaReg", "Muon_etaStaReg", "Muon_phiStaReg", "Muon_chargeStaReg", 
     "Muon_ptStaUpd", "Muon_etaStaUpd", "Muon_phiStaUpd", "Muon_chargeStaUpd", 
-    "Muon_useUpdated", "Muon_ID"
+    "Muon_useUpdated", "Muon_ID",
+    "Muon_phi"
     ]
 branches_tracks = [
     "Track_pt", "Track_eta", "Track_phi", "Track_charge",
@@ -98,7 +105,7 @@ for run in runs:
     print(f"Now at run {run}")
     hists = dict()
     # process the events in batches to avoid using too much memory
-    for batch in uproot.iterate(filenames, step_size="10 MB", library="ak", 
+    for batch in uproot.iterate(filenames, step_size="100 MB", library="ak", 
         filter_name=branches_event+branches_muon+branches_tracks+branches_standalones, 
         aliases=aliases, cut=f"runNumber == {run}"
     ):
@@ -126,6 +133,9 @@ for run in runs:
         muons["phi"] = muons["Muon_phi"]
         muons["charge"] = muons["Muon_charge"]
 
+        # index of the muon within the event (needed to disambiguate)
+        muons["index"] = ak.local_index(muons["Muon_pt"])
+
         # collection of muons that pass ID and hlt
         hlt_pass = muons[(muons["pt"] > ptCut) & (abs(muons["eta"]) < etaCut) & (muons["Muon_ID"]>=4) & (muons["Muon_triggerBits"]&1 != 0)]
 
@@ -150,6 +160,7 @@ for run in runs:
             stas["eta"] = stas["Muon_useUpdated"] * stas["Muon_etaStaUpd"] + (1 - stas["Muon_useUpdated"]) * stas["Muon_etaStaReg"] 
             stas["phi"] = stas["Muon_useUpdated"] * stas["Muon_phiStaUpd"] + (1 - stas["Muon_useUpdated"]) * stas["Muon_phiStaReg"] 
             stas["charge"] = stas["Muon_useUpdated"] * stas["Muon_chargeStaUpd"] + (1 - stas["Muon_useUpdated"]) * stas["Muon_chargeStaReg"] 
+            stas["index"] = muons["index"]
 
             glo_pass = stas[(stas["pt"] > ptCut) & (abs(stas["eta"]) < etaCut) & (stas["Muon_ID"]>=3)]
             glo_fail = stas[(stas["pt"] > ptCut) & (abs(stas["eta"]) < etaCut) & (stas["Muon_ID"]==2)]
@@ -169,7 +180,7 @@ for run in runs:
             trks = trks[(trks["Track_trackAlgo"] != 13) & (trks["Track_trackAlgo"] != 14)] # veto muon seeded tracks
 
 
-        def fill_hists(name, tags, probes=None):
+        def produce(name, tags, probes=None, disambiguate=False):
             # build pairs from the specified collections, compute masses, and fill histograms
 
             # 1.) build pairs
@@ -179,20 +190,34 @@ for run in runs:
                 # require pairs with opposite charge
                 p_charge = ak.combinations(tags["charge"], 2)        
                 lefts, rights = ak.unzip(p_charge)
-                p_mask = lefts*rights == -1
+                mask_p = lefts*rights == -1
 
-                p_pt = ak.combinations(tags["pt"], 2)[p_mask]
-                p_eta = ak.combinations(tags["eta"], 2)[p_mask]
-                p_phi = ak.combinations(tags["phi"], 2)[p_mask]
+                p_pt = ak.combinations(tags["pt"], 2)[mask_p]
+                p_eta = ak.combinations(tags["eta"], 2)[mask_p]
+                p_phi = ak.combinations(tags["phi"], 2)[mask_p]
             else:
                 # require pairs with opposite charge
                 p_charge = ak.cartesian([tags["charge"], probes["charge"]])        
-                lefts, rights = ak.unzip(p_charge)
-                p_mask = lefts*rights == -1
+                l_charge, r_charge = ak.unzip(p_charge)
+                mask_p = l_charge*r_charge == -1
 
-                p_pt = ak.cartesian([tags["pt"],probes["pt"]])[p_mask]
-                p_eta = ak.cartesian([tags["eta"],probes["eta"]])[p_mask]
-                p_phi = ak.cartesian([tags["phi"],probes["phi"]])[p_mask]
+
+                if disambiguate:
+                    # take care that the same object is not used as tag and probe, 
+                    #    this can happen e.g. if the charge used for the probe is different then the one used for the tag
+                    # s1 = sum(ak.flatten(mask_p))
+
+                    p_idx = ak.cartesian([tags["index"], probes["index"]])
+                    l_idx, r_idx = ak.unzip(p_idx)
+                    mask_p = mask_p & (l_idx != r_idx)
+
+                    # s2 = sum(ak.flatten(mask_p))
+
+                    # print(f"Reject {s1-s2} pairs due to ambiguity")
+
+                p_pt = ak.cartesian([tags["pt"],probes["pt"]])[mask_p]
+                p_eta = ak.cartesian([tags["eta"],probes["eta"]])[mask_p]
+                p_phi = ak.cartesian([tags["phi"],probes["phi"]])[mask_p]
 
             # 2.) calculate mass of each pair
             l_pt, r_pt = ak.unzip(p_pt)
@@ -201,58 +226,55 @@ for run in runs:
 
             mu1 = vector.obj(pt=l_pt, phi=l_phi, eta=l_eta, mass=l_pt*0+muonMass)
             mu2 = vector.obj(pt=r_pt, phi=r_phi, eta=r_eta, mass=r_pt*0+muonMass)
-            
+
             masses = (mu1 + mu2).mass
 
+            mask_mass = (masses > mass_lo) & (masses < mass_hi)
+
             # 3.) Fill histograms    
-            if mass_lo:
-                masses = masses[masses > mass_lo]
-            if mass_hi:
-                masses = masses[masses < mass_hi]
+            for region, mask_eta in (
+                ("BB", (abs(l_eta) < etaBound) & (abs(r_eta) < etaBound)),
+                ("BE", (abs(l_eta) < etaBound) != (abs(r_eta) < etaBound)),
+                ("EE", (abs(l_eta) >= etaBound) & (abs(r_eta) >= etaBound))
+            ):
 
-            # Fill histograms    
-            # get masses for each pair    
-            events[f"m_{name}"] = masses
-            
-            mask = (ak.num(events[f"m_{name}"]) >= 1)
+                yy = masses[mask_eta & mask_mass]   # select tag and probe pairs in eta and mass range
+                xx = events["lumiBlock"]
 
-            xx = events[mask]["lumiBlock"]
-            yy = events[mask][f"m_{name}"]
-            
-            # pair multiplicities in each event 
-            # counts = ak.num(events[mask][f"m_{n}"])
-            
-            # bring the event by event array into the same dimension
-            if len(xx) > 0:
-                xx = ak.unflatten(xx,counts=1)
-            
-            # bring the arrays into the same form
-            xx, yy = ak.broadcast_arrays(xx,yy)
-            
-            xx = ak.flatten(xx).to_numpy()
-            yy = ak.flatten(yy).to_numpy()
-            
-            hist = np.histogram2d(xx, yy, bins=[lumi_nBins, mass_nBins], range=((lumi_lo,lumi_hi), (mass_lo, mass_hi)))
-            
-            histname = f"h_mass_{name}"
-            if histname in hists.keys():
-                hists[histname] = (hist[0] + hists[histname][0], hist[1], hist[2])
-            else:
-                hists[histname] = hist
+                # pair multiplicities in each event 
+                # counts = ak.num(yy)
+                
+                # bring the event by event array into the same dimension
+                if len(xx) > 0:
+                    xx = ak.unflatten(xx,counts=1)
+                
+                # bring the arrays into the same form
+                xx, yy = ak.broadcast_arrays(xx,yy)
+                
+                xx = ak.flatten(xx).to_numpy()
+                yy = ak.flatten(yy).to_numpy()
+                
+                hist = np.histogram2d(xx, yy, bins=[lumi_nBins, mass_nBins], range=((lumi_lo,lumi_hi), (mass_lo, mass_hi)))
+                
+                histname = f"h_mass_{name}_{region}"
+                if histname in hists.keys():
+                    hists[histname] = (hist[0] + hists[histname][0], hist[1], hist[2])
+                else:
+                    hists[histname] = hist
 
-        fill_hists("2HLT", hlt_pass)
-        fill_hists("1HLT", hlt_pass, hlt_fail) 
-        fill_hists("SIT_fail", hlt_pass, sel_fail) 
+        produce("2HLT", hlt_pass)
+        produce("1HLT", hlt_pass, hlt_fail) 
+        produce("SIT_fail", hlt_pass, sel_fail) 
 
         if mode == "cmssw":
-            fill_hists("Glo_fail", hlt_pass, glo_fail) 
-            fill_hists("Glo_fail", hlt_pass, trks)
+            produce("Glo_fail", hlt_pass, glo_fail) 
+            produce("Glo_fail", hlt_pass, trks)
         elif mode == "LUM-21-001":
-            fill_hists("Sta_pass", hlt_pass, sta_pass) 
-            fill_hists("Sta_fail", hlt_pass, trks)
+            produce("Sta_pass", hlt_pass, sta_pass) 
+            produce("Sta_fail", hlt_pass, trks)
 
-            fill_hists("Glo_pass", hlt_pass, glo_pass) 
-            fill_hists("Glo_fail", hlt_pass, glo_fail)            
+            produce("Glo_pass", hlt_pass, glo_pass, disambiguate=True) 
+            produce("Glo_fail", hlt_pass, glo_fail)            
 
     # open output root file
     print(f"Write out results in `output_Run{run}.root`")

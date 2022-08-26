@@ -323,7 +323,25 @@ if __name__ == '__main__':
     byLS_data = load_input_csv(byLS_filename)
 
     #####################################   
+
+    # For fitting
+    hPV = ROOT.TH1D("h_PV","", npvBin_, npvMin_, npvMax_)
+
+    h2HLT = ROOT.TH1D("h_mass_2HLT_Z","",MassBin_, MassMin_, MassMax_)
+    h1HLT = ROOT.TH1D("h_mass_1HLT_Z","",MassBin_, MassMin_, MassMax_)
+
+    hSITpass = ROOT.TH1D("h_mass_SIT_pass","",MassBin_, MassMin_, MassMax_)
+    hSITfail = ROOT.TH1D("h_mass_SIT_fail","",MassBin_, MassMin_, MassMax_)
+
+    hGlopass = ROOT.TH1D("h_mass_Glo_pass","",MassBin_, MassMin_, MassMax_)
+    hGlofail = ROOT.TH1D("h_mass_Glo_fail","",MassBin_, MassMin_, MassMax_)
+
+    # hTrkfail = ROOT.TH1D("h_mass_Trk_fail","",MassBin_, MassMin_, MassMax_)
+    hStapass = ROOT.TH1D("h_mass_Sta_pass","",MassBin_, MassMin_, MassMax_)
+    hStafail = ROOT.TH1D("h_mass_Sta_fail","",MassBin_, MassMin_, MassMax_)
     
+    byLS_data = byLS_data.loc[(byLS_data['run'] >= int(args.beginRun)) & (byLS_data['run'] < int(args.endRun))]
+
     recLumi = 0
     firstRun = 0
     lastRun = 0
@@ -331,10 +349,7 @@ if __name__ == '__main__':
     results = []
     mergeNextRun=False
     log.info(" === Looping over runs... {0} to {1}".format(int(args.beginRun), int(args.endRun)))
-    for run, byLS_run in byLS_data.groupby('run'):
-
-        if run < int(args.beginRun) or run >= int(args.endRun):
-            continue
+    for run, byLS_run in byLS_data.groupby('run', sort=True):
         
         # first and last run of the measurement
         if firstRun == 0:
@@ -364,21 +379,19 @@ if __name__ == '__main__':
         tSta = file_.Get("Sta")
 
         # histograms need to be in same directory so that they can get filled
-        # For fitting
-        hPV = ROOT.TH1D("h_PV","", npvBin_, npvMin_, npvMax_)
+        hPV.SetDirectory(file_)
+        h2HLT.SetDirectory(file_)
+        h1HLT.SetDirectory(file_)
         
-        h2HLT = ROOT.TH1D("h_mass_2HLT_Z","",MassBin_, MassMin_, MassMax_)
-        h1HLT = ROOT.TH1D("h_mass_1HLT_Z","",MassBin_, MassMin_, MassMax_)
-        
-        hSITpass = ROOT.TH1D("h_mass_SIT_pass","",MassBin_, MassMin_, MassMax_)
-        hSITfail = ROOT.TH1D("h_mass_SIT_fail","",MassBin_, MassMin_, MassMax_)
+        hSITpass.SetDirectory(file_)
+        hSITfail.SetDirectory(file_)
 
-        hGlopass = ROOT.TH1D("h_mass_Glo_pass","",MassBin_, MassMin_, MassMax_)
-        hGlofail = ROOT.TH1D("h_mass_Glo_fail","",MassBin_, MassMin_, MassMax_)
+        hGlopass.SetDirectory(file_)
+        hGlofail.SetDirectory(file_)
         
-        # hTrkfail = ROOT.TH1D("h_mass_Trk_fail","",MassBin_, MassMin_, MassMax_)
-        hStapass = ROOT.TH1D("h_mass_Sta_pass","",MassBin_, MassMin_, MassMax_)
-        hStafail = ROOT.TH1D("h_mass_Sta_fail","",MassBin_, MassMin_, MassMax_)     
+        # hTrkfail.SetDirectory(file_)
+        hStapass.SetDirectory(file_)
+        hStafail.SetDirectory(file_)     
 
         Lumilist = byLS_run.loc[byLS_run['ls'].isin(LSlist)]['recorded(/pb)'].values.tolist()
         ZCountlist = [tHLT.GetEntries("lumiBlock=={0}".format(l))
@@ -465,6 +478,7 @@ if __name__ == '__main__':
             mergeNextRun = nextRun < int(args.endRun) and (mergeNextRun or recLumi < 0.5 * LumiPerMeasurement or args.inclusive)            
 
             if mergeNextRun:
+                log.info(" === Merge with next run ... ")
                 continue
             
             if firstRun != lastRun:
@@ -537,7 +551,25 @@ if __name__ == '__main__':
             hStapass.Reset()
             hStafail.Reset()
 
-            hPV.Reset()
+            hPV.Reset() 
+
+        ### prepare for next run
+        # keep histograms
+        hPV.SetDirectory(0)
+        h2HLT.SetDirectory(0)
+        h1HLT.SetDirectory(0)
+        
+        hSITpass.SetDirectory(0)
+        hSITfail.SetDirectory(0)
+
+        hGlopass.SetDirectory(0)
+        hGlofail.SetDirectory(0)
+        
+        # hTrkfail.SetDirectory(0)
+        hStapass.SetDirectory(0)
+        hStafail.SetDirectory(0)    
+
+        file_.Close()
 
         if mergeNextRun:
             continue
@@ -552,8 +584,6 @@ if __name__ == '__main__':
 
         firstRun = 0
         results = []
-        file_.Close()
-
 
     if args.writeSummaryCSV:
         writeSummaryCSV(outCSVDir, writeByLS=False)

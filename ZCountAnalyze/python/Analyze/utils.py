@@ -1,4 +1,3 @@
-from pandas import DataFrame
 import matplotlib.pyplot as plt
 from scipy.stats import pearsonr
 
@@ -6,41 +5,6 @@ from scipy.optimize import curve_fit
 import uncertainties as unc
 import pdb
 import numpy as np
-import awkward as ak
-import vector
-
-# ------------------------------------------------------------------------------
-def get_masses(pairs, mass_lo=None, mass_hi=None):
-    """
-    compute invariant masses
-    
-    Parameters
-    ----------
-    pairs : awkward array with pairs
-        has to be touples that contain the keys "Muon_pt", "Muon_eta", "Muon_phi", "Muon_mass"
-    mass_lo : float
-        lower mass cut
-    mass_hi : float
-        upper mass cut
-    """
-    
-    # calculate mass of each pair
-    l_pt, r_pt = ak.unzip(pairs["Muon_pt"])
-    l_eta, r_eta = ak.unzip(pairs["Muon_eta"])
-    l_phi, r_phi = ak.unzip(pairs["Muon_phi"])
-    l_mass, r_mass = ak.unzip(pairs["Muon_mass"])
-
-    mu1 = vector.obj(pt=l_pt, phi=l_phi, eta=l_eta, mass=l_mass)
-    mu2 = vector.obj(pt=r_pt, phi=r_phi, eta=r_eta, mass=r_mass)
-    
-    masses = (mu1 + mu2).mass
-    
-    if mass_lo:
-        masses = masses[masses > mass_lo]
-    if mass_hi:
-        masses = masses[masses < mass_hi]
-    
-    return masses #ak.flatten(masses).to_numpy()
 
 def linear(x, a):
     return a * x 

@@ -19,9 +19,7 @@ def load_input_csv(byLS_data):
         
     print("INFO:  === formatting csv file...")    # formatting the csv
     byLS_data[['run', 'fill']] = byLS_data['#run:fill'].str.split(':', expand=True).apply(pd.to_numeric)
-    byLS_data['ls'] = byLS_data['ls'].str.split(':', expand=True)[0].apply(pd.to_numeric)
-    byLS_data = byLS_data.drop(['#run:fill', 'source'], axis=1)
-    
+    byLS_data['ls'] = byLS_data['ls'].str.split(':', expand=True)[0].apply(pd.to_numeric)   
 
     if 'delivered(/ub)' in byLS_data.columns.tolist():  # convert to /pb
         byLS_data['delivered(/ub)'] = byLS_data['delivered(/ub)'].apply(lambda x: x / 1000000.)
@@ -38,6 +36,18 @@ def load_input_csv(byLS_data):
     byLS_data = byLS_data.drop_duplicates(['fill', 'run', 'ls'])
     
     return byLS_data
+
+# ------------------------------------------------------------------------------
+def to_DateTime(time):
+    # converts brilcalc time to python datetime
+    from datetime import datetime
+    time =  time.split(" ")
+    
+    month, day, year = [int(x) for x in time[0].split("/")]
+    hour, min, sec   = [int(x) for x in time[1].split(":")]
+    year += 2000
+    
+    return datetime(year, month, day, hour, min, sec)
 
 # ------------------------------------------------------------------------------
 def getFileName(directory, run):

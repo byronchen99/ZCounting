@@ -167,14 +167,25 @@ for run, byLS_run in byLS_data.groupby('run'):
                 suffix="new")
 
         # load histograms for hlt efficiency and Z yield
-        h_hlt2 = load(f"h_mass_2HLT")
-        h_hlt1 = load(f"h_mass_1HLT")
-        
+        h_hlt2 = load(f"h_mass_2HLT_BB")
+        h_hlt1 = load(f"h_mass_1HLT_BB")
+
+        if etaRegion == "I":
+            h_hlt2.Add(load(f"h_mass_2HLT_BE"))
+            h_hlt2.Add(load(f"h_mass_2HLT_EE"))
+
+            h_hlt1.Add(load(f"h_mass_1HLT_BE"))
+            h_hlt1.Add(load(f"h_mass_1HLT_EE"))
+
         ROOT.calculateHLTEfficiencyAndYield(h_hlt2, h_hlt1, m, etaRegion, sigModel, bkgModel, sigModel, bkgModel, hPV, sigTemplates)
         
         # load histograms for selection efficiency
-        h_sel_fail = load(f"h_mass_SIT_fail")
-        
+        h_sel_fail = load(f"h_mass_SIT_fail_BB")
+
+        if etaRegion == "I":
+            h_sel_fail.Add(load(f"h_mass_SIT_fail_BE"))
+            h_sel_fail.Add(load(f"h_mass_SIT_fail_EE"))
+
         h_sel_pass = h_hlt2.Clone()
         h_sel_pass.Scale(2)
         h_sel_pass.Add(h_hlt1)
@@ -182,14 +193,26 @@ for run, byLS_run in byLS_data.groupby('run'):
         ROOT.calculateDataEfficiency(h_sel_pass, h_sel_fail, m, "Sel", etaRegion, sigModel, bkgModel, sigModel, bkgModel, hPV, sigTemplates)
 
         # load histograms for global muon efficiency
-        h_glo_pass = load(f"h_mass_Glo_pass")
-        h_glo_fail = load(f"h_mass_Glo_fail")
+        h_glo_pass = load(f"h_mass_Glo_pass_BB")
+        h_glo_fail = load(f"h_mass_Glo_fail_BB")
+
+        if etaRegion == "I":
+            h_glo_pass.Add(load(f"h_mass_Glo_pass_BE"))
+            h_glo_pass.Add(load(f"h_mass_Glo_pass_EE"))
+            h_glo_fail.Add(load(f"h_mass_Glo_fail_BE"))
+            h_glo_fail.Add(load(f"h_mass_Glo_fail_EE"))
 
         ROOT.calculateDataEfficiency(h_glo_pass, h_glo_fail, m, "Glo", etaRegion, sigModel, bkgModel, sigModel, bkgModel, hPV, sigTemplates)
 
         # load histograms for standalone muon efficiency
-        h_sta_pass = load(f"h_mass_Sta_pass")
-        h_sta_fail = load(f"h_mass_Sta_fail")
+        h_sta_pass = load(f"h_mass_Sta_pass_BB")
+        h_sta_fail = load(f"h_mass_Sta_fail_BB")
+
+        if etaRegion == "I":
+            h_sta_pass.Add(load(f"h_mass_Sta_pass_BE"))
+            h_sta_pass.Add(load(f"h_mass_Sta_pass_EE"))
+            h_sta_fail.Add(load(f"h_mass_Sta_fail_BE"))
+            h_sta_fail.Add(load(f"h_mass_Sta_fail_EE"))
 
         ROOT.calculateDataEfficiency(h_sta_pass, h_sta_fail, m, "Sta", etaRegion, sigModel, bkgModel, sigModel, bkgModel, hPV, sigTemplates)
 
