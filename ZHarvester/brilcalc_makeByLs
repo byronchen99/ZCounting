@@ -14,3 +14,9 @@ brilcalc lumi --begin 315252 --end 325175 -b "STABLE BEAMS" --byls -o ~/FillByLs
 #2017 low PU
 # lumi sections from https://github.com/MiT-HEP/MitEwk13TeV/blob/CMSSW_94X/Selection/Cert_306896-307082_13TeV_PromptReco_Collisions17_JSON_LowPU_lowPU.txt
 brilcalc lumi --begin 306929 --end 307082 -b "STABLE BEAMS" --byls -o ~/FillByLs_2017_lowPU.csv --hltpath="HLT_HIMu17_v*" --normtag=/cvmfs/cms-bril.cern.ch/cms-lumi-pog/Normtags/normtag_PHYSICS.json -u /fb -i Cert_306896-307082_13TeV_PromptReco_Collisions17_JSON_LowPU_lowPU.txt
+
+# 2022
+brilcalc lumi --begin 355100 --end 356615 -b "STABLE BEAMS" --byls -u /fb \
+--normtag=/eos/cms/store/group/comm_luminosity/ZCounting/2022/Normtags/normtag_BRIL_20220824.json \
+-i /eos/user/c/cmsdqm/www/CAF/certification/Collisions22/Cert_Collisions2022_355100_356615_Golden.json \
+-o /eos/cms/store/group/comm_luminosity/ZCounting/2022/brilcalcByLS/byLS_Collisions22_355100_356615_Golden_20220824.csv

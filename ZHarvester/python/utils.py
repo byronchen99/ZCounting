@@ -229,6 +229,43 @@ def get_ls_for_next_measurement(
         yield list_good_ls_
 
 # ------------------------------------------------------------------------------
+def getCorrelationIO(hPV_data, correlationsFileName):
+    """
+    calculate the correlation factor between the inner and outer muon track
+
+    Parameters
+    ----------
+    hPV_data : TH1
+        1D histogram with number of primary vertices in data
+    correlationsFileName : str
+        path to the file with correlation factors as function of number of primary vertices
+    """
+    import numpy as np
+    import ROOT
+    ROOT.gROOT.SetBatch(True) # disable root prompts
+
+    tfileIO = ROOT.TFile(correlationsFileName,"READ")
+    hcorrIO = tfileIO.Get("cMu_I")
+    # normalize pileup histogram
+    hPV_data.Scale(1./hPV_data.Integral())
+    avgPV = hPV_data.GetMean()
+
+    # fold the correlation with the pileup histogram
+    cIO = 0
+    for ipv in range(0,100):
+        c = hcorrIO.GetBinContent(hcorrIO.FindBin(ipv))
+        pv = hPV_data.GetBinContent(hPV_data.FindBin(ipv))
+        # skip nan values
+        if np.isnan(c):
+            c = 1
+        cIO += c * pv
+
+    tfileIO.Close()
+    print("Correlation coefficienct i/o = {0}".format(cIO))
+    print("For average primary vertices of <pv> = {0}".format(avgPV))
+    return cIO
+
+# ------------------------------------------------------------------------------
 def writeSummaryCSV(outCSVDir, outName="Mergedcsvfile", writeByLS=True, keys=None):
     """
     Collect "by LS" (and "by measurement") csv files and write one big csv file

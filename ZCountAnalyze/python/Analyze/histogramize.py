@@ -35,7 +35,7 @@ args = parser.parse_args()
 mode = "LUM-21-001" # "LUM-21-001" to create histograms as done in LUM-21-001 or "cmssw" to create the histograms done in the cmssw plugin
 
 # acceptance cuts
-ptCut = 27
+ptCut = 25
 etaCut = 2.4
 
 # mass binning

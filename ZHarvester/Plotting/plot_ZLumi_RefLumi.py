@@ -39,7 +39,7 @@ if not os.path.isdir(outDir):
 currentYear = args.year
 secPerLS=float(23.3)
 
-fmt = ".png"
+fmt = "png"
 
 # plotting options
 
@@ -213,13 +213,29 @@ for fill, data_fill in data.groupby("fill"):
     xMin = xMin - xRange * 0.025
     xMax = xMax + xRange * 0.025
     xRange = xMax - xMin
-    
+
     if int(max(x)) > 8:
         ticksteps = 2
     else:
         ticksteps = 1
         
     xTicks = np.arange(0, int(max(x))+ticksteps, ticksteps)
+
+    # average pileup as x axis
+    xPU = data_fill['pileUp'].values
+    xMinPU = min(xPU)
+    xMaxPU = max(xPU)   
+    xRangePU = xMaxPU - xMinPU 
+    xMinPU = xMinPU - xRangePU * 0.025
+    xMaxPU = xMaxPU + xRangePU * 0.025
+    xRangePU = xMaxPU - xMinPU
+
+    if int(max(xPU)) > 8:
+        ticksteps = 2
+    else:
+        ticksteps = 1
+        
+    xTicksPU = np.arange(0, int(max(xPU))+ticksteps, ticksteps)
     
     ### Make plot for efficiency vs time
     plt.clf()
@@ -408,4 +424,81 @@ for fill, data_fill in data.groupby("fill"):
     ax2.yaxis.set_label_coords(-0.12, 0.5)
 
     plt.savefig(outDir+f"/fill{fill}_lumi.{fmt}")
+    plt.close()
+
+
+    ### Make plot for lumi vs pileup
+    plt.clf()
+    fig = plt.figure()
+    if do_ratio:
+        gs = gridspec.GridSpec(2, 1, height_ratios=[2, 1])
+        ax1 = plt.subplot(gs[0])
+        ax2 = plt.subplot(gs[1])
+    else:
+        ax1 = fig.add_subplot(111)
+        
+    fig.subplots_adjust(hspace=0.0, left=0.15, right=0.99, top=0.99, bottom=0.125)
+        
+    ax1.set_xlabel("average pileup")
+    ax1.set_ylabel(ylabelLumi)
+    ax1.text(0.54, 0.97, "\\bf{CMS}", verticalalignment='top', transform=ax1.transAxes, weight="bold")
+    ax1.text(0.65, 0.97, "\\emph{Work in progress}", verticalalignment='top', transform=ax1.transAxes,style='italic')    
+    ax1.text(0.54, 0.89, f"Fill {fill}", verticalalignment='top', transform=ax1.transAxes)    
+
+    y = np.array([yy.n for yy in data_fill['zLumiInst_mc'].values])
+    yErr = np.array([y.s for y in data_fill['zLumiInst_mc'].values])
+
+    yRef = data_fill['dLRec(/nb)'].values   
+    
+    ax1.plot(xPU, yRef, #xerr=(xDown, xUp), 
+        label="Reference luminosity", color="blue", 
+        marker = "_",
+        linestyle='', zorder=0)
+
+    ax1.errorbar(xPU, y, #xerr=(xDown, xUp), 
+        yerr=yErr, 
+        label="Z rate",
+        fmt="ko", ecolor='black', elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
+        zorder=1)
+
+    leg = ax1.legend(loc="lower left", ncol=2, frameon=True, framealpha=1.0, fancybox=False, edgecolor="black")
+    leg.get_frame().set_linewidth(0.8)
+
+    yMin = min(min(y),min(yRef))
+    yMax = max(max(y),max(yRef))
+
+    yRange = yMax - yMin 
+    ax1.set_ylim([yMin - yRange*0.5, yMax + yRange*0.2])
+    ax1.set_xlim([xMinPU, xMaxPU])
+    # ax1.set_xticks(xTicksPU)
+    
+    if do_ratio:
+        ax1.xaxis.set_major_locator(ticker.NullLocator())
+    
+        ratios = []
+        for zlumi, lumi in data_fill[['zLumi_mc','recLumi']].values:
+            ratios.append(zlumi/lumi)
+
+        yRatio = np.array([yy.n for yy in ratios])
+        yRatioErr = np.array([y.s for y in ratios])
+    
+        ax2.set_xlabel("average pileup")
+        ax2.set_ylabel("Ratio")
+        
+        ax2.errorbar(xPU, yRatio, xerr=(xDown, xUp), yerr=yRatioErr, 
+            label="Z rate measurement",
+            fmt="ko", ecolor='black', elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
+            zorder=1)
+            
+        ax2.plot(np.array([xMinPU, xMaxPU]), np.array([1.0, 1.0]), color="black",linestyle="-", linewidth=1)
+        
+        ax2.set_ylim([0.951,1.049])
+        ax2.set_xlim([xMinPU, xMaxPU])
+        # ax2.set_xticks(xTicksPU)
+
+    # align y labels
+    ax1.yaxis.set_label_coords(-0.12, 0.5)
+    ax2.yaxis.set_label_coords(-0.12, 0.5)
+
+    plt.savefig(outDir+f"/fill{fill}_lumi_pileup.{fmt}")
     plt.close()

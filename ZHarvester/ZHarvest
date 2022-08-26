@@ -7,7 +7,7 @@ import os
 import pandas as pd
 import pdb # python debugger might be helpful (see https://docs.python.org/3/library/pdb.html)
 
-from python.utils import load_input_csv, getFileName, get_ls_for_next_measurement, load_histogram, writeSummaryCSV
+from python.utils import load_input_csv, getFileName, get_ls_for_next_measurement, load_histogram, writeSummaryCSV, getCorrelationIO
 
 ROOT.gROOT.SetBatch(True) # disable root prompts
 
@@ -37,23 +37,25 @@ byLsCSV = args.byLsCSV # contains the reference luminosity
 
 dirOutCSV = dirOut+"/csvFiles/"  # folder to store the output csv files
 
-secPerLS = 23.3
+# path to the file with the correlation factors between inner and outer track
+correlationsIO   = "/eos/cms/store//group/comm_luminosity/ZCounting/2022/CorrelationFactors/cMu_nPV_2022.root"
 
+secPerLS = 23.3
 currentYear = 2022
 
 etaRegion = "I" # define eta region. Currently supported are "B" (Barrel) and "I" (Inclusive)
 
-nBinsMass = 50  # number of bins in histograms to fit
-massLo = 66     # lower boundary for fit range
-massHi = 116    # upper boundary for fit range
+nBinsMass = 120  # number of bins in histograms to fit
+massLo = 60     # lower boundary for fit range
+massHi = 120    # upper boundary for fit range
 
 npvLo = 0.5     # lower boundary for npv histogram
 npvHi = 100.5   # upper boundary for npv histogram
 
 maximumLS = 2500        # maximum luminosity block number that is stored in the DQM histograms
 minLSperRun = 20        # only consider runs with at least 20 luminosity blocks
-LumiPerMeasurement = 10 # minimum amount of luminosity required to perform one measurement
-ptCut = 27              # pT cut on muons, only for labeling
+LumiPerMeasurement = 20 # minimum amount of luminosity required to perform one measurement
+ptCut = 25              # pT cut on muons, only for labeling
 
 # |eta| cut on muons, only for labeling 
 if etaRegion == "B":
@@ -251,8 +253,12 @@ for run, byLS_run in byLS_data.groupby('run'):
         # recoZ = h_mass_yield_Z.Integral() * 0.99
         # delivered number of Zs given by efficiency corrected number of reconstructed Zs
         # delZ = recoZ / (effTrigger * effSel**2 * effGlo**2)
-        
-        delZ = recoZ / (effSel**2 * effGlo**2 * effSta**2)
+
+        # correlation factor between inner and outer track
+        cIO = getCorrelationIO(hPV, correlationsIO)
+
+        # calculate efficiency corrected number of Z bosons
+        delZ = recoZ * cIO**2 / (effSel**2 * effGlo**2 * effSta**2)
 
         log.info(f"Delivered number of Zs = {delZ}")
 
@@ -289,6 +295,7 @@ for run, byLS_run in byLS_data.groupby('run'):
             "effSel": effSel,
             "effGlo": effGlo,
             "effSta": effSta,
+            "cIO":cIO,
             # delivered Z rate (corrected for deadtime and extrapolatet to the total time window)
             "delZCount": delZ / deadtime * (totaltimewindow / timewindow),    
             # instantaneous delivered Z rate (corrected for deadtime)

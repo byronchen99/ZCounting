@@ -9,38 +9,16 @@ import pdb
 import uncertainties as unc
 import gc
 
-from python.utils import writeSummaryCSV, getEra, getFileName, load_input_csv, get_ls_for_next_measurement
+from python.utils import writeSummaryCSV, getEra, getFileName, load_input_csv, get_ls_for_next_measurement, getCorrelationIO
 
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
-from ZUtils.python.utils import to_RootTime, getMCCorrection, unorm, pquad, plinear
+from ZUtils.python.utils import to_RootTime
 
 # disable panda warnings when assigning a new column in the dataframe
 pd.options.mode.chained_assignment = None
 
 # turn off graphical output on screen
 ROOT.gROOT.SetBatch(True)
-
-def getCorrelationIO(hPV_data, correlationsFileName):
-    tfileIO = ROOT.TFile(correlationsFileName,"READ")
-    hcorrIO = tfileIO.Get("cMu_I")
-    # normalize pileup histogram
-    hPV_data.Scale(1./hPV_data.Integral())
-    avgPV = hPV_data.GetMean()
-
-    # fold the correlation with the pileup histogram
-    cIO = 0
-    for ipv in range(0,100):
-        c = hcorrIO.GetBinContent(hcorrIO.FindBin(ipv))
-        pv = hPV_data.GetBinContent(hPV_data.FindBin(ipv))
-        # skip nan values
-        if np.isnan(c):
-            c = 1
-        cIO += c * pv
-
-    tfileIO.Close()
-    print("Correlation coefficienct i/o = {0}".format(cIO))
-    print("For average primary vertices of <pv> = {0}".format(avgPV))
-    return cIO
 
 def extract_results(directory, m, cIO):
     log.info(" === Extracting fit results in {0} for {1}".format(directory,m))
