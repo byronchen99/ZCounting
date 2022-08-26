@@ -12,7 +12,6 @@ import numpy as np
 import pdb
 import vector
 import hist
-from utils import get_masses
 import os
 
 import argparse
