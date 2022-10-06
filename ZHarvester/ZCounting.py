@@ -32,7 +32,7 @@ def extract_results(directory, m, cIO):
     w = f.Get("workspace")
     
     res = {
-        "HLTeff": unc.ufloat(w.var("eff").getVal(), w.var("eff").getError()),
+        "effHLT": unc.ufloat(w.var("eff").getVal(), w.var("eff").getError()),
         "cHLT": w.arg("c").getVal(),
         "zReco": unc.ufloat(w.var("Nsig").getVal(), w.var("Nsig").getError()),
         "NbkgHLTPass": unc.ufloat(w.var("NbkgPass").getVal(), w.var("NbkgPass").getError()),
@@ -55,7 +55,7 @@ def extract_results(directory, m, cIO):
     w = f.Get("workspace")
     
     res.update({
-        "Seleff": unc.ufloat(w.var("eff").getVal(), w.var("eff").getError()),
+        "effSel": unc.ufloat(w.var("eff").getVal(), w.var("eff").getError()),
         "NsigSel": unc.ufloat(w.var("Nsig").getVal(), w.var("Nsig").getError()),
         "NbkgSelPass": unc.ufloat(w.var("NbkgPass").getVal(), w.var("NbkgPass").getError()),
         "NbkgSelFail": unc.ufloat(w.var("NbkgFail").getVal(), w.var("NbkgFail").getError()),
@@ -75,7 +75,7 @@ def extract_results(directory, m, cIO):
     w = f.Get("workspace")
     
     res.update({
-        "Gloeff": unc.ufloat(w.var("eff").getVal(), w.var("eff").getError()),
+        "effGlo": unc.ufloat(w.var("eff").getVal(), w.var("eff").getError()),
         "NsigGlo": unc.ufloat(w.var("Nsig").getVal(), w.var("Nsig").getError()),
         "NbkgGloPass": unc.ufloat(w.var("NbkgPass").getVal(), w.var("NbkgPass").getError()),
         "NbkgGloFail": unc.ufloat(w.var("NbkgFail").getVal(), w.var("NbkgFail").getError()),
@@ -94,7 +94,7 @@ def extract_results(directory, m, cIO):
     w = f.Get("workspace")
     
     res.update({
-        "Staeff": unc.ufloat(w.var("eff").getVal(), w.var("eff").getError()),
+        "effSta": unc.ufloat(w.var("eff").getVal(), w.var("eff").getError()),
         "NsigSta": unc.ufloat(w.var("Nsig").getVal(), w.var("Nsig").getError()),
         "NbkgStaPass": unc.ufloat(w.var("NbkgPass").getVal(), w.var("NbkgPass").getError()),
         "NbkgStaFail": unc.ufloat(w.var("NbkgFail").getVal(), w.var("NbkgFail").getError()),
@@ -105,7 +105,7 @@ def extract_results(directory, m, cIO):
     w.Delete()
 
     res["cIO"] = cIO
-    res["zDel"] = res["zReco"] * cIO**2 / (res["Seleff"] * res["Gloeff"] * res["Staeff"])**2
+    res["zDel"] = res["zReco"] * cIO**2 / (res["effSel"] * res["effGlo"] * res["effSta"])**2
 
     return res
         
@@ -235,7 +235,7 @@ if __name__ == '__main__':
         log.warning("signal model {0} unknown! exit()".format(args.sigTemplates))
         exit()
 
-    # background model
+    # background model 
     if args.bkgTemplates == "CMSShape" or args.bkgTemplates == "default" :
         bkgModel = 6
     elif args.bkgTemplates == "Exp":

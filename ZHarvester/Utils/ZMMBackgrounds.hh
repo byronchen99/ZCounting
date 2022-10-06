@@ -362,7 +362,7 @@ CRooCMSShape::CRooCMSShape(RooRealVar &m,
 
   sprintf(vname,"bkg_alpha%s",name);   alpha = new RooRealVar(vname, "bkg_alpha", 90., massLo, massHi);
   sprintf(vname,"bkg_beta%s",name);    beta  = new RooRealVar(vname, "bkg_beta",  0.02, 0.0, 0.1);
-  sprintf(vname,"bkg_gamma%s",name);   gamma = new RooRealVar(vname, "bkg_gamma",   0.02, 0.0, 1.0);
+  sprintf(vname,"bkg_gamma%s",name);   gamma = new RooRealVar(vname, "bkg_gamma",   0.02, 0.0, 0.1);
   sprintf(vname,"bkg_peak%s",name);    peak  = new RooRealVar(vname, "bkg_peak"  ,  91.1876);
   sprintf(vname,"background%s",name);
 

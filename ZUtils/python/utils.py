@@ -79,9 +79,10 @@ def tree_to_df(tree, arrSize=5):
 def to_RootTime(time, currentYear):
     # converts brilcalc time to root TDatime
     time =  time.split(" ")
-    return ROOT.TDatime(currentYear, int(time[0].split("/")[0]),
-                         int(time[0].split("/")[1]), int(time[1].split(":")[0]),
-                         int(time[1].split(":")[1]), int(time[1].split(":")[2])).Convert()
+    return ROOT.TDatime(
+        int(time[0].split("/")[0]), int(time[0].split("/")[1]), int(time[0].split("/")[2]),
+        int(time[1].split(":")[0]), int(time[1].split(":")[1]), int(time[1].split(":")[2])
+        ).Convert()
 
 def getMCCorrection(fIn):
     # input file has to be a picked dictionary with

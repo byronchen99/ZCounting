@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import pdb
 
 #local imports
-from Utils import plot_scatter
+from utils import plot_scatter
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
 from ZUtils.python.utils import tree_to_df
 

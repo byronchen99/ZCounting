@@ -5,7 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 from root_numpy import root2array, list_trees
-from Utils import plot_scatter
+from utils import plot_scatter
 from scipy.stats import pearsonr
 import pdb
 import math

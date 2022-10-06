@@ -40,6 +40,7 @@ if not os.path.isdir(outDir):
     os.mkdir(outDir)
 
 # --- settings
+year = 2022
 secPerLS=float(23.3)
 labelsize = 12.5
 textsize = 15
@@ -66,7 +67,7 @@ lumi_2016 = 36.33
 lumi_2017 = 41.86
 
 # --- uncertainties on PHYSICS luminosity
-include_unc_PHYSICS = True
+include_unc_PHYSICS = True if year != 2022 else False
 unc_2016 = np.sqrt((0.012)**2 + (0.017)**2 - 2*0.012*0.017*0.26)
 unc_2017 = np.sqrt((0.023)**2 + (0.017)**2 - 2*0.023*0.017*0.76)
 unc_2018 = np.sqrt((0.025)**2 + (0.017)**2 - 2*0.025*0.017*0.43)
@@ -76,6 +77,8 @@ print("2016: "+str(unc_2016))
 print("2017: "+str(unc_2017))
 print("2018: "+str(unc_2018))
 
+# --- if averages should be plotted
+plot_averages = True if year != 2022 else False
 
 ########## Data Acquisition ##########
 
@@ -101,7 +104,16 @@ if args.xsec:
     # xsecBE = sum(data_xsec['zDelBE_mc'])/sum(data_xsec['lumiRec'])
     # xsecEE = sum(data_xsec['zDelEE_mc'])/sum(data_xsec['lumiRec'])
     xsec = sum(data_xsec['zDelI'])/sum(data_xsec['lumiRec'])
-            
+    normalize = False
+else:
+    # xsec = 1      
+    # # normalize everything as no cross section is specified
+    # normalize = True    
+
+    # cross section from theory
+    xsec = 772627.88 * 0.995988004755 / 0.3646 * 0.3649 / 1000.
+
+    normalize = False
     
 # --- z luminosity
 print("get Z luminosity")
@@ -109,11 +121,12 @@ data = pd.concat([pd.read_csv(csv, sep=',',low_memory=False) for csv in args.rat
 
 data['zDelI'] = data['zDel'].apply(lambda x: unc.ufloat_fromstr(x).n)
 
-# --->>> prefire corrections
-apply_muon_prefire(data)
-apply_ECAL_prefire(data)
+if year in (2016, 2017, 2018):
+    # --->>> prefire corrections
+    apply_muon_prefire(data)
+    apply_ECAL_prefire(data)
 
-print("apply prefire corrections - done")
+    print("apply prefire corrections - done")
 # <<<---
 
 # data['zDel_mc'] = data['zDelBB_mc'] + data['zDelBE_mc'] + data['zDelEE_mc']
@@ -135,34 +148,40 @@ data = data[data['zLumi'] > 0.]
 # data['zLumiBE_to_dLRec'] = data['zLumiBE'] / data['lumiRec']
 # data['zLumiEE_to_dLRec'] = data['zLumiEE'] / data['lumiRec']
 # data['zLumiI_to_dLRec'] = data['zLumiI'] / data['lumiRec']
+
+if normalize:
+    data['zLumi'] = data['zLumi'] / sum(data['zLumi']) * sum(data['lumiRec'])
+
 data['zLumi_to_dLRec'] = data['zLumi'] / data['lumiRec']
 
+if year == 2016:
+    lumi=0
+    lumi_diff=0
+    invalid_runs = {
+        275657, 275658, 275659, # Outliers in all those runs of 2016. HFOC was used -> problem there?
+        278017, 278018          # More outliers, not clear from where
+    }
+    for run in invalid_runs:
+        data_invalid = data.loc[data['run'] == run]
+        
+        lumi+= data_invalid['lumiRec'].sum()/1000.
+        lumi_diff+= (data_invalid['lumiRec'] / data['zLumi_to_dLRec'] * 0.95).sum()/1000.
 
-lumi=0
-lumi_diff=0
-invalid_runs = {
-    275657, 275658, 275659, # Outliers in all those runs of 2016. HFOC was used -> problem there?
-    278017, 278018          # More outliers, not clear from where
-}
-for run in invalid_runs:
-    data_invalid = data.loc[data['run'] == run]
-    
-    lumi+= data_invalid['lumiRec'].sum()/1000.
-    lumi_diff+= (data_invalid['lumiRec'] / data['zLumi_to_dLRec'] * 0.95).sum()/1000.
+    print("effected luminosity: {0}/fb".format(lumi))
+    print("estimated luminosity difference: {0}/fb".format(lumi-lumi_diff))
 
-print("effected luminosity: {0}/fb".format(lumi))
-print("estimated luminosity difference: {0}/fb".format(lumi-lumi_diff))
-
-print("sort out invalid runs")
-for run in invalid_runs:
-   data = data.loc[data['run'] != run]
+    print("sort out invalid runs")
+    for run in invalid_runs:
+        data = data.loc[data['run'] != run]
 
 data['weightLumi'] = data['lumiRec']
 
-print("analyze {0} fb^-1 of data".format(data['weightLumi'].sum()/1000.))
+print("analyze {0} fb^-1 of data (reference lumi)".format(data['weightLumi'].sum()/1000.))
+print("analyze {0} fb^-1 of data (z lumi)".format(data['zLumi'].sum()/1000.))
+print("ratio: z lumi/ ref. lumi = {0}".format(data['zLumi'].sum()/data['weightLumi'].sum()))
 
 print("Outliers:")
-data_out = data.loc[abs(data['zLumi_to_dLRec']-1) > 0.1]
+data_out = data.loc[abs(data['zLumi_to_dLRec']-1) > 0.05]
 print(data_out[["lumiRec","run","fill", "measurement","zLumi_to_dLRec","zDel"]])
 
 def make_hist(
@@ -178,9 +197,11 @@ def make_hist(
     legend='upper right',
     rangey=[0.89,1.11]
 ):
+    if year >= 2022:
+        lefttitle = "$\sqrt{s}=13.6\,\mathrm{TeV}$"
+    else:
+        lefttitle = "$\sqrt{s}=13\,\mathrm{TeV}$"
 
-
-    lefttitle = "$\sqrt{s}=13\,\mathrm{TeV}$"
 
     if title:
         lefttitle += " $(\mathrm{"+title+"})$"
@@ -196,7 +217,7 @@ def make_hist(
         data = df.loc[(df["run"] < 306828) | (df["run"] >= 307083)]
 
     data = data.sort_values(['run','time'])
-
+    
     data['lumiratio'] = data[zLumi_name] / data[refLumi_name]
 
     # --- sum up each sumN rows
@@ -311,7 +332,11 @@ def make_hist(
 
             ax.scatter(xx, yy, s=data['weightLumi'].values, marker='.', color='green', zorder=1, label="Z rate measurement")
 
-            if suffix1 == "lumi":
+            # ww = data['weightLumi'].values,
+            # rms = (sum((ww*yy)**2)/sum(ww))**0.5
+            # print(f"RMS = {rms}")
+
+            if suffix1 == "lumi" and plot_averages:
                 # average lumi bars at centered at half of the lumi in each bar
                 xxNew = np.array([xx[0]/2., ])
                 xxNew = np.append(xxNew, xx[:-1]+(xx[1:] - xx[:-1])/2.)
@@ -396,13 +421,13 @@ def make_hist(
 #     label="Z luminosity / Ref. luminosity", 
 #     saveas="2017_zcountI", title="2017",rangey=[0.89,1.11])
  
-make_hist(data, lumi_name='zLumi_to_dLRec', saveas="zcount", title="Run\ II")
+# make_hist(data, lumi_name='zLumi_to_dLRec', saveas="zcount", title="Run\ II")
 # make_hist(data, lumi_name='zLumiBB_to_dLRec', label="ZCount(BB) / PHYSICS", saveas="zcountBB")
 # make_hist(data, lumi_name='zLumiBE_to_dLRec', label="ZCount(BE) / PHYSICS", saveas="zcountBE")
 # make_hist(data, lumi_name='zLumiEE_to_dLRec', label="ZCount(EE) / PHYSICS", saveas="zcountEE")
 # # make_hist(data, lumi_name='zLumi_to_dLRec', label="ZCount(I) / PHYSICS", saveas="zcountI")
 
-make_hist(data, run_range=(272007,294645), lumi_name='zLumi_to_dLRec', saveas="2016_zcount", title="2016")#, rangey=[0.7,1.08])
+# make_hist(data, run_range=(272007,294645), lumi_name='zLumi_to_dLRec', saveas="2016_zcount", title="2016")#, rangey=[0.7,1.08])
 # make_hist(data, run_range=(272007,278769), lumi_name='zLumi_to_dLRec', saveas="2016preVFP_zcount", title="2016\ pre\ VFP", legend="lower left")
 # make_hist(data, run_range=(278769,294645), lumi_name='zLumi_to_dLRec', saveas="2016postVFP_zcount", title="2016\ post\ VFP")
 
@@ -410,10 +435,13 @@ make_hist(data, run_range=(272007,294645), lumi_name='zLumi_to_dLRec', saveas="2
 # make_hist(data, run_range=(303434,304797), lumi_name='zLumi_to_dLRec', saveas="2017E_zcount", title="2017 E")#,rangey=[0.85,1.15])
 # make_hist(data, run_range=(305040,306462), lumi_name='zLumi_to_dLRec', saveas="2017F_zcount", title="2017 F")#,rangey=[0.85,1.15])
 
-make_hist(data, run_range=(297046,306462), lumi_name='zLumi_to_dLRec', saveas="2017_zcount", title="2017")#,rangey=[0.85,1.15])
+# make_hist(data, run_range=(297046,306462), lumi_name='zLumi_to_dLRec', saveas="2017_zcount", title="2017")#,rangey=[0.85,1.15])
 # make_hist(data, run_range=(297046,306462), lumi_name='zLumi_to_dLRec', label="ZCount(I) / PHYSICS", saveas="2017_zcountI", title="2017")#,rangey=[0.85,1.15])
 # make_hist(data, run_range=(297046,306462), lumi_name='zLumiBB_to_dLRec', label="ZCount(BB) / PHYSICS", saveas="2017_zcountBB", title="2017")#,rangey=[0.85,1.15])
 # make_hist(data, run_range=(297046,306462), lumi_name='zLumiBE_to_dLRec', label="ZCount(BE) / PHYSICS", saveas="2017_zcountBE", title="2017")#,rangey=[0.85,1.15])
 # make_hist(data, run_range=(297046,306462), lumi_name='zLumiEE_to_dLRec', label="ZCount(EE) / PHYSICS", saveas="2017_zcountEE", title="2017")#,rangey=[0.85,1.15])
 # 
-make_hist(data, run_range=(315252,325175), lumi_name='zLumi_to_dLRec', saveas="2018_zcount", title="2018")
+# make_hist(data, run_range=(315252,325175), lumi_name='zLumi_to_dLRec', saveas="2018_zcount", title="2018")
+
+make_hist(data, lumi_name='zLumi_to_dLRec', saveas="zcount", title="2022")
+

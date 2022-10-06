@@ -361,10 +361,14 @@ def getEra(run):
         return "Run2018C"
     if run <= 325273:
         return "Run2018D"     
-    if run <= 355381:
+    if run <= 355769:
         return "Run2022B"   
+    if run <= 357482:
+        return "Run2022C"
+    if run <= 357900:
+        return "Run2022D"
 
-    return "Run2022C" #default 
+    return "Run2022" #default 
 
 # ------------------------------------------------------------------------------
 def chart_to_js(_chart, _name, _data="data.csv"):

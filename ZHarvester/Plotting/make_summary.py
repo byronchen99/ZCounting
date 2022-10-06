@@ -24,7 +24,7 @@ ROOT.gStyle.SetTitleX(.3)
 parser = argparse.ArgumentParser()
 
 parser.add_argument("-r","--rates", required=True, nargs='+', help="Nominator csv file with z rates per lumisection")
-parser.add_argument("-x","--xsec",  required=True, type=str,
+parser.add_argument("-x","--xsec",  default=None, type=str,
     help="csv file with z rates per lumisection where xsec should be taken from (e.g. from low pileup run)")
 parser.add_argument("-s","--saveDir",  default='./',  type=str, help="give output dir")
 args = parser.parse_args()
@@ -34,20 +34,31 @@ if not os.path.isdir(outDir):
     os.mkdir(outDir)
 
 ########## Data Acquisition ##########
+year = 2022
+if year < 2022:
+    # --- get prefire corrections
+    prefire_variations_Muon = ('nominal', 'SystUp', 'SystDown', 'StatUp', 'StatDown')
+    prefire_variations_ECAL = ("nominal", "Up", "Down",)
+    with open('res/prefiring.json') as file_prefire:
+        res_prefire = json.load(file_prefire)
+else:
+    prefire_variations_Muon = ()
+    prefire_variations_ECAL = ()
 
-# --- get prefire corrections
-prefire_variations_Muon = ('nominal', 'SystUp', 'SystDown', 'StatUp', 'StatDown')
-prefire_variations_ECAL = ("nominal", "Up", "Down",)
-with open('res/prefiring.json') as file_prefire:
-    res_prefire = json.load(file_prefire)
-
+    
 # --- get Z xsec
-print("get Z cross section")
-data_xsec = pd.read_csv(str(args.xsec), sep=',',low_memory=False)
+if args.xsec:
+    print("get Z cross section")
+    data_xsec = pd.read_csv(str(args.xsec), sep=',',low_memory=False)
 
-# --- z luminosity
-print("get Z luminosity")
-data = pd.concat([pd.read_csv(csv, sep=',',low_memory=False) for csv in args.rates] +[data_xsec,], ignore_index=True, sort=False)
+    # --- z luminosity
+    print("get Z luminosity")
+    data = pd.concat([pd.read_csv(csv, sep=',',low_memory=False) for csv in args.rates] +[data_xsec,], ignore_index=True, sort=False)
+else:
+    # --- z luminosity
+    print("get Z luminosity")
+    data = pd.concat([pd.read_csv(csv, sep=',',low_memory=False) for csv in args.rates], ignore_index=True, sort=False)
+
 
 # data['zRec'] = data['zRecBB'] + data['zRecBE'] + data['zRecEE']
 # data['zDelI'] = data['zDel'] #data['zDelBB'] + data['zDelBE'] + data['zDelEE']
@@ -55,18 +66,18 @@ data = pd.concat([pd.read_csv(csv, sep=',',low_memory=False) for csv in args.rat
 # data['zDelDown'] = data['zDelBBDown'] + data['zDelBEDown'] + data['zDelEEDown']
 
 
-data['HLTeff']      = data['HLTeff'].apply(lambda x: unc.ufloat_fromstr(x).n)
-data['Seleff']      = data['Seleff'].apply(lambda x: unc.ufloat_fromstr(x).n)
-data['Staeff']      = data['Staeff'].apply(lambda x: unc.ufloat_fromstr(x).n)
-data['Gloeff']      = data['Gloeff'].apply(lambda x: unc.ufloat_fromstr(x).n)
+data['effHLT']      = data['effHLT'].apply(lambda x: unc.ufloat_fromstr(x).n)
+data['effSel']      = data['effSel'].apply(lambda x: unc.ufloat_fromstr(x).n)
+data['effSta']      = data['effSta'].apply(lambda x: unc.ufloat_fromstr(x).n)
+data['effGlo']      = data['effGlo'].apply(lambda x: unc.ufloat_fromstr(x).n)
 
 # calculate correct statistical uncertainties - before HLT selection
 data['NZ']       = data['zReco'].apply(lambda x: unc.ufloat_fromstr(x).n)
 data['NbkgHLTFail'] = data['NbkgHLTFail'].apply(lambda x: unc.ufloat_fromstr(x).n)
 data['NbkgHLTPass'] = data['NbkgHLTPass'].apply(lambda x: unc.ufloat_fromstr(x).n)
 
-data['N1'] = 2*data['HLTeff']*(1-data['cHLT']*data['HLTeff'])*data['NZ'] + data['NbkgHLTFail']
-data['N2'] = data['HLTeff']**2 * data['cHLT'] * data['NZ'] + data['NbkgHLTPass']
+data['N1'] = 2*data['effHLT']*(1-data['cHLT']*data['effHLT'])*data['NZ'] + data['NbkgHLTFail']
+data['N2'] = data['effHLT']**2 * data['cHLT'] * data['NZ'] + data['NbkgHLTPass']
 
 data['N1'] = data['N1'].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
 data['N2'] = data['N2'].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
@@ -76,7 +87,7 @@ data['N2bkg'] = data['NbkgHLTPass'].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
 data['N1sig'] = data['N1'] - data['N1bkg']
 data['N2sig'] = data['N2'] - data['N2bkg']
 
-data['HLTeff'] = (2 * data['N2sig']) / (2 * data['N2sig'] + data['N1sig'])
+data['effHLT'] = (2 * data['N2sig']) / (2 * data['N2sig'] + data['N1sig'])
 
 # calculate correct statistical uncertainty for ID selection efficiency
 for eff in ("Sel","Glo","Sta"):
@@ -84,8 +95,8 @@ for eff in ("Sel","Glo","Sta"):
     data['Nbkg{0}Pass'.format(eff)] = data['Nbkg{0}Pass'.format(eff)].apply(lambda x: unc.ufloat_fromstr(x).n)
     data['Nbkg{0}Fail'.format(eff)] = data['Nbkg{0}Fail'.format(eff)].apply(lambda x: unc.ufloat_fromstr(x).n)
 
-    data['N{0}Pass'.format(eff)] = data['Nsig{0}'.format(eff)]*data['{0}eff'.format(eff)] + data['Nbkg{0}Pass'.format(eff)]
-    data['N{0}Fail'.format(eff)] = data['Nsig{0}'.format(eff)]*(1-data['{0}eff'.format(eff)]) + data['Nbkg{0}Fail'.format(eff)]
+    data['N{0}Pass'.format(eff)] = data['Nsig{0}'.format(eff)]*data['eff{0}'.format(eff)] + data['Nbkg{0}Pass'.format(eff)]
+    data['N{0}Fail'.format(eff)] = data['Nsig{0}'.format(eff)]*(1-data['eff{0}'.format(eff)]) + data['Nbkg{0}Fail'.format(eff)]
 
     data['N{0}Pass'.format(eff)] = data['N{0}Pass'.format(eff)].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
     data['N{0}Fail'.format(eff)] = data['N{0}Fail'.format(eff)].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
@@ -95,10 +106,10 @@ for eff in ("Sel","Glo","Sta"):
     data['Nsig{0}Pass'.format(eff)] = data['N{0}Pass'.format(eff)] - data['Nbkg{0}Pass'.format(eff)]
     data['Nsig{0}Fail'.format(eff)] = data['N{0}Fail'.format(eff)] - data['Nbkg{0}Fail'.format(eff)]
 
-data['Seleff'] = (2 * data['N2sig'] + data['N1sig']) / (2 * data['N2sig'] + data['N1sig'] + data['NsigSelFail'])
-# data['Gloeff'] = data["NsigSelPass"] / (data["NsigSelPass"]+data["NsigSelFail"])
-# data['Gloeff'] = data["NsigGloPass"] / (data["NsigGloPass"]+data["NsigGloFail"])
-# data['Staeff'] = data["NsigStaPass"] / (data["NsigStaPass"]+data["NsigStaFail"])
+data['effSel'] = (2 * data['N2sig'] + data['N1sig']) / (2 * data['N2sig'] + data['N1sig'] + data['NsigSelFail'])
+# data['effGlo'] = data["NsigSelPass"] / (data["NsigSelPass"]+data["NsigSelFail"])
+# data['effGlo'] = data["NsigGloPass"] / (data["NsigGloPass"]+data["NsigGloFail"])
+# data['effSta'] = data["NsigStaPass"] / (data["NsigStaPass"]+data["NsigStaFail"])
 
 # ad-hoc uncertainties for background subtraction: vary background contribution by 50%
 data['N1sig_Up'] = data['N1'] - 0.5*data['N1bkg']
@@ -116,7 +127,7 @@ data['zRecI_bkgUp'] = data['zRecI_bkgUp'].apply(lambda x: x.n)
 data['zRecI'] = (data['N2sig'] + 0.5*data['N1sig'])**2/data['N2sig'] * data['cHLT']
 data['zDelI'] = (data['N2sig'] + 0.5*data['N1sig'])**2/data['N2sig'] * data['cHLT'] / (
     (2 * data['N2sig'] + data['N1sig']) / (2 * data['N2sig'] + data['N1sig'] + data['NsigSelFail'])*
-    data['Staeff']*data['Gloeff']/data['cIO']
+    data['effSta']*data['effGlo']/data['cIO']
     )**2
 data['zDelI_err'] = data['zDelI'].apply(lambda x: x.s)
 data['zDelI'] = data['zDelI'].apply(lambda x: x.n)
@@ -200,6 +211,7 @@ for region in regions:
         (297020, 306463, "2017"),
         (306828, 307083, "2017H"),   # 2017H
         (315252, 325274, "2018"),
+        (356100, 356616, "2022"),
     ):
         loc = (data['run'] >= lo) & (data['run'] < hi)
 
