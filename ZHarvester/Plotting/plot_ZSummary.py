@@ -1,8 +1,6 @@
 import os,sys
 import ROOT
-from array import array
 import argparse
-from datetime import datetime
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -10,7 +8,6 @@ import numpy as np
 import pandas as pd
 import uncertainties as unc
 import pdb
-import json
 from scipy.stats import norm    # for gauss function
 
 from pandas.plotting import register_matplotlib_converters
@@ -20,7 +17,6 @@ sys.path.append(os.getcwd())
 print(os.getcwd())
 
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
-from ZUtils.python.utils import to_RootTime, unorm
 from python.corrections import apply_muon_prefire, apply_ECAL_prefire
 
 ROOT.gROOT.SetBatch(True)

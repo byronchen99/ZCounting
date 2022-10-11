@@ -1,18 +1,15 @@
-import os,sys
+import sys
 #sys.argv.append( '-b-' )
 #from scipy.interpolate import UnivariateSpline
 import ROOT
-from ROOT import TGraph
-from ROOT import TGraphErrors
 from array import array
 from ROOT import *
-from operator import truediv
-import random
 import argparse
 import scipy.integrate as integrate
 import pandas
 import csv
 import math
+
 ROOT.gROOT.SetBatch(True)
 ROOT.gStyle.SetCanvasPreferGL(1)
 #ROOT.gStyle.SetTitleAlign(33)

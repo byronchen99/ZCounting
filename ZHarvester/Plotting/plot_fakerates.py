@@ -1,6 +1,5 @@
 import pickle
 import argparse
-import ROOT
 import pandas as pd
 import pdb
 import matplotlib.pyplot as plt

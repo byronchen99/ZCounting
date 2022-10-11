@@ -1,20 +1,10 @@
-import os,sys
+import os
 import ROOT
-from array import array
 import argparse
-from datetime import datetime
 import pandas as pd
-import numpy as np
 import uncertainties as unc
 import pdb
-import matplotlib.pyplot as plt
-import json
 
-sys.path.append(os.getcwd())
-print(os.getcwd())
-
-os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
-from ZUtils.python.utils import to_RootTime, unorm
 
 ROOT.gROOT.SetBatch(True)
 ROOT.gStyle.SetCanvasPreferGL(1)

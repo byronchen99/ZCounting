@@ -4,22 +4,19 @@ import numpy as np
 import argparse
 import pdb
 import os, sys
-import math
 import uncertainties as unc
 from scipy.optimize import curve_fit
-from scipy import stats
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-import matplotlib.gridspec as gridspec
 
 sys.path.append(os.getcwd())
 print(os.getcwd())
 
-from python.corrections import apply_muon_prefire, apply_ECAL_prefire, apply_pileup_correction
+from python.corrections import apply_muon_prefire, apply_ECAL_prefire
 
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
-from ZUtils.python.utils import to_RootTime, cms, preliminary, text, workinprogress, unorm, linear
+from ZUtils.python.utils import linear
 
 pd.options.mode.chained_assignment = None
 

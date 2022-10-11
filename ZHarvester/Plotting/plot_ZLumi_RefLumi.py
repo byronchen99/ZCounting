@@ -6,17 +6,14 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import matplotlib.gridspec as gridspec
 import matplotlib.ticker as ticker
-from datetime import datetime
 import os, sys
 import pdb
 
 sys.path.append(os.getcwd())
-print(os.getcwd())
 
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
 from python.corrections import apply_muon_prefire, apply_ECAL_prefire
 from python.utils import to_DateTime, load_input_csv
-from ZUtils.python.utils import to_RootTime
 
 # disable panda warnings when assigning a new column in the dataframe
 pd.options.mode.chained_assignment = None
@@ -27,7 +24,6 @@ parser.add_argument("-r", "--rates", required=True, type=str, help="csv file wit
 parser.add_argument("-l", "--refLumi", default="", type=str, help="give a ByLs.csv as input for additional reference Luminosity")
 parser.add_argument("-x", "--xsec", default="", type=str, help="csv file with z rates per measurement for absolute scale")
 parser.add_argument("-f", "--fill", nargs="*",  type=int, default=[], help="specify a single fill to plot")
-parser.add_argument("-y", "--year",  default=2017, type=int, help="give a year for calculation of time")
 parser.add_argument("-s", "--saveDir",  default='./',  type=str, help="give output dir")
 args = parser.parse_args()
 outDir = args.saveDir
@@ -36,7 +32,6 @@ if not os.path.isdir(outDir):
 
 ########## Settings ##########
 
-currentYear = args.year
 secPerLS=float(23.3)
 
 fmt = "png"
@@ -75,35 +70,18 @@ if args.refLumi != "":
 
     data_ref = load_input_csv(str(args.refLumi))
 
-    # # convert reference data from ByLs.csv file
-    # lumiFile=open(str(args.refLumi))
-    # lumiLines=lumiFile.readlines()
-    # data_ref = pd.read_csv(str(args.refLumi), sep=',',low_memory=False, skiprows=lambda x: lumiLines[x].startswith('#') and not lumiLines[x].startswith('#run'))
-    # if 'recorded(/ub)' in data_ref.columns.tolist():      #convert to /pb
-    #     data_ref['recorded(/ub)'] = data_ref['recorded(/ub)'].apply(lambda x:x / 1000000.)
-    #     data_ref = data_ref.rename(index=str, columns={'recorded(/ub)':'recorded(/pb)' })
-    # elif 'recorded(/fb)' in data_ref.columns.tolist():      #convert to /pb
-    #     data_ref['recorded(/fb)'] = data_ref['recorded(/fb)'].apply(lambda x:x * 1000.)
-    #     data_ref = data_ref.rename(index=str, columns={'recorded(/fb)':'recorded(/pb)' })
-
-    # data_ref['fill'] = pd.to_numeric(data_ref['#run:fill'].str.split(':',expand=True)[1])
-    # data_ref['run'] = pd.to_numeric(data_ref['#run:fill'].str.split(':',expand=True)[0])
-    # data_ref['ls'] = pd.to_numeric(data_ref['ls'].str.split(':',expand=True)[0])
-    # data_ref = data_ref.drop(['#run:fill','hltpath','source'],axis=1)
-    # data_ref = data_ref.sort_values(['fill','run','ls','recorded(/pb)'])
-    # data_ref = data_ref.drop_duplicates(['fill','run','ls'])
-
     if args.fill != []:
         data_ref = data_ref.loc[data_ref['fill'].isin(args.fill)]
     else:
         print("Plot all fills")
 
-    data_ref['time'] = data_ref['time'].apply(lambda x: to_DateTime(x))
-    # data_ref['timeE'] = data_ref['time'] - data_ref['time']
+    data_ref['time'] = data_ref['time'].apply(lambda x: to_DateTime(x, string_format = "mm/dd/yy"))
+    data_ref['time'] = mpl.dates.date2num(data_ref['time'])
 
     data_ref['recorded(/nb)'] = data_ref['recorded(/pb)'] * 1000  # convert into /nb 
     data_ref['dLRec(/nb)'] = data_ref['recorded(/nb)']/secPerLS
-    data_ref = data_ref[['fill','dLRec(/nb)','time', 'recorded(/nb)', 'avgpu']]		#Keep only what you need
+    #Keep only what you need
+    data_ref = data_ref[['fill','dLRec(/nb)','time', 'recorded(/nb)', 'avgpu']]		
 
 else:
     extLumi = False 
@@ -130,20 +108,17 @@ data = pd.read_csv(str(args.rates), sep=',',low_memory=False) #, skiprows=[1,2,3
 if args.fill != []:
     data = data.loc[data['fill'].isin(args.fill)]
 
-data['tdate_begin'] = data['beginTime'].apply(lambda x: to_RootTime(x,currentYear)).astype(float)
-data['tdate_end'] = data['endTime'].apply(lambda x: to_RootTime(x,currentYear)).astype(float)
+data['timeDown'] = data['beginTime'].apply(lambda x: to_DateTime(x))
+data['timeUp'] = data['endTime'].apply(lambda x: to_DateTime(x))
 
-data = data.sort_values(['fill','tdate_begin','tdate_end'])
+# bring them in format to sort and plot them
+data['timeDown'] = mpl.dates.date2num(data['timeDown'])
+data['timeUp'] = mpl.dates.date2num(data['timeUp'])
 
-data['tdate_begin'] = data['tdate_begin']# - 31536000
-data['tdate_end'] = data['tdate_end']# - 31536000
+# center of each time slice
+data['time'] = data['timeDown'] + (data['timeUp'] - data['timeDown'])/2
 
-# origin of ROOT TDatime
-data['time'] = data['tdate_begin'] + (data['tdate_end'] - data['tdate_begin'])/2
-
-data['time'] = data['time'].apply(datetime.utcfromtimestamp)
-data['timeUp'] = data['tdate_end'].apply(datetime.utcfromtimestamp)
-data['timeDown'] = data['tdate_begin'].apply(datetime.utcfromtimestamp)
+data = data.sort_values(['fill','time'])
 
 def unorm(x):
     # for counting experiments: define ufloat with poisson uncertainty
@@ -192,13 +167,13 @@ for fill, data_fill in data.groupby("fill"):
 
         ref_fill_lumi = []
         for tUp, tDown in data_fill[['timeUp','timeDown']].values:
-            ref_fill_lumi.append(ref_fill.loc[(ref_fill['time'] >= tDown) & (ref_fill['time'] < tUp)]['recorded(/nb)'].sum() / ((mpl.dates.date2num(tUp) - mpl.dates.date2num(tDown)) *24 * 3600) )
+            ref_fill_lumi.append(ref_fill.loc[(ref_fill['time'] >= tDown) & (ref_fill['time'] < tUp)]['recorded(/nb)'].sum() / ((tUp - tDown) *24 * 3600) )
         
         yRefExt = np.array(ref_fill_lumi)
 
-    x = mpl.dates.date2num(data_fill['time'].values)
-    xUp = mpl.dates.date2num(data_fill['timeUp'].values)
-    xDown = mpl.dates.date2num(data_fill['timeDown'].values)
+    x = data_fill['time'].values
+    xUp = data_fill['timeUp'].values
+    xDown = data_fill['timeDown'].values
 
     # convert into hours
     xUp = (xUp - x) * 24 
@@ -219,7 +194,7 @@ for fill, data_fill in data.groupby("fill"):
     else:
         ticksteps = 1
         
-    xTicks = np.arange(0, int(max(x))+ticksteps, ticksteps)
+    xTicks = np.arange(0, int(xMax)+ticksteps, ticksteps)
 
     # average pileup as x axis
     xPU = data_fill['pileUp'].values
@@ -235,7 +210,7 @@ for fill, data_fill in data.groupby("fill"):
     else:
         ticksteps = 1
         
-    xTicksPU = np.arange(0, int(max(xPU))+ticksteps, ticksteps)
+    xTicksPU = np.arange(0, int(xMaxPU)+ticksteps, ticksteps)
     
     ### Make plot for efficiency vs time
     plt.clf()

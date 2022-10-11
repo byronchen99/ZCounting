@@ -38,12 +38,17 @@ def load_input_csv(byLS_data):
     return byLS_data
 
 # ------------------------------------------------------------------------------
-def to_DateTime(time):
-    # converts brilcalc time to python datetime
+def to_DateTime(time, string_format = "yy/mm/dd"):
+
+    # converts time string to python datetime
     from datetime import datetime
-    time =  time.split(" ")
-    
-    month, day, year = [int(x) for x in time[0].split("/")]
+    time = time.split(" ")
+
+    if string_format == "yy/mm/dd":     # format agreed upon ATLAS and CMS
+        year, month, day = [int(x) for x in time[0].split("/")]
+    elif string_format == "mm/dd/yy":   # brilcalc format
+        month, day, year = [int(x) for x in time[0].split("/")]
+
     hour, min, sec   = [int(x) for x in time[1].split(":")]
     year += 2000
     

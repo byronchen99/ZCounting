@@ -2,12 +2,8 @@ import os,sys
 #sys.argv.append( '-b-' )
 #from scipy.interpolate import UnivariateSpline
 import ROOT
-from ROOT import TGraph
-from ROOT import TGraphErrors
 from array import array
 from ROOT import *
-from operator import truediv
-import random
 import argparse
 import scipy.integrate as integrate
 ROOT.gROOT.SetBatch(True)

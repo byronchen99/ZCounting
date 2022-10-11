@@ -1,13 +1,11 @@
-import os,sys
+import os
 import ROOT
-from array import array
 import argparse
-from datetime import datetime
 import pandas as pd
 import numpy as np
-import shutil
 import pdb
 import uncertainties as unc
+
 ROOT.gROOT.SetBatch(True)
 ROOT.gStyle.SetCanvasPreferGL(1)
 ROOT.gStyle.SetTitleX(.3)

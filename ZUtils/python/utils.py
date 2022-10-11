@@ -76,14 +76,6 @@ def tree_to_df(tree, arrSize=5):
                         df = df.drop([key],axis=1)
     return df
 
-def to_RootTime(time, currentYear):
-    # converts brilcalc time to root TDatime
-    time =  time.split(" ")
-    return ROOT.TDatime(
-        int(time[0].split("/")[0]), int(time[0].split("/")[1]), int(time[0].split("/")[2]),
-        int(time[1].split(":")[0]), int(time[1].split(":")[1]), int(time[1].split(":")[2])
-        ).Convert()
-
 def getMCCorrection(fIn):
     # input file has to be a picked dictionary with
     #   eta region, function name and parameters for the function
