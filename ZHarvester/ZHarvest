@@ -6,14 +6,10 @@ import ROOT
 import os
 import pandas as pd
 import pdb # python debugger might be helpful (see https://docs.python.org/3/library/pdb.html)
-
-from python.utils import load_input_csv, getFileName, get_ls_for_next_measurement, load_histogram, writeSummaryCSV, getCorrelationIO
+import datetime
+from python.utils import load_input_csv, getFileName, get_ls_for_next_measurement, load_histogram, to_DateTime, writeSummaryCSV, getCorrelationIO
 
 ROOT.gROOT.SetBatch(True) # disable root prompts
-
-os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
-from ZUtils.python.utils import to_RootTime
-
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-b", "--beginRun", help="First run to analyze [%(default)s]", type=int, default=272007)
@@ -267,22 +263,20 @@ for run, byLS_run in byLS_data.groupby('run'):
         
         # amount of seconds where we measured the Z counts (during good lumisections)
         timewindow = len(byLS_m)*secPerLS
-        # convert time string to standard time_t format (which is a UInt_t) 
-        beginTime = to_RootTime(byLS_m['time'][0], currentYear)
-        endTime = to_RootTime(byLS_m['time'][-1], currentYear) + int(secPerLS)
+
+        # convert time string to datetime format
+        beginTime = to_DateTime(byLS_m['time'][0], string_format = "mm/dd/yy")
+        endTime = to_DateTime(byLS_m['time'][-1], string_format = "mm/dd/yy") + datetime.timedelta(seconds=secPerLS)
         
         # total time window from the beginning of the first to the end of the last lumisection
-        totaltimewindow = endTime - beginTime
-        # convert standard time_t format back to time string
-        beginTime = ROOT.TDatime(beginTime).AsSQLString().replace("-","/")[2:]
-        endTime = ROOT.TDatime(endTime).AsSQLString().replace("-","/")[2:]
+        totaltimewindow = (endTime - beginTime).total_seconds()
         
         result = {
             "fill": fill,
             "run": run,
             "measurement": m,
-            "beginTime": beginTime,
-            "endTime": endTime,
+            "beginTime": beginTime.strftime("%y/%m/%d %H:%M:%S"),
+            "endTime": endTime.strftime("%y/%m/%d %H:%M:%S") ,
             "deadtime": deadtime,            
             "timewindow": timewindow,
             "totaltimewindow": totaltimewindow,
