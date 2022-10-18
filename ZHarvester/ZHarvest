@@ -224,7 +224,7 @@ for run, byLS_run in byLS_data.groupby('run'):
         def load_from_workspace(type_eff):
             if type_eff == "yield":
                 filename_eff = f"{dirOutSub}/workspace_{etaRegion}_{m}.root"     # To run for the etaRegion=I
-                #filename_eff = f"{dirOutSub}/workspace_BB_0.root"               # To run for the etaRegion=B
+                #filename_eff = f"{dirOutSub}/workspace_BB_{m}.root"               # To run for the etaRegion=B
             else:
                 filename_eff = f"{dirOutSub}/workspace_{type_eff}_{etaRegion}_{m}.root"
                 
