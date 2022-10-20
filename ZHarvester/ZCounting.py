@@ -3,16 +3,11 @@ import ROOT
 import pandas as pd
 import glob
 import os
-import numpy as np
-import json
 import pdb
 import uncertainties as unc
 import gc
 
-from python.utils import writeSummaryCSV, getEra, getFileName, load_input_csv, get_ls_for_next_measurement, getCorrelationIO
-
-os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
-from ZUtils.python.utils import to_RootTime
+from python.utils import writeSummaryCSV, getEra, getFileName, load_input_csv, get_ls_for_next_measurement, getCorrelationIO, to_DateTime
 
 # disable panda warnings when assigning a new column in the dataframe
 pd.options.mode.chained_assignment = None
@@ -494,14 +489,14 @@ if __name__ == '__main__':
             result = extract_results(outSubDir, m, cIO)
             
             if result:
-                df['time'] = df['time'].apply(lambda x: to_RootTime(x, currentYear))
-            
+                df['time'] = df['time'].apply(lambda x: to_DateTime(x, string_format = "mm/dd/yy"))
+
                 result.update({
                     "fill": fill,
                     "run": run,
                     "measurement": m,
-                    "tdate_begin": min(df['time']),
-                    "tdate_end": max(df['time']),
+                    "tdate_begin": min(df['time']).strftime("%y/%m/%d %H:%M:%S"),
+                    "tdate_end": max(df['time']).strftime("%y/%m/%d %H:%M:%S"),
                     "lumiDel": df['delivered(/pb)'].sum(),
                     "lumiRec": df['recorded(/pb)'].sum(),
                     "timewindow": len(df) * secPerLS,

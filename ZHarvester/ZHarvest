@@ -6,14 +6,10 @@ import ROOT
 import os
 import pandas as pd
 import pdb # python debugger might be helpful (see https://docs.python.org/3/library/pdb.html)
-
-from python.utils import load_input_csv, getFileName, get_ls_for_next_measurement, load_histogram, writeSummaryCSV, getCorrelationIO
+import datetime
+from python.utils import load_input_csv, getFileName, get_ls_for_next_measurement, load_histogram, to_DateTime, writeSummaryCSV, getCorrelationIO
 
 ROOT.gROOT.SetBatch(True) # disable root prompts
-
-os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
-from ZUtils.python.utils import to_RootTime
-
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-b", "--beginRun", help="First run to analyze [%(default)s]", type=int, default=272007)
@@ -45,9 +41,9 @@ currentYear = 2022
 
 etaRegion = "I" # define eta region. Currently supported are "B" (Barrel) and "I" (Inclusive)
 
-nBinsMass = 120  # number of bins in histograms to fit
-massLo = 60     # lower boundary for fit range
-massHi = 120    # upper boundary for fit range
+nBinsMass = 100  # number of bins in histograms to fit  ## V02: 120 ATLAS 100
+massLo = 66     # lower boundary for fit range          ## V02: 60  ATLAS  66
+massHi = 116    # upper boundary for fit range          ## V02: 120 ATLAS 116
 
 npvLo = 0.5     # lower boundary for npv histogram
 npvHi = 100.5   # upper boundary for npv histogram
@@ -55,7 +51,7 @@ npvHi = 100.5   # upper boundary for npv histogram
 maximumLS = 2500        # maximum luminosity block number that is stored in the DQM histograms
 minLSperRun = 20        # only consider runs with at least 20 luminosity blocks
 LumiPerMeasurement = 20 # minimum amount of luminosity required to perform one measurement
-ptCut = 25              # pT cut on muons, only for labeling
+ptCut = 27              # pT cut on muons, only for labeling  ## V02: 25  ATLAS 27
 
 # |eta| cut on muons, only for labeling 
 if etaRegion == "B":
@@ -160,7 +156,10 @@ for run, byLS_run in byLS_data.groupby('run'):
         # get histogram with primary vertex distribution
         hPV = load_histogram("h_npv", fileName, goodLSlist, run=run, prefix="", suffix="new", pileup=True)
 
-        # get histograms binned in mass
+        #if (m==4)
+        #    continue
+        
+       # get histograms binned in mass
         def load(name_):
             return load_histogram(name_, fileName, goodLSlist, run=run, 
                 MassBin=nBinsMass, MassMin=massLo, MassMax=massHi, 
@@ -179,7 +178,8 @@ for run, byLS_run in byLS_data.groupby('run'):
             h_hlt1.Add(load(f"h_mass_1HLT_BE"))
             h_hlt1.Add(load(f"h_mass_1HLT_EE"))
 
-        ROOT.calculateHLTEfficiencyAndYield(h_hlt2, h_hlt1, m, etaRegion, sigModel, bkgModel, sigModel, bkgModel, hPV, sigTemplates)
+        #ROOT.calculateHLTEfficiencyAndYield(h_hlt2, h_hlt1, m, "BB", sigModel, bkgModel, sigModel, bkgModel, hPV, sigTemplates)       # To run for the etaRegion=B
+        ROOT.calculateHLTEfficiencyAndYield(h_hlt2, h_hlt1, m, etaRegion, sigModel, bkgModel, sigModel, bkgModel, hPV, sigTemplates)   # To run for the etaRegion=I
         
         # load histograms for selection efficiency
         h_sel_fail = load(f"h_mass_SIT_fail_BB")
@@ -223,7 +223,8 @@ for run, byLS_run in byLS_data.groupby('run'):
         
         def load_from_workspace(type_eff):
             if type_eff == "yield":
-                filename_eff = f"{dirOutSub}/workspace_{etaRegion}_{m}.root"
+                filename_eff = f"{dirOutSub}/workspace_{etaRegion}_{m}.root"     # To run for the etaRegion=I
+                #filename_eff = f"{dirOutSub}/workspace_BB_{m}.root"               # To run for the etaRegion=B
             else:
                 filename_eff = f"{dirOutSub}/workspace_{type_eff}_{etaRegion}_{m}.root"
                 
@@ -267,22 +268,20 @@ for run, byLS_run in byLS_data.groupby('run'):
         
         # amount of seconds where we measured the Z counts (during good lumisections)
         timewindow = len(byLS_m)*secPerLS
-        # convert time string to standard time_t format (which is a UInt_t) 
-        beginTime = to_RootTime(byLS_m['time'][0], currentYear)
-        endTime = to_RootTime(byLS_m['time'][-1], currentYear) + int(secPerLS)
+
+        # convert time string to datetime format
+        beginTime = to_DateTime(byLS_m['time'][0], string_format = "mm/dd/yy")
+        endTime = to_DateTime(byLS_m['time'][-1], string_format = "mm/dd/yy") + datetime.timedelta(seconds=secPerLS)
         
         # total time window from the beginning of the first to the end of the last lumisection
-        totaltimewindow = endTime - beginTime
-        # convert standard time_t format back to time string
-        beginTime = ROOT.TDatime(beginTime).AsSQLString().replace("-","/")[2:]
-        endTime = ROOT.TDatime(endTime).AsSQLString().replace("-","/")[2:]
+        totaltimewindow = (endTime - beginTime).total_seconds()
         
         result = {
             "fill": fill,
             "run": run,
             "measurement": m,
-            "beginTime": beginTime,
-            "endTime": endTime,
+            "beginTime": beginTime.strftime("%y/%m/%d %H:%M:%S"),
+            "endTime": endTime.strftime("%y/%m/%d %H:%M:%S") ,
             "deadtime": deadtime,            
             "timewindow": timewindow,
             "totaltimewindow": totaltimewindow,
