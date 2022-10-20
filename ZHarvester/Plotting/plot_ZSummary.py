@@ -17,6 +17,7 @@ sys.path.append(os.getcwd())
 print(os.getcwd())
 
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
+from python.utils import to_DateTime
 from python.corrections import apply_muon_prefire, apply_ECAL_prefire
 
 ROOT.gROOT.SetBatch(True)
@@ -84,71 +85,48 @@ if args.xsec:
     print("get Z cross section")
     data_xsec = pd.read_csv(str(args.xsec), sep=',',low_memory=False)#, skiprows=[1,2,3,4,5])
 
-    data_xsec['zDelI'] = data_xsec['zDel'].apply(lambda x: unc.ufloat_fromstr(x).n)
-
     apply_muon_prefire(data_xsec)
     apply_ECAL_prefire(data_xsec)
 
     print("apply prefire corrections - done")
 
-    
-    # data_xsec['zDel_mc']
-
-    # data_xsec['zDel_mc'] = data_xsec['zDelBB_mc'] + data_xsec['zDelBE_mc'] + data_xsec['zDelEE_mc']
-    # 
-    # xsecBB = sum(data_xsec['zDelBB_mc'])/sum(data_xsec['lumiRec'])
-    # xsecBE = sum(data_xsec['zDelBE_mc'])/sum(data_xsec['lumiRec'])
-    # xsecEE = sum(data_xsec['zDelEE_mc'])/sum(data_xsec['lumiRec'])
-    xsec = sum(data_xsec['zDelI'])/sum(data_xsec['lumiRec'])
+    xsec = sum(data_xsec['delZCount'])/sum(data_xsec['recLumi'])
     normalize = False
 else:
-    # xsec = 1      
-    # # normalize everything as no cross section is specified
-    # normalize = True    
+    # normalize everything as no cross section is specified
+    xsec = 1      
+    normalize = True    
 
-    # cross section from theory
-    xsec = 772627.88 * 0.995988004755 / 0.3646 * 0.3649 / 1000.
-
-    normalize = False
+    # # cross section from theory
+    # xsec = 772627.88 * 0.995988004755 / 0.3646 * 0.3649 / 1000.
+    # normalize = False
     
 # --- z luminosity
 print("get Z luminosity")
 data = pd.concat([pd.read_csv(csv, sep=',',low_memory=False) for csv in args.rates], ignore_index=True, sort=False)
 
-data['zDelI'] = data['zDel'].apply(lambda x: unc.ufloat_fromstr(x).n)
-
+# --->>> prefire corrections
 if year in (2016, 2017, 2018):
-    # --->>> prefire corrections
     apply_muon_prefire(data)
     apply_ECAL_prefire(data)
 
     print("apply prefire corrections - done")
 # <<<---
 
-# data['zDel_mc'] = data['zDelBB_mc'] + data['zDelBE_mc'] + data['zDelEE_mc']
-# 
-# data['zLumiBB'] = data['zDelBB_mc'] / xsecBB
-# data['zLumiBE'] = data['zDelBE_mc'] / xsecBE
-# data['zLumiEE'] = data['zDelEE_mc'] / xsecEE
-# data['zLumiI'] = data['zDelI_mc'] / xsecI
+data['zLumi'] = data['delZCount'] / xsec
 
-data['zLumi'] = data['zDelI'] / xsec
+data["beginTime"] = mpl.dates.date2num(data["beginTime"].apply(to_DateTime))
+data["endTime"] = mpl.dates.date2num(data["endTime"].apply(to_DateTime))
 
-data['time'] = (data['tdate_begin']+data['tdate_end'])//2
+data['time'] = (data['beginTime']+data['endTime'])/2
 
-data = data[data['lumiRec'] > 0.]
+data = data[data['recLumi'] > 0.]
 data = data[data['zLumi'] > 0.]
-# data = data[data['zLumiI'] > 0.]
-
-# data['zLumiBB_to_dLRec'] = data['zLumiBB'] / data['lumiRec']
-# data['zLumiBE_to_dLRec'] = data['zLumiBE'] / data['lumiRec']
-# data['zLumiEE_to_dLRec'] = data['zLumiEE'] / data['lumiRec']
-# data['zLumiI_to_dLRec'] = data['zLumiI'] / data['lumiRec']
 
 if normalize:
-    data['zLumi'] = data['zLumi'] / sum(data['zLumi']) * sum(data['lumiRec'])
+    data['zLumi'] = data['zLumi'] / sum(data['zLumi']) * sum(data['recLumi'])
 
-data['zLumi_to_dLRec'] = data['zLumi'] / data['lumiRec']
+data['zLumi_to_dLRec'] = data['zLumi'] / data['recLumi']
 
 if year == 2016:
     lumi=0
@@ -160,8 +138,8 @@ if year == 2016:
     for run in invalid_runs:
         data_invalid = data.loc[data['run'] == run]
         
-        lumi+= data_invalid['lumiRec'].sum()/1000.
-        lumi_diff+= (data_invalid['lumiRec'] / data['zLumi_to_dLRec'] * 0.95).sum()/1000.
+        lumi+= data_invalid['recLumi'].sum()/1000.
+        lumi_diff+= (data_invalid['recLumi'] / data['zLumi_to_dLRec'] * 0.95).sum()/1000.
 
     print("effected luminosity: {0}/fb".format(lumi))
     print("estimated luminosity difference: {0}/fb".format(lumi-lumi_diff))
@@ -170,7 +148,7 @@ if year == 2016:
     for run in invalid_runs:
         data = data.loc[data['run'] != run]
 
-data['weightLumi'] = data['lumiRec']
+data['weightLumi'] = data['recLumi']
 
 print("analyze {0} fb^-1 of data (reference lumi)".format(data['weightLumi'].sum()/1000.))
 print("analyze {0} fb^-1 of data (z lumi)".format(data['zLumi'].sum()/1000.))
@@ -178,14 +156,14 @@ print("ratio: z lumi/ ref. lumi = {0}".format(data['zLumi'].sum()/data['weightLu
 
 print("Outliers:")
 data_out = data.loc[abs(data['zLumi_to_dLRec']-1) > 0.05]
-print(data_out[["lumiRec","run","fill", "measurement","zLumi_to_dLRec","zDel"]])
+print(data_out[["recLumi","run","fill", "measurement","zLumi_to_dLRec","delZCount"]])
 
 def make_hist(
     df,
     run_range=None,
     lumi_name='zLumi_to_dLRec',
     zLumi_name = 'zLumi',
-    refLumi_name = 'lumiRec',    
+    refLumi_name = 'recLumi',    
     sumN=50,    # make averages of sumN measurements
     label="Z luminosity / Ref. luminosity",
     saveas="zcount",

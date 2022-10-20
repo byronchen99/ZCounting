@@ -51,6 +51,8 @@ parser.add_argument("-s","--saveDir",  default='./',  type=str, help="give outpu
 
 args = parser.parse_args()
 
+year = 2022
+
 outDir = args.saveDir
 if not os.path.isdir(outDir):
     os.mkdir(outDir)
@@ -82,14 +84,14 @@ def make_plots(df,
         data = df
 
     if sum(data[yAxis].isnull()) > 0:
-        print(">>> sort out {0} points with nan".format(sum(data['y'].isnull())))
+        print(">>> sort out {0} points with nan".format(sum(data[yAxis].isnull())))
         data = data.loc[~data[yAxis].isnull()]
 
 
     # x_step: intervall in which the measurements are collected in one point
     if xAxis == 'lumi':
-        xAxis = 'lumiRecInst'
-        data[xAxis] = data['lumiRec'] / data['timewindow']
+        xAxis = 'recLumiInst'
+        data[xAxis] = data['recLumi'] / data['timewindow']
         xTitle="Inst. luminosity $[\\mathrm{nb}^{-1}\\mathrm{s}^{-1}]$"
         x_step = 0.2
     elif xAxis == 'time':
@@ -253,7 +255,7 @@ def make_plots(df,
     xx = np.append(xx, xx[-1]+x_step)
     xx_centers = []
     yy = []
-    yy0 = []
+    # yy0 = []
     for i in range(0,len(xx)-1):
         dyy = data.loc[(data[xAxis] < xx[i+1]) & (data[xAxis] >= xx[i])]
 
@@ -261,11 +263,11 @@ def make_plots(df,
             continue
 
         u_y = dyy[yAxis].values
-        u_y0 = dyy[yAxis.replace("_mc","")].values 
+        # u_y0 = dyy[yAxis.replace("_mc","")].values 
         
         # 1) simple mean
         yy_avg = u_y.mean()
-        yy0_avg = u_y0.mean()
+        # yy0_avg = u_y0.mean()
 
         # # 2) or weighted average
         # yy_w = np.array([1./(y.s)**2 for y in u_y])
@@ -279,18 +281,18 @@ def make_plots(df,
 
         xx_centers.append((xx[i] + (xx[i+1] - xx[i]) / 2.))
         yy.append(yy_avg)
-        yy0.append(yy0_avg)
+        # yy0.append(yy0_avg)
 
     xx = np.array(xx_centers)
 
     if normalized:
         yy = np.array(yy) / (sum(yy)/len(yy))
-        yy0 = np.array(yy0) / (sum(yy0)/len(yy0))
+        # yy0 = np.array(yy0) / (sum(yy0)/len(yy0))
 
     yy_err = np.array([y.s for y in yy])
     yy = np.array([y.n for y in yy])
-    yy0_err = np.array([y.s for y in yy0])
-    yy0 = np.array([y.n for y in yy0])
+    # yy0_err = np.array([y.s for y in yy0])
+    # yy0 = np.array([y.n for y in yy0])
 
     print(">>> make fit")
     func = linear #pol2 #quad
@@ -333,9 +335,9 @@ def make_plots(df,
     yMax = 1.05#max(yy + yy_err)
     yRange = abs(yMax - yMin)    
 
-    p4 = ax1.errorbar(xx, yy0, xerr=xx_err, yerr=yy0_err, label="Measurements uncorrected",
-        marker="o", linewidth=0, color="grey", ecolor="grey", elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
-        zorder=1)
+    # p4 = ax1.errorbar(xx, yy0, xerr=xx_err, yerr=yy0_err, label="Measurements uncorrected",
+    #     marker="o", linewidth=0, color="grey", ecolor="grey", elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
+    #     zorder=1)
     
     p3 = ax1.errorbar(xx, yy, xerr=xx_err, yerr=yy_err, label="Measurements",
         marker="o", linewidth=0, color="black", ecolor="black", elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
@@ -349,8 +351,8 @@ def make_plots(df,
                      color='grey', alpha=0.2, zorder=1) 
     p1 = ax1.fill(np.NaN, np.NaN, color='grey', alpha=0.2, linewidth=0.)    
 
-    leg_styles = [p4, p3, (p2[0], p1[0])]
-    leg_labels = ['Measurements unc.','Measurements', 'Linear fit']
+    leg_styles = [p3, (p2[0], p1[0])]
+    leg_labels = ['Measurements', 'Linear fit']
     
     leg = ax1.legend(leg_styles, leg_labels, loc="lower left", ncol=3,
         frameon=True, framealpha=1.0, fancybox=False, edgecolor="black")
@@ -374,17 +376,13 @@ if args.xsec:
     plot_lowPU = True
     # --- get Z xsec
     data_xsec = pd.read_csv(str(args.xsec), sep=',',low_memory=False)#, skiprows=[1,2,3,4,5])
-    # xsecBB = sum(data_xsec['zDelBB'])/sum(data_xsec['lumiRec'])
-    # xsecBE = sum(data_xsec['zDelBE'])/sum(data_xsec['lumiRec'])
-    # xsecEE = sum(data_xsec['zDelEE'])/sum(data_xsec['lumiRec'])
-    # xsecI = sum(data_xsec['zDelI'])/sum(data_xsec['lumiRec'])
 
-    data_xsec['zDelI'] = data_xsec['zDel'].apply(lambda x: unc.ufloat_fromstr(x).n)
+    data_xsec['delZCount'] = data_xsec['zDel'].apply(lambda x: unc.ufloat_fromstr(x).n)
 
     apply_muon_prefire(data_xsec)
     apply_ECAL_prefire(data_xsec)
     
-    xsec = sum(data_xsec['zDelI'])/sum(data_xsec['lumiRec'])
+    xsec = sum(data_xsec['delZCount'])/sum(data_xsec['recLumi'])
 
     
 
@@ -400,7 +398,7 @@ invalid_runs = {
 for run in invalid_runs:
     rates = rates.loc[rates['run'] != run]
 
-rates['lumiRec'] = rates['lumiRec'] * 1000    # convert into /nb
+rates['recLumi'] = rates['recLumi'] * 1000    # convert into /nb
 
 # convert to uncertainties
 # rates['effHLTBB'] = rates['effHLTBB'].apply(lambda x: unc.ufloat_fromstr(x))
@@ -419,7 +417,6 @@ rates['lumiRec'] = rates['lumiRec'] * 1000    # convert into /nb
 # rates['effGloB'] = rates['effGloB'].apply(lambda x: unc.ufloat_fromstr(x))
 # rates['effGloE'] = rates['effGloE'].apply(lambda x: unc.ufloat_fromstr(x))
 # rates['effGloI'] = rates['effGloI'].apply(lambda x: unc.ufloat_fromstr(x))
-
 # rates['ZBBeff'] = rates['ZBBeff'].apply(lambda x: unc.ufloat_fromstr(x))
 # rates['ZBEeff'] = rates['ZBEeff'].apply(lambda x: unc.ufloat_fromstr(x))
 # rates['ZEEeff'] = rates['ZEEeff'].apply(lambda x: unc.ufloat_fromstr(x))
@@ -429,92 +426,78 @@ rates['lumiRec'] = rates['lumiRec'] * 1000    # convert into /nb
 # rates['zDelBB_mc'] = rates['zDelBB_mc'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
 # rates['zDelBE_mc'] = rates['zDelBE_mc'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
 # rates['zDelEE_mc'] = rates['zDelEE_mc'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
-# rates['zDelI_mc'] = rates['zDelI_mc'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
+# rates['delZCount_mc'] = rates['delZCount_mc'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
 # 
 # rates['zDelBB'] = rates['zDelBB'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
 # rates['zDelBE'] = rates['zDelBE'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
 # rates['zDelEE'] = rates['zDelEE'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
-# rates['zDelI'] = rates['zDel'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
-# rates['zDelI'] = rates['zDel'].apply(lambda x: unc.ufloat_fromstr(x))
+# rates['delZCount'] = rates['zDel'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
+# rates['delZCount'] = rates['zDel'].apply(lambda x: unc.ufloat_fromstr(x))
+# rates['effHLT']      = rates['effHLT'].apply(lambda x: unc.ufloat_fromstr(x).n)
+# rates['effSel']      = rates['effSel'].apply(lambda x: unc.ufloat_fromstr(x).n)
+# rates['effSta']      = rates['effSta'].apply(lambda x: unc.ufloat_fromstr(x).n)
+# rates['effGlo']      = rates['effGlo'].apply(lambda x: unc.ufloat_fromstr(x).n)
+# # calculate correct statistical uncertainties - before HLT selection
+# rates['NZ']       = rates['zReco'].apply(lambda x: unc.ufloat_fromstr(x).n)
+# rates['NbkgHLTFail'] = rates['NbkgHLTFail'].apply(lambda x: unc.ufloat_fromstr(x).n)
+# rates['NbkgHLTPass'] = rates['NbkgHLTPass'].apply(lambda x: unc.ufloat_fromstr(x).n)
+# rates['N1'] = 2*rates['effHLT']*(1-rates['cHLT']*rates['effHLT'])*rates['NZ'] + rates['NbkgHLTFail']
+# rates['N2'] = rates['effHLT']**2 * rates['cHLT'] * rates['NZ'] + rates['NbkgHLTPass']
+# rates['N1'] = rates['N1'].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
+# rates['N2'] = rates['N2'].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
+# rates['N1bkg'] = rates['NbkgHLTFail'].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
+# rates['N2bkg'] = rates['NbkgHLTPass'].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
+# rates['N1sig'] = rates['N1'] - rates['N1bkg']
+# rates['N2sig'] = rates['N2'] - rates['N2bkg']
+# rates['effHLT'] = (2 * rates['N2sig']) / (2 * rates['N2sig'] + rates['N1sig'])
+# rates['zRecI'] = (rates['N2sig'] + 0.5*rates['N1sig'])**2/rates['N2sig'] * rates['cHLT']
 
-rates['effHLT']      = rates['effHLT'].apply(lambda x: unc.ufloat_fromstr(x).n)
-rates['effSel']      = rates['effSel'].apply(lambda x: unc.ufloat_fromstr(x).n)
-rates['effSta']      = rates['effSta'].apply(lambda x: unc.ufloat_fromstr(x).n)
-rates['effGlo']      = rates['effGlo'].apply(lambda x: unc.ufloat_fromstr(x).n)
+# # calculate correct statistical uncertainty for ID selection efficiency
+# for eff in ("Sel","Glo","Sta"):
+#     rates['Nsig{0}'.format(eff)]     = rates['Nsig{0}'.format(eff)].apply(lambda x: unc.ufloat_fromstr(x).n)
+#     rates['Nbkg{0}Pass'.format(eff)] = rates['Nbkg{0}Pass'.format(eff)].apply(lambda x: unc.ufloat_fromstr(x).n)
+#     rates['Nbkg{0}Fail'.format(eff)] = rates['Nbkg{0}Fail'.format(eff)].apply(lambda x: unc.ufloat_fromstr(x).n)
 
-# calculate correct statistical uncertainties - before HLT selection
-rates['NZ']       = rates['zReco'].apply(lambda x: unc.ufloat_fromstr(x).n)
-rates['NbkgHLTFail'] = rates['NbkgHLTFail'].apply(lambda x: unc.ufloat_fromstr(x).n)
-rates['NbkgHLTPass'] = rates['NbkgHLTPass'].apply(lambda x: unc.ufloat_fromstr(x).n)
+#     rates['N{0}Pass'.format(eff)] = rates['Nsig{0}'.format(eff)]*rates['eff{0}'.format(eff)] + rates['Nbkg{0}Pass'.format(eff)]
+#     rates['N{0}Fail'.format(eff)] = rates['Nsig{0}'.format(eff)]*(1-rates['eff{0}'.format(eff)]) + rates['Nbkg{0}Fail'.format(eff)]
 
-rates['N1'] = 2*rates['effHLT']*(1-rates['cHLT']*rates['effHLT'])*rates['NZ'] + rates['NbkgHLTFail']
-rates['N2'] = rates['effHLT']**2 * rates['cHLT'] * rates['NZ'] + rates['NbkgHLTPass']
+#     rates['N{0}Pass'.format(eff)] = rates['N{0}Pass'.format(eff)].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
+#     rates['N{0}Fail'.format(eff)] = rates['N{0}Fail'.format(eff)].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
+#     rates['Nbkg{0}Pass'.format(eff)] = rates['Nbkg{0}Pass'.format(eff)].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
+#     rates['Nbkg{0}Fail'.format(eff)] = rates['Nbkg{0}Fail'.format(eff)].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
 
-rates['N1'] = rates['N1'].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
-rates['N2'] = rates['N2'].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
-rates['N1bkg'] = rates['NbkgHLTFail'].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
-rates['N2bkg'] = rates['NbkgHLTPass'].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
+#     rates['Nsig{0}Pass'.format(eff)] = rates['N{0}Pass'.format(eff)] - rates['Nbkg{0}Pass'.format(eff)]
+#     rates['Nsig{0}Fail'.format(eff)] = rates['N{0}Fail'.format(eff)] - rates['Nbkg{0}Fail'.format(eff)]
 
-rates['N1sig'] = rates['N1'] - rates['N1bkg']
-rates['N2sig'] = rates['N2'] - rates['N2bkg']
+# rates['effSel'] = (2 * rates['N2sig'] + rates['N1sig']) / (2 * rates['N2sig'] + rates['N1sig'] + rates['NsigSelFail'])
+# rates['effGlo'] = rates["NsigGloPass"] / (rates["NsigGloPass"]+rates["NsigGloFail"])
+# rates['effSta'] = rates["NsigStaPass"] / (rates["NsigStaPass"]+rates["NsigStaFail"])
 
-rates['effHLT'] = (2 * rates['N2sig']) / (2 * rates['N2sig'] + rates['N1sig'])
+# # calculate correct statistical uncertainty for number of events before selection
+# rates['delZCount'] = rates['zRecI'] / (
+#     (2 * rates['N2sig'] + rates['N1sig']) / (2 * rates['N2sig'] + rates['N1sig'] + rates['NsigSelFail']) 
+#     * rates['effSta']*rates['effGlo'])**2
 
-rates['zRecI'] = (rates['N2sig'] + 0.5*rates['N1sig'])**2/rates['N2sig'] * rates['cHLT']
+if year in (2016, 2017, 2018):
+    apply_muon_prefire(rates)
+    apply_ECAL_prefire(rates)
 
-# calculate correct statistical uncertainty for ID selection efficiency
-for eff in ("Sel","Glo","Sta"):
-    rates['Nsig{0}'.format(eff)]     = rates['Nsig{0}'.format(eff)].apply(lambda x: unc.ufloat_fromstr(x).n)
-    rates['Nbkg{0}Pass'.format(eff)] = rates['Nbkg{0}Pass'.format(eff)].apply(lambda x: unc.ufloat_fromstr(x).n)
-    rates['Nbkg{0}Fail'.format(eff)] = rates['Nbkg{0}Fail'.format(eff)].apply(lambda x: unc.ufloat_fromstr(x).n)
+rates = rates[rates['delZCount'] > 0]
+rates['delZCount'] = rates['delZCount'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
 
-    rates['N{0}Pass'.format(eff)] = rates['Nsig{0}'.format(eff)]*rates['eff{0}'.format(eff)] + rates['Nbkg{0}Pass'.format(eff)]
-    rates['N{0}Fail'.format(eff)] = rates['Nsig{0}'.format(eff)]*(1-rates['eff{0}'.format(eff)]) + rates['Nbkg{0}Fail'.format(eff)]
+rates['xsec'] = rates['delZCount'] / rates['recLumi']
 
-    rates['N{0}Pass'.format(eff)] = rates['N{0}Pass'.format(eff)].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
-    rates['N{0}Fail'.format(eff)] = rates['N{0}Fail'.format(eff)].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
-    rates['Nbkg{0}Pass'.format(eff)] = rates['Nbkg{0}Pass'.format(eff)].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
-    rates['Nbkg{0}Fail'.format(eff)] = rates['Nbkg{0}Fail'.format(eff)].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
-
-    rates['Nsig{0}Pass'.format(eff)] = rates['N{0}Pass'.format(eff)] - rates['Nbkg{0}Pass'.format(eff)]
-    rates['Nsig{0}Fail'.format(eff)] = rates['N{0}Fail'.format(eff)] - rates['Nbkg{0}Fail'.format(eff)]
-
-rates['effSel'] = (2 * rates['N2sig'] + rates['N1sig']) / (2 * rates['N2sig'] + rates['N1sig'] + rates['NsigSelFail'])
-rates['effGlo'] = rates["NsigGloPass"] / (rates["NsigGloPass"]+rates["NsigGloFail"])
-rates['effSta'] = rates["NsigStaPass"] / (rates["NsigStaPass"]+rates["NsigStaFail"])
-
-# calculate correct statistical uncertainty for number of events before selection
-rates['zDelI'] = rates['zRecI'] / (
-    (2 * rates['N2sig'] + rates['N1sig']) / (2 * rates['N2sig'] + rates['N1sig'] + rates['NsigSelFail']) 
-    * rates['effSta']*rates['effGlo'])**2
-
-apply_muon_prefire(rates)
-apply_ECAL_prefire(rates)
-# apply_pileup_correction(rates)
-# rates['xsecBB_mc'] = rates['zDelBB_mc'] / rates['lumiRec']
-# rates['xsecBE_mc'] = rates['zDelBE_mc'] / rates['lumiRec']
-# rates['xsecEE_mc'] = rates['zDelEE_mc'] / rates['lumiRec']
-# rates['xsecI_mc'] = rates['zDelI_mc'] / rates['lumiRec']
-# rates['xsec_mc'] = rates['xsecBB_mc'] + rates['xsecBE_mc'] + rates['xsecEE_mc']
-
-# rates['xsecBB'] = rates['zDelBB'] / rates['lumiRec']
-# rates['xsecBE'] = rates['zDelBE'] / rates['lumiRec']
-# rates['xsecEE'] = rates['zDelEE'] / rates['lumiRec']
-# rates['xsec'] = rates['xsecBB'] + rates['xsecBE'] + rates['xsecEE']
-
-rates['xsecI'] = rates['zDelI'] / rates['lumiRec']
-
-rates['xsecI_mc'] = rates['xsecI'] * rates['cIO']**2 
+# rates['xsecI_mc'] = rates['xsecI'] * rates['cIO']**2 
 
 # only keep necessary data
-rates = rates[["xsecI_mc","xsecI", "lumiRec", "timewindow", "run"]]
+rates = rates[["xsec","recLumi", "timewindow", "run", "pileUp"]]
 
 for yy, ylabel, region, mcRes in (
-    # ("xsec", "sigma", "", ""),
+    ("xsec", "sigma", "", ""),
     # ("xsecBB", "sigma", "BB", ""),
     # ("xsecBE", "sigma", "BE", ""),
     # ("xsecEE", "sigma", "EE", ""),
-    ("xsecI_mc", "sigma", "I", ""),
+    # ("xsecI_mc", "sigma", "I", ""),
     # # ("xsec_mc", "sigma", "", ""),
     # ("xsecBB_mc", "sigma", "BB", ""),
     # ("xsecBE_mc", "sigma", "BE", ""),
@@ -575,5 +558,6 @@ for yy, ylabel, region, mcRes in (
 
     ### Run 3
     # 2022
-    make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2022", run_range=(356309,356616), normalized=True)
+    make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2022", normalized=True, xAxis='lumi')
+    make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2022", normalized=True, xAxis='pileUp')
 
