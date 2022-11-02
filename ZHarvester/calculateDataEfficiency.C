@@ -271,12 +271,20 @@ TFile* generateTemplate(
 ){
     const TString histfilename = outputDir+"/histTemplates_"+effType+".root";
 
-    TFile *outfile = TFile::Open(histfilename,"CREATE");
-    if(!outfile){
+    TFile *outfile = 0;
+
+    if(hPV==0){
+        // if no PU reweighting is done, we can use the template from the last slize if it exists
+
         outfile = TFile::Open(histfilename,"READ");
-        cout << "Use existing template "<< endl;
-        return outfile;
+        if(outfile){
+            cout << "Use existing template "<< endl;
+            return outfile;
+        }
     }
+
+    outfile = TFile::Open(histfilename,"RECREATE");
+
     cout << "Creating histogram templates... "; cout.flush();
 
     TFile *infile    = new TFile(mcfilename);
@@ -379,12 +387,22 @@ TFile* generateTemplate_ZYield(
 ){
     //const TString histfilename = hPV == 0 ? outputDir+"/../histTemplates_HLT.root" : outputDir+"/histTemplates_HLT_"+std::to_string(iBin)+".root";
     const TString histfilename = outputDir+"/histTemplates_HLT.root";
-    TFile *outfile = TFile::Open(histfilename,"CREATE");
-    if(!outfile){
-        cout << "Use existing template "<< endl;
+
+
+    TFile *outfile = 0;
+
+    if(hPV==0){
+        // if no PU reweighting is done, we can use the template from the last slize if it exists
+
         outfile = TFile::Open(histfilename,"READ");
-        return outfile;
+        if(outfile){
+            cout << "Use existing template "<< endl;
+            return outfile;
+        }
     }
+
+    outfile = TFile::Open(histfilename,"RECREATE");
+
     cout << "Creating histogram templates... "; cout.flush();
 
     TFile *infile    = new TFile(mcfilename);
@@ -727,14 +745,9 @@ Double_t make_plot(
     else sprintf(binlabelx, "|#eta| < %.1f", etaCutTag);
 
 
-    if(effType == "yield"){
-        sprintf(pname,"%s_%s_%s_%d", effType.Data(), etaRegion.Data(), std::to_string(passRegion).c_str(), iBin);
-        sprintf(ctitle,"%s %s (%d) ", effType.Data(), std::to_string(passRegion).c_str(), iBin);
-    }
-    else{
-        sprintf(pname,"%s_%s_%s_%d", effType.Data(), etaRegion.Data(), passRegion ? "pass" : "fail", iBin);
-        sprintf(ctitle,"%s %s (%d) ", effType.Data(), passRegion ? "pass" : "fail", iBin);
-    }
+    sprintf(pname,"%s_%s_%i_%d", effType.Data(), etaRegion.Data(), passRegion, iBin);
+    sprintf(ctitle,"%s %i (%d) ", effType.Data(), passRegion, iBin);
+
     
     if(eff != 0){
         if(effType == "yield"){
@@ -878,7 +891,13 @@ Double_t make_plot(
     else{
         pad1->SetLogy(0);
         mframe->SetMinimum(0.);
-        mframe->SetMaximum(mframe->GetMaximum()*1.2);
+
+        if(effType == "Trk"){
+            mframe->SetMaximum(mframe->GetMaximum()*2);
+        }
+        else{
+            mframe->SetMaximum(mframe->GetMaximum()*1.2);
+        }
     }
 
     mframe->Draw();
@@ -962,13 +981,12 @@ Double_t make_plot(
 void getZyield(
     TH1D*          h_yield,         // Histogram with signal and background contribution
     const Int_t    iBin,            // Label of measurement in currect run
-    const Int_t    sigMod,
-    const Int_t    bkgMod,
     const TString  effType="HLT",   // {Trk, Sta, Glo, Sel, HLT}
     const TString  etaRegion="",    // {B, E, BB, BE, EE or I}
-    const Bool_t   passRegion=true,
+    const Int_t    sigMod=1,
+    const Int_t    bkgMod=6,
+    const Int_t    passRegion=1,
     const TString  mcfilename="",   
-    TH1D*          _hQCD=0,
     TH1D*          hPV=0
 ){
     std::cout<<">>> Do fit in "<< etaRegion 
@@ -986,16 +1004,16 @@ void getZyield(
 
     TFile *histfile = 0;
     TH1D *h=0;
-    if(sigMod==2 || sigMod==4) {
+    if(sigMod%2 == 0) {
         if(effType == "HLT"){
-            histfile = generateTemplate_ZYield(mcfilename, 0, iBin);
+            histfile = generateTemplate_ZYield(mcfilename, hPV, iBin);
             if(passRegion)
                 h = (TH1D*)histfile->Get("h_mass_2hlt_"+etaRegion);
             else
                 h = (TH1D*)histfile->Get("h_mass_1hlt_"+etaRegion);            
         }
         else{
-            histfile = generateTemplate(mcfilename, effType, 0);
+            histfile = generateTemplate(mcfilename, effType, hPV);
             assert(histfile);
             if(passRegion)
                 h = (TH1D*)histfile->Get(Form("h_mass_pass_%s", etaRegion.Data()));
@@ -1042,7 +1060,7 @@ void getZyield(
     RooFormulaVar purity("purity","Nsig/(Nsig+Nbkg)",RooArgList(Nsig,Nbkg));
 
     TFile *fFit = new TFile(Form(
-        "%s/workspace_yield_%s_%s_%s_%i.root",outputDir.Data(), effType.Data(), etaRegion.Data(), passRegion ? "pass" : "fail", iBin),
+        "%s/workspace_yield_%s_%s_%i_%i.root",outputDir.Data(), effType.Data(), etaRegion.Data(), passRegion, iBin),
         "RECREATE");
 
     // save all information in RooWorkspace
@@ -1060,16 +1078,26 @@ void getZyield(
     do {
         std::cout<<">>> Fit with strategy "<<i<<std::endl;
         // different fit strategies:
-        // Strategy 0: just fit fail and pass region simultaneously in full range
-        // Strategy 1: first fit fail pdf in sideband range,
-        //    then in complete fail range, then fit fail and pass region simultaneously in full range
-        // Strategy 2: Same as 1 but with wider central region instead of sideband regions
+        // Strategy 0: just fit full pdf in full range
+        // Strategy 1: first fit bkg pdf in sideband range,
+        //    then full pdf in full range
+        // Strategy 2: first fit bkg pdf in sideband range,
+        //    then signal pdf in central range
+        //    then full pdf in full range
 
-        if(i == 1){
+
+        if(i > 0){
+
+            // reset parameters of fit models to initial values
+            sigModel->Reset();
+            bkgModel->Reset();
+
+            Nsig.setVal(NsigInit);
+            Nbkg.setVal(NbkgInit);
+
             // fit bkg shape to sideband region only
             m.setRange("rangeLow", massLo, 76);
             m.setRange("rangeHigh", 106, massHi);
-            m.setRange("rangeCenter", 81, 101);
 
             fitResult = bkgModel->model->fitTo(*data,
                 RooFit::Range("rangeLow,rangeHigh"),
@@ -1081,6 +1109,8 @@ void getZyield(
         }
         if(i == 2){
             // fit signal shape to central region only
+
+            m.setRange("rangeCenter", 81, 101);
 
             fitResult = sigModel->model->fitTo(*data,
                 RooFit::Range("rangeCenter"),
@@ -1114,7 +1144,12 @@ void getZyield(
         );
 
         // reduced chi2 value from number of degree of freedom in the fit nDoF = nBins - nParams
-        const Double_t chi2ndf = chi2Var.getVal() / (data->numEntries() - fitResult->floatParsFinal().getSize());
+        Double_t chi2ndf = chi2Var.getVal() / (data->numEntries() - fitResult->floatParsFinal().getSize());
+
+        if(std::abs(1 - (Nsig.getVal()+Nbkg.getVal())/h_yield->Integral()) > 0.1){
+            std::cout<<"WARNING: something went wrong in the fit, we give a bad chi2"<<std::endl;
+            chi2ndf = 99;
+        }  
 
         std::cout<<"---------------------------------------" <<std::endl;
         std::cout<<"------ strategy = " << i << std::endl;
@@ -1136,25 +1171,25 @@ void getZyield(
     // load best fit values into workspace
     w->loadSnapshot(("snapshot_"+std::to_string(best_fit)).c_str());
 
-    w->Write();
-
-    best_fitResult->Write("fitResult");
-
-    fFit->Write();
-    fFit->Close();
-
     const Double_t chi2 = make_plot(nfl, m, data, sigModel, bkgModel,
         h_yield->Integral(), 
         w->pdf("totalPdf"),
         (RooRealVar*)best_fitResult->floatParsFinal().find("Nsig"), 
         (RooRealVar*)best_fitResult->floatParsFinal().find("Nbkg"),
-        iBin, 0,0,
+        iBin, 0, 0,
         effType.Data(), etaRegion.Data(), passRegion);
 
     RooRealVar chi2_plot("chi2plot","chi2 from plot",chi2);
     RooRealVar chi2_best("chi2","chi2",best_chi2);
     w->import(chi2_plot);
     w->import(chi2_best);
+
+    w->Write();
+
+    best_fitResult->Write("fitResult");
+
+    fFit->Write();
+    fFit->Close();
 
     std::cout<<"---------------------------------------"<<std::endl;
     std::cout<<"------ chi2 = " << chi2 <<std::endl;
@@ -1202,7 +1237,7 @@ void calculateDataEfficiency(
 
     TFile *histfile = 0;
     if(sigpass%2 == 0 || sigfail%2 == 0) {
-        histfile = generateTemplate(mcfilename, effType, 0);
+        histfile = generateTemplate(mcfilename, effType, hPV);
         assert(histfile);
     }
     std::vector<double> vBkgPars;
@@ -1483,7 +1518,7 @@ void calculateDataEfficiency(
 
         i++;
 
-    } while(i < 4 && best_chi2 > 2);
+    } while(i < 4); // && best_chi2 > 2);
 
     // load best fit values into workspace
     w->loadSnapshot(("snapshot_"+std::to_string(best_fit)).c_str());
@@ -1582,7 +1617,7 @@ void calculateHLTEfficiencyAndYield(
 
     TFile *histfile = 0;
     if(sigpass%2 == 0 || sigfail%2 == 0) {
-        histfile = generateTemplate_ZYield(mcfilename, 0, iBin);
+        histfile = generateTemplate_ZYield(mcfilename, hPV, iBin);
         assert(histfile);
     }
     const double corr = extractCorrelation_HLT(mcfilename, hPV, etaRegion);

@@ -8,6 +8,7 @@ import argparse
 import pandas as pd
 import numpy as np
 import pdb
+import matplotlib as mpl
 
 latex = ROOT.TLatex()
 latex.SetNDC()
@@ -16,6 +17,7 @@ sys.path.append(os.getcwd())
 print(os.getcwd())
 
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
+from python.utils import to_DateTime
 
 ROOT.gROOT.SetBatch(True)
 ROOT.gStyle.SetCanvasPreferGL(1)
@@ -39,9 +41,13 @@ if not os.path.isdir(outDir):
 
 # --- z luminosity
 data = pd.read_csv(str(args.rates), sep=',',low_memory=False)#, skiprows=[1,2,3,4,5])
-data = data.sort_values(['fill','run','tdate_begin','tdate_end'])
+data = data.sort_values(['fill','run','beginTime','endTime'])
 
-data['time'] = data['tdate_begin'] + (data['tdate_end'] - data['tdate_begin'])/2
+data["beginTime"] = mpl.dates.date2num(data["beginTime"].apply(to_DateTime))
+data["endTime"] = mpl.dates.date2num(data["endTime"].apply(to_DateTime))
+
+data['time'] = (data['beginTime']+data['endTime'])/2
+
 
 #sort out points with low statistics
 #data = data[data['z_relstat'] < 0.05]
@@ -55,15 +61,19 @@ data = data.replace([np.inf, -np.inf], np.nan).dropna().dropna()
 for category in filter(lambda x: "chi2" in x,data.keys()):
     print("Now {0}".format(category))
 
+    # only consider fits != -1 as those are dummy values
+    yy = data[data[category] != -1][category]
+    xx = data[data[category] != -1]['time']
+
     # list of fits that might have failed, based on chi2_threshold
     print("Runs that might have a failed fit:")
     failed_fits = []
     chi2_threshold = 5.0
-    for x, r, m, l in data[[category,"run","measurement", "lumiRec"]].values:
+    for x, r, m, l in data[data[category] != -1][[category,"run","measurement", "recLumi"]].values:
         if x > 5.0 or x < 0.:
             print(int(r),int(m),x, l)
 
-    graph_chi2 = ROOT.TGraph(len(data),data['time'].values,data[category].values)
+    graph_chi2 = ROOT.TGraph(len(xx.values),xx.values,yy.values)
     graph_chi2.SetName("graph_chi2")
     graph_chi2.SetMarkerStyle(23)
     graph_chi2.SetMarkerColor(ROOT.kAzure-4)
@@ -77,7 +87,7 @@ for category in filter(lambda x: "chi2" in x,data.keys()):
     graph_chi2.GetXaxis().SetTitleSize(0.06)
     graph_chi2.GetYaxis().SetTitleSize(0.06)
     graph_chi2.GetXaxis().SetTitleOffset(0.72)
-    graph_chi2.GetYaxis().SetTitleOffset(1.1)
+    graph_chi2.GetYaxis().SetTitleOffset(0.8)
     graph_chi2.GetXaxis().SetLabelSize(0.05)
     graph_chi2.GetYaxis().SetLabelSize(0.05)
     #graph_chi2.GetYaxis().SetRangeUser(-0.01,0.01)
@@ -85,30 +95,42 @@ for category in filter(lambda x: "chi2" in x,data.keys()):
     c3.SetGrid()
 
     # mean, where outlier with sigma > 1 are rejected
-    avg_chi2 = np.mean(data[category][abs(data[category] - np.mean(data[category])) < np.std(data[category])])
+    avg_chi2 = np.mean(yy[abs(yy - np.mean(yy)) < np.std(yy)])
 
     graph_chi2.Draw("AP")
 
-    legend=ROOT.TLegend(0.2,0.8,0.4,0.9)
-    legend.AddEntry(graph_chi2,"Measurement","p")
-    legend.Draw("same")
+    # legend=ROOT.TLegend(0.2,0.8,0.4,0.9)
+    # legend.AddEntry(graph_chi2,"Measurement","p")
+    # legend.Draw("same")
 
     #text=ROOT.TLatex(0.3,0.83,"CMS Automatic, produced: "+datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     #text.SetNDC()
     #text.Draw()
-    text2=ROOT.TLatex(0.2,0.23,"avg chi2: "+str(avg_chi2))
+    text2=ROOT.TLatex(0.2,0.13,"avg chi2: "+str(avg_chi2))
     text2.SetNDC()
     text2.Draw()
 
     c3.SaveAs(outDir+"/"+category+".png")
     c3.Close()
-    
-    if "pass" in category or "fail" in category:
-        ndf = 360 - 8
-    elif "Glo" in category:
-        ndf = 1080 - 24
+
+    if "Sel" in category:
+        ndf = 120 - 7   
+        #120 bins - ( 
+        #   2 (signal model parameter) 
+        # + 3 (background model parameters) 
+        # + 1 (signal normalization) 
+        # + 1 (background normalization) )
+    elif "TrkPass2" in category:
+        ndf = 130 - 7   
+        #130 bins - ( 
+        #   2 (signal model parameter) 
+        # + 3 (background model parameters) 
+        # + 1 (signal normalization) 
+        # + 1 (background normalization) )        
+    elif "Trk" in category:
+        ndf = 260 - 14
     else:
-        ndf = 720 - 16
+        ndf = 240 - 14
         
         
     nBins = 20
@@ -144,7 +166,7 @@ for category in filter(lambda x: "chi2" in x,data.keys()):
     
     # th1_chi2.Fit("fchi2")
 
-    legend=ROOT.TLegend(0.8,0.8,0.9,0.9)
+    legend=ROOT.TLegend(0.13,0.7,0.3,0.85)
     legend.SetTextSize(0.04)
     legend.SetTextAlign(12)
     legend.SetTextFont(42)
@@ -179,7 +201,7 @@ for category in filter(lambda x: "chi2" in x,data.keys()):
     latex.DrawLatex(0.97, 0.95, year)
 
     latex.SetTextAlign(11)
-    latex.DrawLatex(0.1, 0.95, category.replace("_"," ").replace("chi2"," "))
+    latex.DrawLatex(0.5, 0.95, category.replace("_"," ").replace("chi2"," "))
     latex.DrawLatex(0.20, 0.87, "Work in progress")
 
     latex.SetTextFont(62)

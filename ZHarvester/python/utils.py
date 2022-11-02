@@ -46,11 +46,15 @@ def to_DateTime(time, string_format = "yy/mm/dd"):
 
     if string_format == "yy/mm/dd":     # format agreed upon ATLAS and CMS
         year, month, day = [int(x) for x in time[0].split("/")]
+        year += 2000
+        hour, min, sec   = [int(x) for x in time[1].split(":")]
     elif string_format == "mm/dd/yy":   # brilcalc format
         month, day, year = [int(x) for x in time[0].split("/")]
-
-    hour, min, sec   = [int(x) for x in time[1].split(":")]
-    year += 2000
+        year += 2000
+        hour, min, sec   = [int(x) for x in time[1].split(":")]
+    else:   # default format
+        year, month, day = [int(x) for x in time[0].split("-")]
+        hour, min, sec   = [int(float(x)) for x in time[1].split(":")]
     
     return datetime(year, month, day, hour, min, sec)
 
@@ -234,9 +238,9 @@ def get_ls_for_next_measurement(
         yield list_good_ls_
 
 # ------------------------------------------------------------------------------
-def getCorrelationIO(hPV_data, correlationsFileName):
+def getCorrelation(hPV_data, correlationsFileName, which, region="I"):
     """
-    calculate the correlation factor between the inner and outer muon track
+    calculate the correlation factor from a resource file by folding the PV histogram with the correlation histogram  
 
     Parameters
     ----------
@@ -244,31 +248,65 @@ def getCorrelationIO(hPV_data, correlationsFileName):
         1D histogram with number of primary vertices in data
     correlationsFileName : str
         path to the file with correlation factors as function of number of primary vertices
+    which: str
+        which correlation factor to be read, can be: "IO", "ID"
+    region: str
+        eta region for the correlation factor, can be: "I", "BB", "BE", "EE"
     """
     import numpy as np
     import ROOT
     ROOT.gROOT.SetBatch(True) # disable root prompts
 
-    tfileIO = ROOT.TFile(correlationsFileName,"READ")
-    hcorrIO = tfileIO.Get("cMu_I")
+    tfile = ROOT.TFile(correlationsFileName,"READ")
+
     # normalize pileup histogram
     hPV_data.Scale(1./hPV_data.Integral())
     avgPV = hPV_data.GetMean()
 
-    # fold the correlation with the pileup histogram
-    cIO = 0
-    for ipv in range(0,100):
-        c = hcorrIO.GetBinContent(hcorrIO.FindBin(ipv))
-        pv = hPV_data.GetBinContent(hPV_data.FindBin(ipv))
-        # skip nan values
-        if np.isnan(c):
-            c = 1
-        cIO += c * pv
+    if which=="IO":
+        # load histograms
+        truth = tfile.Get("truth_{0}".format(region))
+        Sta = tfile.Get("Sta_{0}".format(region))
+        Trk = tfile.Get("Trk_{0}".format(region))
+        StaPass = tfile.Get("StaPass_{0}".format(region))
 
-    tfileIO.Close()
-    print("Correlation coefficienct i/o = {0}".format(cIO))
+        # fold with pileup histogram
+        truth.Multiply(hPV_data)
+        Sta.Multiply(hPV_data)
+        Trk.Multiply(hPV_data)
+        StaPass.Multiply(hPV_data)
+
+        # calculate correlation factor
+        nTruth = truth.Integral()
+        nSta = Sta.Integral()
+        nTrk = Trk.Integral()
+        nStaPass = StaPass.Integral()
+
+        corr = (nStaPass / nSta) / (nTrk / (2*nTruth))
+
+
+    elif which=="ID":
+        # load histograms
+        truth = tfile.Get("truth_{0}".format(region))
+        ID2 = tfile.Get("2ID_{0}".format(region))
+        ID1 = tfile.Get("1ID_{0}".format(region))
+
+        # fold with pileup histogram
+        truth.Multiply(hPV_data)
+        ID2.Multiply(hPV_data)
+        ID1.Multiply(hPV_data)
+
+        # calculate correlation factor
+        nTruth = truth.Integral()
+        nID1 = ID1.Integral()
+        nID2 = ID2.Integral()
+
+        corr = 4 * nTruth * nID2 / (nID1 + 2*nID2)**2
+
+    tfile.Close()
+    print("Correlation coefficienct c{0}_{1} = {2}".format(which, region, corr))
     print("For average primary vertices of <pv> = {0}".format(avgPV))
-    return cIO
+    return corr
 
 # ------------------------------------------------------------------------------
 def writeSummaryCSV(outCSVDir, outName="Mergedcsvfile", writeByLS=True, keys=None):
