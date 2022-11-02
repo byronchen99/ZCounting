@@ -47,6 +47,7 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("-r","--rates", required=True, type=str, help="csv file with z rates per Measurement")
 parser.add_argument("-x","--xsec",  type=str, help="csv file where xsec should be taken from (e.g. from low pileup run)")
+parser.add_argument("--label",  default='Work in progress',  type=str, help="specify label ('Work in progress', 'Preliminary', )")
 parser.add_argument("-s","--saveDir",  default='./',  type=str, help="give output dir")
 
 args = parser.parse_args()
@@ -319,7 +320,7 @@ def make_plots(df,
     ax1.set_xlabel(xTitle)
     ax1.set_ylabel(yLabel)
     ax1.text(0.74, 0.97, "\\bf{CMS}", verticalalignment='top', transform=ax1.transAxes, weight="bold")
-    ax1.text(0.81, 0.97, "\\emph{Work in progress}", verticalalignment='top', transform=ax1.transAxes,style='italic')    
+    ax1.text(0.81, 0.97, "\\emph{"+args.label+"}", verticalalignment='top', transform=ax1.transAxes,style='italic')    
     ax1.text(0.74, 0.89, year, verticalalignment='top', transform=ax1.transAxes,style='italic')    
 
     nround = 5
