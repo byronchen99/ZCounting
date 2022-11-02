@@ -326,7 +326,7 @@ def make_hist(
                 ax.errorbar(xxNew, yySum, xerr=(xxErr,xxErr), linestyle="", ecolor='blue', color='blue', zorder=2, label="Average")
 
             ax.text(0.02, 0.97, "\\bf{CMS}", verticalalignment='top', transform=ax.transAxes, weight="bold")
-            ax.text(0.10, 0.97, "\\emph{Work in progress}", verticalalignment='top', transform=ax.transAxes,style='italic')
+            ax.text(0.10, 0.97, "\\emph{"+args.label+"}", verticalalignment='top', transform=ax.transAxes,style='italic')
             ax.text(0.02, 0.88, lefttitle, verticalalignment='top', transform=ax.transAxes,style='italic', horizontalalignment='left')
 
             ax.set_xlabel(xlabel, fontsize=textsize)
