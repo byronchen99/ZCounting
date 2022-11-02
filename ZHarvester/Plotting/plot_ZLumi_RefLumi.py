@@ -24,6 +24,7 @@ parser.add_argument("-r", "--rates", required=True, type=str, help="csv file wit
 parser.add_argument("-l", "--refLumi", default="", type=str, help="give a ByLs.csv as input for additional reference Luminosity")
 parser.add_argument("-x", "--xsec", default="", type=str, help="csv file with z rates per measurement for absolute scale")
 parser.add_argument("-f", "--fill", nargs="*",  type=int, default=[], help="specify a single fill to plot")
+parser.add_argument("--label",  default='Work in progress',  type=str, help="specify label ('Work in progress', 'Preliminary', )")
 parser.add_argument("-s", "--saveDir",  default='./',  type=str, help="give output dir")
 args = parser.parse_args()
 outDir = args.saveDir
@@ -144,7 +145,7 @@ data['dLRec(/nb)'] = data['recLumi'] / data['timewindow'] * 1000  # convert into
 #     data[key] = data[key].apply(lambda x: unc.ufloat_fromstr(x))
 
 
-do_ratio=False
+do_ratio=True ## activate the ratio plots 
 
 for fill, data_fill in data.groupby("fill"):
     print(f"Now at fill {fill}")
@@ -222,7 +223,7 @@ for fill, data_fill in data.groupby("fill"):
     ax1 = plt.subplot(gs[0])
     ax2 = plt.subplot(gs[1])
     
-    fig.subplots_adjust(left=0.15, right=0.99, top=0.99, bottom=0.125, hspace=0.0)
+    fig.subplots_adjust(left=0.15, right=0.95, top=0.95, bottom=0.125, hspace=0.0)
 
     ax1.set_xlabel(xlabel)
     ax1.set_ylabel(ylabelEff)
@@ -230,8 +231,8 @@ for fill, data_fill in data.groupby("fill"):
     maxY = 0
     minY = 1
     for eff, name, col in (
-        # ("effGlo", "$ \epsilon_\mathrm{Glo|Sta}^\mu $", "green"), 
-        # ("effSta", "$ \epsilon_\mathrm{Sta|Trk}^\mu $", "blue"), 
+        ("effGlo", "$ \epsilon_\mathrm{Glo|Sta}^\mu $", "green"), 
+        ("effSta", "$ \epsilon_\mathrm{Sta|Trk}^\mu $", "blue"), 
         ("effSel", "$ \epsilon_\mathrm{ID|Glo}^\mu $", "red"), 
     ):
         
@@ -269,7 +270,7 @@ for fill, data_fill in data.groupby("fill"):
     ax2.set_ylabel(ylabelEff)
 
     ax2.text(0.54, 0.97, "\\bf{CMS}", verticalalignment='top', transform=ax2.transAxes, fontweight="bold")
-    ax2.text(0.65, 0.97, "\\emph{Work in progress}", verticalalignment='top', transform=ax2.transAxes, style='italic')    
+    ax2.text(0.65, 0.97, "\\emph{"+args.label+"}", verticalalignment='top', transform=ax2.transAxes, style='italic') ## DPS Note
     ax2.text(0.54, 0.86, f"Fill {fill}", verticalalignment='top', transform=ax2.transAxes)    
 
     maxY = 0
@@ -325,12 +326,12 @@ for fill, data_fill in data.groupby("fill"):
     else:
         ax1 = fig.add_subplot(111)
         
-    fig.subplots_adjust(hspace=0.0, left=0.15, right=0.99, top=0.99, bottom=0.125)
+    fig.subplots_adjust(hspace=0.0, left=0.15, right=0.95, top=0.95, bottom=0.125)
         
     ax1.set_xlabel(xlabel)
     ax1.set_ylabel(ylabelLumi)
     ax1.text(0.54, 0.97, "\\bf{CMS}", verticalalignment='top', transform=ax1.transAxes, weight="bold")
-    ax1.text(0.65, 0.97, "\\emph{Work in progress}", verticalalignment='top', transform=ax1.transAxes,style='italic')    
+    ax1.text(0.65, 0.97, "\\emph{"+args.label+"}", verticalalignment='top', transform=ax1.transAxes,style='italic')        ## DPS Note
     ax1.text(0.54, 0.89, f"Fill {fill}", verticalalignment='top', transform=ax1.transAxes)    
         
     if args.xsec == "":
@@ -412,12 +413,12 @@ for fill, data_fill in data.groupby("fill"):
     else:
         ax1 = fig.add_subplot(111)
         
-    fig.subplots_adjust(hspace=0.0, left=0.15, right=0.99, top=0.99, bottom=0.125)
+    fig.subplots_adjust(hspace=0.0, left=0.15, right=0.95, top=0.95, bottom=0.125)
         
     ax1.set_xlabel("average pileup")
     ax1.set_ylabel(ylabelLumi)
     ax1.text(0.54, 0.97, "\\bf{CMS}", verticalalignment='top', transform=ax1.transAxes, weight="bold")
-    ax1.text(0.65, 0.97, "\\emph{Work in progress}", verticalalignment='top', transform=ax1.transAxes,style='italic')    
+    ax1.text(0.65, 0.97, "\\emph{"+args.label+"}", verticalalignment='top', transform=ax1.transAxes,style='italic')        ## DPS Note    
     ax1.text(0.54, 0.89, f"Fill {fill}", verticalalignment='top', transform=ax1.transAxes)    
 
     y = np.array([yy.n for yy in data_fill['zLumiInst_mc'].values])

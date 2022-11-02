@@ -17,6 +17,7 @@ sys.path.append(os.getcwd())
 print(os.getcwd())
 
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
+from python.utils import to_DateTime
 from python.corrections import apply_muon_prefire, apply_ECAL_prefire
 from python.utils import to_DateTime
 
@@ -29,6 +30,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-r","--rates", required=True, nargs='+', help="Nominator csv file with z rates per measurement")
 parser.add_argument("-x","--xsec", type=str,
     help="csv file with z rates per measurement where xsec should be taken from (e.g. from low pileup run)")
+parser.add_argument("--label",  default='Work in progress',  type=str, help="specify label ('Work in progress', 'Preliminary', )")
 parser.add_argument("-s","--saveDir",  default='./',  type=str, help="give output dir")
 args = parser.parse_args()
 
@@ -95,33 +97,37 @@ if args.xsec:
     xsec = sum(data_xsec['recZCount'])/sum(data_xsec['recLumi'])
     normalize = False
 else:
-    # xsec = 1      
-    # # normalize everything as no cross section is specified
-    # normalize = True    
+    # normalize everything as no cross section is specified
+    xsec = 1      
+    normalize = True    
 
-    # cross section from theory
-    xsec = 772627.88 * 0.995988004755 / 0.3646 * 0.3649 / 1000.
-
-    normalize = False
-
-
+    # # cross section from theory
+    # xsec = 772627.88 * 0.995988004755 / 0.3646 * 0.3649 / 1000.
+    # normalize = False
+    
 # --- z luminosity
 print("get Z luminosity")
 data = pd.concat([pd.read_csv(csv, sep=',',low_memory=False) for csv in args.rates], ignore_index=True, sort=False)
 
-data['recZCount'] = data['recZCount'].apply(lambda x: unc.ufloat_fromstr(x).n)
-
 # --->>> prefire corrections
-apply_muon_prefire(data)
-apply_ECAL_prefire(data)
+if year in (2016, 2017, 2018):
+    apply_muon_prefire(data)
+    apply_ECAL_prefire(data)
+
+    print("apply prefire corrections - done")
 # <<<---
 
-data['zLumi'] = data['recZCount'] / xsec
+data['zLumi'] = data['delZCount'] / xsec
 
-data["beginTime"] = mpl.dates.date2num(data["beginTime"].apply(to_DateTime))
-data["endTime"] = mpl.dates.date2num(data["endTime"].apply(to_DateTime))
+data['timeDown'] = data['beginTime'].apply(lambda x: to_DateTime(x))
+data['timeUp'] = data['endTime'].apply(lambda x: to_DateTime(x))
 
-data['time'] = (data['beginTime']+data['endTime'])/2
+# bring them in format to sort and plot them
+data['timeDown'] = mpl.dates.date2num(data['timeDown'])
+data['timeUp'] = mpl.dates.date2num(data['timeUp'])
+
+# center of each time slice
+data['time'] = data['timeDown'] + (data['timeUp'] - data['timeDown'])/2
 
 data = data[data['recLumi'] > 0.]
 data = data[data['zLumi'] > 0.]
@@ -161,9 +167,8 @@ print("analyze {0} fb^-1 of data (z lumi)".format(data['zLumi'].sum()/1000.))
 print("ratio: z lumi/ ref. lumi = {0}".format(data['zLumi'].sum()/data['weightLumi'].sum()))
 
 print("Outliers:")
-data_out = data.loc[(abs(data['zLumi_to_dLRec']-1) > 0.10) & (data['recLumi']>19) ]
-print(data_out[["recLumi","run","fill", "measurement","zLumi_to_dLRec","recZCount", 
-    "effHLT", "effSel", "effTrk", "cIO", "cID", "cHLT", "pileUp"]])
+data_out = data.loc[abs(data['zLumi_to_dLRec']-1) > 0.05]
+print(data_out[["recLumi","run","fill", "measurement","zLumi_to_dLRec","delZCount"]])
 
 def make_hist(
     df,
@@ -248,7 +253,7 @@ def make_hist(
             
         ax.set_xlabel(label, fontsize=textsize)
         ax.text(0.03, 0.97, "\\bf{CMS}", verticalalignment='top', transform=ax.transAxes, weight="bold")
-        ax.text(0.14, 0.97, "\\emph{Work in progress}", verticalalignment='top', transform=ax.transAxes,style='italic')
+        ax.text(0.14, 0.97, "\\emph{"+args.label+"}", verticalalignment='top', transform=ax.transAxes,style='italic')
         ax.text(0.03, 0.91, lefttitle, verticalalignment='top', transform=ax.transAxes,style='italic')
         ax.text(0.97, 0.97, "$\\mu$ = {0}".format(round(mean,3)), horizontalalignment="right", verticalalignment='top', transform=ax.transAxes)
         ax.text(0.97, 0.91, "$\\sigma$ = {0}".format(round(std,3)), horizontalalignment="right", verticalalignment='top', transform=ax.transAxes)
@@ -266,9 +271,9 @@ def make_hist(
 
     # --- make scatter
     for xx, xxSum, xlabel, suffix1 in (
-        # (data['run'], run.values, "Run number", "run"),
-        # (data['time'], time.values, ,"Time", "time"),
-        # (data['fill'], fill.values, "Fill number", "fill"),
+        (data['time'].values, time.values, "Time", "time"),
+        (data['fill'].values, fill.values, "Fill number", "fill"),
+        (data['run'].values, run.values, "Run number", "run"),
         (data['weightLumi'].cumsum().values/1000, weight.cumsum().values/1000., "Integrated luminosity [fb$^{-1}$]", "lumi"),
     ):
         rangex = min(xx)-(max(xx)-min(xx))*0.01, max(xx)+(max(xx)-min(xx))*0.01
@@ -283,11 +288,6 @@ def make_hist(
             fig = plt.figure(figsize=(10.0,4.0))
             ax = fig.add_subplot(111)
             fig.subplots_adjust(left=0.1, right=0.99, top=0.99, bottom=0.15)
-
-            if suffix1 in ("time", ):
-                xx = np.array([ROOT.TDatime(x).AsSQLString() for x in xx])
-                ax.xaxis_date()
-                rangex = [ROOT.TDatime(int(rangex[0])).AsSQLString(), ROOT.TDatime(int(rangex[1])).AsSQLString()]
 
             # plot uncertinty bar attributed to PHYSICS luminosity
             if suffix1 in ("lumi", ) and include_unc_PHYSICS:
@@ -335,7 +335,7 @@ def make_hist(
                 ax.errorbar(xxNew, yySum, xerr=(xxErr,xxErr), linestyle="", ecolor='blue', color='blue', zorder=2, label="Average")
 
             ax.text(0.02, 0.97, "\\bf{CMS}", verticalalignment='top', transform=ax.transAxes, weight="bold")
-            ax.text(0.10, 0.97, "\\emph{Work in progress}", verticalalignment='top', transform=ax.transAxes,style='italic')
+            ax.text(0.10, 0.97, "\\emph{"+args.label+"}", verticalalignment='top', transform=ax.transAxes,style='italic')
             ax.text(0.02, 0.88, lefttitle, verticalalignment='top', transform=ax.transAxes,style='italic', horizontalalignment='left')
 
             ax.set_xlabel(xlabel, fontsize=textsize)
@@ -360,7 +360,7 @@ def make_hist(
                 # ax.plot(np.array([6170,6170]), np.array(rangey), 'r-', linewidth=1, zorder=3)
 
                 def get_fill(x):
-                    if len(data.loc[data['run'] > x]):
+                    if len(data.loc[data['run'] > x]) * len(data.loc[data['run'] < x]) > 0:
                         return data.loc[data['run'] > x]['fill'].values[0]
                     else:
                         None 
@@ -375,16 +375,26 @@ def make_hist(
                 ax.plot(np.array([get_fill(306416),get_fill(306416)]), np.array(rangey), 'r--', linewidth=1, zorder=3)
 
                 # different eras
-                ax.plot(np.array([5838,5838]), np.array(rangey), 'k--', linewidth=1, zorder=3)
-                ax.text(5840, rangey[0], "B", verticalalignment='bottom', fontsize=textsize, horizontalalignment='left')
-                ax.plot(np.array([5961,5961]), np.array(rangey), 'k--', linewidth=1, zorder=3)
-                ax.text(5963, rangey[0], "C", verticalalignment='bottom', fontsize=textsize, horizontalalignment='left')
-                ax.plot(np.array([6146,6146]), np.array(rangey), 'k--', linewidth=1, zorder=3)
-                ax.text(6148, rangey[0], "D", verticalalignment='bottom', fontsize=textsize, horizontalalignment='left')
-                ax.plot(np.array([6238,6238]), np.array(rangey), 'k--', linewidth=1, zorder=3)
-                ax.text(6240, rangey[0], "E", verticalalignment='bottom', fontsize=textsize, horizontalalignment='left')
-                ax.plot(np.array([6297,6297]), np.array(rangey), 'k--', linewidth=1, zorder=3)
-                ax.text(6299, rangey[0], "F", verticalalignment='bottom', fontsize=textsize, horizontalalignment='left')
+                for fill, fill_label in (
+                    # 2017
+                    (5838, "B"),
+                    (5961, "C"),
+                    (6146, "D"),
+                    (6238, "E"),
+                    (6297, "F"),
+                    #2022
+                    (get_fill(355100), "B"),
+                    (get_fill(355862), "C"),
+                    (get_fill(356426), "C (Muon)"),
+                    (get_fill(357538), "D"),
+                    (get_fill(359022), "E"),
+                    (get_fill(360390), "F"),
+                ):  
+                    if fill==None:
+                        continue
+
+                    ax.plot(np.array([fill,fill]), np.array(rangey), 'k--', linewidth=1, zorder=3)
+                    ax.text(fill+2, rangey[0], fill_label, verticalalignment='bottom', fontsize=textsize, horizontalalignment='left')
 
             if suffix1 in ("time", ):
                 xfmt = mdates.DateFormatter('%Y-%m-%d')
