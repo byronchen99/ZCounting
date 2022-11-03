@@ -4,7 +4,7 @@
 #Set Variables
 #############
 
-pass='rainbowsix'            # grid passwd
+pass=''            # grid passwd
 cmsswRel='/afs/cern.ch/user/t/tmenezes/work/private/CMSSW_12_4_2/src/'   # path to ZCounting dir.
 #PD='/SingleMuon/'
 # After the RunID = 356426, SingleMuon -> Muon 
