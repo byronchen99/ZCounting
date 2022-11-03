@@ -5,8 +5,8 @@
 #############
 
 pass=''            # grid passwd
-cmsswRel='/afs/cern.ch/user/t/tmenezes/work/private/CMSSW_12_4_0/src/'   # path to ZCounting dir.
-PD='/SingleMuon/'
+cmsswRel='/afs/cern.ch/user/t/tmenezes/work/private/CMSSW_12_4_2/src/'   # path to ZCounting dir.
+PD='/Muon/'
 # After the RunID = 356426, SingleMuon -> Muon 
 #PD='/Muon/'
 COREDIR='https://cmsweb.cern.ch/dqm/offline/data/browse/ROOT/OfflineData/Run2022/'
@@ -23,7 +23,7 @@ cd $cmsswRel
 source /cvmfs/cms.cern.ch/cmsset_default.sh
 eval `scramv1 runtime -sh`
 echo $pass | voms-proxy-init -voms cms -rfc    # get the grid proxy 
-cd /afs/cern.ch/user/t/tmenezes/work/private/CMSSW_12_4_0/src/ZCounting  # enter the ZCounting dir.
+cd /afs/cern.ch/user/t/tmenezes/work/private/CMSSW_12_4_2/src/ZCounting  # enter the ZCounting dir.
 rm -rf filelist.log
 
 
