@@ -19,6 +19,8 @@ class CSignalModel
 protected:
     const double ZMASS = 91.1876;
     const double ZWIDTH = 2.4952;
+
+    const int ipOrder = 2;
     
 public:
     CSignalModel():model(0){}
@@ -65,7 +67,7 @@ public:
 class CMCTemplate : public CSignalModel
 {
 public:
-    CMCTemplate(RooRealVar &m, TH1D* hist, const Bool_t pass, const int ibin, int intOrder=1);
+    CMCTemplate(RooRealVar &m, TH1D* hist, const Bool_t pass, const int ibin, int intOrder=3);
     ~CMCTemplate();
     void Reset();
     TH1D        *inHist;
@@ -76,7 +78,7 @@ public:
 class CMCTemplateConvGaussian : public CSignalModel
 {
 public:
-    CMCTemplateConvGaussian(RooRealVar &m, TH1D* hist, const Bool_t pass, const int ibin, int intOrder=1);
+    CMCTemplateConvGaussian(RooRealVar &m, TH1D* hist, const Bool_t pass, const int ibin, int intOrder=3);
     ~CMCTemplateConvGaussian();
     void Reset();
     RooRealVar  *mean, *sigma;
@@ -89,7 +91,7 @@ public:
 class CMCTemplateConvCrystalBall : public CSignalModel
 {
 public:
-    CMCTemplateConvCrystalBall(RooRealVar &m, TH1D* hist, const Bool_t pass, const int ibin, int intOrder=1);
+    CMCTemplateConvCrystalBall(RooRealVar &m, TH1D* hist, const Bool_t pass, const int ibin, int intOrder=3);
     ~CMCTemplateConvCrystalBall();
     void Reset();
     RooRealVar  *mean, *sigma, *alpha, *n;
@@ -102,7 +104,7 @@ public:
 class CMCStackConvGaussian : public CSignalModel
 {
 public:
-    CMCStackConvGaussian(RooRealVar &m, TH1D* hist_dy, TH1D* hist_tt, const Bool_t pass, const int ibin, int intOrder=1);
+    CMCStackConvGaussian(RooRealVar &m, TH1D* hist_dy, TH1D* hist_tt, const Bool_t pass, const int ibin, int intOrder=3);
     ~CMCStackConvGaussian();
     void Reset(){};
     RooRealVar  *mean, *sigma, *frac;
@@ -170,14 +172,14 @@ CBreitWignerConvCrystalBall::CBreitWignerConvCrystalBall(RooRealVar &m, const Bo
     sprintf(vname,"sig_mean%s",name);  mean  = new RooRealVar(vname,vname,0,-2.5,2.5);
     sprintf(vname,"sig_sigma%s",name); sigma = new RooRealVar(vname,vname,2,0.1, 5);
     sprintf(vname,"sig_alpha%s",name); alpha = new RooRealVar(vname,vname,5,0,20);
-    sprintf(vname,"sig_n%s",name);     n     = new RooRealVar(vname,vname,1,0.25,10);
+    sprintf(vname,"sig_n%s",name);     n     = new RooRealVar(vname,vname,5,0.5,10);
 
 
     sprintf(vname,"sig_cb%s",name);
     cb = new RooCBShape(vname,vname,m,*mean,*sigma,*alpha,*n);
 
     sprintf(vname,"signal%s",name);
-    model = new RooFFTConvPdf(vname,"BW x CB",m,*bw,*cb);
+    model = new RooFFTConvPdf(vname,"BW x CB",m,*bw,*cb, 3);
 }
 
 void CBreitWignerConvCrystalBall::Reset(){
@@ -226,11 +228,11 @@ CBreitWignerConvGaussian::CBreitWignerConvGaussian(RooRealVar &m, const Bool_t p
     sprintf(vname,"sig_gaus%s",name);  gaus  = new RooGaussian(vname,vname,m,*mean,*sigma);
 
     sprintf(vname,"signal%s",name);
-    model = new RooFFTConvPdf(vname,"BW x Gaus",m,*bw,*gaus);
+    model = new RooFFTConvPdf(vname,"BW x Gaus",m,*bw,*gaus, 3);
 }
 
 void CBreitWignerConvGaussian::Reset(){
-    std::cout<<"CBreitWignerConvCrystalBall::Reset() --- "<<std::endl;
+    std::cout<<"CBreitWignerConvGaussian::Reset() --- "<<std::endl;
     mean->setVal(0);
     sigma->setVal(2);
 }
@@ -294,7 +296,7 @@ CMCTemplateConvGaussian::CMCTemplateConvGaussian(RooRealVar &m, TH1D* hist, cons
     sprintf(vname,"sig_histPdf%s",name);  histPdf  = new RooHistPdf(vname,vname,m,*dataHist,intOrder);
 
     sprintf(vname,"signal%s",name);
-    model = new RooFFTConvPdf(vname,"MC x Gaus",m,*histPdf,*gaus);
+    model = new RooFFTConvPdf(vname,"MC x Gaus",m,*histPdf,*gaus, ipOrder);
 }
 
 void CMCTemplateConvGaussian::Reset(){
@@ -324,7 +326,7 @@ CMCTemplateConvCrystalBall::CMCTemplateConvCrystalBall(RooRealVar &m, TH1D* hist
     sprintf(vname,"sig_mean%s",name);  mean  = new RooRealVar(vname,vname,0,-2.5,2.5);
     sprintf(vname,"sig_sigma%s",name); sigma = new RooRealVar(vname,vname,2,0.1, 5);
     sprintf(vname,"sig_alpha%s",name); alpha = new RooRealVar(vname,vname,5,0,20);
-    sprintf(vname,"sig_n%s",name);     n     = new RooRealVar(vname,vname,1,0.25,10);
+    sprintf(vname,"sig_n%s",name);     n     = new RooRealVar(vname,vname,5,0.5,10);
 
     sprintf(vname,"sig_cb%s",name);    
     cb = new RooCBShape(vname,vname,m,*mean,*sigma,*alpha,*n);
@@ -336,7 +338,7 @@ CMCTemplateConvCrystalBall::CMCTemplateConvCrystalBall(RooRealVar &m, TH1D* hist
     sprintf(vname,"sig_histPdf%s",name);  histPdf  = new RooHistPdf(vname,vname,m,*dataHist,intOrder);
 
     sprintf(vname,"signal%s",name);
-    model = new RooFFTConvPdf(vname,"MC x CB",m,*histPdf,*cb);
+    model = new RooFFTConvPdf(vname,"MC x CB",m,*histPdf,*cb, ipOrder);
 }
 
 void CMCTemplateConvCrystalBall::Reset(){
@@ -385,7 +387,7 @@ CMCStackConvGaussian::CMCStackConvGaussian(RooRealVar &m, TH1D* hist_dy, TH1D* h
     stack = new RooAddPdf(vname, "dy + tt", RooArgList(*histPdf_dy,*histPdf_tt), RooArgList(*frac));
 
     sprintf(vname,"signal%s",name);
-    model = new RooFFTConvPdf(vname,"MC x Gaus",m,*stack,*gaus);
+    model = new RooFFTConvPdf(vname,"MC x Gaus",m,*stack,*gaus, ipOrder);
 }
 
 CMCStackConvGaussian::~CMCStackConvGaussian()
