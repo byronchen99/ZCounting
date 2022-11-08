@@ -70,8 +70,17 @@ TString outputDir="";
 
 char lumitext[100] = "";
 
+// precision to integrate PDF in fit instead of taking value at maximum (0 to deactivate)
+// Int_t integrateBinsPrecision = 0;
+
 // Global setters
 //--------------------------------------------------------------------------------------------------
+// void set_IntegrateBinsPrecision(Float_t precision_){
+//     integrateBinsPrecision = precision_;
+
+//     std::cout<<"Set IntegrateBins() precision to "<<precision_<<std::endl;
+// }
+
 void set_massRange(Float_t massLo_, Float_t massHi_, UInt_t nBins=0){
     massLo = massLo_;
     massHi = massHi_;
@@ -259,6 +268,9 @@ Int_t set_background_model(
         case 7:
             model = new CQCD(param_mass, hist, pass, ibin);
             return 1;
+        case 8:
+            model = new CLinear(param_mass, pass, ibin);
+            return 2;
     }
     return 0;
 }
@@ -996,6 +1008,13 @@ void getZyield(
 
     RooRealVar m("m", "mass", massLo, massHi);
     m.setBins(massBin);
+    // This is only needed for the convolution of template with an analytic function 
+    // set to a high number for good precision
+    m.setBins(10000,"cache");  
+    // set sideband range for background fit
+    m.setRange("rangeLow", massLo, 76);
+    m.setRange("rangeHigh", 106, massHi);
+    m.setRange("rangeCenter", 81, 101);
 
     CSignalModel     *sigModel = 0;
     CBackgroundModel *bkgModel = 0;
@@ -1050,6 +1069,10 @@ void getZyield(
     else if(etaRegion == "Trk"){
         NsigInit = passRegion ? NsigMax*0.99 : NsigMax*0.3;
         NbkgInit = passRegion ? 0.01 : NsigMax*0.7;        
+
+        m.setRange("rangeLow", massLo, 76);
+        m.setRange("rangeHigh", 104, massHi);
+        m.setRange("rangeCenter", 76, 104);
     }
     
     RooRealVar Nsig("Nsig","sigYield", NsigInit, 0., 1.5*NsigMax);
@@ -1074,19 +1097,15 @@ void getZyield(
     Double_t best_chi2 = 99;
     Int_t best_fit = 99;
 
-    int i = 0;
+    int attempt = 0;
     do {
-        std::cout<<">>> Fit with strategy "<<i<<std::endl;
-        // different fit strategies:
-        // Strategy 0: just fit full pdf in full range
-        // Strategy 1: first fit bkg pdf in sideband range,
-        //    then full pdf in full range
-        // Strategy 2: first fit bkg pdf in sideband range,
-        //    then signal pdf in central range
-        //    then full pdf in full range
+        std::cout<<">>> Fit with attempt "<<attempt<<std::endl;
+        // different fit attempts:
+        // attempt 0: fit background in sideband, then full pdf in full range
+        // attempt 1: fit signal in center, then full pdf in full range
+        // attempt 2: fit background in sideband, then signal in center, then full pdf in full range
 
-
-        if(i > 0){
+        if(attempt > 0){
 
             // reset parameters of fit models to initial values
             sigModel->Reset();
@@ -1095,30 +1114,45 @@ void getZyield(
             Nsig.setVal(NsigInit);
             Nbkg.setVal(NbkgInit);
 
-            // fit bkg shape to sideband region only
-            m.setRange("rangeLow", massLo, 76);
-            m.setRange("rangeHigh", 106, massHi);
+            if(attempt==3){
+                if(etaRegion == "Trk"){
+                    // define regions different
+                    m.setRange("rangeLow", massLo, 76);
+                    m.setRange("rangeHigh", 104, massHi);
+                    m.setRange("rangeCenter", 76, 104);
+                }
+                else{
+                    // set sideband range for background fit
+                    m.setRange("rangeLow", massLo, 76);
+                    m.setRange("rangeHigh", 106, massHi);
+                    m.setRange("rangeCenter", 81, 101);
+                }
+            }
+        }
 
-            fitResult = bkgModel->model->fitTo(*data,
+        if(attempt != 1){
+
+            bkgModel->model->fitTo(*data,
                 RooFit::Range("rangeLow,rangeHigh"),
                 RooFit::PrintEvalErrors(-1),
                 RooFit::PrintLevel(-1),
                 RooFit::Warnings(0),
-                RooFit::Strategy(1), // MINOS STRATEGY
-                RooFit::Save());
+                RooFit::Strategy(2), // MINOS STRATEGY
+                // RooFit::IntegrateBins(integrateBinsPrecision),
+                RooFit::Minimizer("Minuit2"));
         }
-        if(i == 2){
+
+        if(attempt > 0){
             // fit signal shape to central region only
 
-            m.setRange("rangeCenter", 81, 101);
-
-            fitResult = sigModel->model->fitTo(*data,
+            sigModel->model->fitTo(*data,
                 RooFit::Range("rangeCenter"),
                 RooFit::PrintEvalErrors(-1),
                 RooFit::PrintLevel(-1),
                 RooFit::Warnings(0),
-                RooFit::Strategy(1), // MINOS STRATEGY
-                RooFit::Save());
+                RooFit::Strategy(2), // MINOS STRATEGY
+                // RooFit::IntegrateBins(integrateBinsPrecision),
+                RooFit::Minimizer("Minuit2"));
         }
 
         fitResult = modelPdf.fitTo(*data,
@@ -1126,16 +1160,9 @@ void getZyield(
             RooFit::PrintLevel(-1),
             RooFit::Warnings(0),
             RooFit::Extended(),
-            RooFit::Strategy(1), // MINOS STRATEGY
-            //RooFit::Minos(RooArgSet()),
-            RooFit::Save());
-
-        fitResult = modelPdf.fitTo(*data,
-            RooFit::PrintEvalErrors(-1),
-            RooFit::PrintLevel(-1),
-            RooFit::Warnings(0),
-            RooFit::Extended(),
-            RooFit::Strategy(1), // MINOS STRATEGY
+            RooFit::Strategy(2), // MINOS STRATEGY
+            // RooFit::IntegrateBins(integrateBinsPrecision),
+            RooFit::Minimizer("Minuit2"),
             //RooFit::Minos(RooArgSet()),
             RooFit::Save());
 
@@ -1152,21 +1179,21 @@ void getZyield(
         }  
 
         std::cout<<"---------------------------------------" <<std::endl;
-        std::cout<<"------ strategy = " << i << std::endl;
+        std::cout<<"------ attempt = " << attempt << std::endl;
         std::cout<<"------ chi2/ndf = " << chi2ndf <<std::endl;
         std::cout<<"---------------------------------------" <<std::endl;
 
-        if(i==0 || (chi2ndf < best_chi2) ){
+        if(attempt==0 || (chi2ndf < best_chi2) ){
             best_chi2 = chi2ndf;
-            best_fit = i;
+            best_fit = attempt;
             best_fitResult = fitResult;
-            w->saveSnapshot(("snapshot_"+std::to_string(i)).c_str(),
+            w->saveSnapshot(("snapshot_"+std::to_string(attempt)).c_str(),
                 fitResult->floatParsFinal(), kTRUE);
         }
 
-        i++;
+        attempt++;
 
-    } while(i < 3); // && best_chi2 > 2);
+    } while(attempt < 4 && best_chi2 > 1.5);
 
     // load best fit values into workspace
     w->loadSnapshot(("snapshot_"+std::to_string(best_fit)).c_str());
@@ -1223,6 +1250,13 @@ void calculateDataEfficiency(
 
     RooRealVar m("m","mass",massLo,massHi);
     m.setBins(massBin);
+    // This is only needed for the convolution of template with an analytic function 
+    // set to a high number for good precision
+    m.setBins(10000,"cache");  
+    // set sideband range for background fit
+    m.setRange("rangeLow", massLo, 76);
+    m.setRange("rangeHigh", 106, massHi);
+    m.setRange("rangeCenter", 81, 101);
 
     RooCategory sample("sample","");
     sample.defineType("Pass",1);
@@ -1350,20 +1384,11 @@ void calculateDataEfficiency(
     Double_t best_chi2 = 99;
     Int_t best_fit = 0;
 
-    int i = 0;  // fit strategy
+    int attempt = 0;  // fit attempt
     do {
-        std::cout<<">>> Fit with strategy "<<i<<std::endl;
-        // Strategy 0: just fit fail and pass region simultaneously in full range
-        // Strategy 1: first fit fail and pass pdf separately,
-        //    then set proper initial start values
-        //    then fit both together,
-        // Strategy 2: first fit fail pdf in sideband range,
-        //    then in complete fail range,
-        //    same for pass region
-        //    then set proper initial start values
-        //    then fit fail and pass region simultaneously in full range
+        std::cout<<">>> Fit with attempt "<<attempt<<std::endl;
 
-        if(i>0){
+        if(attempt>0){
             // reset parameters of fit models to initial values
             bkgPass->Reset();
             bkgFail->Reset();
@@ -1373,82 +1398,77 @@ void calculateDataEfficiency(
             eff.setVal(0.98);
             Nsig.setVal(NbkgPassMax*0.99);
 
-            if(i==3){
+            if(attempt==3){
                 // freeze efficiency so each region is fit seprarately first
                 eff.setConstant(kTRUE);
-
-                m.setRange("rangeLow", massLo, 81);
-                m.setRange("rangeHigh", 101, massHi);
-                m.setRange("rangeCenter", 81, 101);
-            }
-
-            if(i==2){
-                m.setRange("rangeLow", massLo, 78);
+                // define regions different
+                m.setRange("rangeLow", massLo, 76);
                 m.setRange("rangeHigh", 104, massHi);
-                m.setRange("rangeCenter", 81, 101);
-
-                std::cout<<">>> Fit sideband regions in fail"<<std::endl;
-                fitResult = bkgFail->model->fitTo(*dataFail,
-                    RooFit::Range("rangeLow,rangeHigh"),
-                    RooFit::PrintEvalErrors(-1),
-                    RooFit::PrintLevel(-1),
-                    RooFit::Warnings(0),
-                    RooFit::Strategy(strategy), // MINUIT STRATEGY
-                    RooFit::Save());
-
-                fitResult = sigFail->model->fitTo(*dataFail,
-                    RooFit::Range("rangeCenter"),
-                    RooFit::PrintEvalErrors(-1),
-                    RooFit::PrintLevel(-1),
-                    RooFit::Warnings(0),
-                    RooFit::Strategy(strategy), // MINUIT STRATEGY
-                    RooFit::Save());
+                m.setRange("rangeCenter", 76, 104);
             }
-            std::cout<<">>> Fit full range pdf in fail "<<std::endl;
-            // fit total pdf in Fail
-            fitResult = modelFail.fitTo(*dataFail,
-                RooFit::PrintEvalErrors(-1),
+        }
+
+        if(attempt!=1){
+            bkgFail->model->fitTo(*dataFail,
+                RooFit::Range("rangeLow,rangeHigh"),
                 RooFit::PrintLevel(-1),
                 RooFit::Warnings(0),
-                RooFit::Extended(1),
-                RooFit::Strategy(strategy), // MINUIT STRATEGY
-                RooFit::Save());
+                RooFit::Strategy(2), // MINOS STRATEGY
+                // RooFit::IntegrateBins(integrateBinsPrecision),
+                RooFit::Minimizer("Minuit2"));
+        }
 
+        if(attempt>0){
+            sigFail->model->fitTo(*dataFail,
+                RooFit::Range("rangeCenter"),
+                RooFit::PrintLevel(-1),
+                RooFit::Warnings(0),
+                RooFit::Strategy(2), // MINOS STRATEGY
+                // RooFit::IntegrateBins(integrateBinsPrecision),
+                RooFit::Minimizer("Minuit2"));
+        }
+
+        modelFail.fitTo(*dataFail,
+            RooFit::PrintEvalErrors(-1),
+            RooFit::PrintLevel(-1),
+            RooFit::Warnings(0),
+            RooFit::Extended(),
+            RooFit::Strategy(2), // MINOS STRATEGY
+            // RooFit::IntegrateBins(integrateBinsPrecision),
+            RooFit::Minimizer("Minuit2"));
+
+        if(attempt!=1){
+            bkgPass->model->fitTo(*dataPass,
+                RooFit::Range("rangeLow,rangeHigh"),
+                RooFit::PrintLevel(-1),
+                RooFit::Warnings(0),
+                RooFit::Strategy(2), // MINOS STRATEGY
+                // RooFit::IntegrateBins(integrateBinsPrecision),
+                RooFit::Minimizer("Minuit2"));
+        }
+
+        if(attempt>0){
+            sigPass->model->fitTo(*dataPass,
+                RooFit::Range("rangeCenter"),
+                RooFit::PrintLevel(-1),
+                RooFit::Warnings(0),
+                RooFit::Strategy(2), // MINOS STRATEGY
+                // RooFit::IntegrateBins(integrateBinsPrecision),
+                RooFit::Minimizer("Minuit2"));
+        }
+
+        modelPass.fitTo(*dataPass,
+            RooFit::PrintEvalErrors(-1),
+            RooFit::PrintLevel(-1),
+            RooFit::Warnings(0),
+            RooFit::Extended(),
+            RooFit::Strategy(2), // MINOS STRATEGY
+            // RooFit::IntegrateBins(integrateBinsPrecision),
+            RooFit::Minimizer("Minuit2"));
+
+        if(attempt > 0){    
             const Double_t n0 = NsigFail.getVal();
-
-            if(i==2){
-                std::cout<<">>> Fit sideband regions in pass"<<std::endl;
-                fitResult = bkgPass->model->fitTo(*dataPass,
-                    RooFit::Range("rangeLow,rangeHigh"),
-                    RooFit::PrintEvalErrors(-1),
-                    RooFit::PrintLevel(-1),
-                    RooFit::Warnings(0),
-                    RooFit::Strategy(strategy), // MINUIT STRATEGY
-                    RooFit::Save());
-
-                fitResult = sigPass->model->fitTo(*dataPass,
-                    RooFit::Range("rangeCenter"),
-                    RooFit::PrintEvalErrors(-1),
-                    RooFit::PrintLevel(-1),
-                    RooFit::Warnings(0),
-                    RooFit::Strategy(strategy), // MINUIT STRATEGY
-                    RooFit::Save());
-            }
-
-            std::cout<<">>> Fit full range in pass"<<std::endl;
-            fitResult = modelPass.fitTo(*dataPass,
-                RooFit::PrintEvalErrors(-1),
-                RooFit::PrintLevel(-1),
-                RooFit::Warnings(0),
-                RooFit::Extended(1),
-                RooFit::Strategy(strategy), // MINUIT STRATEGY
-                RooFit::Save());
-
             const Double_t n1 = NsigPass.getVal();
-
-            if(i==3){
-                eff.setConstant(kFALSE);
-            }
 
             const Double_t iEff = n1/(n1+n0);
             const Double_t iNsig = n1 + n0;
@@ -1462,31 +1482,19 @@ void calculateDataEfficiency(
             Nsig.setVal(iNsig);
         }
 
-        fitResult = totalPdf.fitTo(*dataCombined,
-            RooFit::PrintEvalErrors(-1),
-            RooFit::PrintLevel(-1),
-            RooFit::Warnings(0),
-            RooFit::Extended(1),
-            RooFit::Strategy(0), // MINUIT STRATEGY
-            // RooFit::Minos(RooArgSet(eff)),
-            RooFit::Save());
-            
-        fitResult = totalPdf.fitTo(*dataCombined,
-            RooFit::PrintEvalErrors(-1),
-            RooFit::PrintLevel(-1),
-            RooFit::Warnings(0),
-            RooFit::Extended(1),
-            RooFit::Strategy(1), // MINUIT STRATEGY
-            // RooFit::Minos(RooArgSet(eff)),
-            RooFit::Save());
+        if(attempt==3){
+            eff.setConstant(kFALSE);
+        }
 
         fitResult = totalPdf.fitTo(*dataCombined,
             RooFit::PrintEvalErrors(-1),
             RooFit::PrintLevel(-1),
             RooFit::Warnings(0),
-            RooFit::Extended(1),
-            RooFit::Strategy(2), // MINUIT STRATEGY
-            RooFit::Minos(kTRUE),
+            RooFit::Extended(),
+            RooFit::Strategy(2), // MINOS STRATEGY
+            // RooFit::IntegrateBins(integrateBinsPrecision),
+            RooFit::Minimizer("Minuit2"),
+            //RooFit::Minos(RooArgSet()),
             RooFit::Save());
 
         RooChi2Var chi2Var("chi2", "chi 2", totalPdf, *dataCombined,
@@ -1501,24 +1509,24 @@ void calculateDataEfficiency(
         ){
             std::cout<<"WARNING: something went wrong in the fit, we give a bad chi2"<<std::endl;
             chi2ndf = 99;
-        }  
+        }
 
         std::cout<<"---------------------------------------" <<std::endl;
-        std::cout<<"------ strategy = " << i << std::endl;
+        std::cout<<"------ attempt = " << attempt << std::endl;
         std::cout<<"------ chi2/ndf = " << chi2ndf <<std::endl;
         std::cout<<"---------------------------------------" <<std::endl;
         
-        if(i==0 || (chi2ndf < best_chi2) ){
+        if(attempt==0 || (chi2ndf < best_chi2) ){
             best_chi2 = chi2ndf;
-            best_fit = i;
+            best_fit = attempt;
             best_fitResult = fitResult;
-            w->saveSnapshot(("snapshot_"+std::to_string(i)).c_str(),
+            w->saveSnapshot(("snapshot_"+std::to_string(attempt)).c_str(),
                 fitResult->floatParsFinal(), kTRUE);
         }
 
-        i++;
+        attempt++;
 
-    } while(i < 4); // && best_chi2 > 2);
+    } while(attempt < 4 && best_chi2 > 1.5);
 
     // load best fit values into workspace
     w->loadSnapshot(("snapshot_"+std::to_string(best_fit)).c_str());
@@ -1601,6 +1609,13 @@ void calculateHLTEfficiencyAndYield(
 
     RooRealVar m("m","mass",massLo,massHi);
     m.setBins(massBin);
+    // This is only needed for the convolution of template with an analytic function 
+    // set to a high number for good precision
+    m.setBins(10000,"cache");
+    // set sideband range for background fit
+    m.setRange("rangeLow", massLo, 76);
+    m.setRange("rangeHigh", 104, massHi);
+    m.setRange("rangeCenter", 76, 104);
 
     RooCategory sample("sample","");
     sample.defineType("Pass",1);
@@ -1711,23 +1726,14 @@ void calculateHLTEfficiencyAndYield(
     Double_t best_chi2 = 99;
     Int_t best_fit = 0;
 
-    int i = 0;  // fit strategy
+    int attempt = 0;  // fit attempt
 
     RooMsgService::instance().setSilentMode(kTRUE);
 
     do {
-        std::cout<<">>> Fit with strategy "<<i<<std::endl;
-        // Strategy 0: just fit fail and pass region simultaneously in full range
-        // Strategy 1: first fit fail and pass pdf separately,
-        //    then set proper initial start values
-        //    then fit both together,
-        // Strategy 2: first fit fail pdf in sideband range,
-        //    then in complete fail range,
-        //    same for pass region
-        //    then set proper initial start values
-        //    then fit fail and pass region simultaneously in full range
+        std::cout<<">>> Fit with attempt "<<attempt<<std::endl;
 
-        if(i>0){
+        if(attempt>0){
             // reset parameters of fit models to initial values
             bkgPass->Reset();
             bkgFail->Reset();
@@ -1737,7 +1743,7 @@ void calculateHLTEfficiencyAndYield(
             eff.setVal(0.95);
             Nsig.setVal(NsigMax);
 
-            if(i==3){
+            if(attempt==3){
                 eff.setVal(0.8);
                 Nsig.setVal(NsigMax*0.5);
                 // freeze efficiency so each region is fit seprarately first
@@ -1752,74 +1758,81 @@ void calculateHLTEfficiencyAndYield(
                 m.setRange("rangeHigh", 101, massHi);
                 m.setRange("rangeCenter", 81, 101);
             }
-
-            if(i==2){
+        }
+        
+        if(attempt!=1){
                 std::cout<<">>> Fit sideband regions in fail"<<std::endl;
 
-                fitResult = bkgFail->model->fitTo(*dataFail,
-                    RooFit::Range("rangeLow,rangeHigh"),
-                    RooFit::PrintEvalErrors(-1),
-                    RooFit::PrintLevel(-1),
-                    RooFit::Warnings(0),
-                    RooFit::Strategy(strategy), // MINUIT STRATEGY
-                    // RooFit::Minos(RooArgSet(Nsig)),
-                    RooFit::Save());
-
-                fitResult = sigFail->model->fitTo(*dataFail,
-                    RooFit::Range("rangeCenter"),
-                    RooFit::PrintEvalErrors(-1),
-                    RooFit::PrintLevel(-1),
-                    RooFit::Warnings(0),
-                    RooFit::Strategy(strategy), // MINUIT STRATEGY
-                    // RooFit::Minos(RooArgSet(Nsig)),
-                    RooFit::Save());
-            }
-            std::cout<<">>> Fit full range pdf in fail "<<std::endl;
-            // fit total pdf in Fail
-            fitResult = modelFail.fitTo(*dataFail,
+            bkgFail->model->fitTo(*dataFail,
+                RooFit::Range("rangeLow,rangeHigh"),
                 RooFit::PrintEvalErrors(-1),
                 RooFit::PrintLevel(-1),
                 RooFit::Warnings(0),
-                RooFit::Extended(1),
-                RooFit::Strategy(strategy), // MINUIT STRATEGY
-                // RooFit::Minos(RooArgSet(Nsig)),
-                RooFit::Save());
+                RooFit::Strategy(2), // MINOS STRATEGY
+                // RooFit::IntegrateBins(integrateBinsPrecision),
+                RooFit::Minimizer("Minuit2"));
+        }
+        if(attempt > 0){
+            sigFail->model->fitTo(*dataFail,
+                RooFit::Range("rangeCenter"),
+                RooFit::PrintEvalErrors(-1),
+                RooFit::PrintLevel(-1),
+                RooFit::Warnings(0),
+                RooFit::Strategy(2), // MINOS STRATEGY
+                // RooFit::IntegrateBins(integrateBinsPrecision),
+                RooFit::Minimizer("Minuit2"));
+
+        }
+
+        // fit total pdf in Fail
+        modelFail.fitTo(*dataFail,
+            RooFit::PrintEvalErrors(-1),
+            RooFit::PrintLevel(-1),
+            RooFit::Warnings(0),
+            RooFit::Extended(),
+            RooFit::Strategy(2), // MINOS STRATEGY
+            // RooFit::IntegrateBins(integrateBinsPrecision),
+            RooFit::Minimizer("Minuit2"));
+
+
+        if(attempt!=1){
+                std::cout<<">>> Fit sideband regions in fail"<<std::endl;
+
+            sigPass->model->fitTo(*dataPass,
+                RooFit::Range("rangeLow,rangeHigh"),
+                RooFit::PrintEvalErrors(-1),
+                RooFit::PrintLevel(-1),
+                RooFit::Warnings(0),
+                RooFit::Strategy(2), // MINOS STRATEGY
+                // RooFit::IntegrateBins(integrateBinsPrecision),
+                RooFit::Minimizer("Minuit2"));
+        }
+        if(attempt > 0){
+            sigPass->model->fitTo(*dataPass,
+                RooFit::Range("rangeCenter"),
+                RooFit::PrintEvalErrors(-1),
+                RooFit::PrintLevel(-1),
+                RooFit::Warnings(0),
+                RooFit::Strategy(2), // MINOS STRATEGY
+                // RooFit::IntegrateBins(integrateBinsPrecision),
+                RooFit::Minimizer("Minuit2"));
+
+        }
+
+        // fit total pdf in Pass
+        modelPass.fitTo(*dataPass,
+            RooFit::PrintEvalErrors(-1),
+            RooFit::PrintLevel(-1),
+            RooFit::Warnings(0),
+            RooFit::Extended(),
+            RooFit::Strategy(2), // MINOS STRATEGY
+            // RooFit::IntegrateBins(integrateBinsPrecision),
+            RooFit::Minimizer("Minuit2"));
+
+        if(attempt>0){
+            std::cout<<">>> Fit sideband regions in pass"<<std::endl;
 
             const Double_t n1 = NsigFail.getVal();
-
-            if(i==2){
-                std::cout<<">>> Fit sideband regions in pass"<<std::endl;
-
-                fitResult = bkgPass->model->fitTo(*dataPass,
-                    RooFit::Range("rangeLow,rangeHigh"),
-                    RooFit::PrintEvalErrors(-1),
-                    RooFit::PrintLevel(-1),
-                    RooFit::Warnings(0),
-                    RooFit::Strategy(strategy), // MINUIT STRATEGY
-                    // RooFit::Minos(RooArgSet(Nsig)),
-                    RooFit::Save());
-
-                fitResult = sigPass->model->fitTo(*dataPass,
-                    RooFit::Range("rangeCenter"),
-                    RooFit::PrintEvalErrors(-1),
-                    RooFit::PrintLevel(-1),
-                    RooFit::Warnings(0),
-                    RooFit::Strategy(strategy), // MINUIT STRATEGY
-                    // RooFit::Minos(RooArgSet(Nsig)),
-                    RooFit::Save());
-            }
-
-            std::cout<<">>> Fit full range pdf in pass "<<std::endl;
-            // fit total pdf in Fail
-            fitResult = modelPass.fitTo(*dataPass,
-                RooFit::PrintEvalErrors(-1),
-                RooFit::PrintLevel(-1),
-                RooFit::Warnings(0),
-                RooFit::Extended(1),
-                RooFit::Strategy(strategy), // MINUIT STRATEGY
-                // RooFit::Minos(RooArgSet(Nsig)),
-                RooFit::Save());
-
             const Double_t n2 = NsigPass.getVal();
             const Double_t iEff = 2*n2/(corr*(n1+2*n2));
             const Double_t iNsig = n2/(corr * iEff * iEff);
@@ -1829,7 +1842,7 @@ void calculateHLTEfficiencyAndYield(
             std::cout<<"Nsig = "<<iNsig<<std::endl;
             std::cout<<"<<< "<<std::endl;
 
-            if(i==3){
+            if(attempt==3){
                 eff.setConstant(kFALSE);
             }
 
@@ -1837,35 +1850,15 @@ void calculateHLTEfficiencyAndYield(
             Nsig.setVal(iNsig);
         }
         // fit all regions together
-        std::cout<<"--- fit all regions together -- "<<std::endl;
         fitResult = totalPdf.fitTo(*dataCombined,
             RooFit::PrintEvalErrors(-1),
             RooFit::PrintLevel(-1),
             RooFit::Warnings(0),
-            RooFit::Extended(1),
-            RooFit::Strategy(0), // MINUIT STRATEGY
-            // RooFit::Minos(RooArgSet(eff)),
-            RooFit::Save());
-
-        std::cout<<"--- fit all regions together -- "<<std::endl;
-        fitResult = totalPdf.fitTo(*dataCombined,
-            RooFit::PrintEvalErrors(-1),
-            RooFit::PrintLevel(-1),
-            RooFit::Warnings(0),
-            RooFit::Extended(1),
-            RooFit::Strategy(1), // MINUIT STRATEGY
-            // RooFit::Minos(RooArgSet(eff)),
-            RooFit::Save());
-
-        fitResult = totalPdf.fitTo(*dataCombined,
-            RooFit::PrintEvalErrors(-1),
-            RooFit::PrintLevel(-1),
-            RooFit::Warnings(0),
-            RooFit::Extended(1),
-            RooFit::Strategy(2), // MINUIT STRATEGY
-            RooFit::Minos(kTRUE),
-            // RooFit::InitialHesse(kTRUE),
-            // RooFit::Minos(RooArgSet(Nsig, eff, NbkgPass, NbkgFail)),
+            RooFit::Extended(),
+            RooFit::Strategy(2), // MINOS STRATEGY
+            // RooFit::IntegrateBins(integrateBinsPrecision),
+            RooFit::Minimizer("Minuit2"),
+            //RooFit::Minos(RooArgSet()),
             RooFit::Save());
 
         RooChi2Var chi2Var("chi2", "chi 2", totalPdf, *dataCombined,
@@ -1877,7 +1870,7 @@ void calculateHLTEfficiencyAndYield(
         Double_t chi2ndf = chi2Var.getVal() / ndf;
 
         std::cout<<"---------------------------------------" <<std::endl;
-        std::cout<<"------ strategy = " << i << std::endl;
+        std::cout<<"------ attempt = " << attempt << std::endl;
         std::cout<<"------ chi2/"<<ndf<<" = " << chi2ndf <<std::endl;
         std::cout<<"------ eff = "<<eff.getVal()<<std::endl;
         std::cout<<"------ Nsig = "<<Nsig.getVal()<<std::endl;          
@@ -1890,17 +1883,17 @@ void calculateHLTEfficiencyAndYield(
             chi2ndf = 99;
         }        
 
-        if(i==0 || (chi2ndf < best_chi2 && chi2ndf > 0) ){
+        if(attempt==0 || (chi2ndf < best_chi2 && chi2ndf > 0) ){
             best_chi2 = chi2ndf;
-            best_fit = i;
+            best_fit = attempt;
             best_fitResult = fitResult;
-            w->saveSnapshot(("snapshot_"+std::to_string(i)).c_str(),
+            w->saveSnapshot(("snapshot_"+std::to_string(attempt)).c_str(),
                 fitResult->floatParsFinal(), kTRUE);
         }
 
-        i++;
+        attempt++;
 
-    } while(i < 4); // && best_chi2 > 2)
+    } while(attempt < 4 && best_chi2 > 1.5);
 
     // load best fit values into workspace
     w->loadSnapshot(("snapshot_"+std::to_string(best_fit)).c_str());
@@ -1979,6 +1972,12 @@ void calculateEfficienciesAndYield(
 
     RooRealVar m("m","mass",massLo,massHi);
     m.setBins(massBin);
+    // This is only needed for the convolution of template with an analytic function 
+    // set to a high number for good precision
+    m.setBins(10000,"cache");  
+    // set sideband range for background fit
+    m.setRange("rangeLow", massLo, 76);
+    m.setRange("rangeHigh", 106, massHi);
 
     RooCategory sample("sample","");
     sample.defineType("HLT1",1);
@@ -2101,23 +2100,23 @@ void calculateEfficienciesAndYield(
     Double_t best_chi2 = 99;
     Int_t best_fit = 0;
 
-    int i = 0;  // fit strategy
+    int attempt = 0;  // fit attempt
 
     RooMsgService::instance().setSilentMode(kTRUE);
 
     do {
-        std::cout<<">>> Fit with strategy "<<i<<std::endl;
-        // Strategy 0: just fit fail and pass region simultaneously in full range
-        // Strategy 1: first fit fail and pass pdf separately,
+        std::cout<<">>> Fit with attempt "<<attempt<<std::endl;
+        // attempt 0: just fit fail and pass region simultaneously in full range
+        // attempt 1: first fit fail and pass pdf separately,
         //    then set proper initial start values
         //    then fit both together,
-        // Strategy 2: first fit fail pdf in sideband range,
+        // attempt 2: first fit fail pdf in sideband range,
         //    then in complete fail range,
         //    same for pass region
         //    then set proper initial start values
         //    then fit fail and pass region simultaneously in full range
         
-        if(i>0){
+        if(attempt>0){
             // reset parameters of fit models to initial values
             sigHLT1->Reset();
             sigHLT2->Reset();
@@ -2130,7 +2129,7 @@ void calculateEfficienciesAndYield(
             effSel.setVal(0.90);
             Nsig.setVal(NsigMax);
 
-            if(i==3){
+            if(attempt==3){
                 effHLT.setVal(0.80);
                 effSel.setVal(0.80);
                 Nsig.setVal(NsigMax*0.5);
@@ -2148,7 +2147,7 @@ void calculateEfficienciesAndYield(
                 m.setRange("rangeCenter", 81, 101);
             }
 
-            if(i==2){
+            if(attempt==2){
                 std::cout<<">>> Fit sideband regions in fail"<<std::endl;
 
                 fitResult = bkgHLT1->model->fitTo(*dataHLT1,
@@ -2183,7 +2182,7 @@ void calculateEfficienciesAndYield(
 
             const Double_t n1 = NsigHLT1.getVal();
 
-            if(i==2){
+            if(attempt==2){
                 std::cout<<">>> Fit sideband regions in pass"<<std::endl;
 
                 fitResult = bkgHLT2->model->fitTo(*dataHLT2,
@@ -2218,7 +2217,7 @@ void calculateEfficienciesAndYield(
 
             const Double_t n2 = NsigHLT2.getVal();
 
-            if(i==2){
+            if(attempt==2){
                 std::cout<<">>> Fit sideband regions in pass"<<std::endl;
 
                 fitResult = bkgSelFail->model->fitTo(*dataSelFail,
@@ -2264,7 +2263,7 @@ void calculateEfficienciesAndYield(
             std::cout<<"Nsig = "<<iNsig<<std::endl;
             std::cout<<"<<< "<<std::endl;
 
-            if(i==3){
+            if(attempt==3){
                 effHLT.setConstant(kFALSE);
                 effSel.setConstant(kFALSE);
             }
@@ -2340,7 +2339,7 @@ void calculateEfficienciesAndYield(
         Double_t chi2ndf = chi2Var.getVal() / ndf;
 
         std::cout<<"---------------------------------------" <<std::endl;
-        std::cout<<"------ strategy = " << i << std::endl;
+        std::cout<<"------ attempt = " << attempt << std::endl;
         std::cout<<"------ chi2/"<<ndf<<" = " << chi2ndf <<std::endl;
         std::cout<<"------ eff(HLT) = "<<effHLT.getVal()<<std::endl;
         std::cout<<"------ eff(Sel) = "<<effSel.getVal()<<std::endl;
@@ -2352,17 +2351,17 @@ void calculateEfficienciesAndYield(
             chi2ndf = 99;
         }        
 
-        if(i==0 || (chi2ndf < best_chi2 && chi2ndf > 0) ){
+        if(attempt==0 || (chi2ndf < best_chi2 && chi2ndf > 0) ){
             best_chi2 = chi2ndf;
-            best_fit = i;
+            best_fit = attempt;
             best_fitResult = fitResult;
-            w->saveSnapshot(("snapshot_"+std::to_string(i)).c_str(),
+            w->saveSnapshot(("snapshot_"+std::to_string(attempt)).c_str(),
                 fitResult->floatParsFinal(), kTRUE);
         }
 
-        i++;
+        attempt++;
 
-    } while(i < 4); // && best_chi2 > 2)
+    } while(attempt < 4 && best_chi2 > 1.5);
 
     // load best fit values into workspace
     w->loadSnapshot(("snapshot_"+std::to_string(best_fit)).c_str());
@@ -2460,6 +2459,12 @@ void calculateHLTCorrelation(
 
     RooRealVar m("m","mass",massLo,massHi);
     m.setBins(massBin);
+    // This is only needed for the convolution of template with an analytic function 
+    // set to a high number for good precision
+    m.setBins(10000,"cache");  
+    // set sideband range for background fit
+    m.setRange("rangeLow", massLo, 76);
+    m.setRange("rangeHigh", 106, massHi);
 
     RooCategory sample("sample","");
     sample.defineType("HLT0",1);
@@ -2571,23 +2576,23 @@ void calculateHLTCorrelation(
     Double_t best_chi2 = 99;
     Int_t best_fit = 0;
 
-    int i = 0;  // fit strategy
+    int attempt = 0;  // fit attempt
 
     RooMsgService::instance().setSilentMode(kTRUE);
 
     do {
-        std::cout<<">>> Fit with strategy "<<i<<std::endl;
-        // Strategy 0: just fit fail and pass region simultaneously in full range
-        // Strategy 1: first fit fail and pass pdf separately,
+        std::cout<<">>> Fit with attempt "<<attempt<<std::endl;
+        // attempt 0: just fit fail and pass region simultaneously in full range
+        // attempt 1: first fit fail and pass pdf separately,
         //    then set proper initial start values
         //    then fit both together,
-        // Strategy 2: first fit fail pdf in sideband range,
+        // attempt 2: first fit fail pdf in sideband range,
         //    then in complete fail range,
         //    same for pass region
         //    then set proper initial start values
         //    then fit fail and pass region simultaneously in full range
 
-        if(i>0){
+        if(attempt>0){
             // reset parameters of fit models to initial values
             bkg0->Reset();
             bkg1->Reset();
@@ -2600,7 +2605,7 @@ void calculateHLTCorrelation(
             eff.setVal(0.85);
             Nsig.setVal(NsigMax);
 
-            if(i==3){
+            if(attempt==3){
                 c.setVal(1.03);
                 eff.setVal(0.80);
                 Nsig.setVal(NsigMax*0.5);
@@ -2618,7 +2623,7 @@ void calculateHLTCorrelation(
                 m.setRange("rangeCenter", 81, 101);
             }
 
-            if(i==2){
+            if(attempt==2){
                 std::cout<<">>> Fit sideband regions in fail"<<std::endl;
 
                 fitResult = bkg0->model->fitTo(*dataHLT0,
@@ -2652,7 +2657,7 @@ void calculateHLTCorrelation(
 
             const Double_t n0 = Nsig0.getVal();
 
-            if(i==2){
+            if(attempt==2){
                 std::cout<<">>> Fit sideband regions in fail"<<std::endl;
 
                 fitResult = bkg1->model->fitTo(*dataHLT1,
@@ -2686,7 +2691,7 @@ void calculateHLTCorrelation(
 
             const Double_t n1 = Nsig1.getVal();
 
-            if(i==2){
+            if(attempt==2){
                 std::cout<<">>> Fit sideband regions in fail"<<std::endl;
 
                 fitResult = bkg2->model->fitTo(*dataHLT2,
@@ -2730,7 +2735,7 @@ void calculateHLTCorrelation(
             std::cout<<"C = "<<iC<<std::endl;
             std::cout<<"<<< "<<std::endl;
 
-            if(i==3){
+            if(attempt==3){
                 eff.setConstant(kFALSE);
                 c.setConstant(kFALSE);
             }
@@ -2775,7 +2780,7 @@ void calculateHLTCorrelation(
         Double_t chi2ndf = chi2Var.getVal() / (dataCombined->numEntries() - fitResult->floatParsFinal().getSize());
 
         std::cout<<"---------------------------------------" <<std::endl;
-        std::cout<<"------ strategy = " << i << std::endl;
+        std::cout<<"------ attempt = " << attempt << std::endl;
         std::cout<<"------ chi2/ndf = " << chi2ndf <<std::endl;
         std::cout<<"---------------------------------------" <<std::endl;
 
@@ -2787,17 +2792,17 @@ void calculateHLTCorrelation(
             chi2ndf += 99;
         }
 
-        if(i==0 || (chi2ndf < best_chi2 && chi2ndf > 0) ){
+        if(attempt==0 || (chi2ndf < best_chi2 && chi2ndf > 0) ){
             best_chi2 = chi2ndf;
-            best_fit = i;
+            best_fit = attempt;
             best_fitResult = fitResult;
-            w->saveSnapshot(("snapshot_"+std::to_string(i)).c_str(),
+            w->saveSnapshot(("snapshot_"+std::to_string(attempt)).c_str(),
                 fitResult->floatParsFinal(), kTRUE);
         }
 
-        i++;
+        attempt++;
 
-    } while(i < 4); // && best_chi2 > 2)
+    } while(attempt < 4); // && best_chi2 > 2)
 
     // load best fit values into workspace
     w->loadSnapshot(("snapshot_"+std::to_string(best_fit)).c_str());
