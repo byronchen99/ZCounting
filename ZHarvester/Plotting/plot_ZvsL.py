@@ -275,7 +275,7 @@ def make_plots(df,
         
         # 1) simple mean
         yy_avg = u_y.mean()
-        # yy0_avg = u_y0.mean()
+        yy0_avg = u_y0.mean()
 
         # # 2) or weighted average
         # yy_w = np.array([1./(y.s)**2 for y in u_y])
@@ -289,17 +289,17 @@ def make_plots(df,
 
         xx_centers.append((xx[i] + (xx[i+1] - xx[i]) / 2.))
         yy.append(yy_avg)
-        # yy0.append(yy0_avg)
+        yy0.append(yy0_avg)
 
     xx = np.array(xx_centers)
 
     yy_err = np.array([y.s for y in yy])
     yy = np.array([y.n for y in yy])
-    # yy0_err = np.array([y.s for y in yy0])
-    # yy0 = np.array([y.n for y in yy0])
+    yy0_err = np.array([y.s for y in yy0])
+    yy0 = np.array([y.n for y in yy0])
 
     print(">>> make fit")
-    func = pol2 #linear #pol2 #quad
+    func = linear #pol2 #linear #pol2 #quad
     popt, pcov = curve_fit(func, xx, yy, sigma=yy_err, absolute_sigma=True)
 
     perr = np.sqrt(np.diag(pcov))
@@ -339,9 +339,9 @@ def make_plots(df,
     yMax = 1.05#max(yy + yy_err)
     yRange = abs(yMax - yMin)    
 
-    # p4 = ax1.errorbar(xx, yy0, xerr=xx_err, yerr=yy0_err, label="Measurements uncorrected",
-    #     marker="o", linewidth=0, color="grey", ecolor="grey", elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
-    #     zorder=1)
+    p4 = ax1.errorbar(xx, yy0, xerr=xx_err, yerr=yy0_err, label="Measurements uncorrected",
+        marker="o", linewidth=0, color="grey", ecolor="grey", elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
+        zorder=1)
     
     p3 = ax1.errorbar(xx, yy, xerr=xx_err, yerr=yy_err, label="Measurements",
         marker="o", linewidth=0, color="black", ecolor="black", elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
@@ -355,8 +355,8 @@ def make_plots(df,
                      color='grey', alpha=0.2, zorder=1) 
     p1 = ax1.fill(np.NaN, np.NaN, color='grey', alpha=0.2, linewidth=0.)    
 
-    leg_styles = [p3, (p2[0], p1[0])]
-    leg_labels = ['Measurements', 'Linear fit']
+    leg_styles = [p4, p3, (p2[0], p1[0])]
+    leg_labels = ['Measurements uncorrected','Measurements', 'Linear fit']
     
     leg = ax1.legend(leg_styles, leg_labels, loc="lower left", ncol=3,
         frameon=True, framealpha=1.0, fancybox=False, edgecolor="black")
@@ -424,7 +424,7 @@ rates = rates[["xsec_mc", "xsec", "recLumi", "timewindow", "run", "pileUp"]]
 
 for yy, ylabel, region, mcRes, xAxis in (
     ("xsec_mc", "sigma", "I", "", "pileUp"),
-    # ("xsec_mc", "sigma", "I", "", "lumi"),
+    ("xsec_mc", "sigma", "I", "", "lumi"),
     # # ("xsec_mc", "sigma", "", ""),
     # ("xsecBB_mc", "sigma", "BB", ""),
     # ("xsecBE_mc", "sigma", "BE", ""),
@@ -472,8 +472,8 @@ for yy, ylabel, region, mcRes, xAxis in (
     # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 C", run_range=(319337,320065), normalized=False)
     # # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 D", run_range=(320673,325175), normalized=False)
 
-    # # total 2016
-    make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016", run_range=(272007,294645), normalized=True, xAxis=xAxis)
+    # # # total 2016
+    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016", run_range=(272007,294645), normalized=True, xAxis=xAxis)
     # total 2016 pre VFP
     make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 pre VFP", run_range=(272007,278769), normalized=True, xAxis=xAxis)
     # total 2016 post VFP
@@ -485,6 +485,6 @@ for yy, ylabel, region, mcRes, xAxis in (
 
     ### Run 3
     # 2022
-    make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2022", normalized=True, xAxis='lumi')
-    make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2022", normalized=True, xAxis='pileUp')
+    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2022", normalized=True, xAxis='lumi')
+    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2022", normalized=True, xAxis='pileUp')
 

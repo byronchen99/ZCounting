@@ -75,7 +75,14 @@ for factor in (0, 1):
     massDown = []
     binWidthUp = []
     binWidthDown = []
-    
+
+    altSig1eff = [] 
+    altSig2eff = []
+    altBkgeff = []
+    altSig1yld = [] 
+    altSig2yld = []
+    altBkgyld = []
+
     # load alternative infos
     info_altSig1      = load("/summary_altSigMCxCB/")
     info_altSig2      = load("/summary_altSigMC/")
@@ -153,37 +160,39 @@ for factor in (0, 1):
         )
         
         # --- from alternative sources
-        # --- alternative signal
-        # only take effect on efficiency
-        # info_altSig1[key]['recZCount'] = info_altSig1[key]['recZCount'] / info_altSig1[key]['zRec'] * info[key]['zRec']
-        # info_altSig2[key]['recZCount'] = info_altSig2[key]['recZCount'] / info_altSig2[key]['zRec'] * info[key]['zRec']
-        if info_altSig1:
-            altSig1.append((info_altSig1[key]['recZCount']-info[key]['recZCount'])/info[key]['recZCount']
-                - factor*(info_altSig1['2017H']['recZCount']-info['2017H']['recZCount'])/info['2017H']['recZCount'])
-        if info_altSig2:
-            altSig2.append((info_altSig2[key]['recZCount']-info[key]['recZCount'])/info[key]['recZCount']
-                - factor*(info_altSig2['2017H']['recZCount']-info['2017H']['recZCount'])/info['2017H']['recZCount'])
-        if info_altBkg:                        
-            altBkg.append((info_altBkg[key]['recZCount']-info[key]['recZCount'])/info[key]['recZCount']
-                - factor*(info_altBkg['2017H']['recZCount']-info['2017H']['recZCount'])/info['2017H']['recZCount'])
-        if info_lumiUp:
-            lumiUp.append((info_lumiUp[key]['recZCount']-info[key]['recZCount'])/info[key]['recZCount']
-                - factor*(info_lumiUp['2017H']['recZCount']-info['2017H']['recZCount'])/info['2017H']['recZCount'])
-        if info_lumiDown:
-            lumiDown.append((info_lumiDown[key]['recZCount']-info[key]['recZCount'])/info[key]['recZCount']
-                - factor*(info_lumiDown['2017H']['recZCount']-info['2017H']['recZCount'])/info['2017H']['recZCount'])
-        if info_massUp:
-            massUp.append((info_massUp[key]['recZCount']-info[key]['recZCount'])/info[key]['recZCount']
-                -factor*(info_massUp['2017H']['recZCount']-info['2017H']['recZCount'])/info['2017H']['recZCount'])
-        if info_massDown:
-            massDown.append((info_massDown[key]['recZCount']-info[key]['recZCount'])/info[key]['recZCount']
-                -factor*(info_massDown['2017H']['recZCount']-info['2017H']['recZCount'])/info['2017H']['recZCount'])
-        if info_binWidthUp:
-            binWidthUp.append((info_binWidthUp[key]['recZCount']-info[key]['recZCount'])/info[key]['recZCount']
-                - factor*(info_binWidthUp['2017H']['recZCount']-info['2017H']['recZCount'])/info['2017H']['recZCount'])
-        if info_binWidthDown:
-            binWidthDown.append((info_binWidthDown[key]['recZCount']-info[key]['recZCount'])/info[key]['recZCount']
-                - factor*(info_binWidthDown['2017H']['recZCount']-info['2017H']['recZCount'])/info['2017H']['recZCount'])
+        for src, arr in (
+            (info_altSig1, altSig1),
+            (info_altSig2, altSig2),
+            (info_altBkg, altBkg),
+            (info_lumiUp, lumiUp),
+            (info_lumiDown, lumiDown),
+            (info_massUp, massUp),
+            (info_massDown, massDown),
+            (info_binWidthUp, binWidthUp),
+            (info_binWidthDown, binWidthDown),
+        ):
+            if src:
+                arr.append((src[key]['recZCount']-info[key]['recZCount'])/info[key]['recZCount']
+                - factor*(src['2017H']['recZCount']-info['2017H']['recZCount'])/info['2017H']['recZCount'])
+
+        for src, arr1, arr2 in (
+            (info_altSig1, altSig1eff, altSig1yld),
+            (info_altSig2, altSig2eff, altSig2yld),
+            (info_altBkg, altBkgeff, altBkgyld)
+        ):  
+            # sources that are treated uncorrelated between tracking efficiency and other parts
+            if src:
+                # only take effect on efficiency
+                alt = info[key]['selZCount'] / src[key]['selZCount'] * src[key]['recZCount']
+                altLow = info['2017H']['selZCount'] / src['2017H']['selZCount'] * src['2017H']['recZCount']
+                arr1.append((alt - info[key]['recZCount'])/info[key]['recZCount']
+                    - factor*(altLow - info['2017H']['recZCount'])/info['2017H']['recZCount'])
+
+                # only take effect on other parts
+                arr2.append((src[key]['selZCount']-info[key]['selZCount'])/info[key]['selZCount']
+                    - factor*(src['2017H']['selZCount']-info['2017H']['selZCount'])/info['2017H']['selZCount'])
+
+
 
     suffix = "_ratio" if factor==1 else ""
 
@@ -222,9 +231,15 @@ for factor in (0, 1):
             ("Muon pref. down (syst.)", prefireSystDown, r" & $"),
             ("ECAL pref. up          ", prefireECALUp,   r" & $"),
             ("ECAL pref. down        ", prefireECALDown, r" & $"),
-            ("Alt. sig. model (MCxCB) ", altSig1,          r" & $"),
-            ("Alt. sig. model (MC)    ", altSig2,          r" & $"),
-            ("Alt. bkg. model        ", altBkg,          r" & $"),
+            # ("Alt. sig. model (MCxCB) ", altSig1,          r" & $"),
+            # ("Alt. sig. model (MC)    ", altSig2,          r" & $"),
+            # ("Alt. bkg. model        ", altBkg,          r" & $"),
+            ("Alt. sig. model (MCxCB) - eff ", altSig1eff,          r" & $"),
+            ("Alt. sig. model (MC) - eff    ", altSig2eff,          r" & $"),
+            ("Alt. bkg. model - eff        ", altBkgeff,          r" & $"),
+            ("Alt. sig. model (MCxCB) - yield ", altSig1yld,          r" & $"),
+            ("Alt. sig. model (MC) - yield    ", altSig2yld,          r" & $"),
+            ("Alt. bkg. model - yield        ", altBkgyld,          r" & $"),
             ("Lumi slice up          ", lumiUp,          r" & $"),
             ("Lumi slice down        ", lumiDown,        r" & $"),
             ("Mass range up          ", massUp,        r" & $"),
@@ -235,7 +250,7 @@ for factor in (0, 1):
         ):
             if len(values) == 0:
                 continue
-                
+
             entries = []
             for i, x in enumerate(values):
                 if "\pm" in connector:

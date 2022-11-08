@@ -35,7 +35,7 @@ if not os.path.isdir(outDir):
 
 secPerLS=float(23.3)
 
-fmt = "png"
+fmt = "pdf"
 
 # plotting options
 
@@ -125,24 +125,27 @@ def unorm(x):
     # for counting experiments: define ufloat with poisson uncertainty
     return unc.ufloat(x, np.sqrt(abs(x)))
 
-# sort out nan values
-nan = np.isnan(data['ZRate'])
-print(f"Sort out {sum(nan)} nan values")
-data = data.loc[nan==False]
+# # sort out nan values
+# nan = np.isnan(data['ZRate'])
+# print(f"Sort out {sum(nan)} nan values")
+# data = data.loc[nan==False]
 
-# efficiency corrected number of Z bosons in timewindow, w/o deadtime corrections
-data['zDelI_mc'] = data['ZRate'] * data['timewindow'] * data['deadtime']
+# # efficiency corrected number of Z bosons in timewindow, w/o deadtime corrections
+# data['zDelI_mc'] = data['ZRate'] * data['timewindow'] * data['deadtime']
 
-data['zDelI_mc'] = data['zDelI_mc'].apply(lambda x: unorm(x))
+# data['zDelI_mc'] = data['zDelI_mc'].apply(lambda x: unorm(x))
 
-data['zLumi_mc'] = data['zDelI_mc'] / xsecI
-data['zLumiInst_mc'] = data['zLumi_mc'] / data['timewindow'] * 1000  # convert into /nb
+if data['recZCount'].dtype==object:
+    data['recZCount'] = data['recZCount'].apply(lambda x: unc.ufloat_fromstr(x))
+
+data['zLumi_mc'] = data['recZCount'] / xsecI
+data['zLumiInst_mc'] = data['recZCount'] / data['timewindow'] * 1000  # convert into /nb
 # reference lumi during one measurement
 data['dLRec(/nb)'] = data['recLumi'] / data['timewindow'] * 1000  # convert into /nb 
 
-# # convert inputs to uncertainties
-# for key in ('HLTeff', 'Seleff', 'Gloeff', 'Staeff'):
-#     data[key] = data[key].apply(lambda x: unc.ufloat_fromstr(x))
+# convert inputs to uncertainties
+for key in ('effHLT', 'effSel', 'effTrk'):
+    data[key] = data[key].apply(lambda x: unc.ufloat_fromstr(x))
 
 
 do_ratio=True ## activate the ratio plots 
@@ -231,17 +234,17 @@ for fill, data_fill in data.groupby("fill"):
     maxY = 0
     minY = 1
     for eff, name, col in (
-        ("effGlo", "$ \epsilon_\mathrm{Glo|Sta}^\mu $", "green"), 
-        ("effSta", "$ \epsilon_\mathrm{Sta|Trk}^\mu $", "blue"), 
-        ("effSel", "$ \epsilon_\mathrm{ID|Glo}^\mu $", "red"), 
+        ("effTrk", "$ \epsilon_\mathrm{Trk|Sta}^\mu $", "red"), 
+        ("effSel", "$ \epsilon_\mathrm{Sel|Trk}^\mu $", "blue"), 
+        # ("effSel", "$ \epsilon_\mathrm{ID|Glo}^\mu $", "red"), 
     ):
         
-        # y = [y.n for y in data_fill[eff].values]
-        # yErr = [y.s for y in data_fill[eff].values]
+        y = [y.n for y in data_fill[eff].values]
+        yErr = [y.s for y in data_fill[eff].values]
 
-        y = data_fill[eff].values
+        # y = data_fill[eff].values
 
-        ax1.errorbar(x, y, xerr=(xDown, xUp), #yerr=yErr, 
+        ax1.errorbar(x, y, xerr=(xDown, xUp), yerr=yErr, 
             label=name,
             marker="o", linewidth=0, color=col, ecolor=col, elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
             zorder=1)
@@ -279,12 +282,12 @@ for fill, data_fill in data.groupby("fill"):
         ("effHLT", "$ \epsilon_\mathrm{HLT}^\mu $", "k"), 
         # ("ZIeff", "$ ( \epsilon_\mathrm{ID}^\mu ) ^2 $", "r") 
     ):    
-        # y = [y.n for y in data_fill[eff].values]
-        # yErr = [y.s for y in data_fill[eff].values]
+        y = [y.n for y in data_fill[eff].values]
+        yErr = [y.s for y in data_fill[eff].values]
 
-        y = data_fill[eff].values
+        # y = data_fill[eff].values
 
-        ax2.errorbar(x, y, xerr=(xDown, xUp), #yerr=yErr, 
+        ax2.errorbar(x, y, xerr=(xDown, xUp), yerr=yErr, 
             label=name,
             marker="o", linewidth=0, color=col, ecolor=col, elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
             zorder=1)
@@ -461,7 +464,8 @@ for fill, data_fill in data.groupby("fill"):
         ax2.set_xlabel("average pileup")
         ax2.set_ylabel("Ratio")
         
-        ax2.errorbar(xPU, yRatio, xerr=(xDown, xUp), yerr=yRatioErr, 
+        ax2.errorbar(xPU, yRatio, #xerr=(xDown, xUp), 
+            yerr=yRatioErr, 
             label="Z rate measurement",
             fmt="ko", ecolor='black', elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
             zorder=1)

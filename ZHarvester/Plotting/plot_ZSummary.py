@@ -87,7 +87,8 @@ if args.xsec:
     print("get Z cross section")
     data_xsec = pd.read_csv(str(args.xsec), sep=',',low_memory=False)#, skiprows=[1,2,3,4,5])
 
-    data_xsec['recZCount'] = data_xsec['recZCount'].apply(lambda x: unc.ufloat_fromstr(x).n)
+    if data_xsec['recZCount'].dtype==object:
+        data_xsec['recZCount'] = data_xsec['recZCount'].apply(lambda x: unc.ufloat_fromstr(x).n)
 
     apply_muon_prefire(data_xsec)
     apply_ECAL_prefire(data_xsec)
@@ -109,15 +110,16 @@ else:
 print("get Z luminosity")
 data = pd.concat([pd.read_csv(csv, sep=',',low_memory=False) for csv in args.rates], ignore_index=True, sort=False)
 
-# --->>> prefire corrections
-if year in (2016, 2017, 2018):
-    apply_muon_prefire(data)
-    apply_ECAL_prefire(data)
+if data['recZCount'].dtype==object:
+    data['recZCount'] = data['recZCount'].apply(lambda x: unc.ufloat_fromstr(x).n)
 
-    print("apply prefire corrections - done")
+# --->>> prefire corrections
+apply_muon_prefire(data)
+apply_ECAL_prefire(data)
+    
 # <<<---
 
-data['zLumi'] = data['delZCount'] / xsec
+data['zLumi'] = data['recZCount'] / xsec
 
 data['timeDown'] = data['beginTime'].apply(lambda x: to_DateTime(x))
 data['timeUp'] = data['endTime'].apply(lambda x: to_DateTime(x))
@@ -167,8 +169,8 @@ print("analyze {0} fb^-1 of data (z lumi)".format(data['zLumi'].sum()/1000.))
 print("ratio: z lumi/ ref. lumi = {0}".format(data['zLumi'].sum()/data['weightLumi'].sum()))
 
 print("Outliers:")
-data_out = data.loc[abs(data['zLumi_to_dLRec']-1) > 0.05]
-print(data_out[["recLumi","run","fill", "measurement","zLumi_to_dLRec","delZCount"]])
+data_out = data.loc[data['zLumi_to_dLRec']-1 > 0.1]
+print(data_out[["recLumi","run","fill", "measurement","zLumi_to_dLRec","recZCount"]])
 
 def make_hist(
     df,

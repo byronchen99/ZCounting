@@ -52,12 +52,14 @@ vars = {
     "sig_sigma_HLT_1":      "sig_sigmaPass_1",
     "sig_mean_HLT_2":       "sig_meanPass_2",
     "sig_sigma_HLT_2":      "sig_sigmaPass_2",
-    "bkg_alpha_HLT_1":      "bkg_alphaPass_1",
-    "bkg_beta_HLT_1":       "bkg_betaPass_1",
-    "bkg_gamma_HLT_1":      "bkg_gammaPass_1",
-    "bkg_alpha_HLT_2":      "bkg_alphaPass_2",
-    "bkg_beta_HLT_2":       "bkg_betaPass_2",
-    "bkg_gamma_HLT_2":      "bkg_gammaPass_2",
+    # "bkg_alpha_HLT_1":      "bkg_alphaPass_1",
+    # "bkg_beta_HLT_1":       "bkg_betaPass_1",
+    # "bkg_gamma_HLT_1":      "bkg_gammaPass_1",
+    # "bkg_alpha_HLT_2":      "bkg_alphaPass_2",
+    # "bkg_beta_HLT_2":       "bkg_betaPass_2",
+    # "bkg_gamma_HLT_2":      "bkg_gammaPass_2",
+    "bkg_t1_HLT_1":      "bkg_t1Pass_1",
+    "bkg_t1_HLT_2":      "bkg_t1Pass_2",
     # "sig_meanPass_Sel":     "sig_meanPass_0",
     # "sig_sigmaPass_Sel":    "sig_sigmaPass_0",
     "sig_meanFail_Sel":     "sig_meanFail_0",
@@ -92,9 +94,10 @@ vars = {
     "sig_sigmaPass_Trk":    "sig_sigmaPass_0",
     "sig_meanFail_Trk":     "sig_meanFail_0",
     "sig_sigmaFail_Trk" :   "sig_sigmaFail_0",
-    "bkg_alphaPass_Trk":      "bkg_alphaPass_0",
-    "bkg_betaPass_Trk":       "bkg_betaPass_0",
-    "bkg_gammaPass_Trk":      "bkg_gammaPass_0",
+    # "bkg_alphaPass_Trk":      "bkg_alphaPass_0",
+    # "bkg_betaPass_Trk":       "bkg_betaPass_0",
+    # "bkg_gammaPass_Trk":      "bkg_gammaPass_0",
+    "bkg_t1Pass_Trk":      "bkg_t1Pass_0",
     "bkg_alphaFail_Trk":      "bkg_alphaFail_0",
     "bkg_betaFail_Trk":       "bkg_betaFail_0",
     "bkg_gammaFail_Trk":      "bkg_gammaFail_0",
@@ -110,15 +113,25 @@ xlabels = {
     "sigma": "sigma",
     "alpha" : "alpha",
     "beta" : "beta",
-    "gamma" : "gamma"
+    "gamma" : "gamma",
+    "t1" : "t",
+    "statusMinuit": "Minuit status",
+    "statusHesse": "Hesse status",
+    "statusMinos": "Minos status",
+    "covQual": "Covariance matrix quality"
 }
 
 xlimits = {
     "mean" : [-2.5,2.5],
     "sigma": [0.1, 5],
     "alpha" : [0, 300],
-    "beta" : [0.0, 1.0],
-    "gamma" : [0.0, 1.0]
+    "beta" : [0.0, 0.1],
+    "gamma" : [0.0, 0.1],
+    "t1" : [-1.0, 0.0],
+    "statusMinuit": [0,5],
+    "statusHesse": [0,4],
+    "statusMinos": [0,4],
+    "covQual": [0,3]
 }
 
 
@@ -135,13 +148,17 @@ def plot_variable(key, xx, era="RunII"):
 
     fig.subplots_adjust(hspace=0.0, left=0.13, right=0.98, top=0.99, bottom=0.13)
     
-    var_name = key.split("_")[1].split("Fail")[0].split("Pass")[0]
+    if len(key.split("_")) > 2:
+        var_name = key.split("_")[1].split("Fail")[0].split("Pass")[0]
 
-    labelname = " ".join(key.split("_")[2:])
-    if "Fail" in key:
-        labelname += " Fail"
-    elif "Pass" in key:
-        labelname += " Pass"
+        labelname = " ".join(key.split("_")[2:])
+        if "Fail" in key:
+            labelname += " Fail"
+        elif "Pass" in key:
+            labelname += " Pass"
+    else:
+        var_name = key.split("_")[0]
+        labelname = key.split("_")[1]
 
     ax.set_ylabel("Frequency")
     ax.set_xlabel(xlabels[var_name])
@@ -182,6 +199,7 @@ if args.input.endswith("json"):
         
         plot_variable(key, xx)
 
+
     exit()
 
 for iEra, run_lo, run_hi in (
@@ -198,6 +216,11 @@ for iEra, run_lo, run_hi in (
     for var in vars:
         info[var] = []
 
+    for var in ("covQual", "statusHesse", "statusMinos", "statusMinuit"):
+        for eff in ("HLT", "Sel", "Trk"):
+            info["{0}_{1}".format(var,eff)] = []
+   
+
     for dir_run in glob.glob(inputDir+"/Run*"):
         run = int(dir_run.split("Run")[-1].split("to")[0])
         if run < run_lo or run > run_hi:
@@ -210,10 +233,19 @@ for iEra, run_lo, run_hi in (
             
             for key, var in filter(lambda x: "HLT" in x[0], vars.items()):
                 info[key].append(w.var(var).getVal())
-                
+
+            # check fit result for fit quality
+            r = f.Get("fitResult")
+            info["covQual_HLT"].append(r.covQual())
+            info["statusHesse_HLT"].append(r.status()//100)
+            info["statusMinos_HLT"].append((r.status()//10)%10)
+            info["statusMinuit_HLT"].append(r.status()%10)
+
             f.Close()
             f.Delete()
             w.Delete()
+            r.Delete()
+
         # from efficiency fits
         for eff in ["Trk",]:
             for file_m in glob.glob(dir_run+"/workspace_{0}_{1}_*.root".format(eff, etaRegion)):
@@ -222,10 +254,18 @@ for iEra, run_lo, run_hi in (
                 
                 for key, var in filter(lambda x: x[0].endswith(eff), vars.items()):
                     info[key].append(w.var(var).getVal())
-                    
+
+                # check fit result for fit quality
+                r = f.Get("fitResult")
+                info["covQual_{0}".format(eff)].append(r.covQual())
+                info["statusHesse_{0}".format(eff)].append(r.status()//100)
+                info["statusMinos_{0}".format(eff)].append((r.status()//10)%10)
+                info["statusMinuit_{0}".format(eff)].append(r.status()%10)
                 f.Close()
                 f.Delete()
                 w.Delete()
+                r.Delete()
+
         # from yield fits
         for eff in ["Trk_{0}_2".format(etaRegion), "Sel_{0}".format(etaRegion),]: 
             for file_m in glob.glob(dir_run+"/workspace_yield_{0}_*.root".format(eff)):
@@ -237,10 +277,25 @@ for iEra, run_lo, run_hi in (
                 
                 for key, var in filter(lambda x: x[0].endswith(vareff), vars.items()):
                     info[key].append(w.var(var).getVal())
+
+                if "Trk" in eff:
+                    f.Close()
+                    f.Delete()
+                    w.Delete()
+                    continue
                     
+                # check fit result for fit quality
+                r = f.Get("fitResult")
+                info["covQual_Sel"].append(r.covQual())
+                info["statusHesse_Sel"].append(r.status()//100)
+                info["statusMinos_Sel"].append((r.status()//10)%10)
+                info["statusMinuit_Sel"].append(r.status()%10)
+
                 f.Close()
                 f.Delete()
                 w.Delete()
+                r.Delete()
+
 
     with open(outDir+"/info_{0}.json".format(iEra),"w") as outfile:
         json.dump(info, outfile, indent=4, sort_keys=True)
@@ -251,3 +306,4 @@ for iEra, run_lo, run_hi in (
             continue
         
         plot_variable(key, xx, era=iEra)
+

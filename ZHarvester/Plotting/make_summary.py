@@ -1,5 +1,4 @@
 import os,sys
-import ROOT
 import argparse
 import pandas as pd
 import numpy as np
@@ -11,10 +10,6 @@ sys.path.append(os.getcwd())
 
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
 from ZUtils.python.utils import pexp, pquad
-
-ROOT.gROOT.SetBatch(True)
-ROOT.gStyle.SetCanvasPreferGL(1)
-ROOT.gStyle.SetTitleX(.3)
 
 parser = argparse.ArgumentParser()
 
@@ -68,6 +63,10 @@ data['recZCount_cIODown'] = data['recZCount'] / (data['cIO']**2) * ((data['cIO']
 
 data['recZCount_cIDUp'] = data['recZCount'] / data['cID'] * ((data['cID'] - 1)*2.0 + 1)
 data['recZCount_cIDDown'] = data['recZCount'] / data['cID'] * ((data['cID'] - 1)*0.0 + 1)
+
+# number of selected Z bosons (before tracking efficiency corrections)
+data['effTrk'] = data['effTrk'].apply(lambda x: unc.ufloat_fromstr(x).n)
+data['selZCount'] = data['recZCount'] * data['effTrk']**2
 
 # --->>> prefire corrections
 print("apply muon prefire corrections")
@@ -133,6 +132,7 @@ for lo, hi, era in (
         continue
 
     info[era] = {}        
+    info[era]['selZCount'] = sum(data.loc[loc,'selZCount'])
     info[era]['recZCount'] = sum(data.loc[loc,'recZCount'])
     info[era]['recZCount_err'] = np.sqrt(sum(data.loc[loc,'recZCount_err']**2))
     info[era]['recZCount_cHLTUp']   = sum(data.loc[loc,'recZCount_cHLTUp'])

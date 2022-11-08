@@ -128,9 +128,9 @@ for category in filter(lambda x: "chi2" in x,data.keys()):
         # + 1 (signal normalization) 
         # + 1 (background normalization) )        
     elif "Trk" in category:
-        ndf = 260 - 14
+        ndf = 260 - 12
     else:
-        ndf = 240 - 14
+        ndf = 240 - 10
         
         
     nBins = 20
