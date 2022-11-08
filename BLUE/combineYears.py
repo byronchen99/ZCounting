@@ -46,23 +46,23 @@ with open(args.inputFile) as csv_file:
         systName=row[0]
         if i == 0:
             if len(row) <= 2:
-                print "Error: expected some years in the top line"
+                print("Error: expected some years in the top line")
                 sys.exit(1)
             years = row[2:]
         elif i == 1:
             if systName != 'Luminosity':
-                print "Error: expected first row to have luminosity"
+                print("Error: expected first row to have luminosity")
                 sys.exit(1)
             lumis = [float(x) for x in row[2:]]
             if len(years) != len(lumis):
-                print "Error: number of lumis specified doesn't match number of years"
+                print("Error: number of lumis specified doesn't match number of years")
                 sys.exit(1)
         else:
             if len(row) != len(lumis)+2:
-                print "Error: number of uncertainties for",systName,"doesn't match number of years"
+                print("Error: number of uncertainties for",systName,"doesn't match number of years")
                 sys.exit(1)
             if row[1] != 'C' and row[1] != 'U' and row[1][0] != 'P':
-                print "Error: correlation should be C, U, or P##"
+                print("Error: correlation should be C, U, or P##")
                 sys.exit(1)
             correlations[systName] = row[1]
             uncertainties[systName] = [float(x)/100 for x in row[2:]]
@@ -135,15 +135,15 @@ for u in uncertainties:
 
 total_uncertainty = math.sqrt(total_uncertainty_sq)
 if args.force_correlated:
-    print "*** All uncertainties have been treated as correlated ***"
+    print("*** All uncertainties have been treated as correlated ***")
 if args.force_uncorrelated:
-    print "*** All uncertainties have been treated as uncorrelated ***"
+    print("*** All uncertainties have been treated as uncorrelated ***")
 if not args.ratio:
-    print "Total luminosity is %.2f +/- %.2f (uncertainty of %.2f%%)" % \
-        (total_luminosity, total_uncertainty, 100*total_uncertainty/total_luminosity)
+    print("Total luminosity is %.2f +/- %.2f (uncertainty of %.2f%%)" % \
+        (total_luminosity, total_uncertainty, 100*total_uncertainty/total_luminosity))
 else:
-    print "Ratio luminosity is %.2f +/- %.3f (uncertainty of %.2f%%)" % \
-        (total_luminosity, total_uncertainty, 100*total_uncertainty/total_luminosity)
+    print("Ratio luminosity is %.2f +/- %.3f (uncertainty of %.2f%%)" % \
+        (total_luminosity, total_uncertainty, 100*total_uncertainty/total_luminosity))
                 
 # Next make the final table for use by other people. The first step is to go through and see if any
 # uncertainties are treated as correlated but only are nonzero for one year. If so, we can treat them as
@@ -160,7 +160,7 @@ for u in uncertainties:
 total_uncorrelated = [0]*len(years)
 for u in sorted(uncertainties):
     if correlations[u] == 'C':
-        print u+","+",".join([str(x*100) for x in uncertainties[u]])
+        print(u+","+",".join([str(x*100) for x in uncertainties[u]]))
     elif correlations[u] == 'U':
         for i in range(len(uncertainties[u])):
             total_uncorrelated[i] += (100*uncertainties[u][i])**2
@@ -174,23 +174,23 @@ for u in sorted(uncertainties):
             # Dump the uncorrelated part into the uncorrelated bucket and keep track of the correlated part.
             total_uncorrelated[i] += this_term_uncorr_sq
             correlated_uncertainty.append("%.1f" % (math.sqrt(this_term_corr_sq)))
-        print u+" (correlated part),"+",".join(correlated_uncertainty)
+        print(u+" (correlated part),"+",".join(correlated_uncertainty))
 # Finally, print out the uncorrelateds.
 for i in range(len(years)):
     output_array = ['0.0']*len(years)
     output_array[i] = "%.1f" % (math.sqrt(total_uncorrelated[i]))
-    print "Uncorrelated "+str(years[i])+","+",".join(output_array)
+    print("Uncorrelated "+str(years[i])+","+",".join(output_array))
 
 
 
-print "\n\nSimplified scheme\n"
+print("\n\nSimplified scheme\n")
 
 mergedUncertSquared={}
 for uncert in uncertainties:
     #check which years are correlated
     if correlations[uncert] == 'U':
         for iYear in range(len(years)):
-            if not mergedUncertSquared.has_key(years[iYear]):
+            if years[iYear] not in mergedUncertSquared.keys():
                 mergedUncertSquared[years[iYear]]=[0]
             mergedUncertSquared[years[iYear]][0]+=uncertainties[uncert][iYear]**2
     elif correlations[uncert] == 'C':
@@ -200,7 +200,7 @@ for uncert in uncertainties:
             if uncertainties[uncert][iYear] > 0:
                 thisSet+=years[iYear]
                 nYear+=1
-        if not mergedUncertSquared.has_key(thisSet):
+        if thisSet not in mergedUncertSquared.keys():
             mergedUncertSquared[thisSet]=[0]*nYear
         yearInd=0
         for iYear in range(len(years)):
@@ -211,15 +211,14 @@ for uncert in uncertainties:
 
    
 yearSets=mergedUncertSquared.keys()
-yearSets.sort()
-for year in years:
-    yearSets.remove(year)
-    yearSets.append(year)
+# yearSets.sort()
+# for year in years:
+#     yearSets.remove(year)
+#     yearSets.append(year)
 
 for yearSet in yearSets:
-    print yearSet,
+    print(yearSet)
     for setInd in range(len(mergedUncertSquared[yearSet])):
-        print "%.1f" % (math.sqrt(mergedUncertSquared[yearSet][setInd])*100),
-    print
+        print("%.2f" % (math.sqrt(mergedUncertSquared[yearSet][setInd])*100))
      
 

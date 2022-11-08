@@ -1,72 +1,83 @@
 import numpy as np
-import ROOT
 import matplotlib.pyplot as plt
 import uncertainties as unc
 
-lPHYS = np.array([36.330, 41.480, 59.830])
-lPHYS_Unc = np.array([0.424, 0.962, 1.501])
+blind = False
+
+# # full 2016
+# lPHYS = np.array([36.310, 41.480, 59.830])
+# lPHYS_Unc = np.array([0.424, 0.962, 1.501])
+# only postVFP 2016
+lPHYS = np.array([16.81, 41.480, 59.830])
+lPHYS_Unc = np.array([0.196, 0.962, 1.501])
 
 cPHYS =  np.array([
     [1.00,0.20,0.41],
-    [0.20,1.00,0.34],
-    [0.41,0.34,1.00]
+    [0.20,1.00,0.33],
+    [0.41,0.33,1.00]
 ])
 
-uPHYS = unc.correlated_values_norm(zip(lPHYS, lPHYS_Unc), cPHYS)
+uPHYS = unc.correlated_values_norm(list(zip(lPHYS, lPHYS_Unc)), cPHYS)
 
-# --- from combination of high pileup Z counts
-hasZ = [0,1,1,0]
-lZ = np.array([41.480,59.830])
-lZ_Unc = np.array([0.637,1.486])
+# # --- from combination of high pileup Z counts
+# hasZ = [0,1,1,0]
+# lZ = np.array([41.480,59.830])
+# lZ_Unc = np.array([0.637,1.486])
 
-cZ =  np.array([
-    [1.00,1.00],
-    [1.00,1.00]
-])
-
-uZ = unc.correlated_values_norm(zip(lZ, lZ_Unc), cZ)
-
-
-lComb = np.array([36.330,41.480,59.830])
-lComb_Unc = np.array([0.405,0.536,1.060])
-
-cComb =  np.array([
-    [1.00,0.81,0.56],
-    [0.81,1.00,0.94],
-    [0.56,0.94,1.00]
-])
-
-uComb = unc.correlated_values_norm(zip(lComb, lComb_Unc), cComb)
-
-# # --- from combination of 2017H lumi with high pileup Z counts
-# hasZ = [1,1,1,1]
-# lZ = np.array([36.330,41.480,59.830])
-# lZ_Unc = np.array([0.742,0.847,1.222])
-#
 # cZ =  np.array([
-#     [1.00,1.00,1.00],
-#     [1.00,1.00,1.00],
-#     [1.00,1.00,1.00]
+#     [1.00,1.00],
+#     [1.00,1.00]
 # ])
-#
+
 # uZ = unc.correlated_values_norm(zip(lZ, lZ_Unc), cZ)
-#
-#
+
+
 # lComb = np.array([36.330,41.480,59.830])
-# lComb_Unc = np.array([0.397,0.464,0.672])
-#
+# lComb_Unc = np.array([0.405,0.536,1.060])
+
 # cComb =  np.array([
-#     [1.00,0.97,0.97],
-#     [0.97,1.00,0.97],
-#     [0.97,0.97,1.00]
+#     [1.00,0.81,0.56],
+#     [0.81,1.00,0.94],
+#     [0.56,0.94,1.00]
 # ])
-#
+
 # uComb = unc.correlated_values_norm(zip(lComb, lComb_Unc), cComb)
 
+# --- from combination of 2017H lumi with high pileup Z counts
+hasZ = [1,1,1,1]
 
+if blind:
+    lZ = lPHYS
+    lZ_Unc = np.array([0.308,0.767,1.078])
+else:
+    lZ = np.array([0.961, 0.988, 0.961]) * lPHYS
+    lZ_Unc = np.array([0.308,0.767,1.078])
+
+
+cZ =  np.array([
+    [1.00,0.98,0.98],
+    [0.98,1.00,0.99],
+    [0.98,0.99,1.00]
+])
+
+uZ = unc.correlated_values_norm(list(zip(lZ, lZ_Unc)), cZ)
+
+if blind:
+    lComb = lPHYS
+    lComb_Unc = np.array([0.182,0.452,0.653])
+else:
+    lComb = np.array([16.651, 42.196, 59.204])
+    lComb_Unc = np.array([0.181,0.475,0.667])
+
+cComb =  np.array([
+    [1.00,0.94,0.94],
+    [0.94,1.00,0.99],
+    [0.94,0.99,1.00]
+])
+
+uComb = unc.correlated_values_norm(list(zip(lComb, lComb_Unc)), cComb)
 
 textsize=15
-
 
 fig, ax = plt.subplots(1, 4, sharey=True, figsize=(10, 3))
 fig.subplots_adjust(left=0.1, right=0.97, top=0.99, bottom=0.25, wspace=0.0)
@@ -106,10 +117,10 @@ ax[3].errorbar(xx, yy, xerr=xxErr, yerr=yyErr, fmt='.k', ms=8, capsize=3)
 
 
 
-ax[0].text(0.1, 0.85, '2016', color='black', transform=ax[0].transAxes, fontsize=textsize)
+ax[0].text(0.1, 0.85, '2016 postVFP', color='black', transform=ax[0].transAxes, fontsize=textsize)
 ax[1].text(0.1, 0.85, '2017', color='black', transform=ax[1].transAxes, fontsize=textsize)
 ax[2].text(0.1, 0.85, '2018', color='black', transform=ax[2].transAxes, fontsize=textsize)
-ax[3].text(0.1, 0.85, 'RunII', color='black', transform=ax[3].transAxes, fontsize=textsize)
+ax[3].text(0.1, 0.85, 'Run 2', color='black', transform=ax[3].transAxes, fontsize=textsize)
 ax[3].text(0.6, 0.85, 'CMS', color='black', transform=ax[3].transAxes, fontsize=textsize*1.5, weight='bold')
 
 
@@ -124,7 +135,9 @@ for i in range(4):
 
 ax[3].set_xlabel('Luminosity [fb$^{-1}$]', fontsize = textsize)
 
-plt.savefig('LumiCombination.png')
-plt.savefig('LumiCombination.pdf')
+suffix = "exp" if blind else "obs"
+
+plt.savefig('LumiCombination_{0}.png'.format(suffix))
+plt.savefig('LumiCombination_{0}.pdf'.format(suffix))
 
 plt.close()
