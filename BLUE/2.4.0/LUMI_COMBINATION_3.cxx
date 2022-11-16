@@ -77,9 +77,9 @@ void LUMI_COMBINATION_3(Int_t Flag = 0){
   Double_t lP18 = 59.83;
 
   // measured Z luminosities
-  Double_t lZ16 = lP16 * 0.961;
-  Double_t lZ17 = lP17 * 0.988;
-  Double_t lZ18 = lP18 * 0.961;
+  Double_t lZ16 = lP16 * 0.979;
+  Double_t lZ17 = lP17 * 1.004;
+  Double_t lZ18 = lP18 * 0.981;
   if(Flag == 0){
     lZ16 = lP16;
     lZ17 = lP17;

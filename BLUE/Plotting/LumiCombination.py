@@ -1,6 +1,41 @@
-import numpy as np
+import os
+import matplotlib as mpl
 import matplotlib.pyplot as plt
+import numpy as np
 import uncertainties as unc
+import argparse
+
+parser = argparse.ArgumentParser()
+
+# parser.add_argument("-r","--rates", required=True, nargs='+', help="Nominator csv file with z rates per measurement")
+# parser.add_argument("-x","--xsec", type=str,
+#     help="csv file with z rates per measurement where xsec should be taken from (e.g. from low pileup run)")
+parser.add_argument("--label",  default='Work in progress',  type=str, help="specify label ('Work in progress', 'Preliminary', )")
+parser.add_argument("-s","--saveDir",  default='./',  type=str, help="give output dir")
+args = parser.parse_args()
+
+outDir = args.saveDir
+if not os.path.isdir(outDir):
+    os.mkdir(outDir)
+
+
+textsize = 15
+
+plt.rcParams.update({
+    "text.usetex": True,
+    "font.family": "serif",
+    "font.serif": ["Palatino",],
+    "font.size": textsize,
+    'text.latex.preamble': [r"""\usepackage{bm}"""]
+})
+
+mpl.rcParams.update({
+    "legend.fontsize" : "medium",
+    "axes.labelsize" : "medium",
+    "axes.titlesize" : "medium",
+    "xtick.labelsize" : "medium",
+    "ytick.labelsize" : "medium",
+})
 
 blind = False
 
@@ -50,8 +85,8 @@ if blind:
     lZ = lPHYS
     lZ_Unc = np.array([0.308,0.767,1.078])
 else:
-    lZ = np.array([0.961, 0.988, 0.961]) * lPHYS
-    lZ_Unc = np.array([0.308,0.767,1.078])
+    lZ = np.array([0.979, 1.004, 0.981]) * lPHYS
+    lZ_Unc = np.array([0.314,0.780,1.100])
 
 
 cZ =  np.array([
@@ -66,21 +101,29 @@ if blind:
     lComb = lPHYS
     lComb_Unc = np.array([0.182,0.452,0.653])
 else:
-    lComb = np.array([16.651, 42.196, 59.204])
-    lComb_Unc = np.array([0.181,0.475,0.667])
+    lComb = np.array([16.724, 42.291, 59.608])
+    lComb_Unc = np.array([0.182,0.477,0.672])
 
 cComb =  np.array([
     [1.00,0.94,0.94],
-    [0.94,1.00,0.99],
-    [0.94,0.99,1.00]
+    [0.94,1.00,0.98],
+    [0.94,0.98,1.00]
 ])
 
 uComb = unc.correlated_values_norm(list(zip(lComb, lComb_Unc)), cComb)
 
+# chi2 value and probability
+chiQua = 1.423
+nDof =  3 
+chiQuaProbability = 70.02 
+
 textsize=15
+offset_top = 0.9
+offset_right = 0.98
+offset_left = 0.1
 
 fig, ax = plt.subplots(1, 4, sharey=True, figsize=(10, 3))
-fig.subplots_adjust(left=0.1, right=0.97, top=0.99, bottom=0.25, wspace=0.0)
+fig.subplots_adjust(left=offset_left, right=offset_right, top=offset_top, bottom=0.25, wspace=0.0)
 
 xZOfffset = 0
 for i in range(3):
@@ -117,11 +160,17 @@ ax[3].errorbar(xx, yy, xerr=xxErr, yerr=yyErr, fmt='.k', ms=8, capsize=3)
 
 
 
-ax[0].text(0.1, 0.85, '2016 postVFP', color='black', transform=ax[0].transAxes, fontsize=textsize)
-ax[1].text(0.1, 0.85, '2017', color='black', transform=ax[1].transAxes, fontsize=textsize)
-ax[2].text(0.1, 0.85, '2018', color='black', transform=ax[2].transAxes, fontsize=textsize)
-ax[3].text(0.1, 0.85, 'Run 2', color='black', transform=ax[3].transAxes, fontsize=textsize)
-ax[3].text(0.6, 0.85, 'CMS', color='black', transform=ax[3].transAxes, fontsize=textsize*1.5, weight='bold')
+ax[0].text(0.075, offset_top - 0.075, '2016 postVFP', color='black', transform=ax[0].transAxes, fontsize=textsize)
+ax[1].text(0.075, offset_top - 0.075, '2017', color='black', transform=ax[1].transAxes, fontsize=textsize)
+ax[2].text(0.075, offset_top - 0.075, '2018', color='black', transform=ax[2].transAxes, fontsize=textsize)
+ax[3].text(0.075, offset_top - 0.075, 'Run 2', color='black', transform=ax[3].transAxes, fontsize=textsize)
+# ax[3].text(offset_right - 0.2, offset_top, 'CMS', color='black', transform=ax[3].transAxes, fontsize=textsize*1.5, weight='bold')
+
+plt.text(offset_left, offset_top, "$\\chi^2$/ndf = "+str(round(chiQua,3))+"/"+str(nDof)+"\ ;\ $p$ = "+str(round(chiQuaProbability,3))+"\\%", 
+    verticalalignment='bottom', color='black', transform=plt.gcf().transFigure, fontsize=textsize)
+# ax[3].text(offset_right - 0.3, offset_top, "\\bf{CMS}", verticalalignment='top', horizontalalignment='right', transform=ax.transAxes, weight="bold")
+plt.text(offset_right, offset_top, "{\\bf{"+"CMS"+"}} {\\emph{"+args.label+"}}", 
+    verticalalignment='bottom', horizontalalignment='right', transform=plt.gcf().transFigure)
 
 
 ax[0].set_ylim(0.5, 4.)
@@ -137,7 +186,7 @@ ax[3].set_xlabel('Luminosity [fb$^{-1}$]', fontsize = textsize)
 
 suffix = "exp" if blind else "obs"
 
-plt.savefig('LumiCombination_{0}.png'.format(suffix))
-plt.savefig('LumiCombination_{0}.pdf'.format(suffix))
+plt.savefig('{0}/LumiCombination_{1}.png'.format(outDir, suffix))
+plt.savefig('{0}/LumiCombination_{1}.pdf'.format(outDir, suffix))
 
 plt.close()
