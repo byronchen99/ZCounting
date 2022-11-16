@@ -12,6 +12,7 @@
 #include "RooHistPdf.h"
 #include "RooKeysPdf.h"
 #include "RooRealVar.h"
+#include "RooConstVar.h"
 
 
 class CSignalModel
@@ -27,6 +28,7 @@ public:
     virtual ~CSignalModel(){ delete model; }
     virtual void Reset() = 0;
 
+    RooRealVar  *mean, *sigma, *alpha; // parameters of resolution function need to be defined here to be able to put an external constraint to it
     RooAbsPdf *model;
 };
 
@@ -36,7 +38,7 @@ public:
     CBreitWigner(RooRealVar &m, const Bool_t pass, const int ibin);
     ~CBreitWigner();
     void Reset();
-    RooRealVar     *mass, *width;
+    RooAbsReal     *mass, *width;
 };
 
 class CBreitWignerConvCrystalBall : public CSignalModel
@@ -45,9 +47,9 @@ public:
     CBreitWignerConvCrystalBall(RooRealVar &m, const Bool_t pass, const int ibin);
     ~CBreitWignerConvCrystalBall();
     void Reset();
-    RooRealVar     *mass, *width;
+    RooAbsReal     *mass, *width;
     RooBreitWigner *bw;
-    RooRealVar     *mean, *sigma, *alpha, *n;
+    RooRealVar     *n;
     RooCBShape     *cb;
 };
 
@@ -57,9 +59,8 @@ public:
     CBreitWignerConvGaussian(RooRealVar &m, const Bool_t pass, const int ibin);
     ~CBreitWignerConvGaussian();
     void Reset();
-    RooRealVar     *mass, *width;
+    RooAbsReal     *mass, *width;
     RooBreitWigner *bw;
-    RooRealVar  *mean, *sigma;
     RooGaussian *gaus;
 
 };
@@ -81,7 +82,6 @@ public:
     CMCTemplateConvGaussian(RooRealVar &m, TH1D* hist, const Bool_t pass, const int ibin, int intOrder=3);
     ~CMCTemplateConvGaussian();
     void Reset();
-    RooRealVar  *mean, *sigma;
     RooGaussian *gaus;
     TH1D        *inHist;
     RooDataHist *dataHist;
@@ -94,7 +94,7 @@ public:
     CMCTemplateConvCrystalBall(RooRealVar &m, TH1D* hist, const Bool_t pass, const int ibin, int intOrder=3);
     ~CMCTemplateConvCrystalBall();
     void Reset();
-    RooRealVar  *mean, *sigma, *alpha, *n;
+    RooRealVar  *n;
     RooCBShape  *cb;
     TH1D        *inHist;
     RooDataHist *dataHist;
@@ -107,7 +107,7 @@ public:
     CMCStackConvGaussian(RooRealVar &m, TH1D* hist_dy, TH1D* hist_tt, const Bool_t pass, const int ibin, int intOrder=3);
     ~CMCStackConvGaussian();
     void Reset(){};
-    RooRealVar  *mean, *sigma, *frac;
+    RooRealVar  *frac;
     RooGaussian *gaus;
     TH1D        *inHist_dy, *inHist_tt;
     RooDataHist *dataHist_dy, *dataHist_tt;
@@ -124,14 +124,18 @@ CBreitWigner::CBreitWigner(RooRealVar &m, const Bool_t pass, const int ibin)
     char vname[50];
 
     sprintf(vname,"sig_mass%s",name);
-    mass = new RooRealVar(vname,vname,91,80,100);
-    mass->setVal(ZMASS);
-    mass->setConstant(kTRUE);
+    mass = new RooConstVar(vname,vname,ZMASS);
+
+    // mass = new RooRealVar(vname,vname,91,80,100);
+    // mass->setVal(ZMASS);
+    // mass->setConstant(kTRUE);
 
     sprintf(vname,"sid_width%s",name);
-    width = new RooRealVar(vname,vname,2.5,0.1,10);
-    width->setVal(ZWIDTH);
-    width->setConstant(kTRUE);
+    width = new RooConstVar(vname,vname,ZWIDTH);
+
+    // width = new RooRealVar(vname,vname,2.5,0.1,10);
+    // width->setVal(ZWIDTH);
+    // width->setConstant(kTRUE);
 
     sprintf(vname,"sig_bw%s",name);
     model = new RooBreitWigner(vname,"BW", m,*mass,*width);
@@ -157,29 +161,33 @@ CBreitWignerConvCrystalBall::CBreitWignerConvCrystalBall(RooRealVar &m, const Bo
     char vname[50];
 
     sprintf(vname,"sig_mass%s",name);
-    mass = new RooRealVar(vname,vname,91,80,100);
-    mass->setVal(ZMASS);
-    mass->setConstant(kTRUE);
+    mass = new RooConstVar(vname,vname,ZMASS);
+
+    // mass = new RooRealVar(vname,vname,91,80,100);
+    // mass->setVal(ZMASS);
+    // mass->setConstant(kTRUE);
 
     sprintf(vname,"sid_width%s",name);
-    width = new RooRealVar(vname,vname,2.5,0.1,10);
-    width->setVal(ZWIDTH);
-    width->setConstant(kTRUE);
+    width = new RooConstVar(vname,vname,ZWIDTH);
+
+    // width = new RooRealVar(vname,vname,2.5,0.1,10);
+    // width->setVal(ZWIDTH);
+    // width->setConstant(kTRUE);
 
     sprintf(vname,"sig_bw%s",name);
     bw = new RooBreitWigner(vname,vname,m,*mass,*width);
 
     sprintf(vname,"sig_mean%s",name);  mean  = new RooRealVar(vname,vname,0,-2.5,2.5);
     sprintf(vname,"sig_sigma%s",name); sigma = new RooRealVar(vname,vname,2,0.1, 5);
-    sprintf(vname,"sig_alpha%s",name); alpha = new RooRealVar(vname,vname,5,0,20);
-    sprintf(vname,"sig_n%s",name);     n     = new RooRealVar(vname,vname,5,0.5,10);
+    sprintf(vname,"sig_alpha%s",name); alpha = new RooRealVar(vname,vname,5,1.0,20);
+    sprintf(vname,"sig_n%s",name);     n     = new RooRealVar(vname,vname,5,1.0,10);
 
 
     sprintf(vname,"sig_cb%s",name);
     cb = new RooCBShape(vname,vname,m,*mean,*sigma,*alpha,*n);
 
     sprintf(vname,"signal%s",name);
-    model = new RooFFTConvPdf(vname,"BW x CB",m,*bw,*cb, 3);
+    model = new RooFFTConvPdf(vname,"BW x CB",m,*bw,*cb, ipOrder);
 }
 
 void CBreitWignerConvCrystalBall::Reset(){
@@ -211,14 +219,18 @@ CBreitWignerConvGaussian::CBreitWignerConvGaussian(RooRealVar &m, const Bool_t p
     char vname[50];
 
     sprintf(vname,"sig_mass%s",name);
-    mass = new RooRealVar(vname,vname,91,80,100);
-    mass->setVal(ZMASS);
-    mass->setConstant(kTRUE);
+    mass = new RooConstVar(vname,vname,ZMASS);
+
+    // mass = new RooRealVar(vname,vname,91,80,100);
+    // mass->setVal(ZMASS);
+    // mass->setConstant(kTRUE);
 
     sprintf(vname,"sid_width%s",name);
-    width = new RooRealVar(vname,vname,2.5,0.1,10);
-    width->setVal(ZWIDTH);
-    width->setConstant(kTRUE);
+    width = new RooConstVar(vname,vname,ZWIDTH);
+
+    // width = new RooRealVar(vname,vname,2.5,0.1,10);
+    // width->setVal(ZWIDTH);
+    // width->setConstant(kTRUE);
 
     sprintf(vname,"sig_bw%s",name);
     bw = new RooBreitWigner(vname,vname,m,*mass,*width);
@@ -228,7 +240,7 @@ CBreitWignerConvGaussian::CBreitWignerConvGaussian(RooRealVar &m, const Bool_t p
     sprintf(vname,"sig_gaus%s",name);  gaus  = new RooGaussian(vname,vname,m,*mean,*sigma);
 
     sprintf(vname,"signal%s",name);
-    model = new RooFFTConvPdf(vname,"BW x Gaus",m,*bw,*gaus, 3);
+    model = new RooFFTConvPdf(vname,"BW x Gaus",m,*bw,*gaus, ipOrder);
 }
 
 void CBreitWignerConvGaussian::Reset(){
@@ -325,8 +337,8 @@ CMCTemplateConvCrystalBall::CMCTemplateConvCrystalBall(RooRealVar &m, TH1D* hist
 
     sprintf(vname,"sig_mean%s",name);  mean  = new RooRealVar(vname,vname,0,-2.5,2.5);
     sprintf(vname,"sig_sigma%s",name); sigma = new RooRealVar(vname,vname,2,0.1, 5);
-    sprintf(vname,"sig_alpha%s",name); alpha = new RooRealVar(vname,vname,5,0,20);
-    sprintf(vname,"sig_n%s",name);     n     = new RooRealVar(vname,vname,5,0.5,10);
+    sprintf(vname,"sig_alpha%s",name); alpha = new RooRealVar(vname,vname,5,1.0,20);
+    sprintf(vname,"sig_n%s",name);     n     = new RooRealVar(vname,vname,5,1.0,10);
 
     sprintf(vname,"sig_cb%s",name);    
     cb = new RooCBShape(vname,vname,m,*mean,*sigma,*alpha,*n);

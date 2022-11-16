@@ -76,32 +76,34 @@ for factor in (0, 1):
     binWidthUp = []
     binWidthDown = []
 
+    altBkgPass = []
+    altBkgFail = []
+
     altSig1eff = [] 
     altSig2eff = []
-    altBkgeff = []
     altSig1yld = [] 
     altSig2yld = []
-    altBkgyld = []
 
     # load alternative infos
-    info_altSig1      = load("/summary_altSigMCxCB/")
-    info_altSig2      = load("/summary_altSigMC/")
-    info_altBkg       = load("/summary_altBkg/")
-    info_lumiUp       = load("/summary_lumi30/")
-    info_lumiDown     = load("/summary_lumi15/")
-    info_massUp       = load("/summary_massUp/")
-    info_massDown     = load("/summary_massDown/")
-    info_binWidthUp   = load("/summary_binWidth1/")
-    info_binWidthDown = load("/summary_binWidth025/")
+    prefix = "summary_V10"
+    info_altSig1      = load(f"/{prefix}_altSigMCxCB/")
+    info_altSig2      = load(f"/{prefix}_altSigMC/")
+    info_altBkg       = load(f"/{prefix}_altBkg/")
+    info_lumiUp       = load(f"/{prefix}_lumi30/")
+    info_lumiDown     = load(f"/{prefix}_lumi15/")
+    info_massUp       = load(f"/{prefix}_mass50to130/")
+    info_massDown     = load(f"/{prefix}_mass70to110/")
+    info_binWidthUp   = load(f"/{prefix}_binWidth1/")
+    info_binWidthDown = load(f"/{prefix}_binWidth025/")
 
     # sortdict = {"2016preVFP":1, "2016postVFP":2, "2016H":3, "2017":4, "2017H":5, "2018":6}
     sortdict = {"2016preVFP":1, "2016postVFP":2, "2017":4, "2017H":5, "2018":6}
     
     items = filter(lambda x: x[0] in sortdict.keys(), info.items())
 
+
     # for alternative signal - only take the effect on the efficiency
     for key, iEra in sorted(items, key=lambda item: sortdict[item[0]]):
-
 
         # for key, iEra in sorted(items, key=lambda item: sortdict[item[0]]):
         # in case of empty info, continue
@@ -158,6 +160,13 @@ for factor in (0, 1):
         prefireECALDown.append((iEra['prefECAL_Down']-iEra['prefECAL_nominal'])/iEra['prefECAL_nominal']
             - factor*(info['2017H']['prefECAL_Down']-info['2017H']['prefECAL_nominal'])/info['2017H']['prefECAL_nominal']
         )
+
+        if info_altBkg:
+            altBkgPass.append((info_altBkg[key]['recZCount_altBkgPass']-iEra['recZCount'])/iEra['recZCount']
+                - factor*(info_altBkg['2017H']['recZCount_altBkgPass']-info['2017H']['recZCount'])/info['2017H']['recZCount'])
+            altBkgFail.append((info_altBkg[key]['recZCount_altBkgFail']-iEra['recZCount'])/iEra['recZCount']
+                - factor*(info_altBkg['2017H']['recZCount_altBkgFail']-info['2017H']['recZCount'])/info['2017H']['recZCount'])        
+
         
         # --- from alternative sources
         for src, arr in (
@@ -172,27 +181,24 @@ for factor in (0, 1):
             (info_binWidthDown, binWidthDown),
         ):
             if src:
-                arr.append((src[key]['recZCount']-info[key]['recZCount'])/info[key]['recZCount']
+                arr.append((src[key]['recZCount']-iEra['recZCount'])/iEra['recZCount']
                 - factor*(src['2017H']['recZCount']-info['2017H']['recZCount'])/info['2017H']['recZCount'])
 
+        # split signal shape variations in sources where inner track and where outer track are varied
         for src, arr1, arr2 in (
             (info_altSig1, altSig1eff, altSig1yld),
             (info_altSig2, altSig2eff, altSig2yld),
-            (info_altBkg, altBkgeff, altBkgyld)
         ):  
-            # sources that are treated uncorrelated between tracking efficiency and other parts
             if src:
                 # only take effect on efficiency
-                alt = info[key]['selZCount'] / src[key]['selZCount'] * src[key]['recZCount']
+                alt = iEra['selZCount'] / src[key]['selZCount'] * src[key]['recZCount']
                 altLow = info['2017H']['selZCount'] / src['2017H']['selZCount'] * src['2017H']['recZCount']
-                arr1.append((alt - info[key]['recZCount'])/info[key]['recZCount']
+                arr1.append((alt - iEra['recZCount'])/iEra['recZCount']
                     - factor*(altLow - info['2017H']['recZCount'])/info['2017H']['recZCount'])
 
                 # only take effect on other parts
-                arr2.append((src[key]['selZCount']-info[key]['selZCount'])/info[key]['selZCount']
+                arr2.append((src[key]['selZCount']-iEra['selZCount'])/iEra['selZCount']
                     - factor*(src['2017H']['selZCount']-info['2017H']['selZCount'])/info['2017H']['selZCount'])
-
-
 
     suffix = "_ratio" if factor==1 else ""
 
@@ -221,31 +227,33 @@ for factor in (0, 1):
         sysUp = [0 for x in stat]
         sysDown = [0 for x in stat]
         for name, values, connector in (
-            ("Correlation \CHLT      ", cHLTUp,          r" & $\pm "),
-            ("Correlation \CID       ", cIDUp,           r" & $\pm "),
-            ("Correlation \CGlo      ", cIOUp,           r" & $\pm "),
-            ("Background subtr.      ", bkgUp,   r" & $\pm "),
-            ("Muon pref. up (stat.)  ", prefireStatUp,   r" & $"),
-            ("Muon pref. down (stat.)", prefireStatDown, r" & $"),
-            ("Muon pref. up (syst.)  ", prefireSystUp,   r" & $"),
-            ("Muon pref. down (syst.)", prefireSystDown, r" & $"),
-            ("ECAL pref. up          ", prefireECALUp,   r" & $"),
-            ("ECAL pref. down        ", prefireECALDown, r" & $"),
-            # ("Alt. sig. model (MCxCB) ", altSig1,          r" & $"),
-            # ("Alt. sig. model (MC)    ", altSig2,          r" & $"),
-            # ("Alt. bkg. model        ", altBkg,          r" & $"),
-            ("Alt. sig. model (MCxCB) - eff ", altSig1eff,          r" & $"),
-            ("Alt. sig. model (MC) - eff    ", altSig2eff,          r" & $"),
-            ("Alt. bkg. model - eff        ", altBkgeff,          r" & $"),
-            ("Alt. sig. model (MCxCB) - yield ", altSig1yld,          r" & $"),
-            ("Alt. sig. model (MC) - yield    ", altSig2yld,          r" & $"),
-            ("Alt. bkg. model - yield        ", altBkgyld,          r" & $"),
-            ("Lumi slice up          ", lumiUp,          r" & $"),
-            ("Lumi slice down        ", lumiDown,        r" & $"),
-            ("Mass range up          ", massUp,        r" & $"),
-            ("Mass range down        ", massDown,      r" & $"),
-            ("Bin width up           ", binWidthUp,      r" & $"),
-            ("Bin width down         ", binWidthDown,    r" & $"),
+            ("Correlation \CHLT       ", cHLTUp,          r" & $\pm "),
+            ("Correlation \CID        ", cIDUp,           r" & $\pm "),
+            ("Correlation \CGlo       ", cIOUp,           r" & $\pm "),
+            ("Background subtr.       ", bkgUp,   r" & $\pm "),
+            ("Muon pref. up (stat.)   ", prefireStatUp,   r" & $"),
+            ("Muon pref. down (stat.) ", prefireStatDown, r" & $"),
+            ("Muon pref. up (syst.)   ", prefireSystUp,   r" & $"),
+            ("Muon pref. down (syst.) ", prefireSystDown, r" & $"),
+            ("ECAL pref. up           ", prefireECALUp,   r" & $"),
+            ("ECAL pref. down         ", prefireECALDown, r" & $"),
+            ("Alt. sig. model (MCxCB) ", altSig1,          r" & $"),
+            ("Alt. sig. model (MC)    ", altSig2,          r" & $"),
+            # ("Alt. bkg. model         ", altBkg,          r" & $"),
+            ("Alt. bkg. model (Pass)  ", altBkgPass,      r" & $"),
+            ("Alt. bkg. model (Fail)  ", altBkgFail,      r" & $"),
+        #    ("Alt. sig. model (MCxCB) - eff ", altSig1eff,          r" & $"),
+        #    ("Alt. sig. model (MC) - eff    ", altSig2eff,          r" & $"),
+        #    ("Alt. bkg. model - eff        ", altBkgeff,          r" & $"),
+        #    ("Alt. sig. model (MCxCB) - yield ", altSig1yld,          r" & $"),
+        #    ("Alt. sig. model (MC) - yield    ", altSig2yld,          r" & $"),
+        #    ("Alt. bkg. model - yield        ", altBkgyld,          r" & $"),
+            ("Lumi slice up           ", lumiUp,          r" & $"),
+            ("Lumi slice down         ", lumiDown,        r" & $"),
+            # ("Mass range up           ", massUp,        r" & $"),
+            # ("Mass range down         ", massDown,      r" & $"),
+            ("Bin width up            ", binWidthUp,      r" & $"),
+            ("Bin width down          ", binWidthDown,    r" & $"),
 
         ):
             if len(values) == 0:

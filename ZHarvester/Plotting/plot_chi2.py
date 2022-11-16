@@ -127,13 +127,18 @@ for category in filter(lambda x: "chi2" in x,data.keys()):
         # + 3 (background model parameters) 
         # + 1 (signal normalization) 
         # + 1 (background normalization) )        
+    elif "TrkPass" in category:
+        ndf = 130 - 5
+    elif "TrkFail" in category:
+        ndf = 130 - 7
     elif "Trk" in category:
         ndf = 260 - 12
+    elif "HLT2" in category or "HLT1" in category:
+        ndf = 120 - 5
     else:
         ndf = 240 - 10
         
-        
-    nBins = 20
+    nBins = 50
     xmin = 0.
     xmax = 2.0*avg_chi2
 

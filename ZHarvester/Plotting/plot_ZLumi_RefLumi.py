@@ -359,7 +359,7 @@ for fill, data_fill in data.groupby("fill"):
             zorder=0)
 
     ax1.errorbar(x, y, xerr=(xDown, xUp), yerr=yErr, 
-        label="Z rate",# measurement",
+        label="Z boson rate",# measurement",
         fmt="ko", ecolor='black', elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
         zorder=1)
 
@@ -422,7 +422,7 @@ for fill, data_fill in data.groupby("fill"):
     ax1.set_ylabel(ylabelLumi)
     ax1.text(0.54, 0.97, "\\bf{CMS}", verticalalignment='top', transform=ax1.transAxes, weight="bold")
     ax1.text(0.65, 0.97, "\\emph{"+args.label+"}", verticalalignment='top', transform=ax1.transAxes,style='italic')        ## DPS Note    
-    ax1.text(0.54, 0.89, f"Fill {fill}", verticalalignment='top', transform=ax1.transAxes)    
+    ax1.text(0.54, 0.87, f"Fill {fill}", verticalalignment='top', transform=ax1.transAxes)    
 
     y = np.array([yy.n for yy in data_fill['zLumiInst_mc'].values])
     yErr = np.array([y.s for y in data_fill['zLumiInst_mc'].values])
@@ -436,7 +436,7 @@ for fill, data_fill in data.groupby("fill"):
 
     ax1.errorbar(xPU, y, #xerr=(xDown, xUp), 
         yerr=yErr, 
-        label="Z rate",
+        label="Z boson rate",
         fmt="ko", ecolor='black', elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
         zorder=1)
 

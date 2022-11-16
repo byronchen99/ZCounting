@@ -126,11 +126,12 @@ def finalizePlot(ax, legend="best", prefix="", cmsTag="", year="", nameTag="", r
 
     ax.text(xT, yT, "\\bf{CMS}", verticalalignment='top', transform=ax.transAxes, weight="bold")
     ax.text(xT+0.11, yT, "\\emph{Simulation}", verticalalignment='top', transform=ax.transAxes,style='italic')
-    ax.text(xT, yT-0.07, "\\emph{Work in progress}", verticalalignment='top', transform=ax.transAxes,style='italic')    
-    ax.text(0.98, yT, yearnames[year[1]], verticalalignment='top', horizontalalignment='right', transform=ax.transAxes)
+    # ax.text(xT, yT-0.07, "\\emph{Work in progress}", verticalalignment='top', transform=ax.transAxes,style='italic')    
+    ax.text(xT, yT-0.07, "\\emph{Preliminary}", verticalalignment='top', transform=ax.transAxes,style='italic')    
+    # ax.text(0.98, yT, yearnames[year[1]], verticalalignment='top', horizontalalignment='right', transform=ax.transAxes)
 
 
-    leg = ax.legend(loc=legend, frameon=True, framealpha=1.0, fancybox=False, edgecolor="black")
+    leg = ax.legend(loc=legend, frameon=True, ncol=2,framealpha=1.0, fancybox=False, edgecolor="black")
     leg.get_frame().set_linewidth(0.8)
 
     ax.set_xlim(rangeX)
@@ -152,10 +153,10 @@ def finalizePlot(ax, legend="best", prefix="", cmsTag="", year="", nameTag="", r
 
 
 for year in [
-   ["2016preVFP","Summer16preVFP"],
-   ["2016postVFP","Summer16postVFP"],
+#    ["2016preVFP","Summer16preVFP"],
+#    ["2016postVFP","Summer16postVFP"],
    ["2017","Fall17"],
-   ["2018","Autumn18"]
+#    ["2018","Autumn18"]
     ]:
         
     if year[0] == "2016preVFP":
@@ -195,7 +196,7 @@ for year in [
         arr_cID = hist2array("cID_I")
 
     # tfile = ROOT.TFile("/afs/desy.de/user/d/dwalter/nfsHome/data/Lumi/V17/TTrees/ZCountingAll-V17_01-{0}-DYJetsToLL_M_50_LO.root".format(year[1]),"READ")
-    tfile = ROOT.TFile("/afs/desy.de/user/d/dwalter/nfsHome/data/Lumi/V17_30/TTrees/ZCountingAll-V17_30-{0}-DYJetsToLL_M_50_LO.root".format(year[1]),"READ")
+    tfile = ROOT.TFile("/afs/desy.de/user/d/dwalter/nfsHome/data/Lumi/V17_31/TTrees/ZCountingAll-V17_31-{0}-DYJetsToLL_M_50_LO.root".format(year[1]),"READ")
     # tfile = ROOT.TFile("/nfs/dust/cms/user/dwalter/CMSSW_10_2_20_UL/src/potato-zcount/zcount/output/ZCountingAll-V17_28-DYFlatV17-d20221031-t141632/ZCountingAll-V17_28-{0}-DYJetsToLL_M_50_LO.root".format(year[1]),"READ")
 
     print("load events in arrays")
@@ -328,7 +329,7 @@ for year in [
     # elif year[1] == "Fall17":
     #     rangeY = [0.98, 1.01]
     # else:
-    rangeY=[0.97,1.0175]
+    rangeY=[0.9875,1.0125]
     
     ax = preparePlot("Measurement / Truth", xVar)
     ax.plot([min(xx), max(xx+widthX)], [1,1], "k--")
@@ -338,7 +339,8 @@ for year in [
     yy0 = np.append(yy0, yy0[-1])
 
     ax.plot(xx0, yy0, 
-        label="$N_\\mathrm{Z}$", drawstyle='steps-post', color=colors[1], zorder=0)                  
+        label="$N_\\mathrm{Z}$", drawstyle='steps-post', color="black", #colors[1],
+        zorder=0)                  
     # ax.plot(xx, df["RZhlt_corr1"].values, label="$N_\\mathrm{Z}\ C_\\mathrm{HLT}$", drawstyle='steps', color=colors[2])    
 
     # do_fits = False
@@ -375,18 +377,18 @@ for year in [
         yy0 = df["RZhlt_corrIO"].apply(lambda x: x.n).values
         yy0 = np.append(yy0, yy0[-1])
 
-        ax.plot(xx0, yy0, 
-            label="$N_\\mathrm{Z}\ C_\\mathrm{IO}^2$", drawstyle='steps-post', 
-            color=colors[2], zorder=1)    
+        # ax.plot(xx0, yy0, 
+        #     label="$N_\\mathrm{Z}\ C_\\mathrm{IO}^2$", drawstyle='steps-post', 
+        #     color=colors[2], zorder=1)    
         
  
         yy0 = df["RZhlt_corrIOandID"].apply(lambda x: x.n).values
         yy0 = np.append(yy0, yy0[-1])
 
-        ax.plot(xx0, yy0, 
-            label="$N_\\mathrm{Z}\ C_\\mathrm{IO}^2 C_\\mathrm{ID}$", 
-            drawstyle='steps-post', 
-            color=colors[3], zorder=1)            
+        # ax.plot(xx0, yy0, 
+        #     label="$N_\\mathrm{Z}\ C_\\mathrm{IO}^2 C_\\mathrm{ID}$", 
+        #     drawstyle='steps-post', 
+        #     color=colors[3], zorder=1)            
 
         xx0 = xx+widthX/2.
         yy0 = df["RZhlt_corrIOandIDandHLT"].apply(lambda x: x.n).values
@@ -394,9 +396,11 @@ for year in [
         xxerr0 = np.ones(len(xx))*widthX/2.
 
         ax.errorbar(xx0, yy0, yerr=yyerr0, xerr=xxerr0,
-            label="$N_\\mathrm{Z}\ C_\\mathrm{IO}^2 C_\\mathrm{ID} C_\\mathrm{HLT}$", 
+            # label="$N_\\mathrm{Z}\ C_\\mathrm{IO}^2 C_\\mathrm{ID} C_\\mathrm{HLT}$", 
+            label="$N_\\mathrm{Z}$ corrected",
             #drawstyle='steps-post', 
-            color=colors[0], linestyle="",marker=".", zorder=2)            
+            color="black", #colors[0], 
+            linestyle="",marker=".", zorder=2)            
 
         # --> Do fit
         print(">>> make fit")
@@ -411,19 +415,20 @@ for year in [
         yFit = np.array([f(x).n for x in xFit])
         yErrFit = np.array([f(x).s for x in xFit])
 
-        ax.plot(xFit, yFit, color=colors[0])   
+        # ax.plot(xFit, yFit, color=colors[0])   
         # <--
 
     else:
         df["RZhlt_corrHLT"] = df["RZhlt"] * df["cHLT"]
 
-        ax.errorbar(xx+widthX/2., df["RZhlt_corrHLT"].apply(lambda x: x.n).values, 
-            yerr=df["RZhlt_corrHLT"].apply(lambda x: x.s).values, xerr=np.ones(len(xx))*widthX/2.,
-            label="$N_\\mathrm{Z}\ C_\\mathrm{HLT}$", 
-            #drawstyle='steps-post', 
-            color=colors[0], linestyle="",marker=".", zorder=2)              
+        # ax.errorbar(xx+widthX/2., df["RZhlt_corrHLT"].apply(lambda x: x.n).values, 
+        #     yerr=df["RZhlt_corrHLT"].apply(lambda x: x.s).values, xerr=np.ones(len(xx))*widthX/2.,
+        #     label="$N_\\mathrm{Z}\ C_\\mathrm{HLT}$", 
+        #     #drawstyle='steps-post', 
+        #     color="black",#colors[0], 
+        #     linestyle="",marker=".", zorder=2)              
 
-    finalizePlot(ax, "lower left", "HLT", region="I", cmsTag="center left", year=year, nameTag="", yRange=rangeY)                
+    finalizePlot(ax, "upper right", "HLT", region="I", cmsTag="center left", year=year, nameTag="", yRange=rangeY)                
         
     # for c, yRangeEff in (
     #     ("HLT", [0.70,1.03]),

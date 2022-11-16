@@ -169,7 +169,7 @@ print("analyze {0} fb^-1 of data (z lumi)".format(data['zLumi'].sum()/1000.))
 print("ratio: z lumi/ ref. lumi = {0}".format(data['zLumi'].sum()/data['weightLumi'].sum()))
 
 print("Outliers:")
-data_out = data.loc[data['zLumi_to_dLRec']-1 > 0.1]
+data_out = data.loc[abs(data['zLumi_to_dLRec']-1) > 0.1]
 print(data_out[["recLumi","run","fill", "measurement","zLumi_to_dLRec","recZCount"]])
 
 def make_hist(
@@ -219,11 +219,11 @@ def make_hist(
 
     # --- make histogram
     # mean and std without outliers
-    # mean = data['lumiratio'][(data['lumiratio']<4.0) & (data['lumiratio']>0.25)].mean()
-    # std = data['lumiratio'][(data['lumiratio']<4.0) & (data['lumiratio']>0.25)].std()
-
-    mean = data['lumiratio'].mean()
-    std = data['lumiratio'].std()
+    mean = data['lumiratio'][(data['lumiratio']<2.0) & (data['lumiratio']>0.5)].mean()
+    std = data['lumiratio'][(data['lumiratio']<2.0) & (data['lumiratio']>0.5)].std()
+    # # mean and std with outliers
+    # mean = data['lumiratio'].mean()
+    # std = data['lumiratio'].std()
 
     width = 3*std
     range = (mean - width, mean + width)
@@ -245,7 +245,7 @@ def make_hist(
             nEntries, bins, _ = ax.hist(xx, bins=nBins, range=range)
             ax.set_ylabel("Number of entries", fontsize=textsize)
         
-        if True:
+        if False:
             # # plot a gaussian function with mean and std from distribution for comparison
 
             hist_integral = sum(nEntries * (bins[1:] - bins[:-1]))
@@ -316,7 +316,7 @@ def make_hist(
                     color="grey", alpha=0.4, hatch='/', zorder=4, #, alpha=0.6
                     label="Ref. luminosity uncertainty")
 
-            ax.scatter(xx, yy, s=data['weightLumi'].values, marker='.', color='green', zorder=1, label="Z rate measurement")
+            ax.scatter(xx, yy, s=data['weightLumi'].values, marker='.', color='green', zorder=1, label="Measurement")
 
             # ww = data['weightLumi'].values,
             # rms = (sum((ww*yy)**2)/sum(ww))**0.5
@@ -404,7 +404,11 @@ def make_hist(
             print("save scatter as {0}".format(outDir+"/scatter_"+suffix+"_"+suffix1+"_"+saveas))
             plt.xticks(fontsize = labelsize)
             plt.yticks(fontsize = labelsize)
-            ax.legend(loc=legend, ncol=2, markerscale=3, scatteryoffsets=[0.5], fontsize=textsize, frameon=True, framealpha=1.0, fancybox=False, edgecolor="black")
+            if "lower" in legend:
+                ncol = 3
+            else:
+                ncol = 2
+            ax.legend(loc=legend, ncol=ncol, markerscale=3, scatteryoffsets=[0.5], fontsize=textsize, frameon=True, framealpha=1.0, fancybox=False, edgecolor="black")
 
             ax.xaxis.set_label_coords(0.5, -0.1)
 
@@ -423,21 +427,21 @@ make_hist(data, saveas="zcount", title="Run\ II")
 # make_hist(data, label="ZCount(EE) / PHYSICS", saveas="zcountEE")
 # # make_hist(data, label="ZCount(I) / PHYSICS", saveas="zcountI")
 
-make_hist(data, run_range=(272007,294645), saveas="2016_zcount", title="2016")#, rangey=[0.7,1.08])
-make_hist(data, run_range=(272007,278769), saveas="2016preVFP_zcount", title="2016\ pre\ VFP", legend="lower left")
-make_hist(data, run_range=(278769,294645), saveas="2016postVFP_zcount", title="2016\ post\ VFP")
+make_hist(data, run_range=(272007,294645), saveas="2016_zcount", title="2016",rangey=[0.92,1.08])#, rangey=[0.7,1.08])
+make_hist(data, run_range=(272007,278769), saveas="2016preVFP_zcount", title="2016\ pre\ VFP",rangey=[0.92,1.08])
+make_hist(data, run_range=(278769,294645), saveas="2016postVFP_zcount", title="2016\ post\ VFP",rangey=[0.92,1.08])
 
 # make_hist(data, run_range=(297046,299329), saveas="2017B_zcount", title="2017 B")#,rangey=[0.85,1.15])
 # make_hist(data, run_range=(303434,304797), saveas="2017E_zcount", title="2017 E")#,rangey=[0.85,1.15])
 # make_hist(data, run_range=(305040,306462), saveas="2017F_zcount", title="2017 F")#,rangey=[0.85,1.15])
 
-make_hist(data, run_range=(297046,306462), saveas="2017_zcount", title="2017")#,rangey=[0.85,1.15])
+make_hist(data, run_range=(297046,306462), saveas="2017_zcount", title="2017",  legend="lower right",rangey=[0.92,1.08])#)
 # make_hist(data, run_range=(297046,306462), label="ZCount(I) / PHYSICS", saveas="2017_zcountI", title="2017")#,rangey=[0.85,1.15])
 # make_hist(data, run_range=(297046,306462), label="ZCount(BB) / PHYSICS", saveas="2017_zcountBB", title="2017")#,rangey=[0.85,1.15])
 # make_hist(data, run_range=(297046,306462), label="ZCount(BE) / PHYSICS", saveas="2017_zcountBE", title="2017")#,rangey=[0.85,1.15])
 # make_hist(data, run_range=(297046,306462), label="ZCount(EE) / PHYSICS", saveas="2017_zcountEE", title="2017")#,rangey=[0.85,1.15])
 # 
-make_hist(data, run_range=(315252,325175), saveas="2018_zcount", title="2018")
+make_hist(data, run_range=(315252,325175), saveas="2018_zcount", title="2018",rangey=[0.92,1.08])
 
 # make_hist(data, saveas="zcount", year="2022")
 

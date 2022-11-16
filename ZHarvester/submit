@@ -228,7 +228,7 @@ if __name__ == '__main__':
         help='specify amount of luminosity per measurement in pb-1'
     )
     parserA.add_argument(
-        '-f','--factorization', default=2, type=int,
+        '-f','--factorization', default=3, type=int,
         help='specify factorization schemes for muon efficiency'
     )
     parserA.add_argument(

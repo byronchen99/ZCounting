@@ -1,6 +1,10 @@
 #!/bin/bash
-export PATH=$HOME/.local/bin:/afs/cern.ch/cms/lumi/brilconda-1.1.7/bin:$PATH
+# export PATH=$HOME/.local/bin:/afs/cern.ch/cms/lumi/brilconda-1.1.7/bin:$PATH
+export PATH=$HOME/.local/bin:/cvmfs/cms-bril.cern.ch/brilconda3/bin:$PATH
 
+# list available normtags with: "briltag listiov"
+
+### Run 32
 #2016
 # brilcalc lumi --begin 272786 --end 284044 -b "STABLE BEAMS" --byls -o ~/FillByLs_2016.csv --hltpath="HLT_Iso*Mu24_v*" --normtag="pcc16PaperV2"
 brilcalc lumi --begin 272786 --end 284044 -b "STABLE BEAMS" --byls -o ~/FillByLs_2016.csv \
@@ -14,6 +18,13 @@ brilcalc lumi --begin 297046 --end 306462 -b "STABLE BEAMS" --byls -o ~/FillByLs
 --normtag=/cvmfs/cms-bril.cern.ch/cms-lumi-pog/Normtags/normtag_PHYSICS.json \
 -i /afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions17/13TeV/Legacy_2017/Cert_294927-306462_13TeV_UL2017_Collisions17_GoldenJSON.txt
 
+#2017 low PU
+# lumi sections from https://github.com/MiT-HEP/MitEwk13TeV/blob/CMSSW_94X/Selection/Cert_306896-307082_13TeV_PromptReco_Collisions17_JSON_LowPU_lowPU.txt
+brilcalc lumi --begin 306929 --end 307082 -b "STABLE BEAMS" --byls -o ~/FillByLs_2017_lowPU.csv \
+--hltpath="HLT_HIMu17_v*" -u /fb \
+--normtag=/cvmfs/cms-bril.cern.ch/cms-lumi-pog/Normtags/normtag_PHYSICS.json \
+-i Cert_306896-307082_13TeV_PromptReco_Collisions17_JSON_LowPU_lowPU.txt
+
 #2018:
 brilcalc lumi --begin 315252 --end 325175 -b "STABLE BEAMS" --byls -o ~/FillByLs_2018.csv \
 --hltpath="HLT_IsoMu24_v*" -u /fb \
@@ -21,12 +32,15 @@ brilcalc lumi --begin 315252 --end 325175 -b "STABLE BEAMS" --byls -o ~/FillByLs
 -i /afs/cern.ch/cms/CAF/CMSCOMM/COMM_DQM/certification/Collisions18/13TeV/Legacy_2018/Cert_314472-325175_13TeV_Legacy2018_Collisions18_JSON.txt
 
 
-#2017 low PU
-# lumi sections from https://github.com/MiT-HEP/MitEwk13TeV/blob/CMSSW_94X/Selection/Cert_306896-307082_13TeV_PromptReco_Collisions17_JSON_LowPU_lowPU.txt
-brilcalc lumi --begin 306929 --end 307082 -b "STABLE BEAMS" --byls -o ~/FillByLs_2017_lowPU.csv \
---hltpath="HLT_HIMu17_v*" -u /fb \
---normtag=/cvmfs/cms-bril.cern.ch/cms-lumi-pog/Normtags/normtag_PHYSICS.json \
--i Cert_306896-307082_13TeV_PromptReco_Collisions17_JSON_LowPU_lowPU.txt
+# New normtag for HFET and HFOC for 2017 and 2018 (see https://indico.cern.ch/event/1001140/contributions/4212474/attachments/2182728/3687512/BRIL_DPG_Feb_2_HF.pdf)
+# In 2017, HFET was default, in 2018, HFOC was default 
+# hfet17New_v0
+# hfoc17New_v0
+# hfet18NEW_v0
+# hfoc18NEW_v0
+
+
+### Run 3
 
 # 2022
 brilcalc lumi --begin 355100 --end 356615 -b "STABLE BEAMS" --byls -u /fb \

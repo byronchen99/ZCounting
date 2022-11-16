@@ -17,7 +17,7 @@ pd.options.mode.chained_assignment = None
 # turn off graphical output on screen
 ROOT.gROOT.SetBatch(True)
 
-def extract_results(directory, m, cIO, cID):
+def extract_results(directory, m, cIO, cID, cHLT=None):
     log.info(" === Extracting fit results in {0} for {1}".format(directory,m))
     
     # helper function to read the workspace for a specific fit
@@ -32,6 +32,17 @@ def extract_results(directory, m, cIO, cID):
         w = f.Get("workspace")
         return f, w
 
+    def open_workspace_yield(filename):
+        f, w = open_workspace("workspace_yield_"+filename)
+        
+        Nsig = w.var("Nsig").getVal()
+        chi2 = w.arg("chi2").getVal()
+        
+        f.Close()
+        f.Delete()
+        w.Delete()
+        return Nsig, chi2
+
     def unorm(value):
         if value > 0:
             return unc.ufloat(value, np.sqrt(value))
@@ -39,169 +50,210 @@ def extract_results(directory, m, cIO, cID):
             return unc.ufloat(value, value)
 
     # --- HLT efficiency and yield
-    f, w = open_workspace("workspace_{0}".format(etaRegionZ))
-    
-    effHLT = w.var("eff").getVal()
-    cHLT = w.arg("c").getVal()
-    NsigHLT = w.var("Nsig").getVal()
-    chi2HLT = w.arg("chi2").getVal()
-    
-    f.Close()
-    f.Delete()
-    w.Delete()
-
-    NsigHLT1 = unorm(2*effHLT*(1-cHLT*effHLT) * NsigHLT)
-    NsigHLT2 = unorm(effHLT**2 * cHLT * NsigHLT)
-    effHLT = (2 * NsigHLT2) / (2 * NsigHLT2 + NsigHLT1)
-
-    res = {
-            "effHLT": effHLT,
-            "NsigHLT1": NsigHLT1,
-            "NsigHLT2": NsigHLT2,
-            "cHLT": cHLT,
-            "cIO": cIO,
-            "chi2HLT": chi2HLT,
-            "cID": cID,
-    }
-
-    if factorization_scheme == 1:
+    if factorization_scheme == 3: 
         # --- For selection (Sel) efficiency        
-        f, w = open_workspace("workspace_Sel_{0}".format(etaRegion))
+        NsigHLT2, chi2HLT2 = open_workspace_yield("HLT_{0}_2".format(etaRegion))
+        NsigHLT1, chi2HLT1 = open_workspace_yield("HLT_{0}_1".format(etaRegion))
+        NsigSelFail, chi2Sel = open_workspace_yield("Sel_{0}_0".format(etaRegion))
+        NsigTrkPass, chi2TrkPass = open_workspace_yield("Trk_{0}_1".format(etaRegion))
+        NsigTrkFail, chi2TrkFail = open_workspace_yield("Trk_{0}_0".format(etaRegion))
+
         
-        effSel = w.var("eff").getVal()
-        NsigSel = w.var("Nsig").getVal()
-        chi2Sel = w.arg("chi2").getVal() 
-
-        f.Close()
-        f.Delete()
-        w.Delete()
-    
-        # --- For global (Glo) efficiency
-        f, w = open_workspace("workspace_Glo_{0}".format(etaRegion))
-     
-        effGlo = w.var("eff").getVal()
-        NsigGlo = w.var("Nsig").getVal()
-        chi2Glo = w.arg("chi2").getVal()
-
-        f.Close()
-        f.Delete()
-        w.Delete()
-
-        # --- For standalone (Sta) efficiency
-        f, w = open_workspace("workspace_Sta_{0}".format(etaRegion))
-
-        effSta = w.var("eff").getVal()
-        NsigSta = w.var("Nsig").getVal()
-        chi2Sta = w.arg("chi2").getVal()
-
-        f.Close()
-        f.Delete()
-        w.Delete()
-
-        # --- Final calculation, poisson uncertainty from counts 
-        NsigSelPass = unorm(NsigSel*effSel)
-        NsigSelFail = unorm(NsigSel*(1-effSel))
-
-        NsigGloPass = unorm(NsigGlo*effGlo)
-        NsigGloFail = unorm(NsigGlo*(1-effGlo))
-
-        NsigStaPass = unorm(NsigSta*effSta)
-        NsigStaFail = unorm(NsigSta*(1-effSta))
-
-        effSel = NsigSelPass / (NsigSelPass + NsigSelFail)
-        effGlo = NsigGloPass / (NsigGloPass + NsigGloFail)
-        effSta = NsigStaPass / (NsigStaPass + NsigStaFail)
-
-        effID = (effSta*effGlo*effSel)**2
-
-        res.update({
-            "effSel": effSel,
-            "effGlo": effGlo,
-            "effSta": effSta,
-            "NsigSelPass": NsigSelPass,
-            "NsigSelFail": NsigSelFail,
-            "NsigGloPass": NsigGloPass,
-            "NsigGloFail": NsigGloFail,
-            "NsigStaPass": NsigStaPass,
-            "NsigStaFail": NsigStaFail,
-            "chi2Sel": chi2Sel,
-            "chi2Glo": chi2Glo,
-            "chi2Sta": chi2Sta,
-        })
-
-    else:
-        # --- For selection (Sel) efficiency        
-        f, w = open_workspace("workspace_yield_Sel_{0}_0".format(etaRegion))
-        
-        NsigSelFail = w.var("Nsig").getVal()
-        chi2Sel = w.arg("chi2").getVal()
-        
-        f.Close()
-        f.Delete()
-        w.Delete()
-
-        # --- For tracking (Trk) efficiency        
-        f, w = open_workspace("workspace_Trk_{0}".format(etaRegion))
-        
-        effTrk = w.var("eff").getVal()
-        NsigTrk = w.var("Nsig").getVal()
-        chi2Trk = w.arg("chi2").getVal()
-
-        f.Close()
-        f.Delete()
-
-        # # --- For corrections of (Trk) efficiency
-        # f, w = open_workspace("workspace_yield_Trk_{0}_2".format(etaRegion))
-
-        # # in this case it is possible that there was no event and the fit was not performed    
-        # if w is None:
-        #     NsigTrkPass2 = 0
-        #     chi2TrkPass2 = -1 
-        # else:
-        #     NsigTrkPass2 = w.var("Nsig").getVal()
-        #     chi2TrkPass2 = w.arg("chi2").getVal() 
-            
-        #     f.Close()
-        #     f.Delete()
-        #     w.Delete()
-
-        # --- Final calculation, poisson uncertainty from counts 
+        NsigHLT2 = unorm(NsigHLT2)
+        NsigHLT1 = unorm(NsigHLT1)
         NsigSelFail = unorm(NsigSelFail)
+        NsigTrkPass = unorm(NsigTrkPass)
+        NsigTrkFail = unorm(NsigTrkFail)
 
-        NsigTrkPass = unorm(NsigTrk*effTrk)
-        NsigTrkFail = unorm(NsigTrk*(1-effTrk))
-
-        # NsigTrkPass2 = unorm(NsigTrkPass2)
-
+        effHLT = (2 * NsigHLT2) / (2 * NsigHLT2 + NsigHLT1)
         effSel = (2 * NsigHLT2 + NsigHLT1) / (2 * NsigHLT2 + NsigHLT1 + NsigSelFail)
-
-        # # tracking efficiency: corrections from fakes
-        # # first order correction
-        # corr1 = NsigTrkPass2 * NsigTrkFail / NsigTrkPass
-        # # second order correction
-        # corr2 = NsigTrkPass2**2 * NsigTrkFail**2 / NsigTrkPass**3
-        # effTrk = (NsigTrkPass + NsigTrkPass2 - corr1 + corr2) / (NsigTrkPass + NsigTrkPass2 + NsigTrkFail)
-
         effTrk = NsigTrkPass / (NsigTrkPass + NsigTrkFail)
-
-
-        res.update({
-            "effSel": effSel,
-            "effTrk": effTrk,
-            "NsigSelFail": NsigSelFail,
-            # "NsigTrkPass2": NsigTrkPass2,
-            "NsigTrkPass": NsigTrkPass,
-            "NsigTrkFail": NsigTrkFail,
-            "chi2Sel": chi2Sel,
-            "chi2Trk": chi2Trk,
-            # "chi2TrkPass2": chi2TrkPass2,
-        })
 
         effID = (effSel*effTrk)**2
 
-    res.update({
-        "recZCount": (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 * cHLT * cID * cIO**2 / effID
-    })
+        res = {
+            "NsigHLT2": NsigHLT2,
+            "NsigHLT1": NsigHLT1,
+            "NsigSelFail": NsigSelFail,
+            "NsigTrkPass": NsigTrkPass,
+            "NsigTrkFail": NsigTrkFail,
+            "effHLT": effHLT,
+            "effSel": effSel,
+            "effTrk": effTrk,
+            "cHLT": cHLT,
+            "cIO": cIO,
+            "cID": cID,
+            "chi2HLT2": chi2HLT2,
+            "chi2HLT1": chi2HLT1,
+            "chi2Sel": chi2Sel,
+            "chi2TrkPass": chi2TrkPass,
+            "chi2TrkFail": chi2TrkFail,
+            "recZCount": (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 * cHLT * cID * cIO**2 / effID
+        }
+    else:
+        f, w = open_workspace("workspace_{0}".format(etaRegionZ))
+        
+        effHLT = w.var("eff").getVal()
+        cHLT = w.arg("c").getVal()
+        NsigHLT = w.var("Nsig").getVal()
+        chi2HLT = w.arg("chi2").getVal()
+        
+        f.Close()
+        f.Delete()
+        w.Delete()
+
+        NsigHLT1 = unorm(2*effHLT*(1-cHLT*effHLT) * NsigHLT)
+        NsigHLT2 = unorm(effHLT**2 * cHLT * NsigHLT)
+        effHLT = (2 * NsigHLT2) / (2 * NsigHLT2 + NsigHLT1)
+
+        res = {
+                "effHLT": effHLT,
+                "NsigHLT1": NsigHLT1,
+                "NsigHLT2": NsigHLT2,
+                "cHLT": cHLT,
+                "cIO": cIO,
+                "chi2HLT": chi2HLT,
+                "cID": cID,
+        }
+
+        if factorization_scheme == 1:
+            # --- For selection (Sel) efficiency        
+            f, w = open_workspace("workspace_Sel_{0}".format(etaRegion))
+            
+            effSel = w.var("eff").getVal()
+            NsigSel = w.var("Nsig").getVal()
+            chi2Sel = w.arg("chi2").getVal() 
+
+            f.Close()
+            f.Delete()
+            w.Delete()
+
+            # --- For global (Glo) efficiency
+            f, w = open_workspace("workspace_Glo_{0}".format(etaRegion))
+            
+            effGlo = w.var("eff").getVal()
+            NsigGlo = w.var("Nsig").getVal()
+            chi2Glo = w.arg("chi2").getVal()
+
+            f.Close()
+            f.Delete()
+            w.Delete()
+
+            # --- For standalone (Sta) efficiency
+            f, w = open_workspace("workspace_Sta_{0}".format(etaRegion))
+
+            effSta = w.var("eff").getVal()
+            NsigSta = w.var("Nsig").getVal()
+            chi2Sta = w.arg("chi2").getVal()
+
+            f.Close()
+            f.Delete()
+            w.Delete()
+
+            # --- Final calculation, poisson uncertainty from counts 
+            NsigSelPass = unorm(NsigSel*effSel)
+            NsigSelFail = unorm(NsigSel*(1-effSel))
+
+            NsigGloPass = unorm(NsigGlo*effGlo)
+            NsigGloFail = unorm(NsigGlo*(1-effGlo))
+
+            NsigStaPass = unorm(NsigSta*effSta)
+            NsigStaFail = unorm(NsigSta*(1-effSta))
+
+            effSel = NsigSelPass / (NsigSelPass + NsigSelFail)
+            effGlo = NsigGloPass / (NsigGloPass + NsigGloFail)
+            effSta = NsigStaPass / (NsigStaPass + NsigStaFail)
+
+            effID = (effSta*effGlo*effSel)**2
+
+            res.update({
+                "effSel": effSel,
+                "effGlo": effGlo,
+                "effSta": effSta,
+                "NsigSelPass": NsigSelPass,
+                "NsigSelFail": NsigSelFail,
+                "NsigGloPass": NsigGloPass,
+                "NsigGloFail": NsigGloFail,
+                "NsigStaPass": NsigStaPass,
+                "NsigStaFail": NsigStaFail,
+                "chi2Sel": chi2Sel,
+                "chi2Glo": chi2Glo,
+                "chi2Sta": chi2Sta,
+            })
+
+        elif factorization_scheme == 2:
+            # --- For selection (Sel) efficiency        
+            f, w = open_workspace("workspace_yield_Sel_{0}_0".format(etaRegion))
+            
+            NsigSelFail = w.var("Nsig").getVal()
+            chi2Sel = w.arg("chi2").getVal()
+            
+            f.Close()
+            f.Delete()
+            w.Delete()
+
+            # --- For tracking (Trk) efficiency        
+            f, w = open_workspace("workspace_Trk_{0}".format(etaRegion))
+            
+            effTrk = w.var("eff").getVal()
+            NsigTrk = w.var("Nsig").getVal()
+            chi2Trk = w.arg("chi2").getVal()
+
+            f.Close()
+            f.Delete()
+
+            # # --- For corrections of (Trk) efficiency
+            # f, w = open_workspace("workspace_yield_Trk_{0}_2".format(etaRegion))
+
+            # # in this case it is possible that there was no event and the fit was not performed    
+            # if w is None:
+            #     NsigTrkPass2 = 0
+            #     chi2TrkPass2 = -1 
+            # else:
+            #     NsigTrkPass2 = w.var("Nsig").getVal()
+            #     chi2TrkPass2 = w.arg("chi2").getVal() 
+                
+            #     f.Close()
+            #     f.Delete()
+            #     w.Delete()
+
+            # --- Final calculation, poisson uncertainty from counts 
+            NsigSelFail = unorm(NsigSelFail)
+
+            NsigTrkPass = unorm(NsigTrk*effTrk)
+            NsigTrkFail = unorm(NsigTrk*(1-effTrk))
+
+            # NsigTrkPass2 = unorm(NsigTrkPass2)
+
+            effSel = (2 * NsigHLT2 + NsigHLT1) / (2 * NsigHLT2 + NsigHLT1 + NsigSelFail)
+
+            # # tracking efficiency: corrections from fakes
+            # # first order correction
+            # corr1 = NsigTrkPass2 * NsigTrkFail / NsigTrkPass
+            # # second order correction
+            # corr2 = NsigTrkPass2**2 * NsigTrkFail**2 / NsigTrkPass**3
+            # effTrk = (NsigTrkPass + NsigTrkPass2 - corr1 + corr2) / (NsigTrkPass + NsigTrkPass2 + NsigTrkFail)
+
+            effTrk = NsigTrkPass / (NsigTrkPass + NsigTrkFail)
+
+
+            res.update({
+                "effSel": effSel,
+                "effTrk": effTrk,
+                "NsigSelFail": NsigSelFail,
+                # "NsigTrkPass2": NsigTrkPass2,
+                "NsigTrkPass": NsigTrkPass,
+                "NsigTrkFail": NsigTrkFail,
+                "chi2Sel": chi2Sel,
+                "chi2Trk": chi2Trk,
+                # "chi2TrkPass2": chi2TrkPass2,
+            })
+
+            effID = (effSel*effTrk)**2
+
+        res.update({
+            "recZCount": (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 * cHLT * cID * cIO**2 / effID
+        })
 
     return res
 
@@ -243,7 +295,7 @@ if __name__ == '__main__':
                         help='specify whether or not to do an inclusive fit of the specified runs')
     parser.add_argument('--collect', default=False, action="store_true",
                         help='specify whether or not to run the fits or just collect the results')
-    parser.add_argument('-f','--factorization', default=2, type=int,
+    parser.add_argument('-f','--factorization', default=3, type=int,
                         help='specify factorization schemes for muon efficiency')
     parser.add_argument("-o", "--dirOut", help="where to store the output files", default="./")
 
@@ -257,12 +309,13 @@ if __name__ == '__main__':
     # implemented so far:
     #    1: eff(Sel|Glo) * eff(Glo|Sta) * eff(Sta|Trk)
     #    2: eff(Sel|Trk) * eff(Trk|Sta)
+    #    3: same as 2 but fit each histogram separately
     factorization_scheme = args.factorization
 
     if factorization_scheme == 1:
         mcCorrelations = "/mcCorrections/InnerOuter_V17_01/"
         prefix_dqm="ZCountingAll-V17_02-"
-    elif factorization_scheme == 2:
+    elif factorization_scheme >= 2:
         mcCorrelations = "/mcCorrections/correlations_V17_31/"
         prefix_dqm="ZCountingAll-V17_31-"
 
@@ -344,7 +397,7 @@ if __name__ == '__main__':
         bkgModelPass = 1    # exp
         bkgModelFail = 6    # RooCMSShape
     elif args.bkgTemplates == "alt" :
-        bkgModelPass = 8    # linear
+        bkgModelPass = 0    # constant
         bkgModelFail = 4    # Das
     elif args.bkgTemplates == "Exp":
         bkgModelFail = 1
@@ -446,7 +499,7 @@ if __name__ == '__main__':
         hStapass = ROOT.TH1D("h_mass_Sta_pass","",MassBin_, MassMin_, MassMax_)
         hStafail = ROOT.TH1D("h_mass_Sta_fail","",MassBin_, MassMin_, MassMax_)
 
-    elif factorization_scheme == 2:
+    elif factorization_scheme >= 2:
         hTrkpass = ROOT.TH1D("h_mass_Trk_pass","",MassBinSta_, MassMinSta_, MassMaxSta_)
         hTrkfail = ROOT.TH1D("h_mass_Trk_fail","",MassBinSta_, MassMinSta_, MassMaxSta_)
 
@@ -506,7 +559,7 @@ if __name__ == '__main__':
             hStapass.SetDirectory(file_)
             hStafail.SetDirectory(file_)
 
-        elif factorization_scheme == 2:
+        elif factorization_scheme >= 2:
             tTrk = file_.Get("Trk")
 
             hTrkpass.SetDirectory(file_)
@@ -559,7 +612,7 @@ if __name__ == '__main__':
                     tSta.Draw("mass>>+h_mass_Sta_pass","pass==1 && lumiBlock=={0} {1}".format(iLS, acceptance))   
                     tSta.Draw("mass>>+h_mass_Sta_fail","pass==0 && lumiBlock=={0} {1}".format(iLS, acceptance))  
 
-                elif factorization_scheme == 2:
+                elif factorization_scheme >= 2:
 
                     tTrk.Draw("mass>>+h_mass_Trk_pass", "pass>=1  && lumiBlock=={0} {1}".format(iLS, acceptanceSta))   
                     tTrk.Draw("mass>>+h_mass_Trk_fail", "pass==0  && lumiBlock=={0} {1}".format(iLS, acceptanceSta))   
@@ -626,9 +679,11 @@ if __name__ == '__main__':
                     
                     ROOT.set_output(outSubDir)
                     ROOT.set_luminosity(recLumi)
-    
-                    ROOT.calculateHLTEfficiencyAndYield(h2HLT, h1HLT, m, etaRegionZ, sigModel, bkgModelPass, sigModel, bkgModelPass, hPV, sigTemplates )
+
+                    cHLT=None # set default
+
                     if factorization_scheme == 1:
+                        ROOT.calculateHLTEfficiencyAndYield(h2HLT, h1HLT, m, etaRegionZ, sigModel, bkgModelPass, sigModel, bkgModelPass, hPV, sigTemplates )
 
                         ROOT.calculateDataEfficiency(hSelpass, hSelfail, m, "Sel",etaRegion, sigModel, bkgModelPass, sigModel, bkgModelFail, 0, sigTemplates )
                         ROOT.set_massRange(MassMinSta_, MassMaxSta_, MassBinSta_)
@@ -637,13 +692,30 @@ if __name__ == '__main__':
                         ROOT.calculateDataEfficiency(hStapass, hStafail, m, "Sta", etaRegion, sigModel, bkgModelPass, sigModel, bkgModelFail, 0, sigTemplates )
                     
                     elif factorization_scheme == 2:
+                        ROOT.calculateHLTEfficiencyAndYield(h2HLT, h1HLT, m, etaRegionZ, sigModel, bkgModelPass, sigModel, bkgModelPass, hPV, sigTemplates )
+
                         ROOT.getZyield(hSelfail, m, "Sel", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, hPV)
 
                         ROOT.set_massRange(MassMinSta_, MassMaxSta_, MassBinSta_)
                         ROOT.calculateDataEfficiency(hTrkpass, hTrkfail, m, "Trk", etaRegion, sigModel, bkgModelPass, sigModel, bkgModelFail, 0, sigTemplates )
-                        
+
                         # if hTrkpass2.Integral() > 0:
                             # ROOT.getZyield(hTrkpass2, m, "Trk", etaRegion, sigModel, bkgModel, 2, sigTemplates, 0)
+
+                        ROOT.set_massRange(MassMin_, MassMax_, MassBin_)
+
+                    elif factorization_scheme == 3:
+                        cHLT = ROOT.extractCorrelation_HLT(sigTemplates, hPV, etaRegionZ)
+
+                        ROOT.getZyield(h2HLT, m, "HLT", etaRegion, sigModel, bkgModelPass, 2, sigTemplates, 0)
+                        ROOT.getZyield(h1HLT, m, "HLT", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
+
+                        ROOT.getZyield(hSelfail, m, "Sel", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, 0)
+
+                        ROOT.set_massRange(MassMinSta_, MassMaxSta_, MassBinSta_)
+
+                        ROOT.getZyield(hTrkpass, m, "Trk", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
+                        ROOT.getZyield(hTrkfail, m, "Trk", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, 0)
 
                         ROOT.set_massRange(MassMin_, MassMax_, MassBin_)
 
@@ -651,10 +723,9 @@ if __name__ == '__main__':
                     os.system("rm {0}/histTemplates_*".format(outSubDir))
 
             cIO = getCorrelation(hPV, mcCorrelations, which="IO")
-
             cID = getCorrelation(hPV, mcCorrelations, which="ID")
 
-            result = extract_results(outSubDir, m, cIO, cID)
+            result = extract_results(outSubDir, m, cIO, cID, cHLT)
             
             if result:              
                 delLumi = df['delivered(/pb)'].sum()
@@ -705,7 +776,7 @@ if __name__ == '__main__':
                 hGlofail.Reset()
                 hStapass.Reset()
                 hStafail.Reset()
-            elif factorization_scheme == 2:
+            elif factorization_scheme >= 2:
                 hTrkpass.Reset()
                 hTrkfail.Reset()
                 # hTrkpass2.Reset()
@@ -723,7 +794,7 @@ if __name__ == '__main__':
             hGlofail.SetDirectory(0)
             hStapass.SetDirectory(0)
             hStafail.SetDirectory(0)
-        elif factorization_scheme == 2:
+        elif factorization_scheme >= 2:
             hTrkpass.SetDirectory(0)
             hTrkfail.SetDirectory(0)  
 

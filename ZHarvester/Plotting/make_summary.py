@@ -16,6 +16,10 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-r","--rates", required=True, nargs='+', help="Nominator csv file with z rates per lumisection")
 parser.add_argument("-x","--xsec",  default=None, type=str,
     help="csv file with z rates per lumisection where xsec should be taken from (e.g. from low pileup run)")
+parser.add_argument("--rnominal",  default=None, nargs='+', type=str,
+    help="Nominator csv file with z rates per lumisection for nominal")
+parser.add_argument("--xnominal",  default=None, type=str,
+    help="csv file with z rates per lumisection where xsec should be taken from (e.g. from low pileup run) for nominal")
 parser.add_argument("-s","--saveDir",  default='./',  type=str, help="give output dir")
 args = parser.parse_args()
 
@@ -51,6 +55,57 @@ else:
     # --- z luminosity
     print("get Z luminosity")
     data = pd.concat([pd.read_csv(csv, sep=',',low_memory=False) for csv in args.rates], ignore_index=True, sort=False)
+
+# --- get nominal Z rates (needed to split uncertainties)
+if args.xnominal:
+    print("get Z cross section")
+    xsec_nominal = pd.read_csv(str(args.xnominal), sep=',',low_memory=False)
+    print("get Z luminosity")
+    nominal = pd.concat([pd.read_csv(csv, sep=',',low_memory=False) for csv in args.rnominal] +[xsec_nominal,], ignore_index=True, sort=False)
+
+    cHLT = nominal['cHLT']
+    cID = nominal['cID']
+    cIO = nominal['cIO']
+
+    nominal['NsigHLT2'] = nominal['NsigHLT2'].apply(lambda x: unc.ufloat_fromstr(x).n)
+    nominal['NsigHLT1'] = nominal['NsigHLT1'].apply(lambda x: unc.ufloat_fromstr(x).n)
+    nominal['NsigSelFail'] = nominal['NsigSelFail'].apply(lambda x: unc.ufloat_fromstr(x).n)
+    nominal['NsigTrkPass'] = nominal['NsigTrkPass'].apply(lambda x: unc.ufloat_fromstr(x).n)
+    nominal['NsigTrkFail'] = nominal['NsigTrkFail'].apply(lambda x: unc.ufloat_fromstr(x).n)
+
+    data['NsigHLT2'] = data['NsigHLT2'].apply(lambda x: unc.ufloat_fromstr(x).n)
+    data['NsigHLT1'] = data['NsigHLT1'].apply(lambda x: unc.ufloat_fromstr(x).n)
+    data['NsigSelFail'] = data['NsigSelFail'].apply(lambda x: unc.ufloat_fromstr(x).n)
+    data['NsigTrkPass'] = data['NsigTrkPass'].apply(lambda x: unc.ufloat_fromstr(x).n)
+    data['NsigTrkFail'] = data['NsigTrkFail'].apply(lambda x: unc.ufloat_fromstr(x).n)    
+
+    # varying the background shapes in the passing categories
+    NsigHLT2 = data['NsigHLT2']
+    NsigHLT1 = data['NsigHLT1']
+    NsigSelFail = nominal['NsigSelFail']
+    NsigTrkPass = data['NsigTrkPass']
+    NsigTrkFail = nominal['NsigTrkFail']
+
+    effSel = (2 * NsigHLT2 + NsigHLT1) / (2 * NsigHLT2 + NsigHLT1 + NsigSelFail)
+    effTrk = NsigTrkPass / (NsigTrkPass + NsigTrkFail)
+    effID = (effSel*effTrk)**2
+
+    data['recZCount_altBkgPass'] = (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 * cHLT * cID * cIO**2 / effID
+
+    # varying the background shapes in the failing categories
+    NsigHLT2 = nominal['NsigHLT2']
+    NsigHLT1 = nominal['NsigHLT1']
+    NsigSelFail = data['NsigSelFail']
+    NsigTrkPass = nominal['NsigTrkPass']
+    NsigTrkFail = data['NsigTrkFail']
+
+    effSel = (2 * NsigHLT2 + NsigHLT1) / (2 * NsigHLT2 + NsigHLT1 + NsigSelFail)
+    effTrk = NsigTrkPass / (NsigTrkPass + NsigTrkFail)
+    effID = (effSel*effTrk)**2
+
+    data['recZCount_altBkgFail'] = (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 * cHLT * cID * cIO**2 / effID
+
+
 
 data['recZCount_err'] = data['recZCount'].apply(lambda x: unc.ufloat_fromstr(x).s)
 data['recZCount'] = data['recZCount'].apply(lambda x: unc.ufloat_fromstr(x).n)
@@ -141,6 +196,11 @@ for lo, hi, era in (
     info[era]['recZCount_cIODown']  = sum(data.loc[loc,'recZCount_cIODown'])
     info[era]['recZCount_cIDUp']    = sum(data.loc[loc,'recZCount_cIDUp'])
     info[era]['recZCount_cIDDown']  = sum(data.loc[loc,'recZCount_cIDDown'])
+
+    if args.xnominal:
+        info[era]['recZCount_altBkgPass']  = sum(data.loc[loc,'recZCount_altBkgPass'])
+        info[era]['recZCount_altBkgFail']  = sum(data.loc[loc,'recZCount_altBkgFail'])
+
 
 
     for var in prefire_variations_Muon:

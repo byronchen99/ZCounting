@@ -216,7 +216,7 @@ def make_plots(df,
         ax1.errorbar(xPoints, 
             data[yAxis].apply(lambda x: x.n).values, 
             data[yAxis].apply(lambda x: x.s).values, 
-            label="Measurements",
+            label="Measurement",
             marker="o", linewidth=0, color=colors[0], ecolor=colors[0], elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
             zorder=1)
 
@@ -299,7 +299,7 @@ def make_plots(df,
     yy0 = np.array([y.n for y in yy0])
 
     print(">>> make fit")
-    func = linear #pol2 #linear #pol2 #quad
+    func = pol2 #linear #pol2 #quad
     popt, pcov = curve_fit(func, xx, yy, sigma=yy_err, absolute_sigma=True)
 
     perr = np.sqrt(np.diag(pcov))
@@ -327,9 +327,9 @@ def make_plots(df,
     ax1.text(0.74, 0.89, year, verticalalignment='top', transform=ax1.transAxes,style='italic')    
 
     nround = 5
-    ax1.text(0.01, 0.97, 
-        f"$f(x) = ({round(params[0].n,nround)} \\pm {round(params[0].s,nround)}) x + {round(params[1].n,nround)} \\pm {round(params[1].s,nround)}$", 
-        verticalalignment='top', transform=ax1.transAxes,style='italic')    
+    #ax1.text(0.01, 0.97, 
+    #    f"$f(x) = ({round(params[0].n,nround)} \\pm {round(params[0].s,nround)}) x + {round(params[1].n,nround)} \\pm {round(params[1].s,nround)}$", 
+    #    verticalalignment='top', transform=ax1.transAxes,style='italic')    
 
     xMin = min(xx_centers) - x_step/2
     xMax = max(xx_centers) + x_step/2
@@ -339,9 +339,9 @@ def make_plots(df,
     yMax = 1.05#max(yy + yy_err)
     yRange = abs(yMax - yMin)    
 
-    p4 = ax1.errorbar(xx, yy0, xerr=xx_err, yerr=yy0_err, label="Measurements uncorrected",
-        marker="o", linewidth=0, color="grey", ecolor="grey", elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
-        zorder=1)
+    #p4 = ax1.errorbar(xx, yy0, xerr=xx_err, yerr=yy0_err, label="Measurements uncorrected",
+    #    marker="o", linewidth=0, color="grey", ecolor="grey", elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
+    #    zorder=1)
     
     p3 = ax1.errorbar(xx, yy, xerr=xx_err, yerr=yy_err, label="Measurements",
         marker="o", linewidth=0, color="black", ecolor="black", elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
@@ -349,14 +349,14 @@ def make_plots(df,
         
     ax1.plot(np.array([xMin-xRange*0.02,xMax+xRange*0.02]),np.array([1.,1.]), "k--", linewidth=1)
     
-    p2 = ax1.plot(xMC, yMC, color=colors[0],linestyle="solid",  label="Linear fit", linewidth=1)
+    p2 = ax1.plot(xMC, yMC, color=colors[0],linestyle="solid",  label="Fit", linewidth=1)
     
     p1 = ax1.fill_between(xMC, yMC - yErrMC, yMC + yErrMC,
                      color='grey', alpha=0.2, zorder=1) 
     p1 = ax1.fill(np.NaN, np.NaN, color='grey', alpha=0.2, linewidth=0.)    
 
-    leg_styles = [p4, p3, (p2[0], p1[0])]
-    leg_labels = ['Measurements uncorrected','Measurements', 'Linear fit']
+    leg_styles = [p3, (p2[0], p1[0])]
+    leg_labels = ['Measurements', 'Fit']
     
     leg = ax1.legend(leg_styles, leg_labels, loc="lower left", ncol=3,
         frameon=True, framealpha=1.0, fancybox=False, edgecolor="black")
