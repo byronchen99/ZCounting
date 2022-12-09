@@ -103,7 +103,7 @@ def make_plots(df,
         x_step = 1
     elif xAxis == 'pileUp':
         xTitle="average number of pileup interactions"
-        x_step = 2
+        x_step = 1
     else:
         xTitle=xAxis
         x_step = 0.2
@@ -321,12 +321,12 @@ def make_plots(df,
     ax1.set_ylabel(yLabel)
     ax1.text(0.74, 0.97, "\\bf{CMS}", verticalalignment='top', transform=ax1.transAxes, weight="bold")
     ax1.text(0.81, 0.97, "\\emph{"+args.label+"}", verticalalignment='top', transform=ax1.transAxes,style='italic')    
-    ax1.text(0.74, 0.89, year, verticalalignment='top', transform=ax1.transAxes,style='italic')    
+    ax1.text(0.74, 0.89, "13.6 TeV (2022)", verticalalignment='top', transform=ax1.transAxes,style='italic')    
 
     nround = 5
-    ax1.text(0.01, 0.97, 
-        f"$f(x) = ({round(params[0].n,nround)} \\pm {round(params[0].s,nround)}) x + {round(params[1].n,nround)} \\pm {round(params[1].s,nround)}$", 
-        verticalalignment='top', transform=ax1.transAxes,style='italic')    
+#    ax1.text(0.01, 0.97, 
+ #       f"$f(x) = ({round(params[0].n,nround)} \\pm {round(params[0].s,nround)}) x + {round(params[1].n,nround)} \\pm {round(params[1].s,nround)}$", 
+  #      verticalalignment='top', transform=ax1.transAxes,style='italic')    
 
     xMin = min(xx_centers) - x_step/2
     xMax = max(xx_centers) + x_step/2
@@ -483,10 +483,17 @@ if year in (2016, 2017, 2018):
     apply_muon_prefire(rates)
     apply_ECAL_prefire(rates)
 
-rates = rates[rates['delZCount'] > 0]
-rates['delZCount'] = rates['delZCount'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
+#rates = rates[rates['delZCount'] > 0]
+#rates['delZCount'] = rates['delZCount'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
 
-rates['xsec'] = rates['delZCount'] / rates['recLumi']
+#rates['xsec'] = rates['delZCount'] / rates['recLumi']
+
+rates['recZCount'] = rates['ZRate'] * rates['timewindow'] * rates['deadtime']
+rates = rates[rates['recZCount'] > 0]
+rates['recZCount'] = rates['recZCount'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
+
+rates['xsec'] = rates['recZCount'] / rates['recLumi']
+
 
 # rates['xsecI_mc'] = rates['xsecI'] * rates['cIO']**2 
 
