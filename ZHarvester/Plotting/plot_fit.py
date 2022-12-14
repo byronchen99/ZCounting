@@ -15,6 +15,7 @@ import matplotlib.ticker as ticker
 
 textsize = 16
 markersize = 4
+fmt='png'
 
 plt.rcParams.update({
     "text.usetex": True,
@@ -133,7 +134,7 @@ elif len(parts) == 3:
 def plot_fill(name, nSig, nBkg, mSig, mBkg, hist, chi2,
     pulls=True, logscale=False, 
     xlabel="mass [GeV]", ylabel="Entries", cmsLabel="Work in progress",
-    energy="13", luminosity=20
+    energy="13.6", luminosity=20
 ):  
     nameparts = name.split("_")
     index_str = nameparts[1]
@@ -193,7 +194,7 @@ def plot_fill(name, nSig, nBkg, mSig, mBkg, hist, chi2,
     ax1.set_ylabel(ylabel)
 
     xpos = 0.03
-    pos = [0.95, 0.86, 0.72, 0.60, 0.48, 0.36]
+    pos = [0.95, 0.86, 0.72, 0.60, 0.48, 0.36, 0.24]
 
     nround = 0
     if nround <= 0:
@@ -203,28 +204,35 @@ def plot_fill(name, nSig, nBkg, mSig, mBkg, hist, chi2,
 
     ax1.text(xpos, pos[0], "\\bf{CMS}", verticalalignment='top', transform=ax1.transAxes, weight="bold")
     ax1.text(xpos+0.11, pos[0], "\\emph{"+cmsLabel+"}", verticalalignment='top', transform=ax1.transAxes,style='italic')
-    ax1.text(xpos, pos[1], "$"+str(luminosity)+"\,\mathrm{pb}^{-1}\ \mathrm{at}\ {"+energy+"}\,\mathrm{TeV}\ ("+str(year)+")$", 
+    ax1.text(xpos, pos[1], "$"+str(luminosity)+"\,\mathrm{pb}^{-1}$", 
+        verticalalignment='top', transform=ax1.transAxes)
+    ax1.text(xpos, pos[2], "${"+energy+"}\,\mathrm{TeV}\ ("+str(year)+")$", 
         verticalalignment='top', transform=ax1.transAxes)
 
-    ax1.text(xpos, pos[2], "$N^\mathrm{sig}_\mathrm{"+index_str+"}$", verticalalignment='top', transform=ax1.transAxes)
-    ax1.text(xpos, pos[3], "$N^\mathrm{bkg}_\mathrm{"+index_str+"}$", verticalalignment='top', transform=ax1.transAxes)    
-    ax1.text(xpos+0.09, pos[2], "$ = "+xround(nSig.getVal())+"\pm"+xround(nSig.getPropagatedError(fitResult))+"$", verticalalignment='top', transform=ax1.transAxes)
-    ax1.text(xpos+0.09, pos[3], "$ = "+xround(nBkg.getVal())+"\pm"+xround(nBkg.getError())+"$", verticalalignment='top', transform=ax1.transAxes)
+    ax1.text(xpos, pos[3], "$N^\mathrm{sig}_\mathrm{"+index_str+"}$", verticalalignment='top', transform=ax1.transAxes)
+    ax1.text(xpos, pos[4], "$N^\mathrm{bkg}_\mathrm{"+index_str+"}$", verticalalignment='top', transform=ax1.transAxes)    
+    ax1.text(xpos+0.09, pos[3], "$ = "+xround(nSig.getVal())+"\pm"+xround(nSig.getPropagatedError(fitResult))+"$", verticalalignment='top', transform=ax1.transAxes)
+    ax1.text(xpos+0.09, pos[4], "$ = "+xround(nBkg.getVal())+"\pm"+xround(nBkg.getError())+"$", verticalalignment='top', transform=ax1.transAxes)
 
     if eff != None:
-        ax1.text(xpos, pos[4], eff_str, verticalalignment='top', transform=ax1.transAxes)
-        ax1.text(xpos+0.09, pos[4], "$ = "+str(round(eff.getVal(),3))+"\pm"+str(round(eff.getError(),3))+"$",verticalalignment='top', transform=ax1.transAxes)
+        ax1.text(xpos, pos[5], eff_str, verticalalignment='top', transform=ax1.transAxes)
+        ax1.text(xpos+0.09, pos[5], "$ = "+str(round(eff.getVal(),3))+"\pm"+str(round(eff.getError(),3))+"$",verticalalignment='top', transform=ax1.transAxes)
     if c != None:
-        ax1.text(xpos, pos[5], "$C$", verticalalignment='top', transform=ax1.transAxes)
-        ax1.text(xpos+0.09, pos[5], "$ = "+str(round(c.getVal(),3))+"$",verticalalignment='top', transform=ax1.transAxes)
+        ax1.text(xpos, pos[6], "$C$", verticalalignment='top', transform=ax1.transAxes)
+        ax1.text(xpos+0.09, pos[6], "$ = "+str(round(c.getVal(),3))+"$",verticalalignment='top', transform=ax1.transAxes)
 
     xpos2 = 0.65
     ax1.text(xpos2, pos[4], category_str, verticalalignment='top', transform=ax1.transAxes)
     ax1.text(xpos2, pos[5], "$\\chi^2/\\mathrm{dof}$", verticalalignment='top', transform=ax1.transAxes)
     ax1.text(xpos2+0.15, pos[5], "$ = "+str(round(chi2,2))+"$",verticalalignment='top', transform=ax1.transAxes)
 
-    ax1.step(xData, fTot, label="Sig. + Bkg.", color="red", zorder=2, where="mid")
-    ax1.step(xData, fBkg, label="Bkg.", color="blue", zorder=1, where="mid")
+    # step histogram
+    #ax1.step(xData, fTot, label="Sig. + Bkg.", color="red", zorder=2, where="mid")
+    #ax1.step(xData, fBkg, label="Bkg.", color="blue", zorder=1, where="mid")
+
+    # smooth function
+    ax1.plot(xData, fTot, label="Sig. + Bkg.", color="red")
+    ax1.plot(xData, fBkg, label="Bkg.", color="lime")
 
     ax1.errorbar(xData, fData, yerr=fDataErr, label="Data", zorder=3,
         fmt="ko", ecolor='black', elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize)
@@ -265,8 +273,8 @@ def plot_fill(name, nSig, nBkg, mSig, mBkg, hist, chi2,
         ax2.yaxis.set_label_coords(-0.12, 0.5)
 
     #ax1.yaxis.set_label_coords(-0.12, 0.5)
-    print("Plot {0}/fit_{1}.pdf".format(args.saveDir, name))
-    plt.savefig(args.saveDir+"/fit_{0}.pdf".format(name))
+    print("Plot {0}/fit_{1}.{2}".format(args.saveDir, name, fmt))
+    plt.savefig(args.saveDir+"/fit_{0}.{1}".format(name, fmt))
     plt.close()
 
 for i in range(len(names)):
