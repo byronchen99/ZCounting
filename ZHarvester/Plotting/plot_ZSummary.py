@@ -114,7 +114,8 @@ if year in (2016, 2017, 2018):
     print("apply prefire corrections - done")
 # <<<---
 
-data['zLumi'] = data['delZCount'] / xsec
+#data['zLumi'] = data['delZCount'] / xsec
+data['zLumi'] = data['ZRate'] * data['timewindow'] * data['deadtime'] / xsec
 
 data['timeDown'] = data['beginTime'].apply(lambda x: to_DateTime(x))
 data['timeUp'] = data['endTime'].apply(lambda x: to_DateTime(x))
@@ -171,14 +172,15 @@ def make_hist(
     zLumi_name = 'zLumi',
     refLumi_name = 'recLumi',    
     sumN=50,    # make averages of sumN measurements
-    label="Z luminosity / Ref. luminosity",
+    label="Z rate / Ref. luminosity",
     saveas="zcount",
     title=None,
     legend='upper right',
     rangey=[0.89,1.11]
 ):
     if year >= 2022:
-        lefttitle = "$\sqrt{s}=13.6\,\mathrm{TeV}$"
+        #lefttitle = "$\sqrt{s}=13.6\,\mathrm{TeV}$"
+        lefttitle = "$13.6\,\mathrm{TeV}$"
     else:
         lefttitle = "$\sqrt{s}=13\,\mathrm{TeV}$"
 
