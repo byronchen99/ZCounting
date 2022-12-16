@@ -17,7 +17,7 @@ pd.options.mode.chained_assignment = None
 # turn off graphical output on screen
 ROOT.gROOT.SetBatch(True)
 
-def extract_results(directory, m, cIO, cID, cHLT=None):
+def extract_results(directory, m, cIO, cID, cHLT, cAcceptance):
     log.info(" === Extracting fit results in {0} for {1}".format(directory,m))
     
     # helper function to read the workspace for a specific fit
@@ -35,7 +35,9 @@ def extract_results(directory, m, cIO, cID, cHLT=None):
     def open_workspace_yield(filename):
         f, w = open_workspace("workspace_yield_"+filename)
         
-        Nsig = w.var("Nsig").getVal()
+        # The number of signal events is capped at 0, the error is capped to be at least sqrt(N)
+        Nsig = max(w.var("Nsig").getVal(), 0)
+        Nsig = unc.ufloat(Nsig, max(w.var("Nsig").getError(), np.sqrt(Nsig)))
         chi2 = w.arg("chi2").getVal()
         
         f.Close()
@@ -43,217 +45,61 @@ def extract_results(directory, m, cIO, cID, cHLT=None):
         w.Delete()
         return Nsig, chi2
 
-    def unorm(value):
-        if value > 0:
-            return unc.ufloat(value, np.sqrt(value))
-        else: 
-            return unc.ufloat(value, value)
+    # --- For identification (ID) efficiency        
+    NsigHLT2, chi2HLT2 = open_workspace_yield("HLT_{0}_2".format(etaRegion))
+    NsigHLT1, chi2HLT1 = open_workspace_yield("HLT_{0}_1".format(etaRegion))
+    NsigIDFail, chi2ID = open_workspace_yield("ID_{0}_0".format(etaRegion))
 
-    # --- HLT efficiency and yield
-    if factorization_scheme == 3: 
-        # --- For selection (Sel) efficiency        
-        NsigHLT2, chi2HLT2 = open_workspace_yield("HLT_{0}_2".format(etaRegion))
-        NsigHLT1, chi2HLT1 = open_workspace_yield("HLT_{0}_1".format(etaRegion))
-        NsigSelFail, chi2Sel = open_workspace_yield("Sel_{0}_0".format(etaRegion))
-        NsigTrkPass, chi2TrkPass = open_workspace_yield("Trk_{0}_1".format(etaRegion))
-        NsigTrkFail, chi2TrkFail = open_workspace_yield("Trk_{0}_0".format(etaRegion))
+    NsigHLT2 = NsigHLT2
+    NsigHLT1 = NsigHLT1
+    NsigIDFail = NsigIDFail
 
-        
-        NsigHLT2 = unorm(NsigHLT2)
-        NsigHLT1 = unorm(NsigHLT1)
-        NsigSelFail = unorm(NsigSelFail)
-        NsigTrkPass = unorm(NsigTrkPass)
-        NsigTrkFail = unorm(NsigTrkFail)
+    effHLT = (2 * NsigHLT2) / (2 * NsigHLT2 + NsigHLT1)
+    effID = (2 * NsigHLT2 + NsigHLT1) / (2 * NsigHLT2 + NsigHLT1 + NsigIDFail)
 
-        effHLT = (2 * NsigHLT2) / (2 * NsigHLT2 + NsigHLT1)
-        effSel = (2 * NsigHLT2 + NsigHLT1) / (2 * NsigHLT2 + NsigHLT1 + NsigSelFail)
-        effTrk = NsigTrkPass / (NsigTrkPass + NsigTrkFail)
+    NsigGloPass, chi2GloPass = open_workspace_yield("Glo_{0}_1".format(etaRegion))
+    NsigGloFail, chi2GloFail = open_workspace_yield("Glo_{0}_0".format(etaRegion))
 
-        effID = (effSel*effTrk)**2
+    NsigStaPass, chi2StaPass = open_workspace_yield("Sta_{0}_1".format(etaRegion))
+    NsigStaFail, chi2StaFail = open_workspace_yield("Sta_{0}_0".format(etaRegion))
 
-        res = {
-            "NsigHLT2": NsigHLT2,
-            "NsigHLT1": NsigHLT1,
-            "NsigSelFail": NsigSelFail,
-            "NsigTrkPass": NsigTrkPass,
-            "NsigTrkFail": NsigTrkFail,
-            "effHLT": effHLT,
-            "effSel": effSel,
-            "effTrk": effTrk,
-            "cHLT": cHLT,
-            "cIO": cIO,
-            "cID": cID,
-            "chi2HLT2": chi2HLT2,
-            "chi2HLT1": chi2HLT1,
-            "chi2Sel": chi2Sel,
-            "chi2TrkPass": chi2TrkPass,
-            "chi2TrkFail": chi2TrkFail,
-            "recZCount": (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 * cHLT * cID * cIO**2 / effID
-        }
-    else:
-        f, w = open_workspace("workspace_{0}".format(etaRegionZ))
-        
-        effHLT = w.var("eff").getVal()
-        cHLT = w.arg("c").getVal()
-        NsigHLT = w.var("Nsig").getVal()
-        chi2HLT = w.arg("chi2").getVal()
-        
-        f.Close()
-        f.Delete()
-        w.Delete()
+    NsigGloPass = NsigGloPass
+    NsigGloFail = NsigGloFail
 
-        NsigHLT1 = unorm(2*effHLT*(1-cHLT*effHLT) * NsigHLT)
-        NsigHLT2 = unorm(effHLT**2 * cHLT * NsigHLT)
-        effHLT = (2 * NsigHLT2) / (2 * NsigHLT2 + NsigHLT1)
+    NsigStaPass = NsigStaPass
+    NsigStaFail = NsigStaFail
 
-        res = {
-                "effHLT": effHLT,
-                "NsigHLT1": NsigHLT1,
-                "NsigHLT2": NsigHLT2,
-                "cHLT": cHLT,
-                "cIO": cIO,
-                "chi2HLT": chi2HLT,
-                "cID": cID,
-        }
+    effGlo = NsigGloPass / (NsigGloPass + NsigGloFail)
+    effSta = NsigStaPass / (NsigStaPass + NsigStaFail)
 
-        if factorization_scheme == 1:
-            # --- For selection (Sel) efficiency        
-            f, w = open_workspace("workspace_Sel_{0}".format(etaRegion))
-            
-            effSel = w.var("eff").getVal()
-            NsigSel = w.var("Nsig").getVal()
-            chi2Sel = w.arg("chi2").getVal() 
+    effMu = effID*effGlo*effSta
 
-            f.Close()
-            f.Delete()
-            w.Delete()
-
-            # --- For global (Glo) efficiency
-            f, w = open_workspace("workspace_Glo_{0}".format(etaRegion))
-            
-            effGlo = w.var("eff").getVal()
-            NsigGlo = w.var("Nsig").getVal()
-            chi2Glo = w.arg("chi2").getVal()
-
-            f.Close()
-            f.Delete()
-            w.Delete()
-
-            # --- For standalone (Sta) efficiency
-            f, w = open_workspace("workspace_Sta_{0}".format(etaRegion))
-
-            effSta = w.var("eff").getVal()
-            NsigSta = w.var("Nsig").getVal()
-            chi2Sta = w.arg("chi2").getVal()
-
-            f.Close()
-            f.Delete()
-            w.Delete()
-
-            # --- Final calculation, poisson uncertainty from counts 
-            NsigSelPass = unorm(NsigSel*effSel)
-            NsigSelFail = unorm(NsigSel*(1-effSel))
-
-            NsigGloPass = unorm(NsigGlo*effGlo)
-            NsigGloFail = unorm(NsigGlo*(1-effGlo))
-
-            NsigStaPass = unorm(NsigSta*effSta)
-            NsigStaFail = unorm(NsigSta*(1-effSta))
-
-            effSel = NsigSelPass / (NsigSelPass + NsigSelFail)
-            effGlo = NsigGloPass / (NsigGloPass + NsigGloFail)
-            effSta = NsigStaPass / (NsigStaPass + NsigStaFail)
-
-            effID = (effSta*effGlo*effSel)**2
-
-            res.update({
-                "effSel": effSel,
-                "effGlo": effGlo,
-                "effSta": effSta,
-                "NsigSelPass": NsigSelPass,
-                "NsigSelFail": NsigSelFail,
-                "NsigGloPass": NsigGloPass,
-                "NsigGloFail": NsigGloFail,
-                "NsigStaPass": NsigStaPass,
-                "NsigStaFail": NsigStaFail,
-                "chi2Sel": chi2Sel,
-                "chi2Glo": chi2Glo,
-                "chi2Sta": chi2Sta,
-            })
-
-        elif factorization_scheme == 2:
-            # --- For selection (Sel) efficiency        
-            f, w = open_workspace("workspace_yield_Sel_{0}_0".format(etaRegion))
-            
-            NsigSelFail = w.var("Nsig").getVal()
-            chi2Sel = w.arg("chi2").getVal()
-            
-            f.Close()
-            f.Delete()
-            w.Delete()
-
-            # --- For tracking (Trk) efficiency        
-            f, w = open_workspace("workspace_Trk_{0}".format(etaRegion))
-            
-            effTrk = w.var("eff").getVal()
-            NsigTrk = w.var("Nsig").getVal()
-            chi2Trk = w.arg("chi2").getVal()
-
-            f.Close()
-            f.Delete()
-
-            # # --- For corrections of (Trk) efficiency
-            # f, w = open_workspace("workspace_yield_Trk_{0}_2".format(etaRegion))
-
-            # # in this case it is possible that there was no event and the fit was not performed    
-            # if w is None:
-            #     NsigTrkPass2 = 0
-            #     chi2TrkPass2 = -1 
-            # else:
-            #     NsigTrkPass2 = w.var("Nsig").getVal()
-            #     chi2TrkPass2 = w.arg("chi2").getVal() 
-                
-            #     f.Close()
-            #     f.Delete()
-            #     w.Delete()
-
-            # --- Final calculation, poisson uncertainty from counts 
-            NsigSelFail = unorm(NsigSelFail)
-
-            NsigTrkPass = unorm(NsigTrk*effTrk)
-            NsigTrkFail = unorm(NsigTrk*(1-effTrk))
-
-            # NsigTrkPass2 = unorm(NsigTrkPass2)
-
-            effSel = (2 * NsigHLT2 + NsigHLT1) / (2 * NsigHLT2 + NsigHLT1 + NsigSelFail)
-
-            # # tracking efficiency: corrections from fakes
-            # # first order correction
-            # corr1 = NsigTrkPass2 * NsigTrkFail / NsigTrkPass
-            # # second order correction
-            # corr2 = NsigTrkPass2**2 * NsigTrkFail**2 / NsigTrkPass**3
-            # effTrk = (NsigTrkPass + NsigTrkPass2 - corr1 + corr2) / (NsigTrkPass + NsigTrkPass2 + NsigTrkFail)
-
-            effTrk = NsigTrkPass / (NsigTrkPass + NsigTrkFail)
-
-
-            res.update({
-                "effSel": effSel,
-                "effTrk": effTrk,
-                "NsigSelFail": NsigSelFail,
-                # "NsigTrkPass2": NsigTrkPass2,
-                "NsigTrkPass": NsigTrkPass,
-                "NsigTrkFail": NsigTrkFail,
-                "chi2Sel": chi2Sel,
-                "chi2Trk": chi2Trk,
-                # "chi2TrkPass2": chi2TrkPass2,
-            })
-
-            effID = (effSel*effTrk)**2
-
-        res.update({
-            "recZCount": (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 * cHLT * cID * cIO**2 / effID
-        })
+    res = {
+        "chi2HLT2": chi2HLT2,
+        "chi2HLT1": chi2HLT1,
+        "chi2ID": chi2ID,
+        "NsigGloPass": NsigGloPass,
+        "NsigGloFail": NsigGloFail,
+        "NsigStaPass": NsigStaPass,
+        "NsigStaFail": NsigStaFail,
+        "effGlo": effGlo,
+        "effSta": effSta,
+        "chi2GloPass": chi2GloPass,
+        "chi2GloFail": chi2GloFail,
+        "chi2StaPass": chi2StaPass,
+        "chi2StaFail": chi2StaFail,
+        "NsigHLT2": NsigHLT2,
+        "NsigHLT1": NsigHLT1,
+        "NsigIDFail": NsigIDFail,
+        "effHLT": effHLT,
+        "effID": effID,
+        "effMu": effMu,
+        "cHLT": cHLT,
+        "cIO": cIO,
+        "cID": cID,
+        "cAcceptance": cAcceptance,
+        "recZCount": (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 / effMu**2 * cHLT * cID * cIO**2 * cAcceptance
+    }
 
     return res
 
@@ -295,8 +141,8 @@ if __name__ == '__main__':
                         help='specify whether or not to do an inclusive fit of the specified runs')
     parser.add_argument('--collect', default=False, action="store_true",
                         help='specify whether or not to run the fits or just collect the results')
-    parser.add_argument('-f','--factorization', default=3, type=int,
-                        help='specify factorization schemes for muon efficiency')
+    parser.add_argument('--mode', default=4, type=int,
+                        help='specify measurement mode')
     parser.add_argument("-o", "--dirOut", help="where to store the output files", default="./")
 
     args = parser.parse_args()
@@ -305,19 +151,16 @@ if __name__ == '__main__':
     else:
         log.basicConfig(format="%(levelname)s: %(message)s", level=log.INFO)
 
-    # factorization schemes for efficiency of muon
-    # implemented so far:
+    # modes implemented so far:
     #    1: eff(Sel|Glo) * eff(Glo|Sta) * eff(Sta|Trk)
     #    2: eff(Sel|Trk) * eff(Trk|Sta)
     #    3: same as 2 but fit each histogram separately
-    factorization_scheme = args.factorization
+    #    4: same as 1 but fit each histogram separately
+    mode = args.mode
 
-    if factorization_scheme == 1:
-        mcCorrelations = "/mcCorrections/InnerOuter_V17_01/"
-        prefix_dqm="ZCountingAll-V17_02-"
-    elif factorization_scheme >= 2:
-        mcCorrelations = "/mcCorrections/correlations_V17_31/"
-        prefix_dqm="ZCountingAll-V17_31-"
+    mcCorrelations = "/mcCorrections/correlations_V17_38/"
+    prefix_dqm="ZCountingInOut-V17_38-"
+
 
     ########################################
     # link to resouces
@@ -375,45 +218,57 @@ if __name__ == '__main__':
     log.info("Lumi per Measurement:    {0}".format(args.LumiPerMeasurement))
     log.info("----------------------------------")
     
-    # signal model
-    if args.sigTemplates == "MCxGauss" or args.sigTemplates == "default":
+    # signal model (or definde additional convolutoin - smearing)
+    if args.sigTemplates == "default":
+        sigModel = 2        # MC, folding with gauss
+        sigModelSta = 2     # MC, folding with gauss
+    elif args.sigTemplates == "Gen":
+        sigModel = 16       # Gen, folding with crystal ball
+        sigModelSta = 2     # MC, folding with gauss
+    elif args.sigTemplates == "MCxGauss":
         sigModel = 2 # MC, folding with gauss
+        sigModelSta = 2     # MC, folding with gauss
     elif args.sigTemplates == "MC":
         sigModel = 4 # MC, no folding
+        sigModelSta = 4     # MC, folding with gauss
     elif args.sigTemplates == "BW":
         sigModel = 3 # BW, no folding
+        sigModelSta = 3     # MC, folding with gauss
     elif args.sigTemplates == "BWxCB":
         sigModel = 1 # BW, folding with crystal ball
+        sigModelSta = 1     # MC, folding with gauss
     elif args.sigTemplates == "BWxGaus":
         sigModel = 5 # BW, folding with gauss
+        sigModelSta = 5     # MC, folding with gauss
     elif args.sigTemplates == "MCxCB":
         sigModel = 6 # MC, folding with crystal ball
+        sigModelSta = 6     # MC, folding with gauss
     else:
         log.warning("signal model {0} unknown! exit()".format(args.sigTemplates))
         exit()
 
     # background model 
     if args.bkgTemplates == "default" :
-        bkgModelPass = 1    # exp
-        bkgModelFail = 6    # RooCMSShape
+        bkgModelSmpl = 1    # exp
+        bkgModelCplx = 6    # RooCMSShape
     elif args.bkgTemplates == "alt" :
-        bkgModelPass = 0    # constant
-        bkgModelFail = 4    # Das
+        bkgModelSmpl = 0    # constant
+        bkgModelCplx = 4    # Das
     elif args.bkgTemplates == "Exp":
-        bkgModelFail = 1
-        bkgModelPass = 1
+        bkgModelCplx = 1
+        bkgModelSmpl = 1
     elif args.bkgTemplates == "Quad":
-        bkgModelFail = 2
-        bkgModelPass = 2
+        bkgModelCplx = 2
+        bkgModelSmpl = 2
     elif args.bkgTemplates == "QuadPlusExp":
-        bkgModelFail = 3
-        bkgModelPass = 3
+        bkgModelCplx = 3
+        bkgModelSmpl = 3
     elif args.bkgTemplates == "Das":
-        bkgModelFail = 4
-        bkgModelPass = 4
+        bkgModelCplx = 4
+        bkgModelSmpl = 4
     elif args.bkgTemplates == "CMSShape":
-        bkgModelFail = 6
-        bkgModelPass = 6
+        bkgModelCplx = 6
+        bkgModelSmpl = 6
     else:
         log.warning("background model {0} unknown! exit()".format(args.bkgTemplates))
         exit()
@@ -424,7 +279,6 @@ if __name__ == '__main__':
     byLS_filelist.sort(key=os.path.getmtime)
     byLS_filename = byLS_filelist[-1]
     log.info(" The brilcalc csv file: " + str(byLS_filename))
-
 
     outDir = args.dirOut if args.dirOut.endswith("/") else args.dirOut+"/"
     if not os.path.isdir(outDir):
@@ -450,6 +304,10 @@ if __name__ == '__main__':
     MassMinSta_ = int(50)
     MassMaxSta_ = int(130)
     MassBinSta_ = int(MassMaxSta_ - MassMinSta_)*2
+
+    # define acceptance cuts
+    acceptance = " && mass>={0} && mass<{1} && ptTag > {2} && ptProbe > {2} && abs(etaTag) < {3} && abs(etaProbe) < {3}".format(MassMin_, MassMax_, args.ptCut, args.etaCut)
+    acceptanceSta = " && mass>={0} && mass<{1} && ptTag > {2} && ptProbe > {2} && abs(etaTag) < {3} && abs(etaProbe) < {3}".format(MassMinSta_, MassMaxSta_, args.ptCut, args.etaCut)
 
     npvBin_ = 75
     npvMin_ = -0.5
@@ -488,18 +346,16 @@ if __name__ == '__main__':
 
     h2HLT = ROOT.TH1D("h_mass_2HLT_Z","",MassBin_, MassMin_, MassMax_)
     h1HLT = ROOT.TH1D("h_mass_1HLT_Z","",MassBin_, MassMin_, MassMax_)
-    hSelfail = ROOT.TH1D("h_mass_Sel_fail","",MassBin_, MassMin_, MassMax_)
+    hIDfail = ROOT.TH1D("h_mass_ID_fail","",MassBin_, MassMin_, MassMax_)
 
-    if factorization_scheme == 1:
-        hSelpass = ROOT.TH1D("h_mass_Sel_pass","",MassBin_, MassMin_, MassMax_)
-
+    if mode in [1,4]:
         hGlopass = ROOT.TH1D("h_mass_Glo_pass","",MassBinSta_, MassMinSta_, MassMaxSta_)
         hGlofail = ROOT.TH1D("h_mass_Glo_fail","",MassBinSta_, MassMinSta_, MassMaxSta_)
 
         hStapass = ROOT.TH1D("h_mass_Sta_pass","",MassBin_, MassMin_, MassMax_)
         hStafail = ROOT.TH1D("h_mass_Sta_fail","",MassBin_, MassMin_, MassMax_)
 
-    elif factorization_scheme >= 2:
+    elif mode in [2,3]:
         hTrkpass = ROOT.TH1D("h_mass_Trk_pass","",MassBinSta_, MassMinSta_, MassMaxSta_)
         hTrkfail = ROOT.TH1D("h_mass_Trk_fail","",MassBinSta_, MassMinSta_, MassMaxSta_)
 
@@ -541,17 +397,16 @@ if __name__ == '__main__':
         hPV.SetDirectory(file_)
         h2HLT.SetDirectory(file_)
         h1HLT.SetDirectory(file_)
-        hSelfail.SetDirectory(file_)
+        hIDfail.SetDirectory(file_)
 
         # trees with muon pairs
+        # dHLT = ROOT.RDataFrame("HLT", file_)
         tHLT = file_.Get("HLT")
-        tSel = file_.Get("Sel")
+        tID = file_.Get("ID")
 
-        if factorization_scheme == 1:
+        if mode in [1,4]:
             tGlo = file_.Get("Glo")
             tSta = file_.Get("Sta")
-
-            hSelpass.SetDirectory(file_)
 
             hGlopass.SetDirectory(file_)
             hGlofail.SetDirectory(file_)
@@ -559,7 +414,7 @@ if __name__ == '__main__':
             hStapass.SetDirectory(file_)
             hStafail.SetDirectory(file_)
 
-        elif factorization_scheme >= 2:
+        elif mode in [2,3]:
             tTrk = file_.Get("Trk")
 
             hTrkpass.SetDirectory(file_)
@@ -586,33 +441,29 @@ if __name__ == '__main__':
             
             ### fill histograms
             file_.cd() # switch to directory where ttrees and histograms are placed
-
-            # define acceptance cuts
-            acceptance = " && mass>={0} && mass<{1} && ptTag > {2} && ptProbe > {2} && abs(etaTag) < {3} && abs(etaProbe) < {3}".format(MassMin_, MassMax_, args.ptCut, args.etaCut)
-            acceptanceSta = " && mass>={0} && mass<{1} && ptTag > {2} && ptProbe > {2} && abs(etaTag) < {3} && abs(etaProbe) < {3}".format(MassMinSta_, MassMaxSta_, args.ptCut, args.etaCut)
-
+                
             log.info(" === Fill histograms for measurement {0} ...".format(m))                        
             for iLS in goodLSlist:
-                    
+                
+                # mask_lumi.append("lumiBlock=={0}".format(iLS))
+
                 tHLT.Draw("nPV>>+h_PV","lumiBlock=={0}".format(iLS))
                 
                 n2Before = h2HLT.Integral()
                 n1Before = h1HLT.Integral()
 
-                tHLT.Draw("mass>>+h_mass_2HLT_Z",   "pass==2  && lumiBlock=={0} {1}".format(iLS, acceptance))
-                tHLT.Draw("mass>>+h_mass_1HLT_Z",   "pass==1  && lumiBlock=={0} {1}".format(iLS, acceptance))
-                tSel.Draw("mass>>+h_mass_Sel_fail", "pass==0  && lumiBlock=={0} {1}".format(iLS, acceptance))
+                tHLT.Draw("mass>>+h_mass_2HLT_Z", "pass==2 && lumiBlock=={0} {1}".format(iLS, acceptance))
+                tHLT.Draw("mass>>+h_mass_1HLT_Z", "pass==1 && lumiBlock=={0} {1}".format(iLS, acceptance))
+                tID.Draw("mass>>+h_mass_ID_fail", "pass==0 && lumiBlock=={0} {1}".format(iLS, acceptance))
                 
-                if factorization_scheme == 1:
-                    tSel.Draw("mass>>+h_mass_Sel_pass", "pass==1  && lumiBlock=={0} {1}".format(iLS, acceptance))
-
+                if mode in [1,4]:
                     tGlo.Draw("mass>>+h_mass_Glo_pass","pass==1 && lumiBlock=={0} {1}".format(iLS, acceptanceSta))                
                     tGlo.Draw("mass>>+h_mass_Glo_fail","pass==0 && lumiBlock=={0} {1}".format(iLS, acceptanceSta))                
  
                     tSta.Draw("mass>>+h_mass_Sta_pass","pass==1 && lumiBlock=={0} {1}".format(iLS, acceptance))   
                     tSta.Draw("mass>>+h_mass_Sta_fail","pass==0 && lumiBlock=={0} {1}".format(iLS, acceptance))  
 
-                elif factorization_scheme >= 2:
+                elif mode in [2,3]:
 
                     tTrk.Draw("mass>>+h_mass_Trk_pass", "pass>=1  && lumiBlock=={0} {1}".format(iLS, acceptanceSta))   
                     tTrk.Draw("mass>>+h_mass_Trk_fail", "pass==0  && lumiBlock=={0} {1}".format(iLS, acceptanceSta))   
@@ -628,6 +479,24 @@ if __name__ == '__main__':
 
                 byLS_m.loc[byLS_m['ls'] == iLS, 'N2HLT'] = n2
                 byLS_m.loc[byLS_m['ls'] == iLS, 'N1HLT'] = n1                    
+
+            # mask_HLT2 = "pass==2 && "+mask_lumi+acceptance
+            # mask_HLT1 = "pass==1 && "+mask_lumi+acceptance
+
+            # dHLT2 = dHLT.Filter("pass==2 && "+mask_lumi+acceptance).AsNumpy(["mass"])
+            # dHLT1 = dHLT.Filter("pass==1 && "+mask_lumi+acceptance).AsNumpy(["mass"])
+
+            # mass = ROOT.RooRealVar("mass", "mass", 60, 120)
+
+            # data = ROOT.RooDataSet.from_numpy({"x": dHLT2}, [mass])
+
+            # read ttree into RooDataSet
+            # m
+            # dHLT2 = dHLT.Filter("pass==2 && "+mask_lumi+acceptance).Take['float']("mass")
+            # dHLT1 = dHLT.Filter("pass==2 && "+mask_lumi+acceptance).Take['float']("mass")
+
+
+
 
             if df is None:
                 df = byLS_m
@@ -682,50 +551,68 @@ if __name__ == '__main__':
 
                     cHLT=None # set default
 
-                    if factorization_scheme == 1:
-                        ROOT.calculateHLTEfficiencyAndYield(h2HLT, h1HLT, m, etaRegionZ, sigModel, bkgModelPass, sigModel, bkgModelPass, hPV, sigTemplates )
+                    hPV.Scale(1./hPV.Integral()) # normalize the primary vertex distribution in data
 
-                        ROOT.calculateDataEfficiency(hSelpass, hSelfail, m, "Sel",etaRegion, sigModel, bkgModelPass, sigModel, bkgModelFail, 0, sigTemplates )
+                    if mode == 1:
+                        ROOT.calculateHLTEfficiencyAndYield(h2HLT, h1HLT, m, etaRegionZ, sigModel, bkgModelSmpl, sigModel, bkgModelSmpl, hPV, sigTemplates )
+
+                        hIDpass = h2HLT.Clone()
+                        hIDpass.Multiply(2)
+                        hIDpass.Add(h1HLT)
+
+                        ROOT.calculateDataEfficiency(hIDpass, hIDfail, m, "ID",etaRegion, sigModel, bkgModelSmpl, sigModel, bkgModelCplx, 0, sigTemplates )
                         ROOT.set_massRange(MassMinSta_, MassMaxSta_, MassBinSta_)
-                        ROOT.calculateDataEfficiency(hGlopass, hGlofail, m, "Glo", etaRegion, sigModel, bkgModelPass, sigModel, bkgModelFail, 0, sigTemplates )
+                        ROOT.calculateDataEfficiency(hGlopass, hGlofail, m, "Glo", etaRegion, sigModel, bkgModelSmpl, sigModel, bkgModelCplx, 0, sigTemplates )
                         ROOT.set_massRange(MassMin_, MassMax_, MassBin_)
-                        ROOT.calculateDataEfficiency(hStapass, hStafail, m, "Sta", etaRegion, sigModel, bkgModelPass, sigModel, bkgModelFail, 0, sigTemplates )
+                        ROOT.calculateDataEfficiency(hStapass, hStafail, m, "Sta", etaRegion, sigModel, bkgModelSmpl, sigModel, bkgModelCplx, 0, sigTemplates )
                     
-                    elif factorization_scheme == 2:
-                        ROOT.calculateHLTEfficiencyAndYield(h2HLT, h1HLT, m, etaRegionZ, sigModel, bkgModelPass, sigModel, bkgModelPass, hPV, sigTemplates )
+                    elif mode == 2:
+                        ROOT.calculateHLTEfficiencyAndYield(h2HLT, h1HLT, m, etaRegionZ, sigModel, bkgModelSmpl, sigModel, bkgModelSmpl, hPV, sigTemplates )
 
-                        ROOT.getZyield(hSelfail, m, "Sel", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, hPV)
+                        ROOT.getZyield(hIDfail, m, "ID", etaRegion, sigModel, bkgModelCplx, 0, sigTemplates, hPV)
 
                         ROOT.set_massRange(MassMinSta_, MassMaxSta_, MassBinSta_)
-                        ROOT.calculateDataEfficiency(hTrkpass, hTrkfail, m, "Trk", etaRegion, sigModel, bkgModelPass, sigModel, bkgModelFail, 0, sigTemplates )
+                        ROOT.calculateDataEfficiency(hTrkpass, hTrkfail, m, "Trk", etaRegion, sigModel, bkgModelSmpl, sigModel, bkgModelCplx, 0, sigTemplates )
 
                         # if hTrkpass2.Integral() > 0:
                             # ROOT.getZyield(hTrkpass2, m, "Trk", etaRegion, sigModel, bkgModel, 2, sigTemplates, 0)
 
                         ROOT.set_massRange(MassMin_, MassMax_, MassBin_)
 
-                    elif factorization_scheme == 3:
-                        cHLT = ROOT.extractCorrelation_HLT(sigTemplates, hPV, etaRegionZ)
+                    elif mode == 3:
+                        ROOT.getZyield(h2HLT, m, "HLT", etaRegion, sigModel, bkgModelSmpl, 2, sigTemplates, 0)
+                        ROOT.getZyield(h1HLT, m, "HLT", etaRegion, sigModel, bkgModelSmpl, 1, sigTemplates, 0)
 
-                        ROOT.getZyield(h2HLT, m, "HLT", etaRegion, sigModel, bkgModelPass, 2, sigTemplates, 0)
-                        ROOT.getZyield(h1HLT, m, "HLT", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
-
-                        ROOT.getZyield(hSelfail, m, "Sel", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, 0)
+                        ROOT.getZyield(hIDfail, m, "ID", etaRegion, sigModel, bkgModelCplx, 0, sigTemplates, 0)
 
                         ROOT.set_massRange(MassMinSta_, MassMaxSta_, MassBinSta_)
 
-                        ROOT.getZyield(hTrkpass, m, "Trk", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
-                        ROOT.getZyield(hTrkfail, m, "Trk", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, 0)
+                        ROOT.getZyield(hTrkpass, m, "Trk", etaRegion, sigModel, bkgModelSmpl, 1, sigTemplates, 0)
+                        ROOT.getZyield(hTrkfail, m, "Trk", etaRegion, sigModel, bkgModelCplx, 0, sigTemplates, 0)
 
                         ROOT.set_massRange(MassMin_, MassMax_, MassBin_)
+                    elif mode == 4:
+                        ROOT.getZyield(h2HLT, m, "HLT", etaRegion, sigModel, bkgModelSmpl, 2, sigTemplates, hPV)
+                        ROOT.getZyield(h1HLT, m, "HLT", etaRegion, sigModel, bkgModelSmpl, 1, sigTemplates, hPV)
+                        ROOT.getZyield(hIDfail, m, "ID", etaRegion, sigModel, bkgModelSmpl, 0, sigTemplates, hPV)
+
+                        ROOT.set_massRange(MassMinSta_, MassMaxSta_, MassBinSta_)
+                        ROOT.getZyield(hGlopass, m, "Glo", etaRegion, sigModelSta, bkgModelSmpl, 1, sigTemplates, 0)
+                        ROOT.getZyield(hGlofail, m, "Glo", etaRegion, sigModelSta, bkgModelCplx, 0, sigTemplates, 0)
+                        ROOT.set_massRange(MassMin_, MassMax_, MassBin_)
+
+                        ROOT.getZyield(hStapass, m, "Sta", etaRegion, sigModel, bkgModelSmpl, 1, sigTemplates, hPV)
+                        ROOT.getZyield(hStafail, m, "Sta", etaRegion, sigModel, bkgModelCplx, 0, sigTemplates, hPV)
 
                     # remove the histogram templates, not needed anymore
                     os.system("rm {0}/histTemplates_*".format(outSubDir))
 
+            cHLT = ROOT.extractCorrelation_HLT(sigTemplates, hPV, etaRegionZ)
+
             cIO = getCorrelation(hPV, mcCorrelations, which="IO")
             cID = getCorrelation(hPV, mcCorrelations, which="ID")
-
-            result = extract_results(outSubDir, m, cIO, cID, cHLT)
+            cAcceptance = getCorrelation(hPV, mcCorrelations, which="Acceptance")
+            result = extract_results(outSubDir, m, cIO, cID, cHLT, cAcceptance)
             
             if result:              
                 delLumi = df['delivered(/pb)'].sum()
@@ -768,15 +655,14 @@ if __name__ == '__main__':
             hPV.Reset() 
             h2HLT.Reset()
             h1HLT.Reset()
-            hSelfail.Reset()
+            hIDfail.Reset()
 
-            if factorization_scheme == 1:
-                hSelpass.Reset()
+            if mode in [1,4]:
                 hGlopass.Reset()
                 hGlofail.Reset()
                 hStapass.Reset()
                 hStafail.Reset()
-            elif factorization_scheme >= 2:
+            elif mode in [2,3]:
                 hTrkpass.Reset()
                 hTrkfail.Reset()
                 # hTrkpass2.Reset()
@@ -786,15 +672,14 @@ if __name__ == '__main__':
         hPV.SetDirectory(0)
         h2HLT.SetDirectory(0)
         h1HLT.SetDirectory(0)
-        hSelfail.SetDirectory(0)
+        hIDfail.SetDirectory(0)
 
-        if factorization_scheme == 1:
-            hSelpass.SetDirectory(0)
+        if mode in [1,4]:
             hGlopass.SetDirectory(0)
             hGlofail.SetDirectory(0)
             hStapass.SetDirectory(0)
             hStafail.SetDirectory(0)
-        elif factorization_scheme >= 2:
+        elif mode in [2,3]:
             hTrkpass.SetDirectory(0)
             hTrkfail.SetDirectory(0)  
 

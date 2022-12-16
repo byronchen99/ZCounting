@@ -20,7 +20,10 @@ parser.add_argument("--rnominal",  default=None, nargs='+', type=str,
     help="Nominator csv file with z rates per lumisection for nominal")
 parser.add_argument("--xnominal",  default=None, type=str,
     help="csv file with z rates per lumisection where xsec should be taken from (e.g. from low pileup run) for nominal")
+parser.add_argument('--mode', default=4, type=int,
+                    help='specify measurement mode')
 parser.add_argument("-s","--saveDir",  default='./',  type=str, help="give output dir")
+
 args = parser.parse_args()
 
 outDir = args.saveDir
@@ -66,45 +69,84 @@ if args.xnominal:
     cHLT = nominal['cHLT']
     cID = nominal['cID']
     cIO = nominal['cIO']
+    cAcceptance = nominal['cAcceptance']
 
     nominal['NsigHLT2'] = nominal['NsigHLT2'].apply(lambda x: unc.ufloat_fromstr(x).n)
     nominal['NsigHLT1'] = nominal['NsigHLT1'].apply(lambda x: unc.ufloat_fromstr(x).n)
-    nominal['NsigSelFail'] = nominal['NsigSelFail'].apply(lambda x: unc.ufloat_fromstr(x).n)
-    nominal['NsigTrkPass'] = nominal['NsigTrkPass'].apply(lambda x: unc.ufloat_fromstr(x).n)
-    nominal['NsigTrkFail'] = nominal['NsigTrkFail'].apply(lambda x: unc.ufloat_fromstr(x).n)
+    nominal['NsigIDFail'] = nominal['NsigIDFail'].apply(lambda x: unc.ufloat_fromstr(x).n)
 
     data['NsigHLT2'] = data['NsigHLT2'].apply(lambda x: unc.ufloat_fromstr(x).n)
     data['NsigHLT1'] = data['NsigHLT1'].apply(lambda x: unc.ufloat_fromstr(x).n)
-    data['NsigSelFail'] = data['NsigSelFail'].apply(lambda x: unc.ufloat_fromstr(x).n)
-    data['NsigTrkPass'] = data['NsigTrkPass'].apply(lambda x: unc.ufloat_fromstr(x).n)
-    data['NsigTrkFail'] = data['NsigTrkFail'].apply(lambda x: unc.ufloat_fromstr(x).n)    
+    data['NsigIDFail'] = data['NsigIDFail'].apply(lambda x: unc.ufloat_fromstr(x).n)  
 
     # varying the background shapes in the passing categories
     NsigHLT2 = data['NsigHLT2']
     NsigHLT1 = data['NsigHLT1']
-    NsigSelFail = nominal['NsigSelFail']
-    NsigTrkPass = data['NsigTrkPass']
-    NsigTrkFail = nominal['NsigTrkFail']
+    NsigIDFail = nominal['NsigIDFail']
 
-    effSel = (2 * NsigHLT2 + NsigHLT1) / (2 * NsigHLT2 + NsigHLT1 + NsigSelFail)
-    effTrk = NsigTrkPass / (NsigTrkPass + NsigTrkFail)
-    effID = (effSel*effTrk)**2
+    effID = (2 * NsigHLT2 + NsigHLT1) / (2 * NsigHLT2 + NsigHLT1 + NsigIDFail)
 
-    data['recZCount_altBkgPass'] = (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 * cHLT * cID * cIO**2 / effID
+    if args.mode in [2,3]:
+        nominal['NsigTrkPass'] = nominal['NsigTrkPass'].apply(lambda x: unc.ufloat_fromstr(x).n)
+        nominal['NsigTrkFail'] = nominal['NsigTrkFail'].apply(lambda x: unc.ufloat_fromstr(x).n)
+        data['NsigTrkPass'] = data['NsigTrkPass'].apply(lambda x: unc.ufloat_fromstr(x).n)
+        data['NsigTrkFail'] = data['NsigTrkFail'].apply(lambda x: unc.ufloat_fromstr(x).n)  
+
+        NsigTrkPass = data['NsigTrkPass']
+        NsigTrkFail = nominal['NsigTrkFail']
+
+        effTrk = NsigTrkPass / (NsigTrkPass + NsigTrkFail)
+
+        effMu = (effID*effTrk)**2
+
+    elif args.mode in [1,4]:
+        nominal['NsigGloPass'] = nominal['NsigGloPass'].apply(lambda x: unc.ufloat_fromstr(x).n)
+        nominal['NsigGloFail'] = nominal['NsigGloFail'].apply(lambda x: unc.ufloat_fromstr(x).n)
+        data['NsigGloPass'] = data['NsigGloPass'].apply(lambda x: unc.ufloat_fromstr(x).n)
+        data['NsigGloFail'] = data['NsigGloFail'].apply(lambda x: unc.ufloat_fromstr(x).n)  
+        nominal['NsigStaPass'] = nominal['NsigStaPass'].apply(lambda x: unc.ufloat_fromstr(x).n)
+        nominal['NsigStaFail'] = nominal['NsigStaFail'].apply(lambda x: unc.ufloat_fromstr(x).n)
+        data['NsigStaPass'] = data['NsigStaPass'].apply(lambda x: unc.ufloat_fromstr(x).n)
+        data['NsigStaFail'] = data['NsigStaFail'].apply(lambda x: unc.ufloat_fromstr(x).n)  
+
+        NsigGloPass = data['NsigGloPass']
+        NsigGloFail = nominal['NsigGloFail']
+        NsigStaPass = data['NsigStaPass']
+        NsigStaFail = nominal['NsigStaFail']
+    
+        effGlo = NsigGloPass / (NsigGloPass + NsigGloFail)
+        effSta = NsigStaPass / (NsigStaPass + NsigStaFail)
+        
+        effMu = (effID*effGlo*effSta)**2
+
+    data['recZCount_altBkgPass'] = (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 * cHLT * cID * cIO**2 * cAcceptance / effMu
 
     # varying the background shapes in the failing categories
     NsigHLT2 = nominal['NsigHLT2']
     NsigHLT1 = nominal['NsigHLT1']
-    NsigSelFail = data['NsigSelFail']
-    NsigTrkPass = nominal['NsigTrkPass']
-    NsigTrkFail = data['NsigTrkFail']
+    NsigIDFail = data['NsigIDFail']
+    effID = (2 * NsigHLT2 + NsigHLT1) / (2 * NsigHLT2 + NsigHLT1 + NsigIDFail)
 
-    effSel = (2 * NsigHLT2 + NsigHLT1) / (2 * NsigHLT2 + NsigHLT1 + NsigSelFail)
-    effTrk = NsigTrkPass / (NsigTrkPass + NsigTrkFail)
-    effID = (effSel*effTrk)**2
+    if args.mode in [2,3]:
+        NsigTrkPass = nominal['NsigTrkPass']
+        NsigTrkFail = data['NsigTrkFail']
 
-    data['recZCount_altBkgFail'] = (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 * cHLT * cID * cIO**2 / effID
+        effTrk = NsigTrkPass / (NsigTrkPass + NsigTrkFail)
+        effMu = (effID*effTrk)**2
 
+    elif args.mode in [1,4]:
+
+        NsigGloPass = nominal['NsigGloPass']
+        NsigGloFail = data['NsigGloFail']
+        NsigStaPass = nominal['NsigStaPass']
+        NsigStaFail = data['NsigStaFail']
+    
+        effGlo = NsigGloPass / (NsigGloPass + NsigGloFail)
+        effSta = NsigStaPass / (NsigStaPass + NsigStaFail)
+
+        effMu = (effID*effGlo*effSta)**2
+
+    data['recZCount_altBkgFail'] = (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 * cHLT * cID * cIO**2 * cAcceptance / effMu
 
 
 data['recZCount_err'] = data['recZCount'].apply(lambda x: unc.ufloat_fromstr(x).s)
@@ -119,9 +161,19 @@ data['recZCount_cIODown'] = data['recZCount'] / (data['cIO']**2) * ((data['cIO']
 data['recZCount_cIDUp'] = data['recZCount'] / data['cID'] * ((data['cID'] - 1)*2.0 + 1)
 data['recZCount_cIDDown'] = data['recZCount'] / data['cID'] * ((data['cID'] - 1)*0.0 + 1)
 
+data['recZCount_cAcceptanceUp'] = data['recZCount'] / data['cAcceptance'] * ((data['cAcceptance'] - 1)*2.0 + 1)
+data['recZCount_cAcceptanceDown'] = data['recZCount'] / data['cAcceptance'] * ((data['cAcceptance'] - 1)*0.0 + 1)
+
 # number of selected Z bosons (before tracking efficiency corrections)
-data['effTrk'] = data['effTrk'].apply(lambda x: unc.ufloat_fromstr(x).n)
-data['selZCount'] = data['recZCount'] * data['effTrk']**2
+if args.mode in [2,3]:
+    data['effTrk'] = data['effTrk'].apply(lambda x: unc.ufloat_fromstr(x).n)
+    data['selZCount'] = data['recZCount'] * data['effTrk']**2
+
+elif args.mode in [1,4]:
+    data['effGlo'] = data['effGlo'].apply(lambda x: unc.ufloat_fromstr(x).n)
+    data['selZCount'] = data['recZCount'] * data['effGlo']**2
+
+
 
 # --->>> prefire corrections
 print("apply muon prefire corrections")
@@ -196,6 +248,8 @@ for lo, hi, era in (
     info[era]['recZCount_cIODown']  = sum(data.loc[loc,'recZCount_cIODown'])
     info[era]['recZCount_cIDUp']    = sum(data.loc[loc,'recZCount_cIDUp'])
     info[era]['recZCount_cIDDown']  = sum(data.loc[loc,'recZCount_cIDDown'])
+    info[era]['recZCount_cAcceptanceUp']    = sum(data.loc[loc,'recZCount_cAcceptanceUp'])
+    info[era]['recZCount_cAcceptanceDown']  = sum(data.loc[loc,'recZCount_cAcceptanceDown'])
 
     if args.xnominal:
         info[era]['recZCount_altBkgPass']  = sum(data.loc[loc,'recZCount_altBkgPass'])

@@ -78,11 +78,12 @@ process.source = cms.Source("PoolSource",
         # "/store/mc/RunIISummer20UL17RECO/DYJetsToLL_M-50_HT-100to200_TuneCP5_PSweights_13TeV-madgraphMLM-pythia8/AODSIM/106X_mc2017_realistic_v6-v1/00000/0C0FD46D-6DAE-6F45-B9F4-129A6ABC69C4.root"
         #'/store/mc/Run3Winter22DR/DYJetsToLL_M-50_TuneCP5_13p6TeV-madgraphMLM-pythia8/AODSIM/FlatPU0to70_122X_mcRun3_2021_realistic_v9_ext1-v2/2520000/002de84f-b906-4509-8cb6-872ee0cf4029.root'
         # 'file:/eos/home-d/dwalter/Lumi/ZCounting_Standalone/CMSSW_12_4_3/src/ZCounting/ZCountAnalyze/002de84f-b906-4509-8cb6-872ee0cf4029.root'
-        'file:/eos/home-d/dwalter/Lumi/ZCounting_Standalone/CMSSW_12_4_3/src/ZCounting/ZCountAnalyze/production/crab3/655c9af9-8470-4625-94c9-24ab6555ffa8.root'
+        'file:/pnfs/desy.de/cms/tier2/store/mc/RunIISummer20UL16RECO/DYJetsToMuMu_H2ErratumFix_TuneCP5_13TeV-powhegMiNNLO-pythia8-photos/AODSIM/106X_mcRun2_asymptotic_v13-v2/2820000/040BB5C6-AF1D-1945-A53F-AC5B13A37D4B.root'
+        # 'file:/nfs/dust/cms/user/dwalter/ZCounting/CMSSW_12_4_9/src/ZCounting/ZCountAnalyze/test/655c9af9-8470-4625-94c9-24ab6555ffa8.root'
     )
 )
 
-genWeights = cms.vint32(1005, 1009, 1004, 1007, 1002, 1003),
+genWeights = cms.vint32(1005, 1009, 1004, 1007, 1002, 1003)
 pdfWeights = cms.vint32(1252, 1354)
 
 if options.year == "2016preVFP":

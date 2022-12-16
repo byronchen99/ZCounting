@@ -151,10 +151,14 @@ void set_energy(Float_t energy_){
     set_lumienergy(luminosity, energy_);
 }
 
-
+//--------------------------------------------------------------------------------------------------
+// generate template for extraction of muon efficiency in barrel (B), endcap (E) or inclusive (I) region
+TFile* generateGenTemplate(
+    const TString mcfilename
+);
 
 //--------------------------------------------------------------------------------------------------
-// generate template for extraction of muon efficiency in barrel or endcap region
+// generate template for extraction of muon efficiency in barrel (B), endcap (E) or inclusive (I) region
 TFile* generateTemplate(
     const TString mcfilename,
     const TString effType,
@@ -162,7 +166,7 @@ TFile* generateTemplate(
 );
 
 //--------------------------------------------------------------------------------------------------
-// generate template for extraction of Z yield in {BB, BE, EE} region
+// generate template for extraction of Z yield in {BB, BE, EE, I} region
 TFile* generateTemplate_ZYield(
 	const TString mcfilename,
 	TH1D          *hPV,
@@ -274,18 +278,80 @@ Int_t set_background_model(
         case 7:
             model = new CQCD(param_mass, hist, pass, ibin);
             return 1;
-        case 8:
-            model = new CLinear(param_mass, pass, ibin);
-            return 2;
     }
     return 0;
+}
+
+//--------------------------------------------------------------------------------------------------
+TFile* generateGenTemplate(
+    const TString mcfilename
+){
+    const TString histfilename = outputDir+"/histTemplates_Gen.root";
+
+
+    // We can use the template from the last slize if it exists
+    TFile *outfile = TFile::Open(histfilename,"READ");
+    if(outfile){
+        cout << "Use existing template "<< endl;
+        return outfile;
+    }
+
+    outfile = TFile::Open(histfilename,"RECREATE");
+
+    cout << "Creating histogram templates... "; cout.flush();
+
+    TFile *infile    = new TFile(mcfilename);
+    TTree *eventTree = (TTree*)infile->Get("Truth");
+
+    Double_t mass, ptTag, etaTag, ptProbe, etaProbe;
+    Double_t wgt;
+    
+    eventTree->SetBranchAddress("massGen",       &mass);
+    eventTree->SetBranchAddress("ptGen1",        &ptTag);
+    eventTree->SetBranchAddress("ptGen2",        &ptProbe);
+    eventTree->SetBranchAddress("etaGen1",       &etaTag);
+    eventTree->SetBranchAddress("etaGen2",       &etaProbe);
+    eventTree->SetBranchAddress("eventWeight",   &wgt);
+
+    TH1D *h_mass = new TH1D("h_mass", "", massBin, massLo, massHi);
+    
+    for(UInt_t ientry=0; ientry<eventTree->GetEntries(); ientry++) {
+        eventTree->GetEntry(ientry);
+
+        if(mass < massLo)  continue;
+        if(mass > massHi)  continue;
+        if(ptTag   < ptCutTag)   continue;
+        if(ptProbe   < ptCutProbe)   continue;
+        if(fabs(etaTag) > etaCutTag) continue;
+        if(fabs(etaProbe) > etaCutProbe) continue;
+
+        h_mass->Fill(mass, wgt);
+    }
+
+    // set negative bin entries to 0
+    for(int i=1; i <= massBin; i++){
+        if(h_mass->GetBinContent(i) < 0.)
+            h_mass->SetBinContent(i, 0.);
+    }
+
+
+    
+    outfile->cd();
+    h_mass->Write();
+    outfile->Write();
+
+    infile->Close();
+    delete infile;
+
+    cout << "Done!" << endl;
+    return outfile;
 }
 
 //--------------------------------------------------------------------------------------------------
 TFile* generateTemplate(
     const TString mcfilename,
     const TString effType,
-    TH1D          *hPV
+    TH1D          *hPV  // primary vertex distribution in data, must be normalized to integral 1
 ){
     const TString histfilename = outputDir+"/histTemplates_"+effType+".root";
 
@@ -307,11 +373,15 @@ TFile* generateTemplate(
 
     TFile *infile    = new TFile(mcfilename);
     TTree *eventTree = (TTree*)infile->Get(effType);
-    TH1D *hPVtemplate = (TH1D*)infile->Get("hPV");
+    TH1D *hPV_scalefactor = 0;
 
     if(hPV){
-        std::cout<<"PV reweighting with <PV> = "<<hPV->GetMean()<<std::endl;       
-        hPV->Divide(hPVtemplate);
+        std::cout<<"PV reweighting with <PV> = "<<hPV->GetMean()<<std::endl;
+
+        TH1D *hPVtemplate = (TH1D*)infile->Get("hPV");  // get primary vertex distribution in MC
+
+        hPV_scalefactor = (TH1D*)hPV->Clone("hPV_scalefactor");
+        hPV_scalefactor->Divide(hPVtemplate);
     }
 
     Double_t mass, ptTag, etaTag, ptProbe, etaProbe;
@@ -349,8 +419,8 @@ TFile* generateTemplate(
         if(fabs(etaTag) > etaCutTag) continue;
         if(fabs(etaProbe) > etaCutProbe) continue;
 
-        if(hPV)
-            wgt *= hPV->GetBinContent(hPV->FindBin(npv));
+        if(hPV_scalefactor)
+            wgt *= hPV_scalefactor->GetBinContent(hPV_scalefactor->FindBin(std::max(1,npv)));
 
         if(fabs(etaProbe) < etaBound){
             if(pass) h_mass_pass_B->Fill(mass, wgt);
@@ -381,6 +451,11 @@ TFile* generateTemplate(
     h_mass_pass_I->Add(h_mass_pass_E);
     h_mass_fail_I->Add(h_mass_fail_E);
     
+    // add passing histograms to failing ones to increase statistics
+    h_mass_fail_B->Add(h_mass_pass_B);
+    h_mass_fail_E->Add(h_mass_pass_E);
+    h_mass_fail_I->Add(h_mass_pass_I);
+
     outfile->cd();
     h_mass_pass_B->Write();
     h_mass_fail_B->Write();
@@ -424,12 +499,16 @@ TFile* generateTemplate_ZYield(
     cout << "Creating histogram templates... "; cout.flush();
 
     TFile *infile    = new TFile(mcfilename);
-    TTree *eventTree = (TTree*)infile->Get("HLT");
-    TH1D *hPVtemplate = (TH1D*)infile->Get("hPV");
-    
+    TTree *eventTree = (TTree*)infile->Get("HLT");    
+    TH1D *hPV_scalefactor = 0;
+
     if(hPV){
-        std::cout<<"PV reweighting with <PV> = "<<hPV->GetMean()<<std::endl;       
-        hPV->Divide(hPVtemplate);
+        std::cout<<"PV reweighting with <PV> = "<<hPV->GetMean()<<std::endl;
+
+        TH1D *hPVtemplate = (TH1D*)infile->Get("hPV");
+
+        hPV_scalefactor = (TH1D*)hPV->Clone("hPV_scalefactor");
+        hPV_scalefactor->Divide(hPVtemplate);
     }
 
     Double_t mass, ptTag, etaTag, ptProbe, etaProbe;
@@ -473,8 +552,8 @@ TFile* generateTemplate_ZYield(
         if(fabs(etaTag) > etaCutTag) continue;
         if(fabs(etaProbe) > etaCutProbe) continue;
 
-        if(hPV)
-            wgt *= hPV->GetBinContent(hPV->FindBin(npv));
+        if(hPV_scalefactor)
+            wgt *= hPV_scalefactor->GetBinContent(hPV_scalefactor->FindBin(std::max(1,npv)));
 
         if(fabs(etaProbe) < etaBound && fabs(etaTag) < etaBound){
             if(pass==2)         h_mass_2hlt_BB->Fill(mass, wgt);
@@ -999,7 +1078,7 @@ Double_t make_plot(
 void getZyield(
     TH1D*          h_yield,         // Histogram with signal and background contribution
     const Int_t    iBin,            // Label of measurement in currect run
-    const TString  effType="HLT",   // {Trk, Sta, Glo, Sel, HLT}
+    const TString  effType="HLT",   // {Trk, Sta, Glo, Sel, ID, HLT}
     const TString  etaRegion="",    // {B, E, BB, BE, EE or I}
     const Int_t    sigMod=1,
     const Int_t    bkgMod=6,
@@ -1030,7 +1109,11 @@ void getZyield(
     TFile *histfile = 0;
     TH1D *h=0;
     if(sigMod%2 == 0) {
-        if(effType == "HLT"){
+        if(sigMod > 10){
+            histfile = generateGenTemplate(mcfilename);
+            h = (TH1D*)histfile->Get("h_mass");
+        }
+        else if(effType == "HLT"){
             histfile = generateTemplate_ZYield(mcfilename, hPV, iBin);
             if(passRegion==2)
                 h = (TH1D*)histfile->Get("h_mass_2hlt_"+etaRegion);
@@ -1050,32 +1133,33 @@ void getZyield(
         assert(h);
     }
 
-    nfl += set_signal_model(sigMod, sigModel, m, passRegion, effType == "Sta" ? 1 : 0, h);
-    nfl += set_background_model(bkgMod, bkgModel, m, passRegion, effType == "Sta" ? 1 : 0);
+    nfl += set_signal_model(sigMod%10, sigModel, m, passRegion, 0, h);
+    nfl += set_background_model(bkgMod, bkgModel, m, passRegion, 0);
     
     // ---> Add constraint terms
-
-
     RooArgSet *constraints = new RooArgSet("constraints");
     RooGaussian *constraint_sig_mean = 0;
     RooGaussian *constraint_sig_sigma = 0;
     RooGaussian *constraint_sig_alpha = 0;
-    if(sigMod == 1 || sigMod == 2 || sigMod == 5 || sigMod == 6){
-        std::cout<<">>> set constraints on signal model parameters "<< std::endl; 
-        // Construct Gaussian constraints p.d.f on signal model
-        constraint_sig_mean = new RooGaussian("constraint_sig_mean","constraint signal mean", *sigModel->mean, RooFit::RooConst(0.), RooFit::RooConst(1.0));
-        constraint_sig_sigma = new RooGaussian("constraint_sig_sigma","constraint signal sigma", *sigModel->sigma, 
-            effType == "Trk" ? RooFit::RooConst(2.5) : RooFit::RooConst(0.5), 
-            effType == "Trk" ? RooFit::RooConst(1.0) : RooFit::RooConst(0.5));
+    if(sigMod%10 == 1 || sigMod%10 == 2 || sigMod%10 == 5 || sigMod%10 == 6){
 
-        constraints->add(*constraint_sig_mean);
-        constraints->add(*constraint_sig_sigma);
+        if(effType == "Trk" || effType == "Glo"){
+            std::cout<<">>> set constraints on signal model parameters "<< std::endl; 
+            // in case of probes with outer track parameters the fit can be unstable, in particular for failing probes,
+            // in these cases, constraints are used to stabalize the fit
+            // Construct Gaussian constraints p.d.f on signal model
+            constraint_sig_mean = new RooGaussian("constraint_sig_mean","constraint signal mean", *sigModel->mean, RooFit::RooConst(0.), RooFit::RooConst(1.0));
+            constraint_sig_sigma = new RooGaussian("constraint_sig_sigma","constraint signal sigma", *sigModel->sigma, RooFit::RooConst(2.5), RooFit::RooConst(1.5));
+            
+            constraints->add(*constraint_sig_mean);
+            constraints->add(*constraint_sig_sigma);
 
-        if(sigMod == 1 || sigMod == 5){
-            constraint_sig_alpha = new RooGaussian("constraint_sig_alpha","constraint signal alpha", *sigModel->alpha, RooFit::RooConst(5.), RooFit::RooConst(3.0));
-            constraints->add(*constraint_sig_alpha);
+            // Constraint on CB parameter
+            if(sigMod%10 == 1 || sigMod%10 == 5){
+                constraint_sig_alpha = new RooGaussian("constraint_sig_alpha","constraint signal alpha", *sigModel->alpha, RooFit::RooConst(5.), RooFit::RooConst(3.0));
+                constraints->add(*constraint_sig_alpha);
+            }
         }
-        
     }
 
     RooGaussian *constraint_alpha = 0;
@@ -1083,6 +1167,8 @@ void getZyield(
     RooGaussian *constraint_gamma = 0;
     if(bkgMod == 6){
         std::cout<<">>> set constraints on signal model parameters "<< std::endl; 
+        // Contraints are used for the RooCMSShape 
+
         constraint_alpha = new RooGaussian("constraint_alpha","constraint alpha", *bkgModel->alpha, RooFit::RooConst(50.), RooFit::RooConst(20.0));
         constraint_beta = new RooGaussian("constraint_beta","constraint beta", *bkgModel->beta, RooFit::RooConst(0.05), RooFit::RooConst(0.05));
         constraint_gamma = new RooGaussian("constraint_gamma","constraint gamma", *bkgModel->gamma, RooFit::RooConst(0.05), RooFit::RooConst(0.05));
@@ -1091,17 +1177,6 @@ void getZyield(
         constraints->add(*constraint_beta);
         constraints->add(*constraint_gamma);
     }
-    
-    // if (constraint_mean!=nullptr && constraint_alpha!=nullptr){
-    //     constraints = new RooArgSet(*constraint_mean, *constraint_sigma, *constraint_alpha, *constraint_beta, *constraint_gamma);
-    // }
-    // else if (constraint_mean!=nullptr){
-    //     constraints = new RooArgSet(*constraint_mean, *constraint_srooigma);
-    // }
-    // else if (constraint_alpha!=nullptr){
-    //     constraints = new RooArgSet(*constraint_alpha, *constraint_beta, *constraint_gamma);
-    // }
-
     // <---
 
     RooDataHist *data = new RooDataHist("ZReco","ZReco",RooArgList(m), h_yield);
@@ -1113,7 +1188,7 @@ void getZyield(
         NsigInit = passRegion ? NsigMax*0.995 : NsigMax*0.95;
         NbkgInit = passRegion ? 0.005 : NsigMax*0.05;
     }
-    else if(effType == "Sel"){
+    else if(effType == "Sel" || effType == "ID"){
         NsigInit = passRegion ? NsigMax*0.99 : NsigMax*0.90;
         NbkgInit = passRegion ? 0.01 : NsigMax*0.1;    
     }
@@ -1199,8 +1274,10 @@ void getZyield(
                 RooFit::PrintLevel(-1),
                 RooFit::Warnings(0),
                 RooFit::Strategy(2), // MINOS STRATEGY
+                (constraints != nullptr) ? RooFit::ExternalConstraints(*constraints) : RooCmdArg::none(),
                 // RooFit::IntegrateBins(integrateBinsPrecision),
-                RooFit::Minimizer(minimizer));
+                RooFit::Minimizer(minimizer)
+                );
         }
 
         if(attempt > 0){
@@ -1217,7 +1294,8 @@ void getZyield(
                 (constraints != nullptr) ? RooFit::ExternalConstraints(*constraints) : RooCmdArg::none(),
                 RooFit::Strategy(2), // MINOS STRATEGY
                 // RooFit::IntegrateBins(integrateBinsPrecision),
-                RooFit::Minimizer(minimizer));
+                RooFit::Minimizer(minimizer)
+                );
 
             // bkgModel->Print();
             // bkgModel->freeze_all_parameters(0);
@@ -1232,8 +1310,9 @@ void getZyield(
             (constraints != nullptr) ? RooFit::ExternalConstraints(*constraints) : RooCmdArg::none(),
             // RooFit::IntegrateBins(integrateBinsPrecision),
             RooFit::Minimizer(minimizer),
-            //RooFit::Minos(RooArgSet()),
-            RooFit::Save());
+            // RooFit::Minos(RooArgSet()),
+            RooFit::Save()
+            );
 
         RooChi2Var chi2Var("chi2", "chi 2", modelPdf, *data,
             RooFit::DataError(RooAbsData::Expected) //use Expected contribution from model PDF to calculate uncertainty

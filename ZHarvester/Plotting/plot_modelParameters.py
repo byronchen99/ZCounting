@@ -41,72 +41,6 @@ inputDir = args.input
 etaRegion = "I"
 etaRegionZ = "I"
 
-# sig_mean_1_HLT = []
-# sig_sigma_1_HLT = []
-# sig_mean_2_HLT = []
-# sig_sigma_2_HLT = []
-
-# # alias: variable name
-# vars = {
-#     "sig_mean_HLT_1":       "sig_meanPass_1",
-#     "sig_sigma_HLT_1":      "sig_sigmaPass_1",
-#     "sig_mean_HLT_2":       "sig_meanPass_2",
-#     "sig_sigma_HLT_2":      "sig_sigmaPass_2",
-#     # "bkg_alpha_HLT_1":      "bkg_alphaPass_1",
-#     # "bkg_beta_HLT_1":       "bkg_betaPass_1",
-#     # "bkg_gamma_HLT_1":      "bkg_gammaPass_1",
-#     # "bkg_alpha_HLT_2":      "bkg_alphaPass_2",
-#     # "bkg_beta_HLT_2":       "bkg_betaPass_2",
-#     # "bkg_gamma_HLT_2":      "bkg_gammaPass_2",
-#     "bkg_t1_HLT_1":      "bkg_t1Pass_1",
-#     "bkg_t1_HLT_2":      "bkg_t1Pass_2",
-#     # "sig_meanPass_Sel":     "sig_meanPass_0",
-#     # "sig_sigmaPass_Sel":    "sig_sigmaPass_0",
-#     "sig_meanFail_Sel":     "sig_meanFail_0",
-#     "sig_sigmaFail_Sel":    "sig_sigmaFail_0",
-#     # "bkg_alphaPass_Sel":      "bkg_alphaPass_0",
-#     # "bkg_betaPass_Sel":       "bkg_betaPass_0",
-#     # "bkg_gammaPass_Sel":      "bkg_gammaPass_0",
-#     "bkg_alphaFail_Sel":      "bkg_alphaFail_0",
-#     "bkg_betaFail_Sel":       "bkg_betaFail_0",
-#     "bkg_gammaFail_Sel":      "bkg_gammaFail_0",    
-#     # "sig_meanPass_Glo":     "sig_meanPass_0",
-#     # "sig_sigmaPass_Glo":    "sig_sigmaPass_0",
-#     # "sig_meanFail_Glo":     "sig_meanFail_0",
-#     # "sig_sigmaFail_Glo":    "sig_sigmaFail_0",
-#     # "bkg_alphaPass_Glo":      "bkg_alphaPass_0",
-#     # "bkg_betaPass_Glo":       "bkg_betaPass_0",
-#     # "bkg_gammaPass_Glo":      "bkg_gammaPass_0",
-#     # "bkg_alphaFail_Glo":      "bkg_alphaFail_0",
-#     # "bkg_betaFail_Glo":       "bkg_betaFail_0",
-#     # "bkg_gammaFail_Glo":      "bkg_gammaFail_0",    
-#     # "sig_meanPass_Sta":     "sig_meanPass_0",
-#     # "sig_sigmaPass_Sta":    "sig_sigmaPass_0",
-#     # "sig_meanFail_Sta":     "sig_meanFail_0",
-#     # "sig_sigmaFail_Sta" :   "sig_sigmaFail_0",
-#     # "bkg_alphaPass_Sta":      "bkg_alphaPass_0",
-#     # "bkg_betaPass_Sta":       "bkg_betaPass_0",
-#     # "bkg_gammaPass_Sta":      "bkg_gammaPass_0",
-#     # "bkg_alphaFail_Sta":      "bkg_alphaFail_0",
-#     # "bkg_betaFail_Sta":       "bkg_betaFail_0",
-#     # "bkg_gammaFail_Sta":      "bkg_gammaFail_0",
-#     "sig_meanPass_Trk":     "sig_meanPass_0",
-#     "sig_sigmaPass_Trk":    "sig_sigmaPass_0",
-#     "sig_meanFail_Trk":     "sig_meanFail_0",
-#     "sig_sigmaFail_Trk" :   "sig_sigmaFail_0",
-#     # "bkg_alphaPass_Trk":      "bkg_alphaPass_0",
-#     # "bkg_betaPass_Trk":       "bkg_betaPass_0",
-#     # "bkg_gammaPass_Trk":      "bkg_gammaPass_0",
-#     "bkg_t1Pass_Trk":      "bkg_t1Pass_0",
-#     "bkg_alphaFail_Trk":      "bkg_alphaFail_0",
-#     "bkg_betaFail_Trk":       "bkg_betaFail_0",
-#     "bkg_gammaFail_Trk":      "bkg_gammaFail_0",
-#     # "sig_mean_Trk_2":       "sig_meanPass_0",
-#     # "sig_sigma_Trk_2":      "sig_sigmaPass_0",
-#     # "bkg_alpha_Trk_2":      "bkg_alphaPass_0",
-#     # "bkg_beta_Trk_2":       "bkg_betaPass_0",
-#     # "bkg_gamma_Trk_2":      "bkg_gammaPass_0",
-# }
 
 xlabels = {
     "mean" : "mean",
@@ -149,6 +83,7 @@ def plot_variable(key, xx, era="RunII"):
     ax = fig.add_subplot(111)
 
     fig.subplots_adjust(hspace=0.0, left=0.13, right=0.98, top=0.99, bottom=0.13)
+    
 
     if len(key.split("_")) > 2:
         var_name = key.split("_")[-1].split("Fail")[0].split("Pass")[0]
@@ -156,6 +91,10 @@ def plot_variable(key, xx, era="RunII"):
         labelname = key.split("_")[0]
         if "Fail" in key:
             labelname += " Fail"
+        elif "HLT_1" in key:
+            labelname += " 1"
+        elif "HLT_2" in key:
+            labelname += " 2"
         elif "Pass" in key:
             labelname += " Pass"
 
@@ -186,9 +125,12 @@ def plot_variable(key, xx, era="RunII"):
     plt.savefig("{0}/fits_{1}_{2}.pdf".format(outDir, key, era))
     plt.close()
 
+
 if args.input.endswith("json"):
     with open(args.input, "r") as file_info:
         info = json.load(file_info)
+
+    iEra = args.input.split(".")[-2].split("_")[-1]
 
     for key, var in info.items():
         
@@ -196,28 +138,26 @@ if args.input.endswith("json"):
         if len(xx) == 0:
             continue
         
-        plot_variable(key, xx)
+        plot_variable(key, xx, era=iEra)
 
 
     exit()
 
 for iEra, run_lo, run_hi in (
-#    ("2016preVFP", 272007, 278808),
-#    ("2016postVFP", 278809, 294645),
+    ("2016preVFP", 272007, 278808),
+    ("2016postVFP", 278809, 294645),
     ("2017", 297020, 306925),
 #    ("2017H", 306926, 307083),
-#    ("2018", 315252, 325273),
+    ("2018", 315252, 325273),
     # ("2022", 355100, 999999),
 ):
     print("Now at era {0}".format(iEra))
 
     # set empty lists
     info = {}
-    # for var in vars:
-    #     info[var] = []
 
     for var in ("covQual", "statusHesse", "statusMinos", "statusMinuit"):
-        for eff in ("HLT", "Sel", "Trk"):
+        for eff in ("HLT", "ID", "Glo", "Sta"):
             for ipass in [0, 1, 2]:
 
                 if eff == "HLT":
@@ -239,6 +179,7 @@ for iEra, run_lo, run_hi in (
         if run == 275310:
             continue
         print("Now at Run {0}".format(run))
+
         # # from HLT efficiency and yield fits
         # for file_m in glob.glob(dir_run+"/workspace_{0}_*.root".format(etaRegionZ)):
         #     f = ROOT.TFile(file_m,"READ")
@@ -279,8 +220,8 @@ for iEra, run_lo, run_hi in (
         #         w.Delete()
         #         r.Delete()
 
-        # from yield fits
-        for eff in ["Trk","Sel","HLT"]: #["Trk_{0}_2".format(etaRegion), "Sel_{0}".format(etaRegion),]: 
+        # from fits of single histograms
+        for eff in ["HLT","ID","Glo","Sta"]: 
             for ipass in [0, 1, 2]:
 
                 if eff == "HLT":
@@ -311,19 +252,6 @@ for iEra, run_lo, run_hi in (
                         else:
                             info[key].append(p.getVal())
 
-                        # var.getVal()
-                    # for var in workspace.allVars():
-                    #     if var
-
-                    # for key, var in filter(lambda x: x[0].endswith(vareff), vars.items()):
-                    #     info[key].append(w.var(var).getVal())
-
-                    # if "Trk" in eff:
-                    #     f.Close()
-                    #     f.Delete()
-                    #     w.Delete()
-                    #     continue
-                        
                     # check fit result for fit quality
                     r = f.Get("fitResult")
                     info[f"{eff}_{pass_key}_covQual"].append(r.covQual())

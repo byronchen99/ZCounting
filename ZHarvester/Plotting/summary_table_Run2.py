@@ -49,6 +49,8 @@ for factor in (0, 1):
     cIDDown = []            # pileup dependent di-muon ID MC correction
     cIOUp = []              # pileup dependent muon inner/outer track MC correction
     cIODown = []            # pileup dependent muon inner/outer track MC correction
+    cAcceptanceUp = []      # pileup dependent MC correction for bias due to kinematic selection of tracks, including the correction to parton level
+    cAcceptanceDown = []    # pileup dependent MC correction for bias due to kinematic selection of tracks, including the correction to parton level
     prefireStatUp = []
     prefireStatDown = []
     prefireSystUp = []
@@ -66,6 +68,7 @@ for factor in (0, 1):
         return info
         
     # ---  variations from alternative fits
+    altSigGen = []
     altSig1 = [] 
     altSig2 = []
     altBkg = []
@@ -85,7 +88,8 @@ for factor in (0, 1):
     altSig2yld = []
 
     # load alternative infos
-    prefix = "summary_V10"
+    prefix = "summary"
+    info_altSigGen    = load(f"/{prefix}_altSigGen/")
     info_altSig1      = load(f"/{prefix}_altSigMCxCB/")
     info_altSig2      = load(f"/{prefix}_altSigMC/")
     info_altBkg       = load(f"/{prefix}_altBkg/")
@@ -129,6 +133,7 @@ for factor in (0, 1):
             (cHLTUp, cHLTDown, "cHLT"),
             (cIDUp, cIDDown, "cID"),
             (cIOUp, cIODown, "cIO"),
+            (cAcceptanceUp, cAcceptanceDown, "cAcceptance"),
         ):
             up.append((iEra['recZCount_{0}Up'.format(name)]-iEra['recZCount'])/iEra['recZCount']
                 - factor*(info['2017H']['recZCount_{0}Up'.format(name)]-info['2017H']['recZCount'])/info['2017H']['recZCount'] )
@@ -170,6 +175,7 @@ for factor in (0, 1):
         
         # --- from alternative sources
         for src, arr in (
+            (info_altSigGen, altSigGen),
             (info_altSig1, altSig1),
             (info_altSig2, altSig2),
             (info_altBkg, altBkg),
@@ -230,7 +236,8 @@ for factor in (0, 1):
             ("Correlation \CHLT       ", cHLTUp,          r" & $\pm "),
             ("Correlation \CID        ", cIDUp,           r" & $\pm "),
             ("Correlation \CGlo       ", cIOUp,           r" & $\pm "),
-            ("Background subtr.       ", bkgUp,   r" & $\pm "),
+            ("Acceptance              ", cAcceptanceUp,     r" & $\pm "),
+            ("Background subtr.       ", bkgUp,           r" & $\pm "),
             ("Muon pref. up (stat.)   ", prefireStatUp,   r" & $"),
             ("Muon pref. down (stat.) ", prefireStatDown, r" & $"),
             ("Muon pref. up (syst.)   ", prefireSystUp,   r" & $"),
@@ -238,8 +245,8 @@ for factor in (0, 1):
             ("ECAL pref. up           ", prefireECALUp,   r" & $"),
             ("ECAL pref. down         ", prefireECALDown, r" & $"),
             ("Alt. sig. model (MCxCB) ", altSig1,          r" & $"),
-            ("Alt. sig. model (MC)    ", altSig2,          r" & $"),
-            # ("Alt. bkg. model         ", altBkg,          r" & $"),
+        #    ("Alt. sig. model (MC)    ", altSig2,          r" & $"),
+            ("Alt. sig. model (Gen)   ", altSigGen,       r" & $"),
             ("Alt. bkg. model (Pass)  ", altBkgPass,      r" & $"),
             ("Alt. bkg. model (Fail)  ", altBkgFail,      r" & $"),
         #    ("Alt. sig. model (MCxCB) - eff ", altSig1eff,          r" & $"),
@@ -250,10 +257,10 @@ for factor in (0, 1):
         #    ("Alt. bkg. model - yield        ", altBkgyld,          r" & $"),
             ("Lumi slice up           ", lumiUp,          r" & $"),
             ("Lumi slice down         ", lumiDown,        r" & $"),
-            # ("Mass range up           ", massUp,        r" & $"),
-            # ("Mass range down         ", massDown,      r" & $"),
             ("Bin width up            ", binWidthUp,      r" & $"),
             ("Bin width down          ", binWidthDown,    r" & $"),
+        #    ("Mass range up           ", massUp,        r" & $"),
+        #    ("Mass range down         ", massDown,      r" & $"),
 
         ):
             if len(values) == 0:
@@ -261,18 +268,24 @@ for factor in (0, 1):
 
             entries = []
             for i, x in enumerate(values):
+                value = round(x*100,2)
+
                 if "\pm" in connector:
-                    entries.append(str(round(abs(x)*100,2))+"$" )
+                    if value < 0:
+                        entries.append("\mp"+str(abs(value))+"$" )
+                    else:
+                        entries.append("\pm"+str(abs(value))+"$" )
                     sysUp[i] += x**2
                     sysDown[i] += x**2
                 elif round(x*100,2) > 0:
-                    entries.append("+"+str(round(x*100,2))+"$" )
+                    entries.append("+"+str(value)+"$" )
                     sysUp[i] += x**2
                 elif round(x*100,2) < 0:
-                    entries.append(str(round(x*100,2))+"$" )
+                    entries.append(str(value)+"$" )
                     sysDown[i] += x**2
                 else:
                     entries.append(r"\NA $")
+            connector = connector.replace("\pm","")
             outfile.write(name + connector + connector.join(entries) + r" \\"+"\n")
         outfile.write(r" \hline "+"\n")
 

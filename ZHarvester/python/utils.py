@@ -249,7 +249,7 @@ def getCorrelation(hPV_data, correlationsFileName, which, region="I"):
     correlationsFileName : str
         path to the file with correlation factors as function of number of primary vertices
     which: str
-        which correlation factor to be read, can be: "IO", "ID"
+        which correlation factor to be read, can be: "IO", "ID", "Acceptance"
     region: str
         eta region for the correlation factor, can be: "I", "BB", "BE", "EE"
     """
@@ -262,46 +262,49 @@ def getCorrelation(hPV_data, correlationsFileName, which, region="I"):
     # normalize pileup histogram
     hPV_data.Scale(1./hPV_data.Integral())
     avgPV = hPV_data.GetMean()
+    hC = tfile.Get("C{0}_{1}".format(which, region))
 
-    if which=="IO":
-        # load histograms
-        truth = tfile.Get("truth_{0}".format(region))
-        Sta = tfile.Get("Sta_{0}".format(region))
-        Trk = tfile.Get("Trk_{0}".format(region))
-        StaPass = tfile.Get("StaPass_{0}".format(region))
+    hC.Multiply(hPV_data)
 
-        # fold with pileup histogram
-        truth.Multiply(hPV_data)
-        Sta.Multiply(hPV_data)
-        Trk.Multiply(hPV_data)
-        StaPass.Multiply(hPV_data)
+    corr = hC.Integral()
+    # if which=="IO":
+    #     # load histograms
+    #     truth = tfile.Get("truth_{0}".format(region))
+    #     Sta = tfile.Get("Sta_{0}".format(region))
+    #     Trk = tfile.Get("Trk_{0}".format(region))
+    #     StaPass = tfile.Get("StaPass_{0}".format(region))
 
-        # calculate correlation factor
-        nTruth = truth.Integral()
-        nSta = Sta.Integral()
-        nTrk = Trk.Integral()
-        nStaPass = StaPass.Integral()
+    #     # fold with pileup histogram
+    #     truth.Multiply(hPV_data)
+    #     Sta.Multiply(hPV_data)
+    #     Trk.Multiply(hPV_data)
+    #     StaPass.Multiply(hPV_data)
 
-        corr = (nStaPass / nSta) / (nTrk / (2*nTruth))
+    #     # calculate correlation factor
+    #     nTruth = truth.Integral()
+    #     nSta = Sta.Integral()
+    #     nTrk = Trk.Integral()
+    #     nStaPass = StaPass.Integral()
 
+    #     corr = (nStaPass / nSta) / (nTrk / (2*nTruth))
 
-    elif which=="ID":
-        # load histograms
-        truth = tfile.Get("truth_{0}".format(region))
-        ID2 = tfile.Get("2ID_{0}".format(region))
-        ID1 = tfile.Get("1ID_{0}".format(region))
+    # elif which=="ID":
+    #     # load histograms
+    #     truth = tfile.Get("truth_{0}".format(region))
+    #     ID2 = tfile.Get("2ID_{0}".format(region))
+    #     ID1 = tfile.Get("1ID_{0}".format(region))
 
-        # fold with pileup histogram
-        truth.Multiply(hPV_data)
-        ID2.Multiply(hPV_data)
-        ID1.Multiply(hPV_data)
+    #     # fold with pileup histogram
+    #     truth.Multiply(hPV_data)
+    #     ID2.Multiply(hPV_data)
+    #     ID1.Multiply(hPV_data)
 
-        # calculate correlation factor
-        nTruth = truth.Integral()
-        nID1 = ID1.Integral()
-        nID2 = ID2.Integral()
+    #     # calculate correlation factor
+    #     nTruth = truth.Integral()
+    #     nID1 = ID1.Integral()
+    #     nID2 = ID2.Integral()
 
-        corr = 4 * nTruth * nID2 / (nID1 + 2*nID2)**2
+    #     corr = 4 * nTruth * nID2 / (nID1 + 2*nID2)**2
 
     tfile.Close()
     print("Correlation coefficienct c{0}_{1} = {2}".format(which, region, corr))

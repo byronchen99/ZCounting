@@ -11,7 +11,7 @@ def zmonitoring(
     etaCut,
     mass,
     LumiPerMeasurement,
-    factorization,
+    mode,
     test,
     runlist = None,
     beginRun=0,
@@ -85,7 +85,7 @@ def zmonitoring(
             mass[1],
             mass[2],
             LumiPerMeasurement,
-            factorization
+            mode
     	))
 
         cs_file.write("queue\n")
@@ -116,7 +116,7 @@ def zmonitoring(
         'mass_hi': mass[1],
         'mass_bins': mass[2],
         'luminosity': LumiPerMeasurement,
-        'factorization': factorization,
+        'mode': mode,
         'ptCut': ptCut,
         'etaCut': etaCut,
         'runs': runs,
@@ -182,7 +182,7 @@ def check(projectdir, resubmit=False, collect=False, longQueue=False):
                 zmonitoring(
                     ji['dirDQM'], ji['dirOut'], ji['byLsCSV'], ji['mcCorrections'], ji['sigTemplates'], ji['bkgTemplates'],
                     ji['ptCut'], ji['etaCut'], (ji['mass_lo'], ji['mass_hi'], ji['mass_bins']), 
-                    ji['luminosity'], ji['factorization'], False,
+                    ji['luminosity'], ji['mode'], False,
                     runlist=[ji['runs'][i] for i in unfinished_jobs],
                     longQueue=longQueue)
 
@@ -228,8 +228,8 @@ if __name__ == '__main__':
         help='specify amount of luminosity per measurement in pb-1'
     )
     parserA.add_argument(
-        '-f','--factorization', default=3, type=int,
-        help='specify factorization schemes for muon efficiency'
+        '--mode', default=4, type=int,
+        help='specify mode schemes for muon efficiency'
     )
     parserA.add_argument(
         '--mass', nargs=3, metavar=('LOW', 'HIGH', 'NBINS'), default=(60, 120, 120),
@@ -297,7 +297,7 @@ if __name__ == '__main__':
             args.etaCut,
             args.mass,
             args.LumiPerMeasurement,
-            args.factorization,
+            args.mode,
             args.test,
             beginRun=args.beginRun,
             endRun=args.endRun,

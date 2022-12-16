@@ -77,6 +77,14 @@ def make_plots(df,
     valid xAxis: 'lumi', 'pileUp', 'measurement', 'time'
     """
 
+    if year == "2022":
+        lefttitle = "$\sqrt{s}=13.6\,\mathrm{TeV}$"
+    else:
+        lefttitle = "$\sqrt{s}=13\,\mathrm{TeV}$"
+
+    if year:
+        lefttitle += " $(\mathrm{"+year+"})$"
+
     if run_range:
         data = df.loc[(df["run"] >= run_range[0]) & (df["run"] <= run_range[1])]
         if len(df) ==0:
@@ -87,7 +95,6 @@ def make_plots(df,
     if sum(data[yAxis].isnull()) > 0:
         print(">>> sort out {0} points with nan".format(sum(data[yAxis].isnull())))
         data = data.loc[~data[yAxis].isnull()]
-
 
     # x_step: intervall in which the measurements are collected in one point
     if xAxis == 'lumi':
@@ -299,7 +306,7 @@ def make_plots(df,
     yy0 = np.array([y.n for y in yy0])
 
     print(">>> make fit")
-    func = pol2 #linear #pol2 #quad
+    func = linear #pol2 #quad
     popt, pcov = curve_fit(func, xx, yy, sigma=yy_err, absolute_sigma=True)
 
     perr = np.sqrt(np.diag(pcov))
@@ -322,14 +329,13 @@ def make_plots(df,
 
     ax1.set_xlabel(xTitle)
     ax1.set_ylabel(yLabel)
-    ax1.text(0.74, 0.97, "\\bf{CMS}", verticalalignment='top', transform=ax1.transAxes, weight="bold")
-    ax1.text(0.81, 0.97, "\\emph{"+args.label+"}", verticalalignment='top', transform=ax1.transAxes,style='italic')    
-    ax1.text(0.74, 0.89, year, verticalalignment='top', transform=ax1.transAxes,style='italic')    
+    ax1.text(0.02, 0.97, "{\\bf{CMS}} "+"\\emph{"+args.label+"} \n"+lefttitle, verticalalignment='top', transform=ax1.transAxes)
 
-    nround = 5
-    #ax1.text(0.01, 0.97, 
-    #    f"$f(x) = ({round(params[0].n,nround)} \\pm {round(params[0].s,nround)}) x + {round(params[1].n,nround)} \\pm {round(params[1].s,nround)}$", 
-    #    verticalalignment='top', transform=ax1.transAxes,style='italic')    
+    # plot fit parameters
+    # nround = 5
+    # ax1.text(0.98, 0.97, 
+    #     f"$f(x) = ({round(params[0].n,nround)} \\pm {round(params[0].s,nround)}) x + {round(params[1].n,nround)} \\pm {round(params[1].s,nround)}$", 
+    #     verticalalignment='top', horizontalalignment="right", transform=ax1.transAxes,style='italic')    
 
     xMin = min(xx_centers) - x_step/2
     xMax = max(xx_centers) + x_step/2
@@ -339,7 +345,7 @@ def make_plots(df,
     yMax = 1.05#max(yy + yy_err)
     yRange = abs(yMax - yMin)    
 
-    #p4 = ax1.errorbar(xx, yy0, xerr=xx_err, yerr=yy0_err, label="Measurements uncorrected",
+    # p4 = ax1.errorbar(xx, yy0, xerr=xx_err, yerr=yy0_err, label="Measurements uncorrected",
     #    marker="o", linewidth=0, color="grey", ecolor="grey", elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
     #    zorder=1)
     
@@ -355,9 +361,13 @@ def make_plots(df,
                      color='grey', alpha=0.2, zorder=1) 
     p1 = ax1.fill(np.NaN, np.NaN, color='grey', alpha=0.2, linewidth=0.)    
 
+    # make a separate entry for uncorrected
+    # leg_styles = [p3, p4, (p2[0], p1[0])]
+    # leg_labels = ['Measurements', 'Uncorrected', 'Fit']
+    
     leg_styles = [p3, (p2[0], p1[0])]
     leg_labels = ['Measurements', 'Fit']
-    
+
     leg = ax1.legend(leg_styles, leg_labels, loc="lower left", ncol=3,
         frameon=True, framealpha=1.0, fancybox=False, edgecolor="black")
     leg.get_frame().set_linewidth(0.8)
@@ -381,12 +391,15 @@ if args.xsec:
     # --- get Z xsec
     data_xsec = pd.read_csv(str(args.xsec), sep=',',low_memory=False)#, skiprows=[1,2,3,4,5])
 
-#    data_xsec['recZCount'] = data_xsec['recZCount'].apply(lambda x: unc.ufloat_fromstr(x).n)
+    if data_xsec['recZCount'].dtype==object:
+        data_xsec['recZCount'] = data_xsec['recZCount'].apply(lambda x: unc.ufloat_fromstr(x))
 
-#    apply_muon_prefire(data_xsec)
-#    apply_ECAL_prefire(data_xsec)
-    
-#    xsec = sum(data_xsec['recZCount'])/sum(data_xsec['recLumi'])
+    apply_muon_prefire(data_xsec)
+    apply_ECAL_prefire(data_xsec)
+
+    print("apply prefire corrections - done")
+
+    xsec = sum(data_xsec['recZCount'])/sum(data_xsec['recLumi'])
 
     
 
@@ -402,28 +415,36 @@ invalid_runs = {
 for run in invalid_runs:
     rates = rates.loc[rates['run'] != run]
 
+# convert to uncertainties
+for key in ['recZCount',]:
+    rates[key] = rates[key].apply(lambda x: unc.ufloat_fromstr(x))
+
+rates = rates[rates['recLumi'] > 0.]
+rates = rates[rates['recZCount'] > 0.]
+
+apply_ECAL_prefire(rates, apply_on="recZCount")
+apply_muon_prefire(rates, apply_on="recZCount")
+
+# # sort out outliers
+# rates['zLumi'] = rates['recZCount'] / xsec
+# rates['zLumi_to_dLRec'] = rates['zLumi'] / rates['recLumi']
+# rates = rates.loc[abs(rates['zLumi_to_dLRec']-1) < 0.1]
+
 if args.xsec:
     # include the lowPU data in the dataframe
     rates = pd.concat([rates, data_xsec])
 
 rates['recLumi'] = rates['recLumi'] * 1000    # convert into /nb
 
-# convert to uncertainties
-for key in ['recZCount',]:
-    rates[key] = rates[key].apply(lambda x: unc.ufloat_fromstr(x))
-
-apply_ECAL_prefire(rates, apply_on="recZCount")
-apply_muon_prefire(rates, apply_on="recZCount")
-
 rates['xsec_mc'] = rates['recZCount'] / rates['recLumi']
 
-rates['xsec'] = rates['xsec_mc'] / rates['cIO']**2 
+rates['xsec'] = rates['xsec_mc'] / (rates['cIO']**2 * rates['cID'] * rates['cHLT'] * rates['cAcceptance'])
 
 # only keep necessary data
 rates = rates[["xsec_mc", "xsec", "recLumi", "timewindow", "run", "pileUp"]]
 
 for yy, ylabel, region, mcRes, xAxis in (
-    ("xsec_mc", "sigma", "I", "", "pileUp"),
+    # ("xsec_mc", "sigma", "I", "", "pileUp"),
     ("xsec_mc", "sigma", "I", "", "lumi"),
     # # ("xsec_mc", "sigma", "", ""),
     # ("xsecBB_mc", "sigma", "BB", ""),
@@ -475,13 +496,13 @@ for yy, ylabel, region, mcRes, xAxis in (
     # # # total 2016
     # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016", run_range=(272007,294645), normalized=True, xAxis=xAxis)
     # total 2016 pre VFP
-    make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 pre VFP", run_range=(272007,278769), normalized=True, xAxis=xAxis)
+    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 pre VFP", run_range=(272007,278769), normalized=True, xAxis=xAxis)
     # total 2016 post VFP
-    make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 post VFP", run_range=(278769,294645), normalized=True, xAxis=xAxis)
+    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 post VFP", run_range=(278769,294645), normalized=True, xAxis=xAxis)
     # # total 2017
     make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2017", run_range=(297046,307083), normalized=True, xAxis=xAxis)
     # # ## total 2018
-    make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018", run_range=(315252,325175), normalized=True, xAxis=xAxis)
+    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018", run_range=(315252,325175), normalized=True, xAxis=xAxis)
 
     ### Run 3
     # 2022

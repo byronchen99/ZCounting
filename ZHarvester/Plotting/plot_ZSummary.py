@@ -172,6 +172,10 @@ print("Outliers:")
 data_out = data.loc[abs(data['zLumi_to_dLRec']-1) > 0.1]
 print(data_out[["recLumi","run","fill", "measurement","zLumi_to_dLRec","recZCount"]])
 
+# sort out outliers
+data = data.loc[abs(data['zLumi_to_dLRec']-1) < 0.1]
+
+
 def make_hist(
     df,
     run_range=None,
@@ -188,7 +192,6 @@ def make_hist(
         lefttitle = "$\sqrt{s}=13.6\,\mathrm{TeV}$"
     else:
         lefttitle = "$\sqrt{s}=13\,\mathrm{TeV}$"
-
 
     if title:
         lefttitle += " $(\mathrm{"+title+"})$"
@@ -245,7 +248,7 @@ def make_hist(
             nEntries, bins, _ = ax.hist(xx, bins=nBins, range=range)
             ax.set_ylabel("Number of entries", fontsize=textsize)
         
-        if False:
+        if True:
             # # plot a gaussian function with mean and std from distribution for comparison
 
             hist_integral = sum(nEntries * (bins[1:] - bins[:-1]))
@@ -254,11 +257,9 @@ def make_hist(
 
             
         ax.set_xlabel(label, fontsize=textsize)
-        ax.text(0.03, 0.97, "\\bf{CMS}", verticalalignment='top', transform=ax.transAxes, weight="bold")
-        ax.text(0.14, 0.97, "\\emph{"+args.label+"}", verticalalignment='top', transform=ax.transAxes,style='italic')
-        ax.text(0.03, 0.91, lefttitle, verticalalignment='top', transform=ax.transAxes,style='italic')
-        ax.text(0.97, 0.97, "$\\mu$ = {0}".format(round(mean,3)), horizontalalignment="right", verticalalignment='top', transform=ax.transAxes)
-        ax.text(0.97, 0.91, "$\\sigma$ = {0}".format(round(std,3)), horizontalalignment="right", verticalalignment='top', transform=ax.transAxes)
+        ax.text(0.03, 0.97, "{\\bf{CMS}} "+"\\emph{"+args.label+"} \n"+lefttitle, verticalalignment='top', transform=ax.transAxes)
+        ax.text(0.97, 0.97, "$\\mu$ = {0} \n $\\sigma$ = {1}".format(round(mean,3), round(std,3)), 
+            verticalalignment='top', horizontalalignment="right", transform=ax.transAxes)
 
         ax.set_xlim(range)
 
@@ -273,9 +274,9 @@ def make_hist(
 
     # --- make scatter
     for xx, xxSum, xlabel, suffix1 in (
-        (data['time'].values, time.values, "Time", "time"),
-        (data['fill'].values, fill.values, "Fill number", "fill"),
-        (data['run'].values, run.values, "Run number", "run"),
+        # (data['time'].values, time.values, "Time", "time"),
+        # (data['fill'].values, fill.values, "Fill number", "fill"),
+        # (data['run'].values, run.values, "Run number", "run"),
         (data['weightLumi'].cumsum().values/1000, weight.cumsum().values/1000., "Integrated luminosity [fb$^{-1}$]", "lumi"),
     ):
         rangex = min(xx)-(max(xx)-min(xx))*0.01, max(xx)+(max(xx)-min(xx))*0.01
@@ -336,9 +337,8 @@ def make_hist(
 
                 ax.errorbar(xxNew, yySum, xerr=(xxErr,xxErr), linestyle="", ecolor='blue', color='blue', zorder=2, label="Average")
 
-            ax.text(0.02, 0.97, "\\bf{CMS}", verticalalignment='top', transform=ax.transAxes, weight="bold")
-            ax.text(0.10, 0.97, "\\emph{"+args.label+"}", verticalalignment='top', transform=ax.transAxes,style='italic')
-            ax.text(0.02, 0.88, lefttitle, verticalalignment='top', transform=ax.transAxes,style='italic', horizontalalignment='left')
+            ax.text(0.02, 0.97, "{\\bf{CMS}} "+"\\emph{"+args.label+"} \n"+lefttitle, verticalalignment='top', transform=ax.transAxes)
+
 
             ax.set_xlabel(xlabel, fontsize=textsize)
             ax.set_ylabel(ylabel, fontsize=textsize)
@@ -421,7 +421,7 @@ def make_hist(
 #     label="Z luminosity / Ref. luminosity", 
 #     saveas="2017_zcountI", title="2017",rangey=[0.89,1.11])
  
-make_hist(data, saveas="zcount", title="Run\ II")
+#make_hist(data, saveas="zcount", title="Run\ II")
 # make_hist(data, label="ZCount(BB) / PHYSICS", saveas="zcountBB")
 # make_hist(data, label="ZCount(BE) / PHYSICS", saveas="zcountBE")
 # make_hist(data, label="ZCount(EE) / PHYSICS", saveas="zcountEE")

@@ -113,30 +113,30 @@ for category in filter(lambda x: "chi2" in x,data.keys()):
     c3.SaveAs(outDir+"/"+category+".png")
     c3.Close()
 
-    if "Sel" in category:
-        ndf = 120 - 7   
+    if "ID" in category or "IDFail" in category:
+        ndf = 120 - 5   
         #120 bins - ( 
         #   2 (signal model parameter) 
         # + 3 (background model parameters) 
         # + 1 (signal normalization) 
         # + 1 (background normalization) )
-    elif "TrkPass2" in category:
-        ndf = 130 - 7   
+    elif "StaFail" in category:
+        ndf = 120 - 7   
+    elif "TrkPass" in category or  "GloPass" in category:
+        ndf = 130 - 5
+    elif "TrkFail" in category or  "GloFail" in category:
+        ndf = 130 - 7
         #130 bins - ( 
         #   2 (signal model parameter) 
         # + 3 (background model parameters) 
         # + 1 (signal normalization) 
-        # + 1 (background normalization) )        
-    elif "TrkPass" in category:
-        ndf = 130 - 5
-    elif "TrkFail" in category:
-        ndf = 130 - 7
+        # + 1 (background normalization) )
     elif "Trk" in category:
         ndf = 260 - 12
-    elif "HLT2" in category or "HLT1" in category:
+    elif "HLT2" in category or "HLT1":
         ndf = 120 - 5
     else:
-        ndf = 240 - 10
+        ndf = 120 - 5
         
     nBins = 50
     xmin = 0.
