@@ -2,7 +2,7 @@ Description,                       Corr, 2016preVFP, 2016postVFP,  2017, 2017H, 
 Luminosity,                        -,         19.50,       16.81, 41.48,  0.20, 59.83
 
 # Statistical
-Stat,                              U,          0.03,        0.03,  0.02,  0.29, 0.02
+# Stat,                              U,          0.03,        0.03,  0.02,  0.29, 0.02
 
 # Prefiring
 ECAL prefiring,                    C,          0.03,        0.04,  0.03,  0.14, 0.0
