@@ -6,6 +6,10 @@ from hist import Hist
 import numpy as np
 import pdb
 import uncertainties as unc
+from uncertainties import unumpy as unp
+import pandas as pd
+
+from plot_utils_zfit import plot_matrix, plot_pulls, plot_scan
 
 import argparse
 
@@ -121,7 +125,7 @@ uncertainties_z = {
     # "z_2022": {
     #     "2022": 2.0
     # },
-    "z_2016preVFP2016postVFP20172017H": {
+    "z_20162017": {
         "2016preVFP": 0.03,
         "2016postVFP": 0.04,
         "2017": 0.03,
@@ -131,7 +135,7 @@ uncertainties_z = {
         "2017": 0.08,
         "2017H": 0.08
     },
-    "z_2016preVFP2016postVFP20172018": {
+    "z_201620172018": {
         "2016preVFP": 0.39,
         "2016postVFP": 0.06,
         "2017": 0.01,
@@ -312,8 +316,8 @@ model = zfit.pdf.BinnedSumPDF([m for m in models.values()])
 #     # azimov_hist = model.to_hist()
 #     data = model.to_binneddata()
 
-loss = zfit.loss.ExtendedBinnedChi2(model, data, constraints=[c for c in constraints.values()])
-# loss = zfit.loss.ExtendedBinnedNLL(model, data, constraints=[c for c in constraints.values()])
+# loss = zfit.loss.ExtendedBinnedChi2(model, data, constraints=[c for c in constraints.values()])
+loss = zfit.loss.ExtendedBinnedNLL(model, data, constraints=[c for c in constraints.values()])
 
 # minimization
 minimizer = zfit.minimize.Minuit(mode=2)#, gradient=True)
@@ -334,176 +338,69 @@ if new_result:
     print("New result was found!")
     print(result)
 
+# --- error propagation to get uncertainty on luminosity
+correlated_values = unc.correlated_values(
+    [result.params[p]["value"] for p in nuisances_lumi.values()], 
+    result.covariance(nuisances_lumi.values()))
+correlated_values_hi = unc.correlated_values_norm([(v,e) for v,e in zip(
+    [result.params[p]["value"] for p in nuisances_lumi.values()], 
+    [result.params[p]["errors"]["upper"] for p in nuisances_lumi.values()])], 
+    result.correlation(nuisances_lumi.values()))
+correlated_values_lo = unc.correlated_values_norm([(v,e) for v,e in zip(
+    [result.params[p]["value"] for p in nuisances_lumi.values()], 
+    [result.params[p]["errors"]["lower"] for p in nuisances_lumi.values()])], 
+    result.correlation(nuisances_lumi.values()))
 
-# error propagation to get uncertainty on luminosity
-for era in eras:
-    # uncertainties from hesse
-    values = unc.correlated_values(
-        [result.params[p]["value"] for p in nuisances_lumi_era[era]], 
-        result.covariance(nuisances_lumi_era[era]))
-
-    # uncertainties from minos
-    err_lo = unc.correlated_values_norm([v for v in zip(
-        [result.params[p]["value"] for p in nuisances_lumi_era[era]], 
-        [result.params[p]["errors"]["lower"] for p in nuisances_lumi_era[era]])], 
-        result.correlation(nuisances_lumi_era[era]))
-
-    err_hi = unc.correlated_values_norm([v for v in zip(
-        [result.params[p]["value"] for p in nuisances_lumi_era[era]], 
-        [result.params[p]["errors"]["upper"] for p in nuisances_lumi_era[era]])], 
-        result.correlation(nuisances_lumi_era[era]))
-
-    lumi = get_luminosity_function(era)(values)
-    lumi_lo = get_luminosity_function(era)(err_lo)
-    lumi_hi = get_luminosity_function(era)(err_hi)
-
-    print("Lumi[{0}] = {1} (+{2} / -{3})".format(era, lumi, lumi_hi.s, lumi_lo.s))
-    print("Del Lumi[{0}] = {1} (+{2} / -{3})".format(era, lumi/lumi.n, lumi_hi.s/lumi.n, lumi_lo.s/lumi.n))
-
-
-# correlation matrix on luminosities
-correlated_values = unc.correlated_values([result.params[p]["value"] for p in nuisances_lumi.values()], result.covariance(nuisances_lumi.values()))
-
-for k,v in zip(nuisances_lumi.values(), correlated_values):
+for k,v, lo, hi in zip(nuisances_lumi.values(), correlated_values, correlated_values_lo, correlated_values_hi):
     result.params[k]["correlated_value"] = v
+    result.params[k]["correlated_value_lo"] = lo
+    result.params[k]["correlated_value_hi"] = hi
 
 lumi_function = [get_luminosity_function(era) for era in eras]
 lumi_values = [lumi_function[i]([result.params[iv]["correlated_value"] for iv in v]) for i, v in enumerate(nuisances_lumi_era.values())]
+lumi_values_lo = [lumi_function[i]([result.params[iv]["correlated_value_lo"] for iv in v]) for i, v in enumerate(nuisances_lumi_era.values())]
+lumi_values_hi = [lumi_function[i]([result.params[iv]["correlated_value_hi"] for iv in v]) for i, v in enumerate(nuisances_lumi_era.values())]
+
+eras.append("Sum")
+lumi_values.append(sum(lumi_values))
+lumi_values_lo.append(sum(lumi_values_lo))
+lumi_values_hi.append(sum(lumi_values_hi))
+
+df_lumi = pd.DataFrame(data={
+    "era":eras, 
+    "value":unp.nominal_values(lumi_values), 
+    "hesse":unp.std_devs(lumi_values), 
+    "error_low":unp.std_devs(lumi_values_lo), 
+    "error_hi":unp.std_devs(lumi_values_hi)
+    })
+
+df_lumi["relative_hesse"] = df_lumi["hesse"] / df_lumi["value"]
+df_lumi["relative_error_low"] = df_lumi["error_low"] / df_lumi["value"]
+df_lumi["relative_error_hi"] = df_lumi["error_hi"] / df_lumi["value"]
+
+print(df_lumi)
 
 corr_matrix_lumi = unc.correlation_matrix(lumi_values)
+cov_matrix_lumi = np.array(unc.covariance_matrix(lumi_values))/1000000. # covariance matrix in fb
 
-print(corr_matrix_lumi)
-
+# print(corr_matrix_lumi)
+# print(cov_matrix_lumi)
 
 all_params = [rate_xsec,] + [n for n in nuisances.values()]
 
 ### --- plotting
-import matplotlib as mpl
-import matplotlib.pyplot as plt
 
-textsize = 15
+plot_matrix(corr_matrix_lumi, labels = eras, name="lumi", matrix_type="correlation", outDir=outDir)
+plot_matrix(cov_matrix_lumi, labels = eras, name="lumi", matrix_type="covariance", outDir=outDir)
 
-plt.rcParams.update({
-    "text.usetex": True,
-    "font.family": "serif",
-    "font.serif": ["Palatino",],
-    "font.size": textsize
-    # 'text.latex.preamble': [r"""\usepackage{bm}"""]
-})
+plot_pulls(result, outDir=outDir)
 
-mpl.rcParams.update({
-    "legend.fontsize" : "medium",
-    "axes.labelsize" : "medium",
-    "axes.titlesize" : "medium",
-    "xtick.labelsize" : "medium",
-    "ytick.labelsize" : "medium",
-})
-
-### --- plot correlation matrix
-def plot_matrix(matrix, labels=[], correlation=True, name=""):
-    fig, ax = plt.subplots()
-    im = ax.imshow(matrix)
-
-    # Show all ticks and label them with the respective list entries
-    ax.set_xticks(np.arange(len(labels)), labels=labels)
-    ax.set_yticks(np.arange(len(labels)), labels=labels)
-
-    # Rotate the tick labels and set their alignment.
-    plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
-            rotation_mode="anchor")
-
-    # Loop over data dimensions and create text annotations.
-    for i in range(len(labels)):
-        for j in range(len(labels)):
-            # if correlation and i == j:
-            #     # correlation matrix is always 1 on diagonal, so we don't plot it
-            #     continue
-            val = round(matrix[i, j],3)
-            text = ax.text(j, i, val, ha="center", va="center", color="w")
-
-    # ax.set_title("Harvest of local farmers (in tons/year)")
-    fig.tight_layout()
-    suffix = "_correlation" if correlation else ""
-    name = name if name.startswith("_") else "_"+name
-    plt.savefig("{0}/matrix{1}{2}.png".format(outDir, name, suffix))
-
-
-plot_matrix(corr_matrix_lumi, labels = [e for e in eras], name="lumi")
-
-exit()
-
-
-### --- plot likelihood scan
-def plot_scan(param, name="param", profile=True, limits=2.):
-    print("Make likelihood scan for {0}".format(name))
-
-    val = result.params[name]["value"]
-    err = result.params[name]["hesse"]["error"]
-
-    # scan around +/- 2 sigma (prefit) interval
-    xLo = val-limits
-    xHi = val+limits
-
-    x = np.linspace(xLo, xHi, num=100)
-    y = []
-    param.floating = False
-    for val in x:
-        param.set_value(val)
-        if profile:
-            minimizer.minimize(loss)
-        y.append(loss.value())
-
-    y = (np.array(y) - result.fmin)*2
-
-    param.floating = True
-    zfit.param.set_values(loss.get_params(), result)
-
-    # ymin = min(y)
-
-    yargmin = np.argmin(y)
-    xmin = x[np.argmin(y)]
-    # left and right 68% intervals
-    xL1 = x[np.argmin(abs(y[:yargmin]-1))]
-    xR1 = x[yargmin+np.argmin(abs(y[yargmin:]-1))]
-    # left and right 95% intervals
-    xL2 = x[np.argmin(abs(y[:yargmin]-4))]
-    xR2 = x[yargmin+np.argmin(abs(y[yargmin:]-4))]
-
-    plt.figure()
-    
-    if max(y) >= 1:
-        plt.plot([xLo, xL1], [1,1], linestyle="dashed", color="gray")
-        plt.plot([xR1, xHi], [1,1], linestyle="dashed", color="gray")
-        plt.plot([xL1, xL1], [0,1], linestyle="dashed", color="gray")
-        plt.plot([xR1, xR1], [0,1], linestyle="dashed", color="gray")
-
-    if max(y) >= 4:
-        plt.plot([xLo, xL2], [4,4], linestyle="dashed", color="gray")
-        plt.plot([xR2, xHi], [4,4], linestyle="dashed", color="gray")
-        plt.plot([xL2, xL2], [0,4], linestyle="dashed", color="gray")
-        plt.plot([xR2, xR2], [0,4], linestyle="dashed", color="gray")
-
-    plt.plot(x, y, color="red")
-    plt.xlabel(name)
-    plt.ylabel("-2 $\\Delta$ ln(L)")
-
-    plt.xlim(xLo,xHi)
-    plt.ylim(0,5)
-
-    fig.tight_layout()
-
-    suffix = "_profiling" if profile else "_scan"
-    plt.savefig("{0}/loss_{1}{2}.png".format(outDir, name, suffix))
-
-plot_scan(rate_xsec, "r_xsec", limits=0.03, profile=False)
-plot_scan(rate_xsec, "r_xsec", limits=0.03)
+# plot_scan(result, loss, minimizer, rate_xsec, "r_xsec", limits=0.03, profile=False, outDir=outDir)
+plot_scan(result, loss, minimizer, rate_xsec, "r_xsec", limits=0.03, outDir=outDir)
 
 # for era, p in p_lumis.items():
-#     plot_scan(p, "l_"+era, limits=0.1)
+#     plot_scan(result, p, "l_"+era, limits=0.1)
 
 for n, p in nuisances.items():
-    plot_scan(p, "n_"+n, profile=False)
-    plot_scan(p, "n_"+n)
-
-
-### --- plot pulls scan
+    # plot_scan(result, loss, minimizer, p, "n_"+n, profile=False, outDir=outDir)
+    plot_scan(result, loss, minimizer, p, "n_"+n, outDir=outDir)
