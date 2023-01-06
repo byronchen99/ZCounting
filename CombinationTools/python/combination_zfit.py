@@ -9,65 +9,56 @@ import uncertainties as unc
 from uncertainties import unumpy as unp
 import pandas as pd
 
-from plot_utils_zfit import plot_matrix, plot_pulls, plot_scan
+from plot_utils_zfit import plot_matrix, plot_pulls, plot_pulls_lumi, plot_scan
+from utils import simplify_uncertainties
 
 import argparse
 
 parser = argparse.ArgumentParser()
+parser.add_argument("--eras",  default=["2017","2017H","2018"],  nargs="+", help="list of eras to be used in combination")
+parser.add_argument("--lumi",  default="res/correlations_lumi.txt",  type=str, help="file containing uncertainties on luminosity")
+parser.add_argument("--zrate", default="res/correlations_ZCounts.txt",  type=str, help="file containing uncertainties on z rate")
 parser.add_argument("--label",  default='Work in progress',  type=str, help="specify label ('Work in progress', 'Preliminary', )")
 parser.add_argument("--unblind",  default=False, action="store_true", help="Fit on data")
 parser.add_argument("-o","--output",  default='Test',  type=str, help="give output dir")
 args = parser.parse_args()
 
+eras = args.eras
+
+
 outDir = args.output
 if not os.path.isdir(outDir):
     os.mkdir(outDir)
+
+uncertainties_lumi, ref_lumi = simplify_uncertainties(args.lumi, eras, prefix="l")
+uncertainties_z, z_yields = simplify_uncertainties(args.zrate, eras, prefix="z")
+
+covariance_lumi_prefit = unc.correlation_matrix([v for v in ref_lumi.values()])
+
+plot_matrix(covariance_lumi_prefit, labels = ref_lumi.keys(), name="lumi_prefit", matrix_type="correlation", outDir=outDir)
+
 
 # fiducial Z cross section at 13TeV
 xsec = 734
 xsec_uncertainty = None # no uncertainty on cross section - free floating parameter
 # xsec_uncertainty = 0.03   # uncertainty on cross section - gaussian constraint
 
-# ratio of fiducial cross sections at 13.6 and 13TeV
-ratio13p6to13 = 1.05
+# ratio of fiducial cross sections at different center of mass energies (13.6 / 13TeV for 2022)
+energy_extrapolation = {
+    "2016preVFP": 1.,
+    "2016postVFP": 1.,
+    "2017": 1.,
+    "2017H": 1.,
+    "2018": 1.,
+    "2022": 1.046,   # With NNLO + N3LL + NLO(EW)
+}   
 
-
-# --- input
-# efficiency corrected number of Z bosons for: 2016preVFP, 2016postVFP, 2017, 2017H, 2018,
-z_yields = {
-    "2016preVFP": 13148175.0,
-    "2016postVFP": 11658670.0,
-    "2017": 26799689.0,
-    "2017H": 144360.0,
-    "2018": 41651170.0,
-}
-
-# # reference lumi in pb using normtags PHYSICS
-# ref_lumi = {
-#     "2016preVFP": 18910.381126,
-#     "2016postVFP": 16968.409375000003,
-#     "2017": 37921.727600000006,
-#     "2017H": 199.269742,
-#     "2018": 59742.764247,
-# }
-
-# reference lumi in pb using normtags PHYSICS (2016), hfet17New_v0 (2017), hfoc18NEW_v0 (2018)
-ref_lumi = {
-    "2016preVFP": 18910.381126,
-    "2016postVFP": 16968.409375000003,
-    "2017": 37568.897576999996,
-    "2017H": 202.692817,
-    "2018": 59629.669634,
-    "2022": 38040,   # Just a dummy number for now
-}
-
-z_yields["2022"] = ref_lumi["2022"] * xsec * ratio13p6to13
 
 if not args.unblind:
     # Use asymov data
-    z_yields = {key: value * xsec for key, value in ref_lumi.items()}
+    z_yields = {key: value * xsec * energy_extrapolation[key] for key, value in ref_lumi.items()}
 
-# statistical uncertainties of Z yields
+# statistical uncertainties of Z yields, right now hard coded TODO
 z_yields_stat = {
     "2016preVFP": 0.00030886129248932546,
     "2016postVFP": 0.0003240928650176417,
@@ -77,92 +68,8 @@ z_yields_stat = {
     "2022": 0.0002,   # Just a dummy number for now    
 }
 
-# uncertainties
-uncertainties_lumi = {
-    "ref_2016": {
-        "2016preVFP": 1.04,
-        "2016postVFP": 1.04
-        },
-    "ref_2017": {
-        "2017": 1.96,
-        "2017H": 1.28
-        },
-    "ref_2018": {
-        "2018": 1.46
-    },
-    # "ref_2022": {
-    #     "2022": 3.0
-    # },
-    "ref_20172018": {
-        "2017": 0.6,
-        "2017H": 0.6,
-        "2018": 0.2
-    },
-    "ref_correlated": {
-        "2016preVFP": 0.8,
-        "2016postVFP": 0.8,
-        "2017": 1.04,
-        "2017H": 1.04,
-        "2018": 2.11
-    }
-}
-uncertainties_z = {
-    "z_2016preVFP": {
-        "2016preVFP": 0.48
-    },
-    "z_2016postVFP": {
-        "2016postVFP": 0.37
-    },
-    "z_2017": {
-        "2017": 0.3
-    },
-    "z_2017H": {
-        "2017H": 0.3
-    },
-    "z_2018": {
-        "2018": 0.31
-    },
-    # "z_2022": {
-    #     "2022": 2.0
-    # },
-    "z_20162017": {
-        "2016preVFP": 0.03,
-        "2016postVFP": 0.04,
-        "2017": 0.03,
-        "2017H": 0.14
-    },
-    "z_20172017H": {
-        "2017": 0.08,
-        "2017H": 0.08
-    },
-    "z_201620172018": {
-        "2016preVFP": 0.39,
-        "2016postVFP": 0.06,
-        "2017": 0.01,
-        "2018": 0.01
-    },
-    "z_correlated": {
-        "2016preVFP": 1.3,
-        "2016postVFP": 1.45,
-        "2017": 1.37,
-        "2017H": 1.53,
-        "2018": 1.38
-    },
-}
  
-
-# uncertainties = {
-#     "2016preVFP": 0.1,
-#     "2016postVFP": 0.1,
-#     "2017": 0.1,
-#     "2017H": 0.1,
-#     "2018": 0.1
-# }
-
-# define eras used in combination
-eras = ["2016preVFP", "2016postVFP", "2017", "2017H", "2018"]
-
-# 
+# --- set up binned likelihood fit
 nBins = len(eras)
 binLo = 0
 binHi = nBins
@@ -173,14 +80,14 @@ hZ = Hist(
 
 # set yields and variance (statistical uncertainty)
 z_yields_uncorrected = {era: (1./(z_yields_stat[era])**2) for era in eras}  # the uncorrected z yields is rederived from the statistical uncertainty
-z_weights = {era: z_yields[era]/z_yields_uncorrected[era] for era in eras}  # the per event weights to get from uncorrected to corrected yield
+z_weights = {era: z_yields[era].n/z_yields_uncorrected[era] for era in eras}  # the per event weights to get from uncorrected to corrected yield
 # hZ[:] = [(z_yields[era], z_yields_uncorrected[era] * z_weights[era]**2) for era in eras]      # the variance is given by square of weights times uncorrected yields
 
 # set uncorrected yields for data
 hZ[:] = [int(z_yields_uncorrected[era]) for era in eras]
 
 # efficiencies to get from corrected to uncorrected number
-z_efficiencies = {era: z_yields_uncorrected[era] / z_yields[era] for era in eras}
+z_efficiencies = {era: z_yields_uncorrected[era] / z_yields[era].n for era in eras}
 
 
 # set the reference lumi counts
@@ -190,7 +97,7 @@ for i, era in enumerate(eras):
         hist.axis.Regular(bins=nBins, start=binLo, stop=binHi, name="x"))
 
     # set lumi
-    hist_ref[i] = ref_lumi[era]
+    hist_ref[i] = ref_lumi[era].n
 
     hists_ref[era] = hist_ref
 
@@ -226,6 +133,7 @@ if xsec_uncertainty != None:
     # put a gaussian constraint on the cross section
     constraints["r_xsec"] = zfit.constraint.GaussianConstraint(rate_xsec, observation=0.0, uncertainty=xsec_uncertainty)
 
+
 # rearange dictionaries: for each era a list of uncertainties, nuisances
 uncertainties_lumi_era = {}
 nuisances_lumi_era = {}
@@ -251,7 +159,7 @@ def get_luminosity_function(era):
     # return function to calculate luminosity for a year
 
     # central value of luminosity
-    central = ref_lumi[era]
+    central = ref_lumi[era].n
 
     # dictionary with uncertainties for the considered era
     def function(params):
@@ -266,9 +174,10 @@ def get_luminosity_function(era):
 def get_scale_function(era):
 
     z_eff = z_efficiencies[era]
+    extrapolation = energy_extrapolation[era]
 
     def function(rate_xsec, lumi, params):#, parameters=[]):
-        s = xsec * z_eff * (1+rate_xsec) * lumi
+        s = xsec * extrapolation * z_eff * (1+rate_xsec) * lumi
         # apply nuisance parameters
         # for p in parameters:
         #     s *= p
@@ -277,7 +186,6 @@ def get_scale_function(era):
         return s
     
     return function
-
 
 models = {}
 lumis = {}
@@ -309,6 +217,7 @@ for era in eras:
     # p_lumis[era] = p_lumi
 
 
+
 # build composite model
 model = zfit.pdf.BinnedSumPDF([m for m in models.values()])
 
@@ -333,6 +242,7 @@ print("Function minimum:", result.fmin)
 print("Converged:", result.converged)
 print("Full minimizer information:", result)
 # print("Correlation matrix:", result.correlation())
+
 
 if new_result:
     print("New result was found!")
@@ -361,6 +271,9 @@ lumi_values = [lumi_function[i]([result.params[iv]["correlated_value"] for iv in
 lumi_values_lo = [lumi_function[i]([result.params[iv]["correlated_value_lo"] for iv in v]) for i, v in enumerate(nuisances_lumi_era.values())]
 lumi_values_hi = [lumi_function[i]([result.params[iv]["correlated_value_hi"] for iv in v]) for i, v in enumerate(nuisances_lumi_era.values())]
 
+lumi_prefit = [ref_lumi[era] for era in eras]
+lumi_prefit.append(sum(lumi_prefit))
+
 eras.append("Sum")
 lumi_values.append(sum(lumi_values))
 lumi_values_lo.append(sum(lumi_values_lo))
@@ -370,12 +283,14 @@ df_lumi = pd.DataFrame(data={
     "era":eras, 
     "value":unp.nominal_values(lumi_values), 
     "hesse":unp.std_devs(lumi_values), 
-    "error_low":unp.std_devs(lumi_values_lo), 
+    "error_lo":unp.std_devs(lumi_values_lo), 
     "error_hi":unp.std_devs(lumi_values_hi)
     })
 
+df_lumi["prefit"] = lumi_prefit
+
 df_lumi["relative_hesse"] = df_lumi["hesse"] / df_lumi["value"]
-df_lumi["relative_error_low"] = df_lumi["error_low"] / df_lumi["value"]
+df_lumi["relative_error_low"] = df_lumi["error_lo"] / df_lumi["value"]
 df_lumi["relative_error_hi"] = df_lumi["error_hi"] / df_lumi["value"]
 
 print(df_lumi)
@@ -394,6 +309,10 @@ plot_matrix(corr_matrix_lumi, labels = eras, name="lumi", matrix_type="correlati
 plot_matrix(cov_matrix_lumi, labels = eras, name="lumi", matrix_type="covariance", outDir=outDir)
 
 plot_pulls(result, outDir=outDir)
+
+plot_pulls_lumi(df_lumi, outDir=outDir)
+
+exit()
 
 # plot_scan(result, loss, minimizer, rate_xsec, "r_xsec", limits=0.03, profile=False, outDir=outDir)
 plot_scan(result, loss, minimizer, rate_xsec, "r_xsec", limits=0.03, outDir=outDir)

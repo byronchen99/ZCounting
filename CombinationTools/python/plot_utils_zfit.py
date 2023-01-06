@@ -1,3 +1,5 @@
+import pdb
+
 textsize = 15
 markersize = 4
 
@@ -59,8 +61,7 @@ def plot_matrix(matrix, labels=[], matrix_type="correlation", name="", outDir=".
     # ax.set_title("Harvest of local farmers (in tons/year)")
     fig.tight_layout()
     name = name if name.startswith("_") else "_"+name
-    suffix = "_"+matrix_type
-    plt.savefig("{0}/matrix{1}{2}.png".format(outDir, name, suffix))
+    plt.savefig("{0}/{1}{2}.png".format(outDir, matrix_type, name))
 
 
 ### --- nuisance parameters pulls and constraints
@@ -115,6 +116,67 @@ def plot_pulls(result, outDir="./"):
     ax.set_ylim(ymin, ymax)
 
     plt.savefig("{0}/pulls.png".format(outDir))
+
+### --- plot results on luminosity
+def plot_pulls_lumi(dataframe, outDir="./"):
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    set_style()
+
+    print("Make plot of lumi results")
+
+    names = dataframe["era"].values
+
+    xx_prefit = dataframe["prefit"].apply(lambda x: x.n).values
+
+    xx_hi_prefit = dataframe["prefit"].apply(lambda x: x.s).values/xx_prefit
+    xx_lo_prefit = xx_hi_prefit
+
+    xx = (dataframe["value"].values - xx_prefit) /xx_prefit
+    xx_hi = dataframe["error_hi"].values/xx_prefit
+    xx_lo = dataframe["error_lo"].values/xx_prefit
+    yy = np.arange(len(names))
+
+    xx_prefit = (xx_prefit-xx_prefit)/xx_prefit
+
+    fig, ax = plt.subplots()
+    fig.subplots_adjust(hspace=0.0, left=0.4, right=0.97, top=0.99, bottom=0.125)
+
+    ymin = yy[0]-1
+    ymax = yy[-1]+1
+
+    ax.plot([-0.02, -0.02], [ymin,ymax], linestyle="dashed", color="gray")
+    ax.plot([0.02, 0.02], [ymin,ymax], linestyle="dashed", color="gray")
+
+    ax.plot([-0.01, -0.01], [ymin,ymax], linestyle="dashed", color="gray")
+    ax.plot([0.01, 0.01], [ymin,ymax], linestyle="dashed", color="gray")
+
+    nround = lambda x: round(x, 3)
+
+    # for i, r in enumerate(is_rate):
+    #     if r:
+    #         ax.text(-0.5, yy[i]-0.4, "$"+str(nround(xx[i]))+"^{+"+str(nround(xx_hi[i]))+"}_{"+str(nround(xx_lo[i]))+"}$")
+
+    ax.errorbar(xx_prefit, yy+0.2, xerr=(abs(xx_lo_prefit), abs(xx_hi_prefit)), label="prefit",
+        fmt="bo", ecolor='blue', elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize)
+
+    ax.errorbar(xx, yy-0.2, xerr=(abs(xx_lo), abs(xx_hi)), label="postfit",
+        fmt="ko", ecolor='black', elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize)
+    ax.set_xlabel("($\\hat{L} - L_0 ) / L_0$")
+    ax.set_ylabel("")
+
+    ax.legend(loc="upper right")
+    
+    xmax = max(max(xx_hi),max(xx_hi_prefit))
+    xmin = xmax
+
+    ax.set_yticks(np.arange(len(names)), labels=names)
+    ax.set_xlim(-0.03,0.03)
+    ax.set_ylim(ymin, ymax+1)
+
+    plt.savefig("{0}/pulls_lumi.png".format(outDir))
+
 
 
 ### --- plot likelihood scan
