@@ -54,7 +54,7 @@ def simplify_uncertainties(inputFile, years=None, ratio=False, force_correlated=
                 if systName not in ['Value', 'Luminosity']:
                     print("Error: expected first row to have vthe central alues")
                     sys.exit(1)
-                values = np.array([float(x) for x in np.array(row[2:])[select]])
+                values = np.array([float(x) for x in row[2:]])[select]
                 if len(years) != len(values):
                     print("Error: number of values specified doesn't match number of years")
                     sys.exit(1)
@@ -63,98 +63,10 @@ def simplify_uncertainties(inputFile, years=None, ratio=False, force_correlated=
                     print("Error: line {0}, correlation should be C, U, or P##".format(i))
                     sys.exit(1)
                 correlations[systName] = row[1]
-                uncertainties[systName] = np.array([float(x)/100 for x in np.array(row[2:])[select]])
+                uncertainties[systName] = np.array([float(x)/100 for x in row[2:]])[select]
                 if len(years) != len(uncertainties[systName]):
                     print("Error: number of uncertainties for",systName,"doesn't match number of years")
                     sys.exit(1)
-
-
-    # total_values = sum(values)
-    # if ratio:
-    #     total_values = values[1]/values[0]
-
-    # total_uncertainty_sq = 0
-    # for u in uncertainties:
-    #     if (correlations[u] == 'C' or force_correlated) and not force_uncorrelated:
-    #         # Correlated -- just add up individual uncertainties
-    #         this_uncertainty = 0
-    #         for i in range(len(years)):
-    #             this_uncertainty += uncertainties[u][i]*values[i]
-    #         if ratio:
-    #             abs_uncertainty_0=uncertainties[u][0]*values[0]
-    #             abs_uncertainty_1=uncertainties[u][1]*values[1]
-    #             if abs_uncertainty_0>abs_uncertainty_1:
-    #                 this_uncertainty = (values[1]/values[0])*(np.sqrt( (abs_uncertainty_1/values[1])**2 + (abs_uncertainty_0/values[0])**2 - 2*abs_uncertainty_1**2/(values[0]*values[1]) ))
-    #             else:
-    #                 this_uncertainty = (values[1]/values[0])*(np.sqrt( (abs_uncertainty_1/values[1])**2 + (abs_uncertainty_0/values[0])**2 - 2*abs_uncertainty_0**2/(values[0]*values[1]) ))
-    #         total_uncertainty_sq += this_uncertainty**2
-    #     elif correlations[u] == 'U' or force_uncorrelated:
-    #         # Uncorrelated -- add in quadrature
-    #         this_uncertainty_sq = 0
-    #         for i in range(len(years)):
-    #             this_uncertainty_sq += (uncertainties[u][i]*values[i])**2
-    #         if ratio:
-    #             abs_uncertainty_0=uncertainties[u][0]*values[0]
-    #             abs_uncertainty_1=uncertainties[u][1]*values[1]
-    #             this_uncertainty_sq = (values[1]/values[0])**2*( (abs_uncertainty_1/values[1])**2 + (abs_uncertainty_0/values[0])**2 )
-    #         total_uncertainty_sq += this_uncertainty_sq
-    #     elif correlations[u][0] == 'P':
-    #         # Partially correlated
-    #         frac_correlated = int(correlations[u][1:])/100.0
-    #         this_uncertainty_corr = 0
-    #         this_uncertainty_uncorr_sq = 0
-    #         for i in range(len(years)):
-    #             # Split up the SQUARED uncertainty into correlated and uncorrelated components.
-    #             this_term_corr_sq = ((uncertainties[u][i]*values[i])**2)*frac_correlated
-    #             this_term_uncorr_sq = ((uncertainties[u][i]*values[i])**2)*(1-frac_correlated)
-    #             this_uncertainty_corr += np.sqrt(this_term_corr_sq)
-    #             this_uncertainty_uncorr_sq += this_term_uncorr_sq
-    #         total_uncertainty_sq += this_uncertainty_corr**2 + this_uncertainty_uncorr_sq
-
-    # total_uncertainty = np.sqrt(total_uncertainty_sq)
-    # if force_correlated:
-    #     print("*** All uncertainties have been treated as correlated ***")
-    # if force_uncorrelated:
-    #     print("*** All uncertainties have been treated as uncorrelated ***")
-    # if not ratio:
-    #     print("Total values is %.2f +/- %.2f (uncertainty of %.2f%%)" % \
-    #         (total_values, total_uncertainty, 100*total_uncertainty/total_values))
-    # else:
-    #     print("Ratio values is %.2f +/- %.3f (uncertainty of %.2f%%)" % \
-    #         (total_values, total_uncertainty, 100*total_uncertainty/total_values))
-                    
-    # # Next make the final table for use by other people. The first step is to go through and see if any
-    # # uncertainties are treated as correlated but only are nonzero for one year. If so, we can treat them as
-    # # uncorrelated rather than have to put them as a separate bucket.
-    # for u in uncertainties:
-    #     n_nonzero = 0
-    #     for x in uncertainties[u]:
-    #         if x > 0:
-    #             n_nonzero += 1
-    #     if n_nonzero == 1 and correlations[u] == 'C':
-    #         correlations[u] = 'U'
-
-    # # Now, for each uncertainty, print it out as is if correlated, but add it to the total uncorrelated bin if
-    # # not.
-    # total_uncorrelated = [0]*len(years)
-    # for u in sorted(uncertainties):
-    #     if correlations[u] == 'U':
-    #         for i in range(len(uncertainties[u])):
-    #             total_uncorrelated[i] += (100*uncertainties[u][i])**2
-    #     elif correlations[u][0] == 'P':
-    #         correlated_uncertainty = []
-    #         frac_correlated = int(correlations[u][1:])/100.0
-    #         for i in range(len(years)):
-    #             # Split the uncertainty into correlated and uncorrelated parts.
-    #             this_term_corr_sq = ((100*uncertainties[u][i])**2)*frac_correlated
-    #             this_term_uncorr_sq = ((100*uncertainties[u][i])**2)*(1-frac_correlated)
-    #             # Dump the uncorrelated part into the uncorrelated bucket and keep track of the correlated part.
-    #             total_uncorrelated[i] += this_term_uncorr_sq
-    #             correlated_uncertainty.append("%.1f" % (np.sqrt(this_term_corr_sq)))
-    # # Finally, print out the uncorrelateds.
-    # for i in range(len(years)):
-    #     output_array = ['0.0']*len(years)
-    #     output_array[i] = "%.1f" % (np.sqrt(total_uncorrelated[i]))
 
     # build up covariance matrix
 

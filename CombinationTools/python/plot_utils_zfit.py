@@ -166,10 +166,10 @@ def plot_pulls_lumi(dataframe, outDir="./"):
     ax.set_xlabel("($\\hat{L} - L_0 ) / L_0$")
     ax.set_ylabel("")
 
-    ax.legend(loc="upper right")
+    ax.legend(loc="upper right", ncol=2)
     
     xmax = max(max(xx_hi),max(xx_hi_prefit))
-    xmin = xmax
+    xmin = -xmax
 
     ax.set_yticks(np.arange(len(names)), labels=names)
     ax.set_xlim(-0.03,0.03)

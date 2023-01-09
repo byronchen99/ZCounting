@@ -33,9 +33,11 @@ if not os.path.isdir(outDir):
 uncertainties_lumi, ref_lumi = simplify_uncertainties(args.lumi, eras, prefix="l")
 uncertainties_z, z_yields = simplify_uncertainties(args.zrate, eras, prefix="z")
 
-covariance_lumi_prefit = unc.correlation_matrix([v for v in ref_lumi.values()])
+covariance_lumi_prefit = unc.correlation_matrix([ref_lumi[e] for e in eras]+[sum(ref_lumi.values()),])
+plot_matrix(covariance_lumi_prefit, labels = eras+["Sum",], name="lumi_prefit", matrix_type="correlation", outDir=outDir)
 
-plot_matrix(covariance_lumi_prefit, labels = ref_lumi.keys(), name="lumi_prefit", matrix_type="correlation", outDir=outDir)
+covariance_z_prefit = unc.correlation_matrix([z_yields[e] for e in eras]+[sum(z_yields.values()),])
+plot_matrix(covariance_z_prefit, labels = eras+["Sum",], name="zyield_prefit", matrix_type="correlation", outDir=outDir)
 
 
 # fiducial Z cross section at 13TeV
@@ -270,6 +272,8 @@ lumi_function = [get_luminosity_function(era) for era in eras]
 lumi_values = [lumi_function[i]([result.params[iv]["correlated_value"] for iv in v]) for i, v in enumerate(nuisances_lumi_era.values())]
 lumi_values_lo = [lumi_function[i]([result.params[iv]["correlated_value_lo"] for iv in v]) for i, v in enumerate(nuisances_lumi_era.values())]
 lumi_values_hi = [lumi_function[i]([result.params[iv]["correlated_value_hi"] for iv in v]) for i, v in enumerate(nuisances_lumi_era.values())]
+lumi_values_lo_valid = [all([result.params[iv]["errors"]["upper_valid"] for iv in v]) for i, v in enumerate(nuisances_lumi_era.values())]
+lumi_values_hi_valid = [all([result.params[iv]["errors"]["lower_valid"] for iv in v]) for i, v in enumerate(nuisances_lumi_era.values())]
 
 lumi_prefit = [ref_lumi[era] for era in eras]
 lumi_prefit.append(sum(lumi_prefit))
@@ -278,13 +282,18 @@ eras.append("Sum")
 lumi_values.append(sum(lumi_values))
 lumi_values_lo.append(sum(lumi_values_lo))
 lumi_values_hi.append(sum(lumi_values_hi))
+lumi_values_lo_valid.append(all(lumi_values_lo_valid))
+lumi_values_hi_valid.append(all(lumi_values_hi_valid))
+
 
 df_lumi = pd.DataFrame(data={
     "era":eras, 
     "value":unp.nominal_values(lumi_values), 
     "hesse":unp.std_devs(lumi_values), 
     "error_lo":unp.std_devs(lumi_values_lo), 
-    "error_hi":unp.std_devs(lumi_values_hi)
+    "error_hi":unp.std_devs(lumi_values_hi),
+    "error_lo_valid":lumi_values_lo_valid, 
+    "error_hi_valid":lumi_values_hi_valid
     })
 
 df_lumi["prefit"] = lumi_prefit
@@ -305,8 +314,8 @@ all_params = [rate_xsec,] + [n for n in nuisances.values()]
 
 ### --- plotting
 
-plot_matrix(corr_matrix_lumi, labels = eras, name="lumi", matrix_type="correlation", outDir=outDir)
-plot_matrix(cov_matrix_lumi, labels = eras, name="lumi", matrix_type="covariance", outDir=outDir)
+plot_matrix(corr_matrix_lumi, labels = eras, name="lumi_postfit", matrix_type="correlation", outDir=outDir)
+plot_matrix(cov_matrix_lumi, labels = eras, name="lumi_postfit", matrix_type="covariance", outDir=outDir)
 
 plot_pulls(result, outDir=outDir)
 
