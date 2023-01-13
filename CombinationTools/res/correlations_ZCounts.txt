@@ -17,5 +17,5 @@ Correlation IO,                    C, 0.39, 0.06, 0.01, 0.0,  0.01, 0.01
 Acceptance,                        C, 1.19, 1.39, 1.36, 1.52, 1.37, 1.37
 
 # Other systematics
-Fit stability,                     U, 0.30, 0.30, 0.30, 0.30, 0.30, 0.3
-Extrapolation (Run2),              C, 0.0,  0.0,  0.0,  0.0,  0.0,  0.1
+Fit stability,                     U, 0.30, 0.30, 0.30, 0.30, 0.30, 0.30
+Extrapolation (Run2),              C, 0.0,  0.0,  0.0,  0.0,  0.0,  0.5

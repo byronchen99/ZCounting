@@ -25,20 +25,11 @@ args = parser.parse_args()
 
 eras = args.eras
 
-
 outDir = args.output
 if not os.path.isdir(outDir):
     os.mkdir(outDir)
 
-uncertainties_lumi, ref_lumi = simplify_uncertainties(args.lumi, eras, prefix="l")
-uncertainties_z, z_yields = simplify_uncertainties(args.zrate, eras, prefix="z")
-
-covariance_lumi_prefit = unc.correlation_matrix([ref_lumi[e] for e in eras]+[sum(ref_lumi.values()),])
-plot_matrix(covariance_lumi_prefit, labels = eras+["Sum",], name="lumi_prefit", matrix_type="correlation", outDir=outDir)
-
-covariance_z_prefit = unc.correlation_matrix([z_yields[e] for e in eras]+[sum(z_yields.values()),])
-plot_matrix(covariance_z_prefit, labels = eras+["Sum",], name="zyield_prefit", matrix_type="correlation", outDir=outDir)
-
+# --- settings
 
 # fiducial Z cross section at 13TeV
 xsec = 734
@@ -55,11 +46,6 @@ energy_extrapolation = {
     "2022": 1.046,   # With NNLO + N3LL + NLO(EW)
 }   
 
-
-if not args.unblind:
-    # Use asymov data
-    z_yields = {key: value * xsec * energy_extrapolation[key] for key, value in ref_lumi.items()}
-
 # statistical uncertainties of Z yields, right now hard coded TODO
 z_yields_stat = {
     "2016preVFP": 0.00030886129248932546,
@@ -69,6 +55,21 @@ z_yields_stat = {
     "2018": 0.0001702104409933952,
     "2022": 0.0002,   # Just a dummy number for now    
 }
+
+# --- calculate initial values / prefit plots
+
+uncertainties_lumi, ref_lumi = simplify_uncertainties(args.lumi, eras, prefix="l")
+uncertainties_z, z_yields = simplify_uncertainties(args.zrate, eras, prefix="z")
+
+covariance_lumi_prefit = unc.correlation_matrix([ref_lumi[e] for e in eras]+[sum(ref_lumi.values()),])
+plot_matrix(covariance_lumi_prefit, labels = eras+["Sum",], name="lumi_prefit", matrix_type="correlation", outDir=outDir)
+
+covariance_z_prefit = unc.correlation_matrix([z_yields[e] for e in eras]+[sum(z_yields.values()),])
+plot_matrix(covariance_z_prefit, labels = eras+["Sum",], name="zyield_prefit", matrix_type="correlation", outDir=outDir)
+
+if not args.unblind:
+    # Use asymov data
+    z_yields = {key: value * xsec * energy_extrapolation[key] for key, value in ref_lumi.items()}
 
  
 # --- set up binned likelihood fit
@@ -227,80 +228,51 @@ model = zfit.pdf.BinnedSumPDF([m for m in models.values()])
 #     # azimov_hist = model.to_hist()
 #     data = model.to_binneddata()
 
-# loss = zfit.loss.ExtendedBinnedChi2(model, data, constraints=[c for c in constraints.values()])
-loss = zfit.loss.ExtendedBinnedNLL(model, data, constraints=[c for c in constraints.values()])
+loss = zfit.loss.ExtendedBinnedNLL(model, data, constraints=[c for c in constraints.values()], options = { "numhess" : False })
 
-# minimization
-minimizer = zfit.minimize.Minuit(mode=2)#, gradient=True)
+minimizer = zfit.minimize.ScipyTrustConstrV1(hessian = "zfit")
 result = minimizer.minimize(loss)
+status = result.valid
 
-# calculate hesse
-result.hesse()
+print(f"status: {status}")
 
-# calculate minuit error by doing likelihood scan
-errors, new_result = result.errors(name='errors') # name='minuit_minos'
+try:
+    hessval = result.loss.hessian(list(result.params)).numpy()
+    cov = np.linalg.inv(hessval)
+    eigvals = np.linalg.eigvalsh(hessval)
+    covstatus = eigvals[0] > 0.
+    print("eigvals", eigvals)
+except:
+    cov = None
+    covstatus = False
 
-print("Function minimum:", result.fmin)
-print("Converged:", result.converged)
-print("Full minimizer information:", result)
-# print("Correlation matrix:", result.correlation())
+print(f"covariance status: {covstatus}")
 
 
-if new_result:
-    print("New result was found!")
-    print(result)
+# --- error propagation to get correlated uncertainty on parameters
+correlated_values = unc.correlated_values([result.params[p]["value"] for p in result.params], cov)
 
-# --- error propagation to get uncertainty on luminosity
-correlated_values = unc.correlated_values(
-    [result.params[p]["value"] for p in nuisances_lumi.values()], 
-    result.covariance(nuisances_lumi.values()))
-correlated_values_hi = unc.correlated_values_norm([(v,e) for v,e in zip(
-    [result.params[p]["value"] for p in nuisances_lumi.values()], 
-    [result.params[p]["errors"]["upper"] for p in nuisances_lumi.values()])], 
-    result.correlation(nuisances_lumi.values()))
-correlated_values_lo = unc.correlated_values_norm([(v,e) for v,e in zip(
-    [result.params[p]["value"] for p in nuisances_lumi.values()], 
-    [result.params[p]["errors"]["lower"] for p in nuisances_lumi.values()])], 
-    result.correlation(nuisances_lumi.values()))
-
-for k,v, lo, hi in zip(nuisances_lumi.values(), correlated_values, correlated_values_lo, correlated_values_hi):
-    result.params[k]["correlated_value"] = v
-    result.params[k]["correlated_value_lo"] = lo
-    result.params[k]["correlated_value_hi"] = hi
+for p, v in zip(result.params, correlated_values):
+    result.params[p]["correlated_value"] = v
 
 lumi_function = [get_luminosity_function(era) for era in eras]
 lumi_values = [lumi_function[i]([result.params[iv]["correlated_value"] for iv in v]) for i, v in enumerate(nuisances_lumi_era.values())]
-lumi_values_lo = [lumi_function[i]([result.params[iv]["correlated_value_lo"] for iv in v]) for i, v in enumerate(nuisances_lumi_era.values())]
-lumi_values_hi = [lumi_function[i]([result.params[iv]["correlated_value_hi"] for iv in v]) for i, v in enumerate(nuisances_lumi_era.values())]
-lumi_values_lo_valid = [all([result.params[iv]["errors"]["upper_valid"] for iv in v]) for i, v in enumerate(nuisances_lumi_era.values())]
-lumi_values_hi_valid = [all([result.params[iv]["errors"]["lower_valid"] for iv in v]) for i, v in enumerate(nuisances_lumi_era.values())]
 
 lumi_prefit = [ref_lumi[era] for era in eras]
 lumi_prefit.append(sum(lumi_prefit))
 
 eras.append("Sum")
 lumi_values.append(sum(lumi_values))
-lumi_values_lo.append(sum(lumi_values_lo))
-lumi_values_hi.append(sum(lumi_values_hi))
-lumi_values_lo_valid.append(all(lumi_values_lo_valid))
-lumi_values_hi_valid.append(all(lumi_values_hi_valid))
-
 
 df_lumi = pd.DataFrame(data={
     "era":eras, 
     "value":unp.nominal_values(lumi_values), 
     "hesse":unp.std_devs(lumi_values), 
-    "error_lo":unp.std_devs(lumi_values_lo), 
-    "error_hi":unp.std_devs(lumi_values_hi),
-    "error_lo_valid":lumi_values_lo_valid, 
-    "error_hi_valid":lumi_values_hi_valid
     })
 
 df_lumi["prefit"] = lumi_prefit
 
 df_lumi["relative_hesse"] = df_lumi["hesse"] / df_lumi["value"]
-df_lumi["relative_error_low"] = df_lumi["error_lo"] / df_lumi["value"]
-df_lumi["relative_error_hi"] = df_lumi["error_hi"] / df_lumi["value"]
 
 print(df_lumi)
 

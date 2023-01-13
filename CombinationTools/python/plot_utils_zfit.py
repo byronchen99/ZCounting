@@ -74,9 +74,9 @@ def plot_pulls(result, outDir="./"):
     set_style()
 
     names = np.array([p.name for p in result.params])
-    xx = np.array([result.params[p]["value"] for p in result.params])
-    xx_hi = np.array([result.params[p]["errors"]["upper"] for p in result.params])
-    xx_lo = np.array([result.params[p]["errors"]["lower"] for p in result.params])
+    xx = np.array([result.params[p]["correlated_value"].n for p in result.params])
+    xx_hi = np.array([result.params[p]["correlated_value"].s for p in result.params])
+    xx_lo = np.array([result.params[p]["correlated_value"].s for p in result.params])
     yy = np.arange(len(names))
 
     # parameters with a name starting with "r_" are rate parameters
@@ -93,6 +93,8 @@ def plot_pulls(result, outDir="./"):
 
     ax.plot([2, 2], [ymin,ymax], linestyle="dashed", color="gray")
     ax.plot([-2, -2], [ymin,ymax], linestyle="dashed", color="gray")
+
+    ax.plot([0.0, 0.0], [ymin,ymax], linestyle="dashed", color="gray")
 
 
     nround = lambda x: round(x, 3)
@@ -118,7 +120,7 @@ def plot_pulls(result, outDir="./"):
     plt.savefig("{0}/pulls.png".format(outDir))
 
 ### --- plot results on luminosity
-def plot_pulls_lumi(dataframe, outDir="./"):
+def plot_pulls_lumi(dataframe, outDir="./", xRange=(-0.03,0.03)):
     import matplotlib.pyplot as plt
     import numpy as np
 
@@ -134,8 +136,8 @@ def plot_pulls_lumi(dataframe, outDir="./"):
     xx_lo_prefit = xx_hi_prefit
 
     xx = (dataframe["value"].values - xx_prefit) /xx_prefit
-    xx_hi = dataframe["error_hi"].values/xx_prefit
-    xx_lo = dataframe["error_lo"].values/xx_prefit
+    xx_hi = dataframe["hesse"].values/xx_prefit
+    xx_lo = dataframe["hesse"].values/xx_prefit
     yy = np.arange(len(names))
 
     xx_prefit = (xx_prefit-xx_prefit)/xx_prefit
@@ -148,9 +150,9 @@ def plot_pulls_lumi(dataframe, outDir="./"):
 
     ax.plot([-0.02, -0.02], [ymin,ymax], linestyle="dashed", color="gray")
     ax.plot([0.02, 0.02], [ymin,ymax], linestyle="dashed", color="gray")
-
     ax.plot([-0.01, -0.01], [ymin,ymax], linestyle="dashed", color="gray")
     ax.plot([0.01, 0.01], [ymin,ymax], linestyle="dashed", color="gray")
+    ax.plot([0.0, 0.0], [ymin,ymax], linestyle="dashed", color="gray")
 
     nround = lambda x: round(x, 3)
 
@@ -172,7 +174,7 @@ def plot_pulls_lumi(dataframe, outDir="./"):
     xmin = -xmax
 
     ax.set_yticks(np.arange(len(names)), labels=names)
-    ax.set_xlim(-0.03,0.03)
+    ax.set_xlim(xRange)
     ax.set_ylim(ymin, ymax+1)
 
     plt.savefig("{0}/pulls_lumi.png".format(outDir))
