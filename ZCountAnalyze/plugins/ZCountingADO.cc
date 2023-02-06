@@ -246,6 +246,8 @@ private:
 
     std::vector<int> muon_nStationsStaReg_;
 
+    std::vector<int> muon_nValidHitsSta_;
+
     std::vector<float> muon_ptStaUpd_;
     std::vector<float> muon_etaStaUpd_;
     std::vector<float> muon_phiStaUpd_;
@@ -288,6 +290,7 @@ private:
     std::vector<int> muon_nTrackerLayers_;
     std::vector<float> muon_validFraction_;
     std::vector<float> muon_trackAlgo_;
+    std::vector<bool> muon_highPurity_;
 
     std::vector<float> muon_ScaleCorr_;
     //std::vector<float> muon_ScaleCorr_stat_RMS_;
@@ -317,6 +320,7 @@ private:
     std::vector<int> track_nTrackerLayers_;
     std::vector<float> track_validFraction_;
     std::vector<float> track_trackAlgo_;
+    std::vector<bool> track_highPurity_;
 
     std::vector<float> track_ScaleCorr_;
 
@@ -702,10 +706,10 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
             }
             
             // reject muons only if best track, both outer tracks, and inner track fail acceptance cuts
-            if (   (             std::abs(StaReg.eta()) > 2.4  || StaReg.pt() < 20)
-                && (mu==0     || std::abs(mu->eta()) > 2.4     || mu->pt() < 20)
-                && (trk==0    || std::abs(trk->eta()) > 2.4    || trk->pt() < 20)
-                && (StaUpd==0 || std::abs(StaUpd->eta()) > 2.4 || StaUpd->pt() < 20)
+            if (   (             std::abs(StaReg.eta()) > 2.5  || StaReg.pt() < 10)
+                && (mu==0     || std::abs(mu->eta()) > 2.5     || mu->pt() < 10)
+                && (trk==0    || std::abs(trk->eta()) > 2.5    || trk->pt() < 10)
+                && (StaUpd==0 || std::abs(StaUpd->eta()) > 2.5 || StaUpd->pt() < 10)
             ) {
                 continue;
             }
@@ -715,8 +719,10 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
             muon_phiStaReg_.push_back(StaReg.phi());     
             muon_chargeStaReg_.push_back(StaReg.charge());
 
-            muon_nStationsStaReg_.push_back(StaReg.hitPattern().muonStationsWithValidHits());            
+            muon_nStationsStaReg_.push_back(StaReg.hitPattern().muonStationsWithValidHits());         
             muon_useUpdated_.push_back(useUpdated);
+
+            muon_nValidHitsSta_.push_back(StaReg.numberOfValidHits());   
 
             if(StaUpd != 0){
                 muon_ptStaUpd_.push_back(StaUpd->pt());
@@ -741,6 +747,7 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
                 muon_nTrackerLayers_.push_back(trk->hitPattern().trackerLayersWithMeasurement());
                 muon_validFraction_.push_back(trk->validFraction());
                 muon_trackAlgo_.push_back(trk->originalAlgo());
+                muon_highPurity_.push_back(trk->qualityMask()&4);
             }
             else{
                 muon_ptTrk_.push_back(-1);
@@ -752,7 +759,7 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
                 muon_nTrackerLayers_.push_back(-1);
                 muon_validFraction_.push_back(-1);
                 muon_trackAlgo_.push_back(-1);
-
+                muon_highPurity_.push_back(0);
             }
 
             if(mu!=0){
@@ -897,8 +904,8 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
         edm::Handle<std::vector<reco::Track>> trackCollection;
         iEvent.getByToken(trackCollection_, trackCollection);
         for (const reco::Track &trk : *trackCollection){        
-            if(std::abs(trk.eta()) > 2.4) continue;
-            if(trk.pt() < 20) continue;
+            if(std::abs(trk.eta()) > 2.5) continue;
+            if(trk.pt() < 10) continue;
         
             // Check if track is already in muons
             bool isMuon = false;
@@ -937,7 +944,8 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
             track_nTrackerLayers_.push_back(trk.hitPattern().trackerLayersWithMeasurement());
             track_validFraction_.push_back(trk.validFraction());
             track_trackAlgo_.push_back(trk.originalAlgo());
-            
+            track_highPurity_.push_back(trk.qualityMask()&4);
+
             if(store_roccor_){
                 double roccorSF = 1.; // Rochester correction
                 if(!iEvent.isRealData()){
@@ -989,8 +997,8 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
                 
             const float sc_pt = sc->energy() * sqrt(1 - std::pow(std::tanh(sc->eta()), 2));
 
-            if (                (std::abs(el.eta()) > 2.5 || el.pt() < 20)
-                && (sc==0    || std::abs(sc->eta()) > 2.5 || sc_pt < 20))          
+            if (                (std::abs(el.eta()) > 2.5 || el.pt() < 10)
+                && (sc==0    || std::abs(sc->eta()) > 2.5 || sc_pt < 10))          
             {
                 continue;
             }
@@ -1068,7 +1076,7 @@ ZCountingAOD::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
             
             const float sc_pt = sc.energy() * sqrt(1 - std::pow(std::tanh(sc.eta()), 2));
             
-            if (std::abs(sc.eta()) > 2.5 || sc_pt < 20){
+            if (std::abs(sc.eta()) > 2.5 || sc_pt < 10){
                 continue;
             }
 
@@ -1277,6 +1285,8 @@ ZCountingAOD::beginJob()
 
         tree_->Branch("Muon_nStationsStaReg", &muon_nStationsStaReg_);
 
+        tree_->Branch("Muon_nValidHitsSta", &muon_nValidHitsSta_);
+
         tree_->Branch("Muon_ptStaUpd", &muon_ptStaUpd_);
         tree_->Branch("Muon_etaStaUpd", &muon_etaStaUpd_);
         tree_->Branch("Muon_phiStaUpd", &muon_phiStaUpd_);
@@ -1316,6 +1326,7 @@ ZCountingAOD::beginJob()
         tree_->Branch("Muon_nPixelHits", &muon_nPixelHits_);
         tree_->Branch("Muon_nTrackerLayers", &muon_nTrackerLayers_);
         tree_->Branch("Muon_trackAlgo", &muon_trackAlgo_);
+        tree_->Branch("Muon_highPurity", &muon_highPurity_);
 
 
         //Roccester corrections
@@ -1351,6 +1362,7 @@ ZCountingAOD::beginJob()
         tree_->Branch("Track_nTrackerLayers", &track_nTrackerLayers_);
         tree_->Branch("Track_validFraction", &track_validFraction_);
         tree_->Branch("Track_trackAlgo", &track_trackAlgo_);
+        tree_->Branch("Track_highPurity", &track_highPurity_);
 
         //Roccester corrections
         if(store_roccor_){
@@ -1472,6 +1484,8 @@ void ZCountingAOD::clearVariables(){
 
     muon_nStationsStaReg_.clear();
 
+    muon_nValidHitsSta_.clear();
+
     muon_ptStaUpd_.clear();
     muon_etaStaUpd_.clear();
     muon_phiStaUpd_.clear();    
@@ -1509,6 +1523,7 @@ void ZCountingAOD::clearVariables(){
     muon_nTrackerLayers_.clear();
     muon_validFraction_.clear();
     muon_trackAlgo_.clear();
+    muon_highPurity_.clear();
 
     muon_ScaleCorr_.clear();
     // muon_ScaleCorr_stat_RMS_.clear();
@@ -1539,6 +1554,7 @@ void ZCountingAOD::clearVariables(){
     track_nTrackerLayers_.clear();
     track_validFraction_.clear();
     track_trackAlgo_.clear();
+    track_highPurity_.clear();
 
     track_ScaleCorr_.clear();
 

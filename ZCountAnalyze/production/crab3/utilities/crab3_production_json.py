@@ -94,4 +94,4 @@ if __name__ == '__main__':
     # disable write permissions
     EXE('chmod 444 '+opts.production_json)
 
-    print colored_text('[output]', ['1', '92']), opts.production_json
+    print(colored_text('[output]', ['1', '92']), opts.production_json)

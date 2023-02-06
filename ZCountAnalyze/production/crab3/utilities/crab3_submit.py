@@ -63,11 +63,11 @@ if __name__ == '__main__':
            KILL(log_prx+'invalid dataset name for entry "'+i_dset_key+'" in input .json file: '+crab3_conf['Data.inputDataset'])
 
         for i_key in crab3_conf:
-            if isinstance(crab3_conf[i_key], unicode):
+            if isinstance(crab3_conf[i_key], str):
                crab3_conf[i_key] = crab3_conf[i_key].encode('UTF8')
 
             elif isinstance(crab3_conf[i_key], list):
-               crab3_conf[i_key] = [(_tmp.encode('UTF8') if isinstance(_tmp, unicode) else _tmp) for _tmp in crab3_conf[i_key]]
+               crab3_conf[i_key] = [(_tmp.encode('UTF8') if isinstance(_tmp, str) else _tmp) for _tmp in crab3_conf[i_key]]
 
         crab3_tag = str(i_dset_key)
 
@@ -150,7 +150,7 @@ if __name__ == '__main__':
 
                       cfgf.write('config.'+i_key+' = '+str(i_out)+'\n')
 
-        print colored_text('['+crab3_cfgfile+']', ['1', '93'])
+        print(colored_text('['+crab3_cfgfile+']', ['1', '93']))
 
         if not opts.no_submit:
 

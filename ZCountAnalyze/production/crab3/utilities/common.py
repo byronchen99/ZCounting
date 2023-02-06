@@ -6,11 +6,11 @@ def KILL(log):
 # --
 
 def WARNING(log):
-    print '\n '+'\033[1m'+'@@@ '+'\033[93m'+'WARNING'+'\033[0m'+' -- '+log+'\n'
+    print('\n '+'\033[1m'+'@@@ '+'\033[93m'+'WARNING'+'\033[0m'+' -- '+log+'\n')
 # --
 
 def EXE(cmd, suspend=True, verbose=False, dry_run=False):
-    if verbose: print '\033[1m'+'>'+'\033[0m'+' '+cmd
+    if verbose: print('\033[1m'+'>'+'\033[0m'+' '+cmd)
     if dry_run: return
 
     _exitcode = os.system(cmd)

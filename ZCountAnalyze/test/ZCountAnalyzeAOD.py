@@ -78,12 +78,13 @@ process.source = cms.Source("PoolSource",
         # "/store/mc/RunIISummer20UL17RECO/DYJetsToLL_M-50_HT-100to200_TuneCP5_PSweights_13TeV-madgraphMLM-pythia8/AODSIM/106X_mc2017_realistic_v6-v1/00000/0C0FD46D-6DAE-6F45-B9F4-129A6ABC69C4.root"
         #'/store/mc/Run3Winter22DR/DYJetsToLL_M-50_TuneCP5_13p6TeV-madgraphMLM-pythia8/AODSIM/FlatPU0to70_122X_mcRun3_2021_realistic_v9_ext1-v2/2520000/002de84f-b906-4509-8cb6-872ee0cf4029.root'
         # 'file:/eos/home-d/dwalter/Lumi/ZCounting_Standalone/CMSSW_12_4_3/src/ZCounting/ZCountAnalyze/002de84f-b906-4509-8cb6-872ee0cf4029.root'
-        'file:/eos/home-d/dwalter/Lumi/ZCounting_Standalone/CMSSW_12_4_3/src/ZCounting/ZCountAnalyze/production/crab3/655c9af9-8470-4625-94c9-24ab6555ffa8.root'
+        "/store/mc/RunIISummer20UL18RECO/DYJetsToLL_1J_MLL_800_1400_TuneCP5_13TeV-amcatnloFXFX-pythia8/AODSIM/106X_upgrade2018_realistic_v11_L1v1-v4/40000/0023CEB0-2B74-2E48-BE8F-89ECE48386A5.root"
+        # 'file:/eos/home-d/dwalter/Lumi/ZCounting_Standalone/CMSSW_12_4_3/src/ZCounting/ZCountAnalyze/production/crab3/655c9af9-8470-4625-94c9-24ab6555ffa8.root'
     )
 )
 
-genWeights = cms.vint32(1005, 1009, 1004, 1007, 1002, 1003),
-pdfWeights = cms.vint32(1252, 1354)
+# genWeights = cms.vint32(1005, 1009, 1004, 1007, 1002, 1003),
+# pdfWeights = cms.vint32(1252, 1354)
 
 if options.year == "2016preVFP":
     globalTag = '106X_mcRun2_asymptotic_preVFP_v11'
@@ -107,8 +108,8 @@ elif options.year == "2018":
     roccoFile = 'ZCounting/ZUtils/data/RoccoR2018UL.txt'
 elif options.year == "2022":
     globalTag = '112X_mcRun3_2021_realistic_v16'
-    genWeights = cms.vint32(1021, 1041, 1006, 1011, 1016, 1031)
-    pdfWeights = cms.vint32(1252, 1354)
+    # genWeights = cms.vint32(1021, 1041, 1006, 1011, 1016, 1031)
+    # pdfWeights = cms.vint32(1252, 1354)
     l1PrefireECAL = "None"
     l1PrefireMuon = "None"
     roccoFile = "None"
@@ -161,8 +162,8 @@ if options.samplename in ('dy', 'zz', 'wz', 'ttz'):
     process.zcounting.hasGenZ = True
     process.zcounting.genZLeptonCollection = cms.InputTag("genZLeptonDecay")
     
-    process.zcounting.genWeights = genWeights
-    process.zcounting.pdfWeights = pdfWeights
+    # process.zcounting.genWeights = genWeights
+    # process.zcounting.pdfWeights = pdfWeights
     process.zcounting.printLHE = False
     
     ### particle level definition of gen events
