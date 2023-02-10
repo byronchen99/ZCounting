@@ -10,7 +10,22 @@ signal_fraction = {
     "Sta_fail": 0.5
 }
 
-def fit(hist, nBins, binLo, binHi, category):
+
+# def fit(hist, nBins, binLo, binHi, category, implementation="roofit", **kwargs):
+
+#     if implementation=="zfit":
+#         zfit(hist, nBins, binLo, binHi, category, kwargs)
+#     elif implementation=="roofit":
+#         roofit(hist, nBins, binLo, binHi, category, kwargs)
+
+# def roofit(hist, nBins, binLo, binHi, category):
+
+#     h2HLT = utils.np_to_hist(h2HLT, nBins, binLo, binHi, "TH1", category)
+
+#     ROOT.getZyield(h2HLT, m, "HLT", etaRegion, sigModel, bkgModelPass, 2, sigTemplates, 0)
+
+
+def zfit(hist, nBins, binLo, binHi, category):
     import zfit
     from python.zfit_models import get_signal, get_background
     from python.zfit_plot import plot_comp_model

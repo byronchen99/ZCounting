@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 
+from python import logging
+from python import common
+
+
 def zmonitoring(
     dirDQM,
     dirOut,
     byLsCSV,
     mcCorrections,
-    sigTemplates,
-    bkgTemplates,
+    sigModel,
+    bkgModel,
     ptCut,
     etaCut,
     mass,
@@ -24,7 +28,7 @@ def zmonitoring(
     import json
 
     if runlist == None:
-        print("create runlist from byLsCSV file")
+        log.info("create runlist from byLsCSV file")
         with open(byLsCSV) as file:
             byLS_lines = file.readlines()
         byLS_data = pd.read_csv(
@@ -35,13 +39,13 @@ def zmonitoring(
         # number of lumisections per Run
         nLS = byLS_data.pivot_table(columns=['#run:fill'], aggfunc='size')
 
-        print("sort out {0} runs with less than {1} LS".format(sum(nLS.values <= minLS), minLS))
+        log.info("sort out {0} runs with less than {1} LS".format(sum(nLS.values <= minLS), minLS))
         runlist = byLS_data['#run:fill'].str.split(':', expand=True)[0].drop_duplicates()
         runlist = runlist[nLS.values > minLS].tolist()
 
     cmsswbase = os.environ['CMSSW_BASE']
     if not cmsswbase:
-        print("please set cmsenv")
+        log.error("please set cmsenv")
         exit()
 
     cs_file = open("cs_tmp.sub", "w")
@@ -62,7 +66,7 @@ def zmonitoring(
         cs_file.write("+RequestRuntime = 10799 \n")  # only works at naf(desy) 43200s = 12h
         cs_file.write("RequestMemory = 1999 \n") 
 
-    print(f"Have {len(runlist)} runs")
+    log.info(f"Have {len(runlist)} runs")
     
     njobs=0
     runs = []
@@ -80,8 +84,8 @@ def zmonitoring(
             byLsCSV,
             dirOut,
             mcCorrections,
-            sigTemplates,
-            bkgTemplates,
+            sigModel,
+            bkgModel,
             ptCut,
             etaCut,
             mass[0],
@@ -95,12 +99,12 @@ def zmonitoring(
         cs_file.write("queue\n")
     cs_file.close()
     if test:
-        print("Execute command to run jobs: ")
-        print("condor_submit cs_tmp.sub")
+        log.info("Execute command to run jobs: ")
+        log.info("condor_submit cs_tmp.sub")
         exit()
     else:
         out = os.popen("condor_submit cs_tmp.sub --verbose").read()
-        print(out)
+        log.info(out)
     #os.system("rm cs_tmp.sub")
     out = out.split("\n")[-2].split(" ")
     clusterId = int(out[-1][:-1])
@@ -112,8 +116,8 @@ def zmonitoring(
         'dirOut': dirOut,
         'byLsCSV': byLsCSV,
         'mcCorrections': mcCorrections,
-        'sigTemplates': sigTemplates,
-        'bkgTemplates': bkgTemplates,
+        'sigModel': sigModel,
+        'bkgModel': bkgModel,
         'mass_lo': mass[0],
         'mass_hi': mass[1],
         'mass_bins': mass[2],
@@ -156,14 +160,14 @@ def check(projectdir, resubmit=False, collect=False, longQueue=False):
             continue
         with open(outfilename, "r") as f:
             lastline = f.readlines()[-1]
-        if lastline != "INFO:  ===Done\n":
+        if lastline != "INFO:ZCounting.py:Done\n":
             unfinished_jobs.append(ijob)
     if len(unfinished_jobs) == 0:
-        print("all jobs done!")
+        log.info("all jobs done!")
     else:
-        print("unfinished jobs: {0}".format(unfinished_jobs))
+        log.info("unfinished jobs: {0}".format(unfinished_jobs))
         if resubmit:
-            print("resubmit unfinished jobs")
+            log.info("resubmit unfinished jobs")
             faildir = projectdir+'/failed'+str(ji['clusterId'])
             if not os.path.isdir(faildir):
                 os.mkdir(faildir)
@@ -182,7 +186,7 @@ def check(projectdir, resubmit=False, collect=False, longQueue=False):
                         os.system("mv {0} {1}/csvFiles/".format(csvFile, faildir))
 
                 zmonitoring(
-                    ji['dirDQM'], ji['dirOut'], ji['byLsCSV'], ji['mcCorrections'], ji['sigTemplates'], ji['bkgTemplates'],
+                    ji['dirDQM'], ji['dirOut'], ji['byLsCSV'], ji['mcCorrections'], ji['sigModel'], ji['bkgModel'],
                     ji['ptCut'], ji['etaCut'], (ji['mass_lo'], ji['mass_hi'], ji['mass_bins']), 
                     ji['luminosity'], ji['mode'], False,
                     runlist=[ji['runs'][i] for i in unfinished_jobs],
@@ -192,8 +196,9 @@ def check(projectdir, resubmit=False, collect=False, longQueue=False):
 # parse command line arguments
 if __name__ == '__main__':
     # setup argument parser
-    import argparse, pdb
-    parser = argparse.ArgumentParser(prog='./submit')
+    import pdb
+    
+    parser = common.parser()
     subparsers = parser.add_subparsers(dest='subparser')
 
     # command line arguments: zmonitoring
@@ -201,58 +206,7 @@ if __name__ == '__main__':
         'zmonitoring',
         help='submit ZMonitoring jobs to HTCondor'
     )
-    parserA.add_argument(
-        '-i', '--inputDQM', type=str, default="default",
-        help='specify directory to input histogram .root files'
-    )
-    parserA.add_argument(
-        "-b", "--beginRun", default=272007, type=int,
-        help="first run to analyze [%(default)s]"
-    )
-    parserA.add_argument(
-        "-e", "--endRun", default=1000000, type=int,
-        help="analyze stops when comes to this run [%(default)s]"
-    )
-    parserA.add_argument(
-        '--mcCorrections', default="default", type=str,
-        help='specify .json file with MC corrections for muon correlations'
-    )
-    parserA.add_argument(
-        '--sigTemplates', default="default", type=str,
-        help='specify if MC template is unsigned for signal shapes'
-    )
-    parserA.add_argument(
-        '--bkgTemplates', default="default", type=str,
-        help='specify if MC template is unsigned for background shapes'
-    )
-    parserA.add_argument(
-        '--LumiPerMeasurement', default=20, type=float,
-        help='specify amount of luminosity per measurement in pb-1'
-    )
-    parserA.add_argument(
-        '--mode', default=4, type=int,
-        help='specify mode schemes for muon efficiency'
-    )
-    parserA.add_argument(
-        '--mass', nargs=3, metavar=('LOW', 'HIGH', 'NBINS'), default=(60, 120, 120),
-        help='specify mass range for tag and probe muon pairs'
-    )
-    parserA.add_argument(
-        '--byLsCSV', default="default", type=str,
-        help='specify byLsCSV to select specific lumi sections'
-    )
-    parserA.add_argument(
-        '--ptCut', type=float, default=25.,
-        help='specify lower pt cut on tag and probe muons'
-    )
-    parserA.add_argument(
-        '--etaCut', type=float, default=2.4,
-        help='specify lower eta cut on tag and probe muons'
-    )
-    parserA.add_argument(
-        '-o', '--output', default='./',
-        help='specify output dir'
-    )
+    parserA = common.parser_zharvest(parserA)
     parserA.add_argument(
         '-t', '--test', default=False, action="store_true",
         help='test without submitting, just create the submit script'
@@ -261,7 +215,6 @@ if __name__ == '__main__':
         '--longQueue', default=False, action="store_true",
         help='submit on the long queue'
     )
-
     # command line arguments: check
     parserC = subparsers.add_parser(
         'check',
@@ -281,20 +234,22 @@ if __name__ == '__main__':
     )
     parserC.add_argument(
         '--longQueue', default=False, action="store_true",
-        help='submit on the long queue'
+        help='resubmit on the long queue'
     )
-
 
     # parse arguments and call subparser
     args = parser.parse_args()
+
+    log = setup_logger(__file__, args.verbose)
+
     if args.subparser == 'zmonitoring':
         zmonitoring(
             args.inputDQM,
             args.output,
             args.byLsCSV,
             args.mcCorrections,
-            args.sigTemplates,
-            args.bkgTemplates,
+            args.sigModel,
+            args.bkgModel,
             args.ptCut,
             args.etaCut,
             args.mass,

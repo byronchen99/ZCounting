@@ -1,3 +1,5 @@
+from python.logging import child_logger
+log = child_logger(__name__)
 
 # ------------------------------------------------------------------------------
 def load_input_csv(byLS_data):
@@ -17,7 +19,7 @@ def load_input_csv(byLS_data):
     byLS_data = pd.read_csv(byLS_data, sep=',', low_memory=False,
         skiprows=lambda x: byLS_lines[x].startswith('#') and not byLS_lines[x].startswith('#run'))
         
-    print("INFO:  === formatting csv file...")    # formatting the csv
+    log.info("formatting csv file...")    # formatting the csv
     byLS_data[['run', 'fill']] = byLS_data['#run:fill'].str.split(':', expand=True).apply(pd.to_numeric)
     byLS_data['ls'] = byLS_data['ls'].str.split(':', expand=True)[0].apply(pd.to_numeric)   
 
@@ -71,18 +73,24 @@ def getFileName(directory, run):
         run number for the rootfile to load
     """
     import glob
-    
+
     # check if run was processed already
     eosFileList = glob.glob(directory + '/*' + str(run) + '*.root')
+
+    # look one level deeper
+    if len(eosFileList) == 0:
+        eosFileList = glob.glob(f'{directory}/000{str(run)[:-2]}xx/*{run}*.root')
+    if len(eosFileList) == 0:
+        eosFileList = glob.glob(f'{directory}/Muon/000{str(run)[:-2]}xx/*{run}*.root')
+    if len(eosFileList) == 0:
+        eosFileList = glob.glob(f'{directory}/SingleMuon/000{str(run)[:-2]}xx/*{run}*.root')
+
     if not len(eosFileList) > 0:
-        # look one level deeper
-        eosFileList = glob.glob(directory + '/*/*' + str(run) + '*.root')
-    if not len(eosFileList) > 0:
-        print("WARNING: === The file does not (yet) exist for run: " + str(run))
+        log.warning(f"The file does not (yet) exist for run: {run}")
         return None
         
     elif len(eosFileList) > 1:
-        print("WARNING: === Multiple files found for run: " + str(run))
+        log.warning(f"Multiple files found for run: {run}")
         return None
     else:
         return eosFileList[0]
@@ -123,16 +131,8 @@ def load_histogram(
     import uproot 
     import numpy as np
     import pdb
-    from hist import Hist
 
     with uproot.open("{0}:{1}{2}".format(fileName, prefix, name)) as th_:
-        
-        # h_ = th_.to_boost(bh.axis.IntCategory(np.arange(1,2501,1)), bh.axis.Regular(80, 50, 130))
-
-        # h1 = bh.Histogram(bh.axis.IntCategory(np.arange(1,2501,1)), bh.axis.Regular(80, 50, 130))
-
-        # pdb.set_trace()
-
 
         h_ = th_.to_numpy()
         
@@ -141,6 +141,9 @@ def load_histogram(
 
         # select lumisections
         h_ = np.sum(h_[0][lumisections], axis=0)
+
+        if sum(h_) <= 0:
+            log.warning(f"No entries found in histogram {name}")
 
         if pileup:
             return h_
@@ -155,19 +158,19 @@ def load_histogram(
         binWidthNew = (MassMax - MassMin)/MassBin
 
         if (binWidth[0] == binWidth).all() == False:
-            print("ERROR:  === variable bin sizes, no rebinning possible!")
+            log.error("variable bin sizes, no rebinning possible!")
             return None
 
         if binWidth[0] > binWidthNew:
-            print("ERROR:  === bin width is smaller than original binning, no rebinning possible!")
+            log.error("bin width is smaller than original binning, no rebinning possible!")
             return None
 
-        # same bin widths, select different range
+        # same bin widths or larger, select different range
         bin_lo = (bins_new[0] - bins_x[0])/binWidth[0]
         bin_hi = (bins_new[-1] - bins_x[-1])/binWidth[0]
 
         if not bin_lo.is_integer() or not bin_hi.is_integer() or bin_lo<0 or bin_hi>0:
-            print("ERROR:  === can not rebin to new range!")
+            log.error("can not rebin to new range!")
             return None
 
         h_ = h_[int(bin_lo):int(bin_hi)]
@@ -177,20 +180,35 @@ def load_histogram(
             l = len(h_)/f
 
             if not f.is_integer() or not l.is_integer():
-                print("ERROR:  === can not rebin to new width!")
+                log.error("can not rebin to new width!")
                 return None           
 
             h_ = h_.reshape(int(l), int(f)).sum(axis=1)
+        
+        return h_
 
-        # # convert numpy array to boost histogram
-        # import boost_histogram as bh
-        # hist = bh.Histogram(bh.axis.Regular(bins=MassBin, start=MassMin, stop=MassMax))
+# ------------------------------------------------------------------------------
+def np_to_hist(y, nBins=None, binLow=None, binHigh=None, histtype="TH1", name=""):
+    if histtype == "np":
+        return y
 
-        # convert numpy array to hist
-        hist = Hist.new.Regular(MassBin, MassMin, MassMax, name="x").Double()
+    if histtype == "boost":
+        import boost_histogram as bh
+        hist = bh.Histogram(bh.axis.Regular(bins=nBins, start=binLow, stop=binHigh))
+        hist[:] = y
+        return hist
 
-        hist[:] = h_
- 
+    if histtype == "hist":
+        from hist import Hist
+        hist = Hist.new.Regular(nBins, binLow, binHigh, name="x").Double()
+        hist[:] = y
+        return hist
+
+    if histtype == "TH1":
+        import ROOT
+        hist = ROOT.TH1D(name, name, nBins, binLow, binHigh)
+        for i, v in enumerate(y):
+            hist.SetBinContent(i, v)
         return hist
 
 
@@ -224,12 +242,10 @@ def get_ls_for_next_measurement(
         If the luminosity in one lumisection is above this value and the number z counts is zero, the ls is skipped 
     """
     
-    
-    
     if luminosities:
         # make measurement based on number of lumisections
         if len(lumisections) != len(luminosities):
-            print("ERROR:  === Same length of lumisections and luminosities is required!")
+            log.error("Same length of lumisections and luminosities is required!")
         
     while len(lumisections) > 0:
         
@@ -250,7 +266,7 @@ def get_ls_for_next_measurement(
                 #   (for lumi > 0.02 /pb we expect 0.02*500 = 10 Z bosons, the probability to find 0 is < 0.01%)
                 # sort out lumisections without any Z candidate (maybe trigger was off)
                 if luminosities[0] > threshold and zcounts[0] == 0:
-                    print("WARNING:  === Zero Z boson candidates found {0}/pb while we would expect {1} -> skip lumi section {2}".format(luminosities[0], luminosities[0]*500, lumisections[0]))
+                    log.warning("Zero Z boson candidates found {0}/pb while we would expect {1} -> skip lumi section {2}".format(luminosities[0], luminosities[0]*500, lumisections[0]))
                     del lumisections[0]
                     del luminosities[0]
                     del zcounts[0]
@@ -309,8 +325,8 @@ def getCorrelation(hPV_data, correlationsFileName, which, region="I"):
     corr = hC.Integral()
 
     tfile.Close()
-    print("Correlation coefficienct c{0}_{1} = {2}".format(which, region, corr))
-    print("For average primary vertices of <pv> = {0}".format(avgPV))
+    log.info("Correlation coefficienct c{0}_{1} = {2}".format(which, region, corr))
+    log.info("For average primary vertices of <pv> = {0}".format(avgPV))
     return corr
 
 # ------------------------------------------------------------------------------
@@ -330,7 +346,7 @@ def writeSummaryCSV(outCSVDir, outName="Mergedcsvfile", writeByLS=True, keys=Non
     import pandas as pd
     import glob
     
-    print("INFO:  === Writing overall CSV file")
+    log.info("Writing overall CSV file")
     rateFileList = sorted(glob.glob(outCSVDir + '/csvfile??????.csv'))
     df_merged = pd.concat([pd.read_csv(m) for m in rateFileList], ignore_index=True, sort=False)
     
@@ -341,7 +357,7 @@ def writeSummaryCSV(outCSVDir, outName="Mergedcsvfile", writeByLS=True, keys=Non
         df_merged.to_csv(file, index=False)
 
     if writeByLS:
-        print("INFO:  ===Writing overall CSV file per LS")
+        log.info("Writing overall CSV file per LS")
         rateFileList = sorted(glob.glob(outCSVDir + '/csvfile*_*.csv'))
         csvList = []
         # add measurement label to the csv list

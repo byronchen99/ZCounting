@@ -356,7 +356,7 @@ TFile* generateTemplate(
     const TString effType,
     TH1D          *hPV
 ){
-    const TString histfilename = outputDir+"/histTemplates_Gen.root";
+    const TString histfilename = outputDir+"/histTemplates_"+effType+".root";
 
     TFile *outfile = 0;
 
@@ -483,7 +483,6 @@ TFile* generateTemplate_ZYield(
 ){
     //const TString histfilename = hPV == 0 ? outputDir+"/../histTemplates_HLT.root" : outputDir+"/histTemplates_HLT_"+std::to_string(iBin)+".root";
     const TString histfilename = outputDir+"/histTemplates_HLT.root";
-
 
     TFile *outfile = 0;
 
@@ -1140,6 +1139,7 @@ void getZyield(
     nfl += set_background_model(bkgMod, bkgModel, m, passRegion, 0);
     
     // ---> Add constraint terms
+    std::cout<<">>> Set up constraints " <<std::endl;
     RooArgSet *constraints = new RooArgSet("constraints");
     RooGaussian *constraint_sig_mean = 0;
     RooGaussian *constraint_sig_sigma = 0;
@@ -1181,6 +1181,7 @@ void getZyield(
         constraints->add(*constraint_gamma);
     }
     // <---
+    std::cout<<">>> Set up data " <<std::endl;
 
     RooDataHist *data = new RooDataHist("ZReco","ZReco",RooArgList(m), h_yield);
 

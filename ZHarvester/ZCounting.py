@@ -7,53 +7,52 @@ import uncertainties as unc
 import datetime
 import numpy as np
 
-from python.utils import writeSummaryCSV, getFileName, load_input_csv, get_ls_for_next_measurement, load_histogram, getCorrelation, to_DateTime
-
-from python.logging import setup_logger
+from python import utils, logging, common
 
 # disable panda warnings when assigning a new column in the dataframe
 pd.options.mode.chained_assignment = None
 
 # turn off graphical output on screen
-# ROOT.gROOT.SetBatch(True)
+ROOT.gROOT.SetBatch(True)
 
+# -------------------------------------------------------------------------------------
+# helper function to read the workspace for a specific fit
+def open_workspace(directory, filename, m):
+    file_result = f"{directory}/{filename}_{m}.root"
+    
+    if not os.path.isfile(file_result):
+        log.warning("No result for `{0}`".format(file_result))
+        return None, None
+    
+    f = ROOT.TFile(file_result,"READ")
+    w = f.Get("workspace")
+    return f, w
+
+def open_workspace_yield(directory, filename, m):
+    f, w = open_workspace(directory, "workspace_yield_"+filename, m)
+    
+    Nsig = w.var("Nsig").getVal()
+    chi2 = w.arg("chi2").getVal()
+    
+    f.Close()
+    f.Delete()
+    w.Delete()
+    return Nsig, chi2
+
+def unorm(value):
+    if value > 0:
+        return unc.ufloat(value, np.sqrt(value))
+    else: 
+        return unc.ufloat(value, value)
+
+# -------------------------------------------------------------------------------------
 def extract_results(directory, m, cIO, cID, cHLT, cKinematicSelection):
-    log.info(" === Extracting fit results in {0} for {1}".format(directory,m))
-    
-    # helper function to read the workspace for a specific fit
-    def open_workspace(filename):
-        file_result = directory+"/{0}_{1}.root".format(filename, m)
-        
-        if not os.path.isfile(file_result):
-            log.warning(" === No result for `{0}`".format(file_result))
-            return None, None
-        
-        f = ROOT.TFile(file_result,"READ")
-        w = f.Get("workspace")
-        return f, w
-
-    def open_workspace_yield(filename):
-        f, w = open_workspace("workspace_yield_"+filename)
-        
-        Nsig = w.var("Nsig").getVal()
-        chi2 = w.arg("chi2").getVal()
-        
-        f.Close()
-        f.Delete()
-        w.Delete()
-        return Nsig, chi2
-
-    def unorm(value):
-        if value > 0:
-            return unc.ufloat(value, np.sqrt(value))
-        else: 
-            return unc.ufloat(value, value)
-    
+    log.info("Extracting fit results in {0} for {1}".format(directory,m))  
 
     # --- For identification (ID) efficiency        
-    NsigHLT2, chi2HLT2 = open_workspace_yield("HLT_{0}_2".format(etaRegion))
-    NsigHLT1, chi2HLT1 = open_workspace_yield("HLT_{0}_1".format(etaRegion))
-    NsigIDFail, chi2ID = open_workspace_yield("ID_{0}_0".format(etaRegion))
+    NsigHLT2, chi2HLT2 = open_workspace_yield(directory, "HLT_{0}_2".format(etaRegion), m)
+    NsigHLT1, chi2HLT1 = open_workspace_yield(directory, "HLT_{0}_1".format(etaRegion), m)
+    NsigIDFail, chi2ID = open_workspace_yield(directory, "ID_{0}_0".format(etaRegion), m)
 
     NsigHLT2 = unorm(NsigHLT2)
     NsigHLT1 = unorm(NsigHLT1)
@@ -62,11 +61,11 @@ def extract_results(directory, m, cIO, cID, cHLT, cKinematicSelection):
     effHLT = (2 * NsigHLT2) / (2 * NsigHLT2 + NsigHLT1)
     effID = (2 * NsigHLT2 + NsigHLT1) / (2 * NsigHLT2 + NsigHLT1 + NsigIDFail)
 
-    NsigGloPass, chi2GloPass = open_workspace_yield("Glo_{0}_1".format(etaRegion))
-    NsigGloFail, chi2GloFail = open_workspace_yield("Glo_{0}_0".format(etaRegion))
+    NsigGloPass, chi2GloPass = open_workspace_yield(directory, "Glo_{0}_1".format(etaRegion), m)
+    NsigGloFail, chi2GloFail = open_workspace_yield(directory, "Glo_{0}_0".format(etaRegion), m)
 
-    NsigStaPass, chi2StaPass = open_workspace_yield("Sta_{0}_1".format(etaRegion))
-    NsigStaFail, chi2StaFail = open_workspace_yield("Sta_{0}_0".format(etaRegion))
+    NsigStaPass, chi2StaPass = open_workspace_yield(directory, "Sta_{0}_1".format(etaRegion), m)
+    NsigStaFail, chi2StaFail = open_workspace_yield(directory, "Sta_{0}_0".format(etaRegion), m)
 
     NsigGloPass = unorm(NsigGloPass)
     NsigGloFail = unorm(NsigGloFail)
@@ -107,104 +106,114 @@ def extract_results(directory, m, cIO, cID, cHLT, cKinematicSelection):
 
     return res
 
+# -------------------------------------------------------------------------------------
+def extract_results_dqm(directory, m, cHLT):
+    log.info("Extracting fit results in {0} for {1}".format(directory,m))  
+
+    # --- For identification (ID) efficiency        
+    NsigHLT2, chi2HLT2 = open_workspace_yield(directory, "HLT_{0}_2".format(etaRegion), m)
+    NsigHLT1, chi2HLT1 = open_workspace_yield(directory, "HLT_{0}_1".format(etaRegion), m)
+    NsigIDFail, chi2ID = open_workspace_yield(directory, "Sel_{0}_0".format(etaRegion), m)
+
+    NsigHLT2 = unorm(NsigHLT2)
+    NsigHLT1 = unorm(NsigHLT1)
+    NsigIDFail = unorm(NsigIDFail)
+
+    effHLT = (2 * NsigHLT2) / (2 * NsigHLT2 + NsigHLT1)
+    effID = (2 * NsigHLT2 + NsigHLT1) / (2 * NsigHLT2 + NsigHLT1 + NsigIDFail)
+
+    NsigGloFail, chi2GloFail = open_workspace_yield(directory, "Glo_{0}_0".format(etaRegion), m)
+
+    NsigGloFail = unorm(NsigGloFail)
+
+    effGlo = (2 * NsigHLT2 + NsigHLT1 + NsigIDFail) / (2 * NsigHLT2 + NsigHLT1 + NsigIDFail + NsigGloFail)
+
+    effMu = effID*effGlo
+
+    res = {
+        "NsigHLT2": NsigHLT2,
+        "NsigHLT1": NsigHLT1,
+        "NsigIDFail": NsigIDFail,
+        "NsigGloFail": NsigGloFail,
+        "chi2HLT2": chi2HLT2,
+        "chi2HLT1": chi2HLT1,
+        "chi2GloFail": chi2GloFail,
+        "effHLT": effHLT,
+        "effID": effID,
+        "effGlo": effGlo,
+        "effMu": effMu,
+        "cHLT": cHLT,
+        "recZCount": (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 / effMu**2 * cHLT
+    }
+
+    return res
 
 ################################################################################
 if __name__ == '__main__':
-    import argparse
     import os
 
     cmsswbase = os.environ['CMSSW_BASE']
+    # cmsswbase = "/eos/home-d/dwalter/Lumi/ZCounting_Standalone/CMSSW_12_4_10/src/ZCounting/ZHarvester"
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-b", "--beginRun", help="first run to analyze [%(default)s]", type=int, default=272007)
-    parser.add_argument("-e", "--endRun", help="analyze stops when comes to this run [%(default)s]", type=int, default=1000000)
-    parser.add_argument("-m", "--measurement", help="Only fit a specific measurement of the run", type=int, default=None)
-    parser.add_argument('--mcCorrections', default="default", type=str,
-                        help='specify .json file with MC corrections for muon correlations')
-    parser.add_argument("-v", "--verbose", help="increase logging level from INFO to DEBUG", default=False,
-                        action="store_true")
-    parser.add_argument("-c", "--writeSummaryCSV", default=False, action="store_true",
-                        help="produce merged CSV with all runs")
-    parser.add_argument("-i", "--eosDir", help="Directory to the input root files from the DQM Offline module",
-                        default="default")
-    parser.add_argument("--byLsCSV", help="ByLs csv input generated by testBril.sh",
-                        default="default")
-    parser.add_argument("--sigTemplates", default="default", type=str,
-        help="Choose one of the options for signal model (MC, MCxGaus, MCxCB, BW, BWxCB, BWxGaus). Default is MCxGaus and exp")
-    parser.add_argument("--bkgTemplates", default="default", type=str,
-        help="Choose one of the options for background model (Exp, Quad, QuadPlusExp, CMSShape, Das). Default is CMSShape and linear")
-    parser.add_argument('--ptCut', type=float, default=25.,
-                        help='specify lower pt cut on tag and probe muons')
-    parser.add_argument('--etaCut', type=float, default=2.4,
-                        help='specify upper |eta| cut on tag and probe muons')
-    parser.add_argument('--mass', nargs=3, metavar=('LOW', 'HIGH', 'NUMBER'), default=(60,120,120), type=int,
-                        help='specify mass range for tag and probe muon pairs')
-    parser.add_argument('--LumiPerMeasurement', default=20, type=float,
-                        help='specify amount of luminosity per measurement in pb-1')
-    parser.add_argument('--inclusive', default=False, action="store_true",
-                        help='specify whether or not to do an inclusive fit of the specified runs')
-    parser.add_argument('--collect', default=False, action="store_true",
-                        help='specify whether or not to run the fits or just collect the results')
-    parser.add_argument('--mode', default="DQM", type=str,
-                        help='specify measurement mode (DQM; TTrees)')
-    parser.add_argument("-o", "--dirOut", help="where to store the output files", default="./")
+    parser = common.parser()
+    parser = common.parser_zharvest(parser)
 
+    parser.add_argument("-m", "--measurement", type=int, default=None, 
+        help="Only fit a specific measurement of the run")
     args = parser.parse_args()
 
-    log = setup_logger(__file__, args.verbose)
+    log = logging.setup_logger(__file__, args.verbose)
 
     prefix_dqm="ZCountingInOut-V17_38-"
 
     ########################################
     # link to resouces
-    eosDir  = args.eosDir
     resPath = cmsswbase + "/src/ZCounting/ZHarvester/res/"
     if( args.beginRun >= 272007 and args.beginRun < 278808
         # there is an overlap for 2016 F in runs with pre and post VFP settings
         and args.beginRun not in [278769, 278801, 278802, 278803, 278804, 278805, 278808]
     ):                                                          # 2016 pre VFP
-        currentYear = 2016
+        year = 2016
         byLsCSV          = resPath+"/FillByLs_2016.csv"
         mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2016preVFP.root"
         sigTemplates     = eosDir+"/"+prefix_dqm+"Summer16preVFP-DYJetsToLL_M_50_LO.root"
     elif args.beginRun < 294645:                                # 2016 post VFP
-        currentYear = 2016
+        year = 2016
         byLsCSV          = resPath+"/FillByLs_2016.csv"
         mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2016postVFP.root"
         sigTemplates     = eosDir+"/"+prefix_dqm+"Summer16postVFP-DYJetsToLL_M_50_LO.root"
     elif args.beginRun > 297020 and args.beginRun < 306828:     # 2017
-        currentYear = 2017
+        year = 2017
         byLsCSV          = resPath+"/FillByLs_2017_IsoMu24.csv"
         mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2017.root"
         sigTemplates     = eosDir+"/"+prefix_dqm+"Fall17-DYJetsToLL_M_50_LO.root"
     elif args.beginRun >= 306926 and args.beginRun < 307083:    # 2017 H
-        currentYear = 2017
+        year = 2017
         byLsCSV          = resPath+"/FillByLs_2017_lowPU.csv"
         mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2017.root"
         sigTemplates     = eosDir+"/"+prefix_dqm+"Fall17-DYJetsToLL_M_50_LO.root"
     elif args.beginRun >= 315252 and args.beginRun < 325273:    # 2018
-        currentYear = 2018
+        year = 2018
         byLsCSV          = resPath+"/FillByLs_2018.csv"
         mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2018.root"
         sigTemplates     = eosDir+"/"+prefix_dqm+"Autumn18-DYJetsToLL_M_50_LO.root"
-    elif args.beginRun >= 355100:                               # 2022
-        currentYear = 2022
-        byLsCSV = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/brilcalcByLS/byLS_Collisions22_355100_356615_Golden.csv"
-        mcCorrelations   = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/CorrelationFactors/c_nPV_2022.root"
+    elif args.beginRun >= 355100 and args.beginRun < 362760:    # 2022
+        year = 2022
+        byLsCSV = f"{args.eosDir}/2022/brilcalcByLS/byLS_Collisions22_355100_362760_Muon_20230210.csv"
+        mcCorrelations   = f"{args.eosDir}/2022/CorrelationFactors/c_nPV_2022.root"
         prefix_dqm =  "ZCountingAll-V01-"
-        sigTemplates = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/SignalTemplates/ZCountingAll-V01-Winter22-DYJetsToLL_M_50_LO.root"
+        sigTemplates = f"{args.eosDir}/2022/SignalTemplates/ZCountingAll-V01-Winter22-DYJetsToLL_M_50_LO.root"
     elif args.beginRun >= 362760:                               # 2023
-        currentYear = 2023
+        year = 2023
     else:
         log.warning("specified begin run {0} unknown! exit()".format(args.beginRun))
         exit()
 
-    if currentYear >= 2022:
-        energy = 13.6
-    else:
-        energy = 13
+    energy = 13.6 if year >= 2022 else 13
 
-    byLsCSV          = byLsCSV          if args.byLsCSV       == "default"   else args.byLsCSV
+    byLsCSV = byLsCSV          if args.byLsCSV       == "default"   else args.byLsCSV
+    eosDir  = f"{args.eosDir}/{year}/DQMFiles/cmsweb.cern.ch/dqm/offline/data/browse/ROOT/OfflineData/Run{year}/"
+
     measurement      = args.measurement
 
     log.info("----------------------------------")
@@ -215,64 +224,17 @@ if __name__ == '__main__':
     log.info("Lumi per Measurement:    {0}".format(args.LumiPerMeasurement))
     log.info("----------------------------------")
     
-    # signal model (or definde additional convolutoin - smearing)
-    if args.sigTemplates in ["default","MCxGauss"]:
-        sigModel = 2        # MC, folding with gauss
-        sigModelSta = 2     # MC, folding with gauss
-    elif args.sigTemplates == "Gen":
-        sigModel = 16       # Gen, folding with crystal ball
-        sigModelSta = 2     # MC, folding with gauss
-    elif args.sigTemplates == "MC":
-        sigModel = 4 # MC, no folding
-        sigModelSta = 4     # MC, folding with gauss
-    elif args.sigTemplates == "BW":
-        sigModel = 3 # BW, no folding
-        sigModelSta = 3     # MC, folding with gauss
-    elif args.sigTemplates == "BWxCB":
-        sigModel = 1 # BW, folding with crystal ball
-        sigModelSta = 1     # MC, folding with gauss
-    elif args.sigTemplates == "BWxGaus":
-        sigModel = 5 # BW, folding with gauss
-        sigModelSta = 5     # MC, folding with gauss
-    elif args.sigTemplates == "MCxCB":
-        sigModel = 6 # MC, folding with crystal ball
-        sigModelSta = 6     # MC, folding with gauss
-    else:
-        log.warning("signal model {0} unknown! exit()".format(args.sigTemplates))
-        exit()
+    sigModel = common.sigModels[args.sigModel]
+    sigModelSta = common.sigModels[args.sigModel.replace("Gen","MCxGauss")]    # for standalone we don't use Gen
+    bkgModelPass = common.bkgModelsPass[args.bkgModel]
+    bkgModelFail = common.bkgModelsFail[args.bkgModel]
 
-    # background model 
-    if args.bkgTemplates == "default" :
-        bkgModelSmpl = 1    # exp
-        bkgModelCplx = 6    # RooCMSShape
-    elif args.bkgTemplates == "alt" :
-        bkgModelSmpl = 0    # constant
-        bkgModelCplx = 4    # Das
-    elif args.bkgTemplates == "Exp":
-        bkgModelCplx = 1
-        bkgModelSmpl = 1
-    elif args.bkgTemplates == "Quad":
-        bkgModelCplx = 2
-        bkgModelSmpl = 2
-    elif args.bkgTemplates == "QuadPlusExp":
-        bkgModelCplx = 3
-        bkgModelSmpl = 3
-    elif args.bkgTemplates == "Das":
-        bkgModelCplx = 4
-        bkgModelSmpl = 4
-    elif args.bkgTemplates == "CMSShape":
-        bkgModelCplx = 6
-        bkgModelSmpl = 6
-    else:
-        log.warning("background model {0} unknown! exit()".format(args.bkgTemplates))
-        exit()
-        
     ########## Input configuration ##########
     # ByLS csv inputs generated by testBRIL.sh
     byLS_filelist = glob.glob(byLsCSV)
     byLS_filelist.sort(key=os.path.getmtime)
     byLS_filename = byLS_filelist[-1]
-    log.info(" The brilcalc csv file: " + str(byLS_filename))
+    log.info("The brilcalc csv file: " + str(byLS_filename))
 
     outDir = args.dirOut if args.dirOut.endswith("/") else args.dirOut+"/"
     if not os.path.isdir(outDir):
@@ -283,7 +245,7 @@ if __name__ == '__main__':
         try:
             os.mkdir(outCSVDir)
         except OSError:
-            log.warning(": directory already exists ...")
+            log.warning("Directory already exists ...")
 
     ########### Constant settings ##########
     secPerLS = float(23.3)
@@ -294,10 +256,11 @@ if __name__ == '__main__':
     MassMin_ = int(args.mass[0])
     MassMax_ = int(args.mass[1])
     MassBin_ = int(args.mass[2])
+    MassBinWidth = (MassMax_ - MassMin_)/MassBin_
 
     MassMinSta_ = int(50)
     MassMaxSta_ = int(130)
-    MassBinSta_ = int(MassMaxSta_ - MassMinSta_)*2
+    MassBinSta_ = int((MassMaxSta_ - MassMinSta_)/MassBinWidth)
 
     if args.mode == "DQM":
         npvMin_ = 0.5     
@@ -306,7 +269,7 @@ if __name__ == '__main__':
         npvMin_ = -0.5
         npvMax_ = 74.5
 
-    npvBin_ = npvMax_ - npvMin_
+    npvBin_ = int(npvMax_ - npvMin_)
 
     maximumLS = 2500        # maximum luminosity block number that is stored in the DQM histograms
 
@@ -318,7 +281,7 @@ if __name__ == '__main__':
         etaRegionZ = "I"
 
     if not args.collect:
-        log.info(" Loading C marco...")
+        log.info("Loading C marco...")
         # load functions for fitting
         ROOT.gROOT.LoadMacro(os.path.dirname(os.path.realpath(
             __file__)) + "/calculateDataEfficiency.C")
@@ -326,13 +289,13 @@ if __name__ == '__main__':
         ROOT.set_massRange(MassMin_, MassMax_, MassBin_)
 
         ROOT.set_npvRange(npvMin_, npvMax_)
-        if currentYear >= 2022:
+        if year >= 2022:
             ROOT.set_energy(energy)
 
         ROOT.set_ptCut(args.ptCut)
         ROOT.set_etaCut(args.etaCut)
     
-    byLS_data = load_input_csv(byLS_filename)
+    byLS_data = utils.load_input_csv(byLS_filename)
     byLS_data = byLS_data.loc[(byLS_data['run'] >= int(args.beginRun)) & (byLS_data['run'] < int(args.endRun))]
 
     if args.mode == "TTrees":
@@ -356,7 +319,7 @@ if __name__ == '__main__':
     df=None
     results = []
     mergeNextRun=False
-    log.info(" === Looping over runs... {0} to {1}".format(int(args.beginRun), int(args.endRun)))
+    log.info(f"Looping over runs... {args.beginRun} to {args.endRun}")
     for run, byLS_run in byLS_data.groupby('run', sort=True):
         
         # first and last run of the measurement
@@ -368,17 +331,17 @@ if __name__ == '__main__':
         LSlist = byLS_run['ls'].values.tolist()
         Lumilist = byLS_run.loc[byLS_run['ls'].isin(LSlist)]['recorded(/pb)'].values.tolist()
 
-        log.info(" === Running Fill {0}".format(fill))
-        log.info(" === Running Run {0}".format(run))
+        log.info(f"Running Fill {fill}")
+        log.info(f"Running Run {run}")
         
         if args.mode == "TTrees":
-            eosFile = eosDir+"/"+prefix_dqm+"*Muon_"+str(run)+"*.root"
+            eosFile = f"{eosDir}/{prefix_dqm}*Muon_{run}*.root"
             eosFiles = glob.glob(eosFile)
             if len(eosFiles) == 1:
                 eosFile = eosFiles[0]
             else:
-                log.warning(" === No file or more than one was found! - continue")
-                log.warning(" === Was looking for: {}".format(eosFile))            
+                log.warning("No file or more than one was found! - continue")
+                log.warning(f"Was looking for: {eosFile}")            
                 continue
             file_ = ROOT.TFile(eosFile,"READ")
 
@@ -401,18 +364,18 @@ if __name__ == '__main__':
             # ZCountlist = [tHLT.GetEntries("lumiBlock=={0}".format(l)) for l in LSlist]
         else:
             log.info(f"Now at run {run}")
-            fileName = getFileName(eosDir,run)
+            fileName = utils.getFileName(eosDir,run)
             if fileName is None:
                 continue
             log.info(f"Found file `{fileName}`")
 
-        log.debug(" === Have lumi secion list {0}".format(LSlist))        
-        log.info(" === Looping over measurements...")
+        log.debug("Have lumi secion list {0}".format(LSlist))        
+        log.info("Looping over measurements...")
         for m, goodLSlist in enumerate(
-            get_ls_for_next_measurement(lumisections=LSlist, luminosities=Lumilist, #zcounts=ZCountlist, 
+            utils.get_ls_for_next_measurement(lumisections=LSlist, luminosities=Lumilist, #zcounts=ZCountlist, 
                 lumiPerMeasurement=LumiPerMeasurement)
         ):
-            log.debug(" === Selected lumi section list {0}".format(goodLSlist))
+            log.debug("Selected lumi section list {0}".format(goodLSlist))
 
             if measurement is not None and measurement < m:
                 break
@@ -428,7 +391,7 @@ if __name__ == '__main__':
                 acceptance = " && mass>={0} && mass<{1} && ptTag > {2} && ptProbe > {2} && abs(etaTag) < {3} && abs(etaProbe) < {3}".format(MassMin_, MassMax_, args.ptCut, args.etaCut)
                 acceptanceSta = " && mass>={0} && mass<{1} && ptTag > {2} && ptProbe > {2} && abs(etaTag) < {3} && abs(etaProbe) < {3}".format(MassMinSta_, MassMaxSta_, args.ptCut, args.etaCut)
 
-                log.info(" === Fill histograms for measurement {0} ...".format(m))                        
+                log.info("Fill histograms for measurement {0} ...".format(m))                        
                 for iLS in goodLSlist:
                         
                     tHLT.Draw("nPV>>+h_PV","lumiBlock=={0}".format(iLS))
@@ -464,11 +427,11 @@ if __name__ == '__main__':
                     prefix=""
                 
                 # get histogram with primary vertex distribution
-                # hPV = load_histogram("h_npv", fileName, goodLSlist, run=run, prefix=prefix, suffix="new", pileup=True)
+                hPV = utils.load_histogram("h_npv", fileName, goodLSlist, run=run, prefix=prefix, suffix="new", pileup=True)
 
                 # get histograms binned in mass
                 def load(name_):
-                    return load_histogram(name_, fileName, goodLSlist, run=run, 
+                    return utils.load_histogram(name_, fileName, goodLSlist, run=run, 
                         MassBin=MassBin_, MassMin=MassMin_, MassMax=MassMax_, 
                         prefix=prefix, 
                         suffix="new")
@@ -523,8 +486,6 @@ if __name__ == '__main__':
             # dHLT1 = dHLT.Filter("pass==2 && "+mask_lumi+acceptance).Take['float']("mass")
 
 
-
-
             if df is None:
                 df = byLS_m
             else:
@@ -532,8 +493,8 @@ if __name__ == '__main__':
             
             recLumi = df['recorded(/pb)'].sum()
 
-            log.info(" === Have now recorded lumi = {0}".format(recLumi))            
-            # log.info(" === Have now {0} | {1} events".format(df['N2HLT'].sum(), h2HLT.Integral()))
+            log.info("Have now recorded lumi = {0}".format(recLumi))            
+            # log.info("Have now {0} | {1} events".format(df['N2HLT'].sum(), h2HLT.Integral()))
             
             if args.mode == "TTrees":
                 # check if upcoming runs make enough data for a measurement
@@ -543,7 +504,7 @@ if __name__ == '__main__':
                 for r, dr in byLS_data.groupby('run'):
                     if r <= run or r >= int(args.endRun):
                         continue
-                    # if getFileName(eosDir, r) is None: # check if file of next run exists
+                    # if utils.getFileName(eosDir, r) is None: # check if file of next run exists
                     #     continue
                     nextRun = r
                     LS = dr['ls'].values.tolist()
@@ -552,25 +513,27 @@ if __name__ == '__main__':
                         mergeNextRun = False
                         break
                 
-                mergeNextRun = nextRun < int(args.endRun) and (mergeNextRun or recLumi < 0.5 * LumiPerMeasurement or args.inclusive)            
+                mergeNextRun = nextRun < int(args.endRun) and (mergeNextRun or recLumi < 0.5 * LumiPerMeasurement)            
 
                 if mergeNextRun:
-                    log.info(" === Merge with next run ... ")
+                    log.info("Merge with next run ... ")
                     continue
 
-            log.info(" === Histograms filled ...")  
+            log.info("Histograms filled ...")  
 
             if firstRun != lastRun:
                 outSubDir = outDir + "Run{0}to{1}".format(firstRun,lastRun)
             else:
                 outSubDir = outDir + "Run{0}/".format(run)
 
-            log.debug(" === Running measurement {0}".format(m))
+            log.debug("Running measurement {0}".format(m))
 
             ### --- perform fit with zfit
-            # from python.zfit import fit
+            # from python.fit import zfit
 
             # pdb.set_trace()
+
+            # h2HLT = utils.np_to_hist(h2HLT, MassBin_, MassMin_, MassMax_, "hist")
 
             # fit(h2HLT, MassBin_, MassMin_, MassMax_, category="HLT 2")
             # fit(h1HLT, MassBin_, MassMin_, MassMax_, category="HLT 1")
@@ -590,28 +553,58 @@ if __name__ == '__main__':
                     ROOT.set_output(outSubDir)
                     ROOT.set_luminosity(recLumi)
 
-                    ROOT.getZyield(h2HLT, m, "HLT", etaRegion, sigModel, bkgModelSmpl, 2, sigTemplates, 0)
-                    ROOT.getZyield(h1HLT, m, "HLT", etaRegion, sigModel, bkgModelSmpl, 1, sigTemplates, 0)
-                    ROOT.getZyield(hIDfail, m, "ID", etaRegion, sigModel, bkgModelSmpl, 0, sigTemplates, 0)
+                    if args.mode == "TTrees":
+                        ROOT.getZyield(h2HLT, m, "HLT", etaRegion, sigModel, bkgModelPass, 2, sigTemplates, 0)
+                        ROOT.getZyield(h1HLT, m, "HLT", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
+                        ROOT.getZyield(hIDfail, m, "ID", etaRegion, sigModel, bkgModelPass, 0, sigTemplates, 0)
 
-                    ROOT.set_massRange(MassMinSta_, MassMaxSta_, MassBinSta_)
-                    ROOT.getZyield(hGlopass, m, "Glo", etaRegion, sigModel, bkgModelSmpl, 1, sigTemplates, 0)
-                    ROOT.getZyield(hGlofail, m, "Glo", etaRegion, sigModel, bkgModelCplx, 0, sigTemplates, 0)
-                    ROOT.set_massRange(MassMin_, MassMax_, MassBin_)
+                        ROOT.set_massRange(MassMinSta_, MassMaxSta_, MassBinSta_)
+                        ROOT.getZyield(hGlopass, m, "Glo", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
+                        ROOT.getZyield(hGlofail, m, "Glo", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, 0)
+                        ROOT.set_massRange(MassMin_, MassMax_, MassBin_)
 
-                    ROOT.getZyield(hStapass, m, "Sta", etaRegion, sigModel, bkgModelSmpl, 1, sigTemplates, 0)
-                    ROOT.getZyield(hStafail, m, "Sta", etaRegion, sigModel, bkgModelCplx, 0, sigTemplates, 0)
+                        ROOT.getZyield(hStapass, m, "Sta", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
+                        ROOT.getZyield(hStafail, m, "Sta", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, 0)                        
+
+                    else:
+                        hPV = utils.np_to_hist(hPV, npvBin_, npvMin_, npvMax_, "TH1", "hPV")
+
+                        def to_hist(h_, name):
+                            return utils.np_to_hist(h_, MassBin_, MassMin_, MassMax_, "TH1", name)
+                        
+                        h2HLT = to_hist(h2HLT, "HLT2")
+                        h1HLT = to_hist(h1HLT, "HLT1")
+                        hIDfail = to_hist(hIDfail, "IDfail")
+                        # hGlopass = to_hist(hGlopass, "Glopass")
+                        hGlofail = to_hist(hGlofail, "Glofail")
+                        # hStapass = to_hist(hStapass, "Stapass")
+                        # hStafail = to_hist(hStafail, "Stafail")
+
+                        ROOT.getZyield(h2HLT, m, "HLT", etaRegion, sigModel, bkgModelPass, 2, sigTemplates, 0)
+                        ROOT.getZyield(h1HLT, m, "HLT", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
+                        ROOT.getZyield(hIDfail, m, "Sel", etaRegion, sigModel, bkgModelPass, 0, sigTemplates, 0)
+
+                        ROOT.set_massRange(MassMinSta_, MassMaxSta_, MassBinSta_)
+                        # ROOT.getZyield(hGlopass, m, "Glo", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
+                        ROOT.getZyield(hGlofail, m, "Glo", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, 0)
+                        ROOT.set_massRange(MassMin_, MassMax_, MassBin_)
+
+                        # ROOT.getZyield(hStapass, m, "Sta", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
+                        # ROOT.getZyield(hStafail, m, "Sta", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, 0)
 
                     # remove the histogram templates, not needed anymore
                     os.system("rm {0}/histTemplates_*".format(outSubDir))
 
             cHLT = ROOT.extractCorrelation_HLT(sigTemplates, hPV, etaRegionZ)
 
-            cIO = getCorrelation(hPV, mcCorrelations, which="IO")
-            cID = getCorrelation(hPV, mcCorrelations, which="ID")
-            cKinematicSelection = getCorrelation(hPV, mcCorrelations, which="KinematicSelection")
-            result = extract_results(outSubDir, m, cIO, cID, cHLT, cKinematicSelection)
-            
+            if args.mode == "TTrees":
+                cID = utils.getCorrelation(hPV, mcCorrelations, which="ID")
+                cIO = utils.getCorrelation(hPV, mcCorrelations, which="IO")
+                cKinematicSelection = utils.getCorrelation(hPV, mcCorrelations, which="KinematicSelection")
+                result = extract_results(outSubDir, m, cIO, cID, cHLT, cKinematicSelection)
+            else:
+                result = extract_results_dqm(outSubDir, m, cHLT)
+
             if result:              
                 delLumi = df['delivered(/pb)'].sum()
                 recLumi = df['recorded(/pb)'].sum()
@@ -620,8 +613,8 @@ if __name__ == '__main__':
                 timewindow = len(df) * secPerLS
 
                 # convert time string to datetime format
-                beginTime = to_DateTime(df['time'][0], string_format = "mm/dd/yy")
-                endTime = to_DateTime(df['time'][-1], string_format = "mm/dd/yy") + datetime.timedelta(seconds=secPerLS)
+                beginTime = utils.to_DateTime(df['time'][0], string_format = "mm/dd/yy")
+                endTime = utils.to_DateTime(df['time'][-1], string_format = "mm/dd/yy") + datetime.timedelta(seconds=secPerLS)
                 
                 # total time window from the beginning of the first to the end of the last lumisection
                 totaltimewindow = (endTime - beginTime).total_seconds()
@@ -644,7 +637,7 @@ if __name__ == '__main__':
             
                 results.append(result)
             else:
-                log.info(" === No result - continue")
+                log.info("No result - continue")
             
             # prepare for next measurement
             df=None
@@ -675,14 +668,14 @@ if __name__ == '__main__':
             hStapass.SetDirectory(0)
             hStafail.SetDirectory(0)
 
-        file_.Close()
+            file_.Close()
 
         if mergeNextRun:
             continue
         
         if measurement is None or measurement == m:
             ## Write per measurement csv file - one per run
-            log.info(" === Writing per Run CSV file")
+            log.info("Writing per Run CSV file")
             results = pd.concat([pd.DataFrame([result]) for result in results], ignore_index=True, sort=False)
 
             with open(outCSVDir + '/csvfile{0}.csv'.format(run), 'w') as file:
@@ -692,6 +685,6 @@ if __name__ == '__main__':
         results = []
 
     if args.writeSummaryCSV:
-        writeSummaryCSV(outCSVDir, writeByLS=False)
+        utils.writeSummaryCSV(outCSVDir, writeByLS=False)
 
-    log.info(" ===Done")
+    log.info("Done")
