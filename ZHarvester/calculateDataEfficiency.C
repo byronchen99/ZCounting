@@ -34,6 +34,8 @@
 #include "RooAddPdf.h"
 #include "RooFitResult.h"
 #include "RooExtendPdf.h"
+#include "RooConstVar.h"
+#include "RooGaussian.h"
 
 #include "RooPlot.h"
 #include "RooGlobalFunc.h"
@@ -149,10 +151,14 @@ void set_energy(Float_t energy_){
     set_lumienergy(luminosity, energy_);
 }
 
-
+//--------------------------------------------------------------------------------------------------
+// generate template for extraction of muon efficiency in barrel (B), endcap (E) or inclusive (I) region
+TFile* generateGenTemplate(
+    const TString mcfilename
+);
 
 //--------------------------------------------------------------------------------------------------
-// generate template for extraction of muon efficiency in barrel or endcap region
+// generate template for extraction of muon efficiency in barrel (B), endcap (E) or inclusive (I) region
 TFile* generateTemplate(
     const TString mcfilename,
     const TString effType,
@@ -160,7 +166,7 @@ TFile* generateTemplate(
 );
 
 //--------------------------------------------------------------------------------------------------
-// generate template for extraction of Z yield in {BB, BE, EE} region
+// generate template for extraction of Z yield in {BB, BE, EE, I} region
 TFile* generateTemplate_ZYield(
 	const TString mcfilename,
 	TH1D          *hPV,
@@ -222,6 +228,7 @@ Int_t set_signal_model(
 
 //--------------------------------------------------------------------------------------------------
 // Background Model:
+//      0: uniform background distribution
 //      1: exponential model
 //      2: quadratic model
 //      3: exponential + quadratic model
@@ -239,6 +246,9 @@ Int_t set_background_model(
     std::vector<double> *params=0
 ){
     switch(model_type) {
+        case 0:
+            model = new CUniform(param_mass, pass, ibin);
+            return 0;
         case 1:
             model = new CExponential(param_mass, pass, ibin);
             return 1;
@@ -276,6 +286,71 @@ Int_t set_background_model(
 }
 
 //--------------------------------------------------------------------------------------------------
+TFile* generateGenTemplate(
+    const TString mcfilename
+){
+    const TString histfilename = outputDir+"/histTemplates_Gen.root";
+
+
+    // We can use the template from the last slize if it exists
+    TFile *outfile = TFile::Open(histfilename,"READ");
+    if(outfile){
+        cout << "Use existing template "<< endl;
+        return outfile;
+    }
+
+    outfile = TFile::Open(histfilename,"RECREATE");
+
+    cout << "Creating histogram templates... "; cout.flush();
+
+    TFile *infile    = new TFile(mcfilename);
+    TTree *eventTree = (TTree*)infile->Get("Truth");
+
+    Double_t mass, ptTag, etaTag, ptProbe, etaProbe;
+    Double_t wgt;
+    
+    eventTree->SetBranchAddress("massGen",       &mass);
+    eventTree->SetBranchAddress("ptGen1",        &ptTag);
+    eventTree->SetBranchAddress("ptGen2",        &ptProbe);
+    eventTree->SetBranchAddress("etaGen1",       &etaTag);
+    eventTree->SetBranchAddress("etaGen2",       &etaProbe);
+    eventTree->SetBranchAddress("eventWeight",   &wgt);
+
+    TH1D *h_mass = new TH1D("h_mass", "", massBin, massLo, massHi);
+    
+    for(UInt_t ientry=0; ientry<eventTree->GetEntries(); ientry++) {
+        eventTree->GetEntry(ientry);
+
+        if(mass < massLo)  continue;
+        if(mass > massHi)  continue;
+        if(ptTag   < ptCutTag)   continue;
+        if(ptProbe   < ptCutProbe)   continue;
+        if(fabs(etaTag) > etaCutTag) continue;
+        if(fabs(etaProbe) > etaCutProbe) continue;
+
+        h_mass->Fill(mass, wgt);
+    }
+
+    // set negative bin entries to 0
+    for(int i=1; i <= massBin; i++){
+        if(h_mass->GetBinContent(i) < 0.)
+            h_mass->SetBinContent(i, 0.);
+    }
+
+
+    
+    outfile->cd();
+    h_mass->Write();
+    outfile->Write();
+
+    infile->Close();
+    delete infile;
+
+    cout << "Done!" << endl;
+    return outfile;
+}
+
+//--------------------------------------------------------------------------------------------------
 TFile* generateTemplate(
     const TString mcfilename,
     const TString effType,
@@ -283,12 +358,20 @@ TFile* generateTemplate(
 ){
     const TString histfilename = outputDir+"/histTemplates_"+effType+".root";
 
-    TFile *outfile = TFile::Open(histfilename,"CREATE");
-    if(!outfile){
+    TFile *outfile = 0;
+
+    if(hPV==0){
+        // if no PU reweighting is done, we can use the template from the last slize if it exists
+
         outfile = TFile::Open(histfilename,"READ");
-        cout << "Use existing template "<< endl;
-        return outfile;
+        if(outfile){
+            cout << "Use existing template "<< endl;
+            return outfile;
+        }
     }
+
+    outfile = TFile::Open(histfilename,"RECREATE");
+
     cout << "Creating histogram templates... "; cout.flush();
 
     TFile *infile    = new TFile(mcfilename);
@@ -391,12 +474,22 @@ TFile* generateTemplate_ZYield(
 ){
     //const TString histfilename = hPV == 0 ? outputDir+"/../histTemplates_HLT.root" : outputDir+"/histTemplates_HLT_"+std::to_string(iBin)+".root";
     const TString histfilename = outputDir+"/histTemplates_HLT.root";
-    TFile *outfile = TFile::Open(histfilename,"CREATE");
-    if(!outfile){
-        cout << "Use existing template "<< endl;
+
+
+    TFile *outfile = 0;
+
+    if(hPV==0){
+        // if no PU reweighting is done, we can use the template from the last slize if it exists
+
         outfile = TFile::Open(histfilename,"READ");
-        return outfile;
+        if(outfile){
+            cout << "Use existing template "<< endl;
+            return outfile;
+        }
     }
+
+    outfile = TFile::Open(histfilename,"RECREATE");
+
     cout << "Creating histogram templates... "; cout.flush();
 
     TFile *infile    = new TFile(mcfilename);
@@ -739,14 +832,9 @@ Double_t make_plot(
     else sprintf(binlabelx, "|#eta| < %.1f", etaCutTag);
 
 
-    if(effType == "yield"){
-        sprintf(pname,"%s_%s_%s_%d", effType.Data(), etaRegion.Data(), std::to_string(passRegion).c_str(), iBin);
-        sprintf(ctitle,"%s %s (%d) ", effType.Data(), std::to_string(passRegion).c_str(), iBin);
-    }
-    else{
-        sprintf(pname,"%s_%s_%s_%d", effType.Data(), etaRegion.Data(), passRegion ? "pass" : "fail", iBin);
-        sprintf(ctitle,"%s %s (%d) ", effType.Data(), passRegion ? "pass" : "fail", iBin);
-    }
+    sprintf(pname,"%s_%s_%i_%d", effType.Data(), etaRegion.Data(), passRegion, iBin);
+    sprintf(ctitle,"%s %i (%d) ", effType.Data(), passRegion, iBin);
+
     
     if(eff != 0){
         if(effType == "yield"){
@@ -890,7 +978,13 @@ Double_t make_plot(
     else{
         pad1->SetLogy(0);
         mframe->SetMinimum(0.);
-        mframe->SetMaximum(mframe->GetMaximum()*1.2);
+
+        if(effType == "Trk"){
+            mframe->SetMaximum(mframe->GetMaximum()*2);
+        }
+        else{
+            mframe->SetMaximum(mframe->GetMaximum()*1.2);
+        }
     }
 
     mframe->Draw();
@@ -974,13 +1068,12 @@ Double_t make_plot(
 void getZyield(
     TH1D*          h_yield,         // Histogram with signal and background contribution
     const Int_t    iBin,            // Label of measurement in currect run
-    const Int_t    sigMod,
-    const Int_t    bkgMod,
-    const TString  effType="HLT",   // {Trk, Sta, Glo, Sel, HLT}
+    const TString  effType="HLT",   // {Trk, Sta, Glo, Sel, ID, HLT}
     const TString  etaRegion="",    // {B, E, BB, BE, EE or I}
-    const Bool_t   passRegion=true,
+    const Int_t    sigMod=1,
+    const Int_t    bkgMod=6,
+    const Int_t    passRegion=1,
     const TString  mcfilename="",   
-    TH1D*          _hQCD=0,
     TH1D*          hPV=0
 ){
     std::cout<<">>> Do fit in "<< etaRegion 
@@ -1005,16 +1098,22 @@ void getZyield(
 
     TFile *histfile = 0;
     TH1D *h=0;
-    if(sigMod==2 || sigMod==4) {
-        if(effType == "HLT"){
-            histfile = generateTemplate_ZYield(mcfilename, 0, iBin);
-            if(passRegion)
+    if(sigMod%2 == 0) {
+        if(sigMod > 10){
+            histfile = generateGenTemplate(mcfilename);
+            h = (TH1D*)histfile->Get("h_mass");
+        }
+        else if(effType == "HLT"){
+            histfile = generateTemplate_ZYield(mcfilename, hPV, iBin);
+            if(passRegion==2)
                 h = (TH1D*)histfile->Get("h_mass_2hlt_"+etaRegion);
-            else
+            else if(passRegion==1)
                 h = (TH1D*)histfile->Get("h_mass_1hlt_"+etaRegion);            
+            else
+                h = (TH1D*)histfile->Get("h_mass_0hlt_"+etaRegion);     
         }
         else{
-            histfile = generateTemplate(mcfilename, effType, 0);
+            histfile = generateTemplate(mcfilename, effType, hPV);
             assert(histfile);
             if(passRegion)
                 h = (TH1D*)histfile->Get(Form("h_mass_pass_%s", etaRegion.Data()));
@@ -1024,31 +1123,74 @@ void getZyield(
         assert(h);
     }
 
-    nfl += set_signal_model(sigMod, sigModel, m, passRegion, effType == "Sta" ? 1 : 0, h);
-    nfl += set_background_model(bkgMod, bkgModel, m, passRegion, effType == "Sta" ? 1 : 0);
+    nfl += set_signal_model(sigMod%10, sigModel, m, passRegion, 0, h);
+    nfl += set_background_model(bkgMod, bkgModel, m, passRegion, 0);
     
+    // ---> Add constraint terms
+    RooArgSet *constraints = new RooArgSet("constraints");
+    RooGaussian *constraint_sig_mean = 0;
+    RooGaussian *constraint_sig_sigma = 0;
+    RooGaussian *constraint_sig_alpha = 0;
+    if(sigMod%10 == 1 || sigMod%10 == 2 || sigMod%10 == 5 || sigMod%10 == 6){
+
+        if(effType == "Trk" || effType == "Glo"){
+            std::cout<<">>> set constraints on signal model parameters "<< std::endl; 
+            // in case of probes with outer track parameters the fit can be unstable, in particular for failing probes,
+            // in these cases, constraints are used to stabalize the fit
+            // Construct Gaussian constraints p.d.f on signal model
+            constraint_sig_mean = new RooGaussian("constraint_sig_mean","constraint signal mean", *sigModel->mean, RooFit::RooConst(0.), RooFit::RooConst(1.0));
+            constraint_sig_sigma = new RooGaussian("constraint_sig_sigma","constraint signal sigma", *sigModel->sigma, RooFit::RooConst(2.5), RooFit::RooConst(1.5));
+            
+            constraints->add(*constraint_sig_mean);
+            constraints->add(*constraint_sig_sigma);
+
+            // Constraint on CB parameter
+            if(sigMod%10 == 1 || sigMod%10 == 5){
+                constraint_sig_alpha = new RooGaussian("constraint_sig_alpha","constraint signal alpha", *sigModel->alpha, RooFit::RooConst(5.), RooFit::RooConst(3.0));
+                constraints->add(*constraint_sig_alpha);
+            }
+        }
+    }
+
+    RooGaussian *constraint_alpha = 0;
+    RooGaussian *constraint_beta = 0;
+    RooGaussian *constraint_gamma = 0;
+    if(bkgMod == 6){
+        std::cout<<">>> set constraints on signal model parameters "<< std::endl; 
+        // Contraints are used for the RooCMSShape 
+
+        constraint_alpha = new RooGaussian("constraint_alpha","constraint alpha", *bkgModel->alpha, RooFit::RooConst(50.), RooFit::RooConst(20.0));
+        constraint_beta = new RooGaussian("constraint_beta","constraint beta", *bkgModel->beta, RooFit::RooConst(0.05), RooFit::RooConst(0.05));
+        constraint_gamma = new RooGaussian("constraint_gamma","constraint gamma", *bkgModel->gamma, RooFit::RooConst(0.05), RooFit::RooConst(0.05));
+
+        constraints->add(*constraint_alpha);
+        constraints->add(*constraint_beta);
+        constraints->add(*constraint_gamma);
+    }
+    // <---
+
     RooDataHist *data = new RooDataHist("ZReco","ZReco",RooArgList(m), h_yield);
 
     const Double_t NsigMax = h_yield->Integral();
     Double_t NsigInit = 0;  // initial signal contribution
     Double_t NbkgInit = 0;  // initial background contribution
-    if(etaRegion == "HLT"){
+    if(effType == "HLT"){
         NsigInit = passRegion ? NsigMax*0.995 : NsigMax*0.95;
         NbkgInit = passRegion ? 0.005 : NsigMax*0.05;
     }
-    else if(etaRegion == "Sel"){
+    else if(effType == "Sel" || effType == "ID"){
         NsigInit = passRegion ? NsigMax*0.99 : NsigMax*0.90;
         NbkgInit = passRegion ? 0.01 : NsigMax*0.1;    
     }
-    else if(etaRegion == "Glo"){
+    else if(effType == "Glo"){
         NsigInit = passRegion ? NsigMax*0.99 : NsigMax*0.2;
         NbkgInit = passRegion ? 0.01 : NsigMax*0.8;         
     }
-    else if(etaRegion == "Sta"){
+    else if(effType == "Sta"){
         NsigInit = passRegion ? NsigMax*0.99 : NsigMax*0.1;
         NbkgInit = passRegion ? 0.01 : NsigMax*0.9;               
     }
-    else if(etaRegion == "Trk"){
+    else if(effType == "Trk"){
         NsigInit = passRegion ? NsigMax*0.99 : NsigMax*0.3;
         NbkgInit = passRegion ? 0.01 : NsigMax*0.7;        
 
@@ -1065,7 +1207,7 @@ void getZyield(
     RooFormulaVar purity("purity","Nsig/(Nsig+Nbkg)",RooArgList(Nsig,Nbkg));
 
     TFile *fFit = new TFile(Form(
-        "%s/workspace_yield_%s_%s_%s_%i.root",outputDir.Data(), effType.Data(), etaRegion.Data(), passRegion ? "pass" : "fail", iBin),
+        "%s/workspace_yield_%s_%s_%i_%i.root",outputDir.Data(), effType.Data(), etaRegion.Data(), passRegion, iBin),
         "RECREATE");
 
     // save all information in RooWorkspace
@@ -1076,8 +1218,10 @@ void getZyield(
 
     RooFitResult *fitResult=0;
     RooFitResult *best_fitResult=0;
-    Double_t best_chi2 = 99;
-    Int_t best_fit = 99;
+    Double_t best_chi2 = 100;
+    Int_t best_fit = 0;
+
+    TString minimizer = "Minuit2";
 
     int attempt = 0;
     do {
@@ -1097,7 +1241,7 @@ void getZyield(
             Nbkg.setVal(NbkgInit);
 
             if(attempt==3){
-                if(etaRegion == "Trk"){
+                if(effType == "Trk"){
                     // define regions different
                     m.setRange("rangeLow", massLo, 76);
                     m.setRange("rangeHigh", 104, massHi);
@@ -1121,20 +1265,27 @@ void getZyield(
                 RooFit::Warnings(0),
                 RooFit::Strategy(2), // MINOS STRATEGY
                 // RooFit::IntegrateBins(integrateBinsPrecision),
-                RooFit::Minimizer("Minuit2"));
+                RooFit::Minimizer(minimizer));
         }
 
         if(attempt > 0){
             // fit signal shape to central region only
+
+            // bkgModel->Print();
+            // bkgModel->freeze_all_parameters(1);
 
             sigModel->model->fitTo(*data,
                 RooFit::Range("rangeCenter"),
                 RooFit::PrintEvalErrors(-1),
                 RooFit::PrintLevel(-1),
                 RooFit::Warnings(0),
+                (constraints != nullptr) ? RooFit::ExternalConstraints(*constraints) : RooCmdArg::none(),
                 RooFit::Strategy(2), // MINOS STRATEGY
                 // RooFit::IntegrateBins(integrateBinsPrecision),
-                RooFit::Minimizer("Minuit2"));
+                RooFit::Minimizer(minimizer));
+
+            // bkgModel->Print();
+            // bkgModel->freeze_all_parameters(0);
         }
 
         fitResult = modelPdf.fitTo(*data,
@@ -1143,8 +1294,9 @@ void getZyield(
             RooFit::Warnings(0),
             RooFit::Extended(),
             RooFit::Strategy(2), // MINOS STRATEGY
+            (constraints != nullptr) ? RooFit::ExternalConstraints(*constraints) : RooCmdArg::none(),
             // RooFit::IntegrateBins(integrateBinsPrecision),
-            RooFit::Minimizer("Minuit2"),
+            RooFit::Minimizer(minimizer),
             //RooFit::Minos(RooArgSet()),
             RooFit::Save());
 
@@ -1153,14 +1305,23 @@ void getZyield(
         );
 
         // reduced chi2 value from number of degree of freedom in the fit nDoF = nBins - nParams
-        const Double_t chi2ndf = chi2Var.getVal() / (data->numEntries() - fitResult->floatParsFinal().getSize());
+        Double_t chi2ndf = chi2Var.getVal() / (data->numEntries() - fitResult->floatParsFinal().getSize());
+
+        if(std::abs(1 - (Nsig.getVal()+Nbkg.getVal())/h_yield->Integral()) > 0.1){
+            std::cout<<"WARNING: something went wrong in the fit, we give a bad chi2"<<std::endl;
+            chi2ndf = 99;
+        }  
 
         std::cout<<"---------------------------------------" <<std::endl;
         std::cout<<"------ attempt = " << attempt << std::endl;
         std::cout<<"------ chi2/ndf = " << chi2ndf <<std::endl;
+        std::cout<<"------ status = " << fitResult->status() <<std::endl;
         std::cout<<"---------------------------------------" <<std::endl;
 
-        if(attempt==0 || (chi2ndf < best_chi2) ){
+        if(attempt==0 || (fitResult->status() < best_fitResult->status()) || ((fitResult->status() == best_fitResult->status()) && (chi2ndf < best_chi2))){
+            // always take the first attempt,
+            // take the other attempt if the fit status os lower (better)
+            // of if the fit status is the same, take the other attempt if it has lower chi2
             best_chi2 = chi2ndf;
             best_fit = attempt;
             best_fitResult = fitResult;
@@ -1170,10 +1331,23 @@ void getZyield(
 
         attempt++;
 
-    } while(attempt < 4 && best_chi2 > 1.5);
+    } while(attempt < 4 && (best_chi2 > 1.5 || best_fitResult->status() != 0));
 
     // load best fit values into workspace
     w->loadSnapshot(("snapshot_"+std::to_string(best_fit)).c_str());
+
+    const Double_t chi2 = make_plot(nfl, m, data, sigModel, bkgModel,
+        h_yield->Integral(), 
+        w->pdf("totalPdf"),
+        (RooRealVar*)best_fitResult->floatParsFinal().find("Nsig"), 
+        (RooRealVar*)best_fitResult->floatParsFinal().find("Nbkg"),
+        iBin, 0, 0,
+        effType.Data(), etaRegion.Data(), passRegion);
+
+    RooRealVar chi2_plot("chi2plot","chi2 from plot",chi2);
+    RooRealVar chi2_best("chi2","chi2",best_chi2);
+    w->import(chi2_plot);
+    w->import(chi2_best);
 
     w->Write();
 
@@ -1181,19 +1355,6 @@ void getZyield(
 
     fFit->Write();
     fFit->Close();
-
-    const Double_t chi2 = make_plot(nfl, m, data, sigModel, bkgModel,
-        h_yield->Integral(), 
-        w->pdf("totalPdf"),
-        (RooRealVar*)best_fitResult->floatParsFinal().find("Nsig"), 
-        (RooRealVar*)best_fitResult->floatParsFinal().find("Nbkg"),
-        iBin, 0,0,
-        effType.Data(), etaRegion.Data(), passRegion);
-
-    RooRealVar chi2_plot("chi2plot","chi2 from plot",chi2);
-    RooRealVar chi2_best("chi2","chi2",best_chi2);
-    w->import(chi2_plot);
-    w->import(chi2_best);
 
     std::cout<<"---------------------------------------"<<std::endl;
     std::cout<<"------ chi2 = " << chi2 <<std::endl;
@@ -1203,6 +1364,14 @@ void getZyield(
     delete bkgModel;
     delete data;
     delete histfile;
+
+    if(constraint_sig_mean!=nullptr) delete constraint_sig_mean;
+    if(constraint_sig_sigma!=nullptr) delete constraint_sig_sigma;
+    if(constraint_sig_alpha!=nullptr) delete constraint_sig_alpha;
+    if(constraint_alpha!=nullptr) delete constraint_alpha;
+    if(constraint_beta!=nullptr) delete constraint_beta;
+    if(constraint_gamma!=nullptr) delete constraint_gamma;
+
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1248,7 +1417,7 @@ void calculateDataEfficiency(
 
     TFile *histfile = 0;
     if(sigpass%2 == 0 || sigfail%2 == 0) {
-        histfile = generateTemplate(mcfilename, effType, 0);
+        histfile = generateTemplate(mcfilename, effType, hPV);
         assert(histfile);
     }
     std::vector<double> vBkgPars;
@@ -1321,6 +1490,29 @@ void calculateDataEfficiency(
     nflfail += set_signal_model(sigfail, sigFail, m, kFALSE, 0, hFail);
     nflfail += set_background_model(bkgfail, bkgFail, m, kFALSE, 0, hbkgQCDFail, &vBkgPars);
 
+    // ---> Add constraint terms
+    // Construct Gaussian constraints p.d.f on signal model
+    RooArgSet *constraints = 0;
+    RooGaussian *constraint_pass_mean = 0;
+    RooGaussian *constraint_pass_sigma = 0;
+    RooGaussian *constraint_fail_mean = 0;
+    RooGaussian *constraint_fail_sigma = 0;
+    if(sigpass == 2 || sigpass == 6 || sigfail == 2 || sigfail == 6){
+        // Construct Gaussian constraints p.d.f on signal model
+        constraint_pass_mean = new RooGaussian("constraint_pass_mean","constraint mean", *sigPass->mean, RooFit::RooConst(0.), RooFit::RooConst(1.0));
+        constraint_pass_sigma = new RooGaussian("constraint_pass_sigma","constraint sigma", *sigPass->sigma, 
+            effType == "Trk" ? RooFit::RooConst(2.5) : RooFit::RooConst(0.5), 
+            effType == "Trk" ? RooFit::RooConst(1.0) : RooFit::RooConst(0.5));
+
+        constraint_fail_mean = new RooGaussian("constraint_fail_mean","constraint mean", *sigFail->mean, RooFit::RooConst(0.), RooFit::RooConst(1.0));
+        constraint_fail_sigma = new RooGaussian("constraint_fail_sigma","constraint sigma", *sigFail->sigma, 
+            effType == "Trk" ? RooFit::RooConst(2.5) : RooFit::RooConst(0.5), 
+            effType == "Trk" ? RooFit::RooConst(1.0) : RooFit::RooConst(0.5));
+
+        constraints = new RooArgSet(*constraint_pass_mean, *constraint_pass_sigma, *constraint_fail_mean, *constraint_fail_sigma);
+    }
+    // <---
+
     Double_t NsigMax     = passHist->Integral()+failHist->Integral();
     Double_t NbkgFailMax = failHist->Integral();
     Double_t NbkgPassMax = passHist->Integral();
@@ -1335,8 +1527,7 @@ void calculateDataEfficiency(
     RooFormulaVar NsigFail("NsigFail","(1.0-eff)*Nsig",RooArgList(eff,Nsig));
 
     RooAddPdf modelPass("modelPass","Model for PASS sample",
-        (bkgpass>0) ? RooArgList(*(sigPass->model),*(bkgPass->model)) :  RooArgList(*(sigPass->model)),
-        (bkgpass>0) ? RooArgList(NsigPass,NbkgPass) : RooArgList(NsigPass));
+        RooArgList(*(sigPass->model),*(bkgPass->model)),RooArgList(NsigPass,NbkgPass));
     RooAddPdf modelFail("modelFail","Model for FAIL sample",
         RooArgList(*(sigFail->model),*(bkgFail->model)),RooArgList(NsigFail,NbkgFail));
 
@@ -1358,8 +1549,10 @@ void calculateDataEfficiency(
     Int_t strategy = 2; // Minuit strategy
     RooFitResult *fitResult=0;
     RooFitResult *best_fitResult=0;
-    Double_t best_chi2 = 99;
+    Double_t best_chi2 = 100;
     Int_t best_fit = 0;
+
+    TString minimizer = "Minuit2";
 
     int attempt = 0;  // fit attempt
     do {
@@ -1392,17 +1585,22 @@ void calculateDataEfficiency(
                 RooFit::Warnings(0),
                 RooFit::Strategy(2), // MINOS STRATEGY
                 // RooFit::IntegrateBins(integrateBinsPrecision),
-                RooFit::Minimizer("Minuit2"));
+                RooFit::Minimizer(minimizer));
         }
+
+        // bkgFail->Print();
+        // bkgFail->freeze_all_parameters(1);
+        // NbkgFail.setConstant(1);
 
         if(attempt>0){
             sigFail->model->fitTo(*dataFail,
                 RooFit::Range("rangeCenter"),
                 RooFit::PrintLevel(-1),
                 RooFit::Warnings(0),
+                (constraints != nullptr) ? RooFit::ExternalConstraints(*constraints) : RooCmdArg::none(),
                 RooFit::Strategy(2), // MINOS STRATEGY
                 // RooFit::IntegrateBins(integrateBinsPrecision),
-                RooFit::Minimizer("Minuit2"));
+                RooFit::Minimizer(minimizer));
         }
 
         modelFail.fitTo(*dataFail,
@@ -1410,9 +1608,10 @@ void calculateDataEfficiency(
             RooFit::PrintLevel(-1),
             RooFit::Warnings(0),
             RooFit::Extended(),
+            (constraints != nullptr) ? RooFit::ExternalConstraints(*constraints) : RooCmdArg::none(),
             RooFit::Strategy(2), // MINOS STRATEGY
             // RooFit::IntegrateBins(integrateBinsPrecision),
-            RooFit::Minimizer("Minuit2"));
+            RooFit::Minimizer(minimizer));
 
         if(attempt!=1){
             bkgPass->model->fitTo(*dataPass,
@@ -1421,7 +1620,7 @@ void calculateDataEfficiency(
                 RooFit::Warnings(0),
                 RooFit::Strategy(2), // MINOS STRATEGY
                 // RooFit::IntegrateBins(integrateBinsPrecision),
-                RooFit::Minimizer("Minuit2"));
+                RooFit::Minimizer(minimizer));
         }
 
         if(attempt>0){
@@ -1429,9 +1628,10 @@ void calculateDataEfficiency(
                 RooFit::Range("rangeCenter"),
                 RooFit::PrintLevel(-1),
                 RooFit::Warnings(0),
+                (constraints != nullptr) ? RooFit::ExternalConstraints(*constraints) : RooCmdArg::none(),
                 RooFit::Strategy(2), // MINOS STRATEGY
                 // RooFit::IntegrateBins(integrateBinsPrecision),
-                RooFit::Minimizer("Minuit2"));
+                RooFit::Minimizer(minimizer));
         }
 
         modelPass.fitTo(*dataPass,
@@ -1439,9 +1639,10 @@ void calculateDataEfficiency(
             RooFit::PrintLevel(-1),
             RooFit::Warnings(0),
             RooFit::Extended(),
+            (constraints != nullptr) ? RooFit::ExternalConstraints(*constraints) : RooCmdArg::none(),
             RooFit::Strategy(2), // MINOS STRATEGY
             // RooFit::IntegrateBins(integrateBinsPrecision),
-            RooFit::Minimizer("Minuit2"));
+            RooFit::Minimizer(minimizer));
 
         if(attempt > 0){    
             const Double_t n0 = NsigFail.getVal();
@@ -1463,14 +1664,19 @@ void calculateDataEfficiency(
             eff.setConstant(kFALSE);
         }
 
+        // bkgFail->Print();
+        // bkgFail->freeze_all_parameters(0);
+        // NbkgFail.setConstant(0);
+
         fitResult = totalPdf.fitTo(*dataCombined,
             RooFit::PrintEvalErrors(-1),
             RooFit::PrintLevel(-1),
             RooFit::Warnings(0),
             RooFit::Extended(),
+            (constraints != nullptr) ? RooFit::ExternalConstraints(*constraints) : RooCmdArg::none(),
             RooFit::Strategy(2), // MINOS STRATEGY
             // RooFit::IntegrateBins(integrateBinsPrecision),
-            RooFit::Minimizer("Minuit2"),
+            RooFit::Minimizer(minimizer),
             //RooFit::Minos(RooArgSet()),
             RooFit::Save());
 
@@ -1491,9 +1697,13 @@ void calculateDataEfficiency(
         std::cout<<"---------------------------------------" <<std::endl;
         std::cout<<"------ attempt = " << attempt << std::endl;
         std::cout<<"------ chi2/ndf = " << chi2ndf <<std::endl;
+        std::cout<<"------ status = " << fitResult->status() <<std::endl;
         std::cout<<"---------------------------------------" <<std::endl;
         
-        if(attempt==0 || (chi2ndf < best_chi2) ){
+        if(attempt==0 || (fitResult->status() < best_fitResult->status()) || ((fitResult->status() == best_fitResult->status()) && (chi2ndf < best_chi2))){
+            // always take the first attempt,
+            // take the other attempt if the fit status os lower (better)
+            // of if the fit status is the same, take the other attempt if it has lower chi2
             best_chi2 = chi2ndf;
             best_fit = attempt;
             best_fitResult = fitResult;
@@ -1502,10 +1712,16 @@ void calculateDataEfficiency(
         }
 
         attempt++;
+        // if(attempt==4 && minimizer == "Minuit2"){
+        //     // try all again with different minimizer
+        //     minimizer = "Minuit";
+        //     attempt = 0;
+        // }
 
-    } while(attempt < 4 && best_chi2 > 1.5);
+    } while(attempt < 4 && (best_chi2 > 1.5 || best_fitResult->status() != 0));
 
     // load best fit values into workspace
+    std::cout<<"------ load snapshot " << best_fit <<std::endl;
     w->loadSnapshot(("snapshot_"+std::to_string(best_fit)).c_str());
     
     RooFormulaVar* NsigFormular = (RooFormulaVar*)w->arg("NsigPass");
@@ -1564,6 +1780,11 @@ void calculateDataEfficiency(
     delete histfile;
     delete histbkgQCDfile;
     // delete histbkgTTfile;
+
+    if(constraint_pass_mean!=nullptr) delete constraint_pass_mean;
+    if(constraint_pass_sigma!=nullptr) delete constraint_pass_sigma;
+    if(constraint_fail_mean!=nullptr) delete constraint_fail_mean;
+    if(constraint_fail_sigma!=nullptr) delete constraint_fail_sigma;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1609,7 +1830,7 @@ void calculateHLTEfficiencyAndYield(
 
     TFile *histfile = 0;
     if(sigpass%2 == 0 || sigfail%2 == 0) {
-        histfile = generateTemplate_ZYield(mcfilename, 0, iBin);
+        histfile = generateTemplate_ZYield(mcfilename, hPV, iBin);
         assert(histfile);
     }
     const double corr = extractCorrelation_HLT(mcfilename, hPV, etaRegion);
@@ -1663,6 +1884,24 @@ void calculateHLTEfficiencyAndYield(
     nflfail += set_signal_model(sigfail, sigFail, m, kTRUE, 1, hFail);
     nflfail += set_background_model(bkgfail, bkgFail, m, kTRUE, 1, hbkgQCDFail);
 
+    // ---> Add constraint terms
+    RooArgSet *constraints = 0;
+    RooGaussian *constraint_pass_mean = 0;
+    RooGaussian *constraint_pass_sigma = 0;
+    RooGaussian *constraint_fail_mean = 0;
+    RooGaussian *constraint_fail_sigma = 0;
+    if(sigpass == 2 || sigpass == 6 || sigfail == 2 || sigfail == 6){
+        // Construct Gaussian constraints p.d.f on signal model
+        constraint_pass_mean = new RooGaussian("constraint_pass_mean","constraint mean", *sigPass->mean, RooFit::RooConst(0.), RooFit::RooConst(1.0));
+        constraint_pass_sigma = new RooGaussian("constraint_pass_sigma","constraint sigma", *sigPass->sigma, RooFit::RooConst(0.5), RooFit::RooConst(0.5));
+
+        constraint_fail_mean = new RooGaussian("constraint_fail_mean","constraint mean", *sigFail->mean, RooFit::RooConst(0.), RooFit::RooConst(1.0));
+        constraint_fail_sigma = new RooGaussian("constraint_fail_sigma","constraint sigma", *sigFail->sigma, RooFit::RooConst(0.5), RooFit::RooConst(0.5));
+
+        constraints = new RooArgSet(*constraint_pass_mean, *constraint_pass_sigma, *constraint_fail_mean, *constraint_fail_sigma);
+    }
+    // <---
+
     Double_t NsigMax     = passHist->Integral() + failHist->Integral();
     Double_t NbkgFailMax = failHist->Integral();
     Double_t NbkgPassMax = passHist->Integral();
@@ -1697,16 +1936,17 @@ void calculateHLTEfficiencyAndYield(
     w->import(*dataCombined);
     w->import(totalPdf);
 
+    RooMsgService::instance().setSilentMode(kTRUE);
+
     Int_t strategy = 2; // Minuit strategy
     RooFitResult *fitResult=0;
     RooFitResult *best_fitResult=0;
-    Double_t best_chi2 = 99;
+    Double_t best_chi2 = 100;
     Int_t best_fit = 0;
 
+    TString minimizer = "Minuit2";
+
     int attempt = 0;  // fit attempt
-
-    RooMsgService::instance().setSilentMode(kTRUE);
-
     do {
         std::cout<<">>> Fit with attempt "<<attempt<<std::endl;
 
@@ -1747,17 +1987,22 @@ void calculateHLTEfficiencyAndYield(
                 RooFit::Warnings(0),
                 RooFit::Strategy(2), // MINOS STRATEGY
                 // RooFit::IntegrateBins(integrateBinsPrecision),
-                RooFit::Minimizer("Minuit2"));
+                RooFit::Minimizer(minimizer));
         }
+
+        // bkgFail->Print();
+        // bkgFail->freeze_all_parameters(1);
+
         if(attempt > 0){
             sigFail->model->fitTo(*dataFail,
                 RooFit::Range("rangeCenter"),
                 RooFit::PrintEvalErrors(-1),
                 RooFit::PrintLevel(-1),
                 RooFit::Warnings(0),
+                (constraints != nullptr) ? RooFit::ExternalConstraints(*constraints) : RooCmdArg::none(),
                 RooFit::Strategy(2), // MINOS STRATEGY
                 // RooFit::IntegrateBins(integrateBinsPrecision),
-                RooFit::Minimizer("Minuit2"));
+                RooFit::Minimizer(minimizer));
 
         }
 
@@ -1767,32 +2012,38 @@ void calculateHLTEfficiencyAndYield(
             RooFit::PrintLevel(-1),
             RooFit::Warnings(0),
             RooFit::Extended(),
+            (constraints != nullptr) ? RooFit::ExternalConstraints(*constraints) : RooCmdArg::none(),
             RooFit::Strategy(2), // MINOS STRATEGY
             // RooFit::IntegrateBins(integrateBinsPrecision),
-            RooFit::Minimizer("Minuit2"));
+            RooFit::Minimizer(minimizer));
 
 
         if(attempt!=1){
                 std::cout<<">>> Fit sideband regions in fail"<<std::endl;
 
-            sigPass->model->fitTo(*dataPass,
+            bkgPass->model->fitTo(*dataPass,
                 RooFit::Range("rangeLow,rangeHigh"),
                 RooFit::PrintEvalErrors(-1),
                 RooFit::PrintLevel(-1),
                 RooFit::Warnings(0),
                 RooFit::Strategy(2), // MINOS STRATEGY
                 // RooFit::IntegrateBins(integrateBinsPrecision),
-                RooFit::Minimizer("Minuit2"));
+                RooFit::Minimizer(minimizer));
         }
+
+        // bkgPass->Print();
+        // bkgPass->freeze_all_parameters(1);
+
         if(attempt > 0){
             sigPass->model->fitTo(*dataPass,
                 RooFit::Range("rangeCenter"),
                 RooFit::PrintEvalErrors(-1),
                 RooFit::PrintLevel(-1),
                 RooFit::Warnings(0),
+                (constraints != nullptr) ? RooFit::ExternalConstraints(*constraints) : RooCmdArg::none(),
                 RooFit::Strategy(2), // MINOS STRATEGY
                 // RooFit::IntegrateBins(integrateBinsPrecision),
-                RooFit::Minimizer("Minuit2"));
+                RooFit::Minimizer(minimizer));
 
         }
 
@@ -1802,9 +2053,10 @@ void calculateHLTEfficiencyAndYield(
             RooFit::PrintLevel(-1),
             RooFit::Warnings(0),
             RooFit::Extended(),
+            (constraints != nullptr) ? RooFit::ExternalConstraints(*constraints) : RooCmdArg::none(),
             RooFit::Strategy(2), // MINOS STRATEGY
             // RooFit::IntegrateBins(integrateBinsPrecision),
-            RooFit::Minimizer("Minuit2"));
+            RooFit::Minimizer(minimizer));
 
         if(attempt>0){
             std::cout<<">>> Fit sideband regions in pass"<<std::endl;
@@ -1826,15 +2078,22 @@ void calculateHLTEfficiencyAndYield(
             eff.setVal(iEff);
             Nsig.setVal(iNsig);
         }
+
+        // bkgFail->Print();
+        // bkgPass->Print();
+        // bkgFail->freeze_all_parameters(0);
+        // bkgPass->freeze_all_parameters(0);
+
         // fit all regions together
         fitResult = totalPdf.fitTo(*dataCombined,
             RooFit::PrintEvalErrors(-1),
             RooFit::PrintLevel(-1),
             RooFit::Warnings(0),
             RooFit::Extended(),
+            (constraints != nullptr) ? RooFit::ExternalConstraints(*constraints) : RooCmdArg::none(),
             RooFit::Strategy(2), // MINOS STRATEGY
             // RooFit::IntegrateBins(integrateBinsPrecision),
-            RooFit::Minimizer("Minuit2"),
+            RooFit::Minimizer(minimizer),
             //RooFit::Minos(RooArgSet()),
             RooFit::Save());
 
@@ -1846,13 +2105,6 @@ void calculateHLTEfficiencyAndYield(
         const Int_t ndf = dataCombined->numEntries() - fitResult->floatParsFinal().getSize();
         Double_t chi2ndf = chi2Var.getVal() / ndf;
 
-        std::cout<<"---------------------------------------" <<std::endl;
-        std::cout<<"------ attempt = " << attempt << std::endl;
-        std::cout<<"------ chi2/"<<ndf<<" = " << chi2ndf <<std::endl;
-        std::cout<<"------ eff = "<<eff.getVal()<<std::endl;
-        std::cout<<"------ Nsig = "<<Nsig.getVal()<<std::endl;          
-        std::cout<<"---------------------------------------" <<std::endl;
-
         if(    std::abs(1 - (NsigPass.getVal()+NbkgPass.getVal())/passHist->Integral()) > 0.1
             || std::abs(1 - (NsigFail.getVal()+NbkgFail.getVal())/failHist->Integral()) > 0.1
         ){
@@ -1860,7 +2112,18 @@ void calculateHLTEfficiencyAndYield(
             chi2ndf = 99;
         }        
 
-        if(attempt==0 || (chi2ndf < best_chi2 && chi2ndf > 0) ){
+        std::cout<<"---------------------------------------" <<std::endl;
+        std::cout<<"------ attempt = " << attempt << std::endl;
+        std::cout<<"------ chi2/"<<ndf<<" = " << chi2ndf <<std::endl;
+        std::cout<<"------ status = " << fitResult->status() <<std::endl;
+        std::cout<<"------ eff = "<<eff.getVal()<<std::endl;
+        std::cout<<"------ Nsig = "<<Nsig.getVal()<<std::endl;          
+        std::cout<<"---------------------------------------" <<std::endl;
+
+        if(attempt==0 || (fitResult->status() < best_fitResult->status()) || ((fitResult->status() == best_fitResult->status()) && (chi2ndf < best_chi2))){
+            // always take the first attempt,
+            // take the other attempt if the fit status os lower (better)
+            // of if the fit status is the same, take the other attempt if it has lower chi2
             best_chi2 = chi2ndf;
             best_fit = attempt;
             best_fitResult = fitResult;
@@ -1870,7 +2133,7 @@ void calculateHLTEfficiencyAndYield(
 
         attempt++;
 
-    } while(attempt < 4 && best_chi2 > 1.5);
+    } while(attempt < 4 && (best_chi2 > 1.5 || best_fitResult->status() != 0));
 
     // load best fit values into workspace
     w->loadSnapshot(("snapshot_"+std::to_string(best_fit)).c_str());
@@ -1927,6 +2190,11 @@ void calculateHLTEfficiencyAndYield(
     delete bkgPass;
     delete sigFail;
     delete bkgFail;
+
+    if(constraint_pass_mean!=nullptr) delete constraint_pass_mean;
+    if(constraint_pass_sigma!=nullptr) delete constraint_pass_sigma;
+    if(constraint_fail_mean!=nullptr) delete constraint_fail_mean;
+    if(constraint_fail_sigma!=nullptr) delete constraint_fail_sigma;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -2074,7 +2342,7 @@ void calculateEfficienciesAndYield(
     Int_t strategy = 2; // Minuit strategy
     RooFitResult *fitResult=0;
     RooFitResult *best_fitResult=0;
-    Double_t best_chi2 = 99;
+    Double_t best_chi2 = 100;
     Int_t best_fit = 0;
 
     int attempt = 0;  // fit attempt
@@ -2550,7 +2818,7 @@ void calculateHLTCorrelation(
     Int_t strategy = 2; // Minuit strategy
     RooFitResult *fitResult=0;
     RooFitResult *best_fitResult=0;
-    Double_t best_chi2 = 99;
+    Double_t best_chi2 = 100;
     Int_t best_fit = 0;
 
     int attempt = 0;  // fit attempt
@@ -2611,6 +2879,7 @@ void calculateHLTCorrelation(
                     RooFit::Strategy(strategy), // MINUIT STRATEGY
                     // RooFit::Minos(RooArgSet(Nsig)),
                     RooFit::Save());
+
 
                 fitResult = sig0->model->fitTo(*dataHLT0,
                     RooFit::Range("rangeCenter"),

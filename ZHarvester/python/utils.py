@@ -116,39 +116,79 @@ def load_histogram(
         If the pileup histogram is to be returned
     """
 
-    import ROOT 
-    
-    file_ = ROOT.TFile(fileName)
-    
-    h_X_ls = file_.Get("{0}{1}".format(prefix, name)).Clone("{0}{1}{2}".format(prefix, name, suffix))
-    h_X_ls.SetDirectory(0)
-    h_X = h_X_ls.ProjectionY("h_tmp_{0}_{1}_{2}".format(name, run, suffix), lumisections[0], lumisections[0], "e")
-    
-    for ls in lumisections[1:]:
-        h_X.Add(h_X_ls.ProjectionY("h_tmp_{0}_{1}_{2}_{3}".format(name, run, ls, suffix), ls, ls, "e"))
-    
-    if pileup:
-        h_X.SetDirectory(0)
-        return h_X
-        
-    # create new histogram in correct bin range
-    hNew = ROOT.TH1D("h_mass_{0}_{1}_{2}_{3}".format(
-        name, run, lumisections[0], suffix), "",MassBin, MassMin, MassMax)
-    
-    for ibin in range(0, h_X.GetNbinsX()+1):
-        binCenter = h_X.GetBinCenter(ibin)
-        if binCenter < MassMin:
-            continue
-        elif binCenter > MassMax:
-            break
-        else:
-            content = h_X.GetBinContent(ibin)
-            newBin = hNew.FindBin(binCenter)
-            hNew.SetBinContent(newBin, hNew.GetBinContent(newBin) + content)
-        
-    hNew.SetDirectory(0)
+    import uproot 
+    import numpy as np
+    import pdb
+    from hist import Hist
 
-    return hNew
+    with uproot.open("{0}:{1}{2}".format(fileName, prefix, name)) as th_:
+        
+        # h_ = th_.to_boost(bh.axis.IntCategory(np.arange(1,2501,1)), bh.axis.Regular(80, 50, 130))
+
+        # h1 = bh.Histogram(bh.axis.IntCategory(np.arange(1,2501,1)), bh.axis.Regular(80, 50, 130))
+
+        # pdb.set_trace()
+
+
+        h_ = th_.to_numpy()
+        
+        # x-axis is mass or primary vertices
+        bins_x = h_[2]
+
+        # select lumisections
+        h_ = np.sum(h_[0][lumisections], axis=0)
+
+        if pileup:
+            return h_
+        
+        bins_new = np.linspace(MassMin, MassMax, MassBin+1)
+
+        # no rebinning if bins are already the same
+        if bins_new == bins_x or (len(bins_new)==len(bins_x) and (bins_new == bins_x).all()):
+            return h_
+        
+        binWidth = bins_x[1:]-bins_x[:-1]
+        binWidthNew = (MassMax - MassMin)/MassBin
+
+        if (binWidth[0] == binWidth).all() == False:
+            print("ERROR:  === variable bin sizes, no rebinning possible!")
+            return None
+
+        if binWidth[0] > binWidthNew:
+            print("ERROR:  === bin width is smaller than original binning, no rebinning possible!")
+            return None
+
+        # same bin widths, select different range
+        bin_lo = (bins_new[0] - bins_x[0])/binWidth[0]
+        bin_hi = (bins_new[-1] - bins_x[-1])/binWidth[0]
+
+        if not bin_lo.is_integer() or not bin_hi.is_integer() or bin_lo<0 or bin_hi>0:
+            print("ERROR:  === can not rebin to new range!")
+            return None
+
+        h_ = h_[int(bin_lo):int(bin_hi)]
+
+        if binWidth[0] < binWidthNew:
+            f = binWidthNew/binWidth[0]
+            l = len(h_)/f
+
+            if not f.is_integer() or not l.is_integer():
+                print("ERROR:  === can not rebin to new width!")
+                return None           
+
+            h_ = h_.reshape(int(l), int(f)).sum(axis=1)
+
+        # # convert numpy array to boost histogram
+        # import boost_histogram as bh
+        # hist = bh.Histogram(bh.axis.Regular(bins=MassBin, start=MassMin, stop=MassMax))
+
+        # convert numpy array to hist
+        hist = Hist.new.Regular(MassBin, MassMin, MassMax, name="x").Double()
+
+        hist[:] = h_
+ 
+        return hist
+
 
 # ------------------------------------------------------------------------------
 def get_ls_for_next_measurement(
@@ -234,9 +274,9 @@ def get_ls_for_next_measurement(
         yield list_good_ls_
 
 # ------------------------------------------------------------------------------
-def getCorrelationIO(hPV_data, correlationsFileName):
+def getCorrelation(hPV_data, correlationsFileName, which, region="I"):
     """
-    calculate the correlation factor between the inner and outer muon track
+    calculate the correlation factor from a resource file by folding the PV histogram with the correlation histogram  
 
     Parameters
     ----------
@@ -244,31 +284,30 @@ def getCorrelationIO(hPV_data, correlationsFileName):
         1D histogram with number of primary vertices in data
     correlationsFileName : str
         path to the file with correlation factors as function of number of primary vertices
+    which: str
+        which correlation factor to be read, can be: "IO", "ID", "Acceptance"
+    region: str
+        eta region for the correlation factor, can be: "I", "BB", "BE", "EE"
     """
     import numpy as np
     import ROOT
     ROOT.gROOT.SetBatch(True) # disable root prompts
 
-    tfileIO = ROOT.TFile(correlationsFileName,"READ")
-    hcorrIO = tfileIO.Get("cMu_I")
+    tfile = ROOT.TFile(correlationsFileName,"READ")
+
     # normalize pileup histogram
     hPV_data.Scale(1./hPV_data.Integral())
     avgPV = hPV_data.GetMean()
+    hC = tfile.Get("C{0}_{1}".format(which, region))
 
-    # fold the correlation with the pileup histogram
-    cIO = 0
-    for ipv in range(0,100):
-        c = hcorrIO.GetBinContent(hcorrIO.FindBin(ipv))
-        pv = hPV_data.GetBinContent(hPV_data.FindBin(ipv))
-        # skip nan values
-        if np.isnan(c):
-            c = 1
-        cIO += c * pv
+    hC.Multiply(hPV_data)
 
-    tfileIO.Close()
-    print("Correlation coefficienct i/o = {0}".format(cIO))
+    corr = hC.Integral()
+
+    tfile.Close()
+    print("Correlation coefficienct c{0}_{1} = {2}".format(which, region, corr))
     print("For average primary vertices of <pv> = {0}".format(avgPV))
-    return cIO
+    return corr
 
 # ------------------------------------------------------------------------------
 def writeSummaryCSV(outCSVDir, outName="Mergedcsvfile", writeByLS=True, keys=None):

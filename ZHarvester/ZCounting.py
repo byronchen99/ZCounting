@@ -1,116 +1,119 @@
 import logging as log
-import ROOT
+# import ROOT
 import pandas as pd
 import glob
 import os
 import pdb
 import uncertainties as unc
-import gc
+import datetime
+import numpy as np
 
-from python.utils import writeSummaryCSV, getEra, getFileName, load_input_csv, get_ls_for_next_measurement, getCorrelationIO, to_DateTime
+from python.utils import writeSummaryCSV, getFileName, load_input_csv, get_ls_for_next_measurement, load_histogram, getCorrelation, to_DateTime
+
 
 # disable panda warnings when assigning a new column in the dataframe
 pd.options.mode.chained_assignment = None
 
 # turn off graphical output on screen
-ROOT.gROOT.SetBatch(True)
+# ROOT.gROOT.SetBatch(True)
 
-def extract_results(directory, m, cIO):
+def extract_results(directory, m, cIO, cID, cHLT, cKinematicSelection):
     log.info(" === Extracting fit results in {0} for {1}".format(directory,m))
+    
+    # helper function to read the workspace for a specific fit
+    def open_workspace(filename):
+        file_result = directory+"/{0}_{1}.root".format(filename, m)
         
-    file_yield = directory+"/workspace_I_{0}.root".format(m)
+        if not os.path.isfile(file_result):
+            log.warning(" === No result for `{0}`".format(file_result))
+            return None, None
+        
+        f = ROOT.TFile(file_result,"READ")
+        w = f.Get("workspace")
+        return f, w
+
+    def open_workspace_yield(filename):
+        f, w = open_workspace("workspace_yield_"+filename)
+        
+        Nsig = w.var("Nsig").getVal()
+        chi2 = w.arg("chi2").getVal()
+        
+        f.Close()
+        f.Delete()
+        w.Delete()
+        return Nsig, chi2
+
+    def unorm(value):
+        if value > 0:
+            return unc.ufloat(value, np.sqrt(value))
+        else: 
+            return unc.ufloat(value, value)
     
-    if not os.path.isfile(file_yield):
-        return None
-    
-    f = ROOT.TFile(file_yield,"READ")
-    w = f.Get("workspace")
-    
+
+    # --- For identification (ID) efficiency        
+    NsigHLT2, chi2HLT2 = open_workspace_yield("HLT_{0}_2".format(etaRegion))
+    NsigHLT1, chi2HLT1 = open_workspace_yield("HLT_{0}_1".format(etaRegion))
+    NsigIDFail, chi2ID = open_workspace_yield("ID_{0}_0".format(etaRegion))
+
+    NsigHLT2 = unorm(NsigHLT2)
+    NsigHLT1 = unorm(NsigHLT1)
+    NsigIDFail = unorm(NsigIDFail)
+
+    effHLT = (2 * NsigHLT2) / (2 * NsigHLT2 + NsigHLT1)
+    effID = (2 * NsigHLT2 + NsigHLT1) / (2 * NsigHLT2 + NsigHLT1 + NsigIDFail)
+
+    NsigGloPass, chi2GloPass = open_workspace_yield("Glo_{0}_1".format(etaRegion))
+    NsigGloFail, chi2GloFail = open_workspace_yield("Glo_{0}_0".format(etaRegion))
+
+    NsigStaPass, chi2StaPass = open_workspace_yield("Sta_{0}_1".format(etaRegion))
+    NsigStaFail, chi2StaFail = open_workspace_yield("Sta_{0}_0".format(etaRegion))
+
+    NsigGloPass = unorm(NsigGloPass)
+    NsigGloFail = unorm(NsigGloFail)
+
+    NsigStaPass = unorm(NsigStaPass)
+    NsigStaFail = unorm(NsigStaFail)
+
+    effGlo = NsigGloPass / (NsigGloPass + NsigGloFail)
+    effSta = NsigStaPass / (NsigStaPass + NsigStaFail)
+
+    effMu = effID*effGlo*effSta
+
     res = {
-        "effHLT": unc.ufloat(w.var("eff").getVal(), w.var("eff").getError()),
-        "cHLT": w.arg("c").getVal(),
-        "zReco": unc.ufloat(w.var("Nsig").getVal(), w.var("Nsig").getError()),
-        "NbkgHLTPass": unc.ufloat(w.var("NbkgPass").getVal(), w.var("NbkgPass").getError()),
-        "NbkgHLTFail": unc.ufloat(w.var("NbkgFail").getVal(), w.var("NbkgFail").getError()),
-        # "chi2HLTpass": w.arg("chi2pass").getVal(),
-        # "chi2HLTfail": w.arg("chi2fail").getVal(),
-        "chi2HLT": w.arg("chi2").getVal()
+        "NsigHLT2": NsigHLT2,
+        "NsigHLT1": NsigHLT1,
+        "NsigIDFail": NsigIDFail,
+        "NsigGloPass": NsigGloPass,
+        "NsigGloFail": NsigGloFail,
+        "NsigStaPass": NsigStaPass,
+        "NsigStaFail": NsigStaFail,
+        "chi2HLT2": chi2HLT2,
+        "chi2HLT1": chi2HLT1,
+        "chi2GloPass": chi2GloPass,
+        "chi2GloFail": chi2GloFail,
+        "chi2StaPass": chi2StaPass,
+        "chi2StaFail": chi2StaFail,
+        "effHLT": effHLT,
+        "effID": effID,
+        "effGlo": effGlo,
+        "effSta": effSta,
+        "effMu": effMu,
+        "cHLT": cHLT,
+        "cIO": cIO,
+        "cID": cID,
+        "cKinematicSelection": cKinematicSelection,
+        "recZCount": (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 / effMu**2 * cHLT * cID * cIO**2 * cKinematicSelection
     }
-    
-    f.Close()
-    f.Delete()
-    w.Delete()
-
-    file_yield = directory+"/workspace_Sel_I_{0}.root".format(m)
-    
-    if not os.path.isfile(file_yield):
-        return None
-    
-    f = ROOT.TFile(file_yield,"READ")
-    w = f.Get("workspace")
-    
-    res.update({
-        "effSel": unc.ufloat(w.var("eff").getVal(), w.var("eff").getError()),
-        "NsigSel": unc.ufloat(w.var("Nsig").getVal(), w.var("Nsig").getError()),
-        "NbkgSelPass": unc.ufloat(w.var("NbkgPass").getVal(), w.var("NbkgPass").getError()),
-        "NbkgSelFail": unc.ufloat(w.var("NbkgFail").getVal(), w.var("NbkgFail").getError()),
-        "chi2Sel": w.arg("chi2").getVal() 
-    })
-    
-    f.Close()
-    f.Delete()
-    w.Delete()
-
-    file_yield = directory+"/workspace_Glo_I_{0}.root".format(m)
-    
-    if not os.path.isfile(file_yield):
-        return None
-    
-    f = ROOT.TFile(file_yield,"READ")
-    w = f.Get("workspace")
-    
-    res.update({
-        "effGlo": unc.ufloat(w.var("eff").getVal(), w.var("eff").getError()),
-        "NsigGlo": unc.ufloat(w.var("Nsig").getVal(), w.var("Nsig").getError()),
-        "NbkgGloPass": unc.ufloat(w.var("NbkgPass").getVal(), w.var("NbkgPass").getError()),
-        "NbkgGloFail": unc.ufloat(w.var("NbkgFail").getVal(), w.var("NbkgFail").getError()),
-        "chi2Glo": w.arg("chi2").getVal()
-    })
-    f.Close()
-    f.Delete()
-    w.Delete()
-
-    file_yield = directory+"/workspace_Sta_I_{0}.root".format(m)
-    
-    if not os.path.isfile(file_yield):
-        return None
-    
-    f = ROOT.TFile(file_yield,"READ")
-    w = f.Get("workspace")
-    
-    res.update({
-        "effSta": unc.ufloat(w.var("eff").getVal(), w.var("eff").getError()),
-        "NsigSta": unc.ufloat(w.var("Nsig").getVal(), w.var("Nsig").getError()),
-        "NbkgStaPass": unc.ufloat(w.var("NbkgPass").getVal(), w.var("NbkgPass").getError()),
-        "NbkgStaFail": unc.ufloat(w.var("NbkgFail").getVal(), w.var("NbkgFail").getError()),
-        "chi2Sta": w.arg("chi2").getVal()
-    })
-    f.Close()
-    f.Delete()
-    w.Delete()
-
-    res["cIO"] = cIO
-    res["zDel"] = res["zReco"] * cIO**2 / (res["effSel"] * res["effGlo"] * res["effSta"])**2
 
     return res
-        
+
 
 ################################################################################
 if __name__ == '__main__':
     import argparse
     import os
 
-    cmsswbase = os.environ['CMSSW_BASE']
+    # cmsswbase = os.environ['CMSSW_BASE']
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-b", "--beginRun", help="first run to analyze [%(default)s]", type=int, default=272007)
@@ -122,14 +125,14 @@ if __name__ == '__main__':
                         action="store_true")
     parser.add_argument("-c", "--writeSummaryCSV", default=False, action="store_true",
                         help="produce merged CSV with all runs")
-    parser.add_argument("-i", "--dirDQM", help="Directory to the input root files from the DQM Offline module",
+    parser.add_argument("-i", "--eosDir", help="Directory to the input root files from the DQM Offline module",
                         default="default")
     parser.add_argument("--byLsCSV", help="ByLs csv input generated by testBril.sh",
                         default="default")
     parser.add_argument("--sigTemplates", default="default", type=str,
-        help="Choose one of the options for signal model (MC, MCxGaus, MCxCB, BW, BWxCB, BWxGaus). Default is MCxGaus")
+        help="Choose one of the options for signal model (MC, MCxGaus, MCxCB, BW, BWxCB, BWxGaus). Default is MCxGaus and exp")
     parser.add_argument("--bkgTemplates", default="default", type=str,
-        help="Choose one of the options for background model (Exp, Quad, QuadPlusExp, CMSShape, Das). Default is CMSShape")
+        help="Choose one of the options for background model (Exp, Quad, QuadPlusExp, CMSShape, Das). Default is CMSShape and linear")
     parser.add_argument('--ptCut', type=float, default=25.,
                         help='specify lower pt cut on tag and probe muons')
     parser.add_argument('--etaCut', type=float, default=2.4,
@@ -142,6 +145,8 @@ if __name__ == '__main__':
                         help='specify whether or not to do an inclusive fit of the specified runs')
     parser.add_argument('--collect', default=False, action="store_true",
                         help='specify whether or not to run the fits or just collect the results')
+    parser.add_argument('--mode', default="DQM", type=str,
+                        help='specify measurement mode (DQM; TTrees)')
     parser.add_argument("-o", "--dirOut", help="where to store the output files", default="./")
 
     args = parser.parse_args()
@@ -150,56 +155,50 @@ if __name__ == '__main__':
     else:
         log.basicConfig(format="%(levelname)s: %(message)s", level=log.INFO)
 
+    prefix_dqm="ZCountingInOut-V17_38-"
+
     ########################################
     # link to resouces
-    eosDir           = args.dirDQM
-    prefix_dqm="ZCountingAll-V17_02-" #"DQMData/Run {0}/ZCounting/Run summary/Histograms/".format(run)
-    resPath = cmsswbase + "/src/ZCounting/ZHarvester/res/"
+    eosDir  = args.eosDir
+    # resPath = cmsswbase + "/src/ZCounting/ZHarvester/res/"
+    resPath = "/eos/home-d/dwalter/Lumi/ZCounting_Standalone/CMSSW_12_4_10/src/ZCounting/ZHarvester"
     if( args.beginRun >= 272007 and args.beginRun < 278808
         # there is an overlap for 2016 F in runs with pre and post VFP settings
         and args.beginRun not in [278769, 278801, 278802, 278803, 278804, 278805, 278808]
     ):                                                          # 2016 pre VFP
+        currentYear = 2016
         byLsCSV          = resPath+"/FillByLs_2016.csv"
-        correlationsIO   = resPath+"/correlations/InnerOuter_V17_01/cMu_nPV_2016preVFP.root"
+        mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2016preVFP.root"
         sigTemplates     = eosDir+"/"+prefix_dqm+"Summer16preVFP-DYJetsToLL_M_50_LO.root"
-        era = "2016preVFP"
-        currentYear = 2016
     elif args.beginRun < 294645:                                # 2016 post VFP
-        byLsCSV          = resPath+"/FillByLs_2016.csv"
-        correlationsIO   = resPath+"/correlations/InnerOuter_V17_01/cMu_nPV_2016postVFP.root"
-        sigTemplates     = eosDir+"/"+prefix_dqm+"Summer16postVFP-DYJetsToLL_M_50_LO.root"
-        era = "2016postVFP"
         currentYear = 2016
+        byLsCSV          = resPath+"/FillByLs_2016.csv"
+        mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2016postVFP.root"
+        sigTemplates     = eosDir+"/"+prefix_dqm+"Summer16postVFP-DYJetsToLL_M_50_LO.root"
     elif args.beginRun > 297020 and args.beginRun < 306828:     # 2017
+        currentYear = 2017
         byLsCSV          = resPath+"/FillByLs_2017_IsoMu24.csv"
-        correlationsIO   = resPath+"/correlations/InnerOuter_V17_01/cMu_nPV_2017.root"
+        mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2017.root"
         sigTemplates     = eosDir+"/"+prefix_dqm+"Fall17-DYJetsToLL_M_50_LO.root"
-        era = "2017"
-        currentYear = 2017
     elif args.beginRun >= 306926 and args.beginRun < 307083:    # 2017 H
-        byLsCSV          = resPath+"/FillByLs_2017_lowPU.csv"
-        correlationsIO   = resPath+"/correlations/InnerOuter_V17_01/cMu_nPV_2017.root"
-        sigTemplates     = eosDir+"/"+prefix_dqm+"Fall17-DYJetsToLL_M_50_LO.root"
-        era = "2017H"
         currentYear = 2017
+        byLsCSV          = resPath+"/FillByLs_2017_lowPU.csv"
+        mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2017.root"
+        sigTemplates     = eosDir+"/"+prefix_dqm+"Fall17-DYJetsToLL_M_50_LO.root"
     elif args.beginRun >= 315252 and args.beginRun < 325273:    # 2018
-        byLsCSV          = resPath+"/FillByLs_2018.csv"
-        correlationsIO   = resPath+"/correlations/InnerOuter_V17_01/cMu_nPV_2018.root"
-        sigTemplates     = eosDir+"/"+prefix_dqm+"Autumn18-DYJetsToLL_M_50_LO.root"
-        era = "2018"
         currentYear = 2018
+        byLsCSV          = resPath+"/FillByLs_2018.csv"
+        mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2018.root"
+        sigTemplates     = eosDir+"/"+prefix_dqm+"Autumn18-DYJetsToLL_M_50_LO.root"
     elif args.beginRun >= 355100:                               # 2022
+        currentYear = 2022
         byLsCSV = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/brilcalcByLS/byLS_Collisions22_355100_356615_Golden.csv"
-        correlationsIO   = "/eos/cms/store//group/comm_luminosity/ZCounting/2022/CorrelationFactors/cMu_nPV_2022.root"
+        mcCorrelations   = "/eos/cms/store//group/comm_luminosity/ZCounting/2022/CorrelationFactors/c_nPV_2022.root"
         prefix_dqm =  "ZCountingAll-V01-"
         sigTemplates = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/SignalTemplates/ZCountingAll-V01-Winter22-DYJetsToLL_M_50_LO.root"
-        era = "2022"
-        currentYear = 2022
     else:
-        correlationsIO      = None
-        byLsCSV             = None
-        sigTemplates        = None
-        currentYear = 2017
+        log.warning("specified begin run {0} unknown! exit()".format(args.beginRun))
+        exit()
 
     byLsCSV          = byLsCSV          if args.byLsCSV       == "default"   else args.byLsCSV
     measurement      = args.measurement
@@ -212,8 +211,7 @@ if __name__ == '__main__':
     log.info("Lumi per Measurement:    {0}".format(args.LumiPerMeasurement))
     log.info("----------------------------------")
     
-    # signal model
-    sigTemplates = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/SignalTemplates/ZCountingAll-V01-Winter22-DYJetsToLL_M_50_LO.root"
+    # signal model 
     if args.sigTemplates == "MCxGauss" or args.sigTemplates == "default":
         sigModel = 2 # MC, folding with gauss
     elif args.sigTemplates == "MC":
@@ -231,20 +229,30 @@ if __name__ == '__main__':
         exit()
 
     # background model 
-    if args.bkgTemplates == "CMSShape" or args.bkgTemplates == "default" :
-        bkgModel = 6
+    if args.bkgTemplates == "default" :
+        bkgModelPass = 1    # exp
+        bkgModelFail = 6    # RooCMSShape
+    elif args.bkgTemplates == "alt" :
+        bkgModelPass = 0    # constant
+        bkgModelFail = 4    # Das
     elif args.bkgTemplates == "Exp":
-        bkgModel = 1
+        bkgModelFail = 1
+        bkgModelPass = 1
     elif args.bkgTemplates == "Quad":
-        bkgModel = 2
+        bkgModelFail = 2
+        bkgModelPass = 2
     elif args.bkgTemplates == "QuadPlusExp":
-        bkgModel = 3
+        bkgModelFail = 3
+        bkgModelPass = 3
     elif args.bkgTemplates == "Das":
-        bkgModel = 4
+        bkgModelFail = 4
+        bkgModelPass = 4
+    elif args.bkgTemplates == "CMSShape":
+        bkgModelFail = 6
+        bkgModelPass = 6
     else:
         log.warning("background model {0} unknown! exit()".format(args.bkgTemplates))
         exit()
-        
         
     ########## Input configuration ##########
     # ByLS csv inputs generated by testBRIL.sh
@@ -252,7 +260,6 @@ if __name__ == '__main__':
     byLS_filelist.sort(key=os.path.getmtime)
     byLS_filename = byLS_filelist[-1]
     log.info(" The brilcalc csv file: " + str(byLS_filename))
-
 
     outDir = args.dirOut if args.dirOut.endswith("/") else args.dirOut+"/"
     if not os.path.isdir(outDir):
@@ -275,46 +282,61 @@ if __name__ == '__main__':
     MassMax_ = int(args.mass[1])
     MassBin_ = int(args.mass[2])
 
-    npvBin_ = 100
-    npvMin_ = 0.5
-    npvMax_ = 100.5
+    MassMinSta_ = int(50)
+    MassMaxSta_ = int(130)
+    MassBinSta_ = int(MassMaxSta_ - MassMinSta_)*2
 
-    if not args.collect:
-        log.info(" Loading C marco...")
-        # load functions for fitting
-        ROOT.gROOT.LoadMacro(os.path.dirname(os.path.realpath(
-            __file__)) + "/calculateDataEfficiency.C")
+    npvMin_ = -0.5  # lower boundary for npv histogram
+    npvMax_ = 74.5  # upper boundary for npv histogram
 
-        ROOT.set_massRange(MassMin_, MassMax_, MassBin_)
-        ROOT.set_npvRange(npvMin_, npvMax_)
-        if currentYear >= 2022:
-            ROOT.set_energy(13.6)
+    if args.mode == "DQM":
+        npvMin_ = 0.5     
+        npvMax_ = 100.5   
 
-        ROOT.set_ptCut(args.ptCut)
-        ROOT.set_etaCut(args.etaCut)
+    npvBin_ = npvMax_ - npvMin_
+
+    maximumLS = 2500        # maximum luminosity block number that is stored in the DQM histograms
+
+    if args.etaCut == 0.9:
+        etaRegion = "B"
+        etaRegionZ = "BB"
+    else:
+        etaRegion = "I"
+        etaRegionZ = "I"
+
+    # if not args.collect:
+    #     log.info(" Loading C marco...")
+    #     # load functions for fitting
+    #     ROOT.gROOT.LoadMacro(os.path.dirname(os.path.realpath(
+    #         __file__)) + "/calculateDataEfficiency.C")
+
+    #     ROOT.set_massRange(MassMin_, MassMax_, MassBin_)
+
+    #     ROOT.set_npvRange(npvMin_, npvMax_)
+    #     if currentYear >= 2022:
+    #         ROOT.set_energy(13.6)
+
+    #     ROOT.set_ptCut(args.ptCut)
+    #     ROOT.set_etaCut(args.etaCut)
     
     byLS_data = load_input_csv(byLS_filename)
-
-    #####################################   
-
-    # For fitting
-    hPV = ROOT.TH1D("h_PV","", npvBin_, npvMin_, npvMax_)
-
-    h2HLT = ROOT.TH1D("h_mass_2HLT_Z","",MassBin_, MassMin_, MassMax_)
-    h1HLT = ROOT.TH1D("h_mass_1HLT_Z","",MassBin_, MassMin_, MassMax_)
-
-    hSITpass = ROOT.TH1D("h_mass_SIT_pass","",MassBin_, MassMin_, MassMax_)
-    hSITfail = ROOT.TH1D("h_mass_SIT_fail","",MassBin_, MassMin_, MassMax_)
-
-    hGlopass = ROOT.TH1D("h_mass_Glo_pass","",MassBin_, MassMin_, MassMax_)
-    hGlofail = ROOT.TH1D("h_mass_Glo_fail","",MassBin_, MassMin_, MassMax_)
-
-    # hTrkfail = ROOT.TH1D("h_mass_Trk_fail","",MassBin_, MassMin_, MassMax_)
-    hStapass = ROOT.TH1D("h_mass_Sta_pass","",MassBin_, MassMin_, MassMax_)
-    hStafail = ROOT.TH1D("h_mass_Sta_fail","",MassBin_, MassMin_, MassMax_)
-    
     byLS_data = byLS_data.loc[(byLS_data['run'] >= int(args.beginRun)) & (byLS_data['run'] < int(args.endRun))]
 
+    if args.mode == "TTrees":
+        # Define histograms for fitting
+        hPV = ROOT.TH1D("h_PV","", npvBin_, npvMin_, npvMax_)
+
+        h2HLT = ROOT.TH1D("h_mass_2HLT_Z","",MassBin_, MassMin_, MassMax_)
+        h1HLT = ROOT.TH1D("h_mass_1HLT_Z","",MassBin_, MassMin_, MassMax_)
+        hIDfail = ROOT.TH1D("h_mass_ID_fail","",MassBin_, MassMin_, MassMax_)
+
+        hGlopass = ROOT.TH1D("h_mass_Glo_pass","",MassBinSta_, MassMinSta_, MassMaxSta_)
+        hGlofail = ROOT.TH1D("h_mass_Glo_fail","",MassBinSta_, MassMinSta_, MassMaxSta_)
+
+        hStapass = ROOT.TH1D("h_mass_Sta_pass","",MassBin_, MassMin_, MassMax_)
+        hStafail = ROOT.TH1D("h_mass_Sta_fail","",MassBin_, MassMin_, MassMax_)
+    
+    #####################################   
     recLumi = 0
     firstRun = 0
     lastRun = 0
@@ -331,50 +353,51 @@ if __name__ == '__main__':
 
         fill = byLS_run.drop_duplicates('fill')['fill'].values[0]
         LSlist = byLS_run['ls'].values.tolist()
+        Lumilist = byLS_run.loc[byLS_run['ls'].isin(LSlist)]['recorded(/pb)'].values.tolist()
 
         log.info(" === Running Fill {0}".format(fill))
         log.info(" === Running Run {0}".format(run))
         
-        eosFile = eosDir+"/"+prefix_dqm+getEra(run)+"*Muon_"+str(run)+"*.root"
-        eosFiles = glob.glob(eosFile)
-        if len(eosFiles) == 1:
-            eosFile = eosFiles[0]
+        if args.mode == "TTrees":
+            eosFile = eosDir+"/"+prefix_dqm+"*Muon_"+str(run)+"*.root"
+            eosFiles = glob.glob(eosFile)
+            if len(eosFiles) == 1:
+                eosFile = eosFiles[0]
+            else:
+                log.warning(" === No file or more than one was found! - continue")
+                log.warning(" === Was looking for: {}".format(eosFile))            
+                continue
+            file_ = ROOT.TFile(eosFile,"READ")
+
+            # histograms need to be in same directory so that they can get filled
+            hPV.SetDirectory(file_)
+            h2HLT.SetDirectory(file_)
+            h1HLT.SetDirectory(file_)
+            hIDfail.SetDirectory(file_)
+            hGlopass.SetDirectory(file_)
+            hGlofail.SetDirectory(file_)
+            hStapass.SetDirectory(file_)
+            hStafail.SetDirectory(file_)
+
+            # trees with muon pairs
+            tHLT = file_.Get("HLT")
+            tID  = file_.Get("ID")
+            tGlo = file_.Get("Glo")
+            tSta = file_.Get("Sta")
+
+            # ZCountlist = [tHLT.GetEntries("lumiBlock=={0}".format(l)) for l in LSlist]
         else:
-            log.warning(" === No file or more than one was found! - continue")
-            log.warning(" === Was looking for: {}".format(eosFile))            
-            continue
-        file_ = ROOT.TFile(eosFile,"READ")
+            log.info(f"Now at run {run}")
+            fileName = getFileName(eosDir,run)
+            if fileName is None:
+                continue
+            log.info(f"Found file `{fileName}`")
 
-        # trees with muon pairs
-        tHLT = file_.Get("HLT")
-        tSel = file_.Get("Sel")
-        tGlo = file_.Get("Glo")
-        tSta = file_.Get("Sta")
-
-        # histograms need to be in same directory so that they can get filled
-        hPV.SetDirectory(file_)
-        h2HLT.SetDirectory(file_)
-        h1HLT.SetDirectory(file_)
-        
-        hSITpass.SetDirectory(file_)
-        hSITfail.SetDirectory(file_)
-
-        hGlopass.SetDirectory(file_)
-        hGlofail.SetDirectory(file_)
-        
-        # hTrkfail.SetDirectory(file_)
-        hStapass.SetDirectory(file_)
-        hStafail.SetDirectory(file_)     
-
-        Lumilist = byLS_run.loc[byLS_run['ls'].isin(LSlist)]['recorded(/pb)'].values.tolist()
-        ZCountlist = [tHLT.GetEntries("lumiBlock=={0}".format(l))
-            + tSel.GetEntries("lumiBlock=={0}".format(l)) 
-            + tSta.GetEntries("lumiBlock=={0}".format(l)) for l in LSlist]
 
         log.debug(" === Have lumi secion list {0}".format(LSlist))        
         log.info(" === Looping over measurements...")
         for m, goodLSlist in enumerate(
-            get_ls_for_next_measurement(lumisections=LSlist, luminosities=Lumilist, zcounts=ZCountlist, 
+            get_ls_for_next_measurement(lumisections=LSlist, luminosities=Lumilist, #zcounts=ZCountlist, 
                 lumiPerMeasurement=LumiPerMeasurement)
         ):
             log.debug(" === Selected lumi section list {0}".format(goodLSlist))
@@ -385,41 +408,93 @@ if __name__ == '__main__':
             # create datafram byLS for measurement
             byLS_m = byLS_run.loc[byLS_run['ls'].isin(goodLSlist)]
             
-            ### fill histograms
-            file_.cd() # switch to directory where ttrees and histograms are placed
+            if args.mode == "TTrees":
+                ### fill histograms
+                file_.cd() # switch to directory where ttrees and histograms are placed
 
-            # define acceptance cuts
-            acceptance = " && mass>={0} && mass<{1} && ptTag > {2} && ptProbe > {2}".format(MassMin_, MassMax_, args.ptCut)
+                # define acceptance cuts
+                acceptance = " && mass>={0} && mass<{1} && ptTag > {2} && ptProbe > {2} && abs(etaTag) < {3} && abs(etaProbe) < {3}".format(MassMin_, MassMax_, args.ptCut, args.etaCut)
+                acceptanceSta = " && mass>={0} && mass<{1} && ptTag > {2} && ptProbe > {2} && abs(etaTag) < {3} && abs(etaProbe) < {3}".format(MassMinSta_, MassMaxSta_, args.ptCut, args.etaCut)
 
-            log.info(" === Fill histograms for measurement {0} ...".format(m))                        
-            for iLS in goodLSlist:
+                log.info(" === Fill histograms for measurement {0} ...".format(m))                        
+                for iLS in goodLSlist:
+                        
+                    tHLT.Draw("nPV>>+h_PV","lumiBlock=={0}".format(iLS))
                     
-                tHLT.Draw("nPV>>+h_PV","lumiBlock=={0}".format(iLS))
+                    n2Before = h2HLT.Integral()
+                    n1Before = h1HLT.Integral()
+
+                    tHLT.Draw("mass>>+h_mass_2HLT_Z", "pass==2 && lumiBlock=={0} {1}".format(iLS, acceptance))
+                    tHLT.Draw("mass>>+h_mass_1HLT_Z", "pass==1 && lumiBlock=={0} {1}".format(iLS, acceptance))
+                    tID.Draw("mass>>+h_mass_ID_fail", "pass==0 && lumiBlock=={0} {1}".format(iLS, acceptance))
+                    
+                    tGlo.Draw("mass>>+h_mass_Glo_pass","pass==1 && lumiBlock=={0} {1}".format(iLS, acceptanceSta))                
+                    tGlo.Draw("mass>>+h_mass_Glo_fail","pass==0 && lumiBlock=={0} {1}".format(iLS, acceptanceSta))                
+
+                    tSta.Draw("mass>>+h_mass_Sta_pass","pass==1 && lumiBlock=={0} {1}".format(iLS, acceptance))   
+                    tSta.Draw("mass>>+h_mass_Sta_fail","pass==0 && lumiBlock=={0} {1}".format(iLS, acceptance))  
+
+                    n2After = h2HLT.Integral()
+                    n1After = h1HLT.Integral()
+                    
+                    # store the number of 1hlt and 2hlt events in each lumisection
+                    n2 = n2After - n2Before
+                    n1 = n1After - n1Before
+
+                    byLS_m.loc[byLS_m['ls'] == iLS, 'N2HLT'] = n2
+                    byLS_m.loc[byLS_m['ls'] == iLS, 'N1HLT'] = n1                    
+            else:
+                # get histograms from good lumisections
+                log.info("Load histograms ...")
+                if args.mode == "DQM":
+                    prefix=f"DQMData/Run {run}/ZCounting/Run summary/Histograms/"
+                else:
+                    prefix=""
                 
-                n2Before = h2HLT.Integral()
-                n1Before = h1HLT.Integral()
+                # get histogram with primary vertex distribution
+                # hPV = load_histogram("h_npv", fileName, goodLSlist, run=run, prefix=prefix, suffix="new", pileup=True)
 
-                tHLT.Draw("mass>>+h_mass_2HLT_Z",  "pass==2 && lumiBlock=={0} {1}".format(iLS, acceptance))
-                tHLT.Draw("mass>>+h_mass_1HLT_Z",  "pass==1 && lumiBlock=={0} {1}".format(iLS, acceptance))
+                # get histograms binned in mass
+                def load(name_):
+                    return load_histogram(name_, fileName, goodLSlist, run=run, 
+                        MassBin=MassBin_, MassMin=MassMin_, MassMax=MassMax_, 
+                        prefix=prefix, 
+                        suffix="new")
                 
-                tSel.Draw("mass>>+h_mass_SIT_pass","pass==1 && lumiBlock=={0} {1}".format(iLS, acceptance))                
-                tSel.Draw("mass>>+h_mass_SIT_fail","pass==0 && lumiBlock=={0} {1}".format(iLS, acceptance))                
+                # load histograms for hlt efficiency and Z yield
+                h2HLT = load(f"h_mass_2HLT_BB")
+                h1HLT = load(f"h_mass_1HLT_BB")
 
-                tGlo.Draw("mass>>+h_mass_Glo_pass","pass==1 && lumiBlock=={0} {1}".format(iLS, acceptance))                
-                tGlo.Draw("mass>>+h_mass_Glo_fail","pass==0 && lumiBlock=={0} {1}".format(iLS, acceptance))                
+                # load histograms with probes that fail selection, for selection efficiency
+                hIDfail = load(f"h_mass_SIT_fail_BB")
 
-                tSta.Draw("mass>>+h_mass_Sta_pass","pass==1 && lumiBlock=={0} {1}".format(iLS, acceptance))   
-                tSta.Draw("mass>>+h_mass_Sta_fail","pass==0 && lumiBlock=={0} {1}".format(iLS, acceptance))   
-                             
-                n2After = h2HLT.Integral()
-                n1After = h1HLT.Integral()
-                
-                # store the number of 1hlt and 2hlt events in each lumisection
-                n2 = n2After - n2Before
-                n1 = n1After - n1Before
+                # load histograms for global muon efficiency
+                # hGlopass = load(f"h_mass_Glo_pass_BB")
+                hGlofail = load(f"h_mass_Glo_fail_BB")
 
-                byLS_m.loc[byLS_m['ls'] == iLS, 'N2HLT'] = n2
-                byLS_m.loc[byLS_m['ls'] == iLS, 'N1HLT'] = n1                    
+                # load histograms for standalone muon efficiency
+                # hStapass = load(f"h_mass_Sta_pass_BB")
+                # hStafail = load(f"h_mass_Sta_fail_BB")
+
+                if etaRegion == "I":
+                    h2HLT += load(f"h_mass_2HLT_BE")
+                    h2HLT += load(f"h_mass_2HLT_EE")
+
+                    h1HLT += load(f"h_mass_1HLT_BE")
+                    h1HLT += load(f"h_mass_1HLT_EE")
+
+                    hIDfail += load(f"h_mass_SIT_fail_BE")
+                    hIDfail += load(f"h_mass_SIT_fail_EE")
+
+                    # hGlopass += load(f"h_mass_Glo_pass_BE")
+                    # hGlopass += load(f"h_mass_Glo_pass_EE")
+                    hGlofail += load(f"h_mass_Glo_fail_BE")
+                    hGlofail += load(f"h_mass_Glo_fail_EE")
+                    
+                    # hStapass += load(f"h_mass_Sta_pass_BE")
+                    # hStapass += load(f"h_mass_Sta_pass_EE")
+                    # hStafail += load(f"h_mass_Sta_fail_BE")
+                    # hStafail += load(f"h_mass_Sta_fail_EE")
 
             if df is None:
                 df = byLS_m
@@ -429,37 +504,59 @@ if __name__ == '__main__':
             recLumi = df['recorded(/pb)'].sum()
 
             log.info(" === Have now recorded lumi = {0}".format(recLumi))            
-            log.info(" === Have now {0} | {1} events".format(df['N2HLT'].sum(), h2HLT.Integral()))
-            log.info(" === Histograms filled ...")  
+            # log.info(" === Have now {0} | {1} events".format(df['N2HLT'].sum(), h2HLT.Integral()))
             
-            # check if upcoming runs make enough data for a measurement
-            lumi=0
-            mergeNextRun=True
-            nextRun = run+1
-            for r, dr in byLS_data.groupby('run'):
-                if r <= run or r >= int(args.endRun):
-                    continue
-                # if getFileName(eosDir, r) is None: # check if file of next run exists
-                #     continue
-                nextRun = r
-                LS = dr['ls'].values.tolist()
-                lumi += sum(dr.loc[dr['ls'].isin(LS)]['recorded(/pb)'].values)
-                if lumi > 0.5 * LumiPerMeasurement:
-                    mergeNextRun = False
-                    break
-            
-            mergeNextRun = nextRun < int(args.endRun) and (mergeNextRun or recLumi < 0.5 * LumiPerMeasurement or args.inclusive)            
+            if args.mode == "TTrees":
+                # check if upcoming runs make enough data for a measurement
+                lumi=0
+                mergeNextRun=True
+                nextRun = run+1
+                for r, dr in byLS_data.groupby('run'):
+                    if r <= run or r >= int(args.endRun):
+                        continue
+                    # if getFileName(eosDir, r) is None: # check if file of next run exists
+                    #     continue
+                    nextRun = r
+                    LS = dr['ls'].values.tolist()
+                    lumi += sum(dr.loc[dr['ls'].isin(LS)]['recorded(/pb)'].values)
+                    if lumi > 0.5 * LumiPerMeasurement:
+                        mergeNextRun = False
+                        break
+                
+                mergeNextRun = nextRun < int(args.endRun) and (mergeNextRun or recLumi < 0.5 * LumiPerMeasurement or args.inclusive)            
 
-            if mergeNextRun:
-                log.info(" === Merge with next run ... ")
-                continue
-            
+                if mergeNextRun:
+                    log.info(" === Merge with next run ... ")
+                    continue
+
+            log.info(" === Histograms filled ...")  
+
             if firstRun != lastRun:
                 outSubDir = outDir + "Run{0}to{1}".format(firstRun,lastRun)
             else:
                 outSubDir = outDir + "Run{0}/".format(run)
 
             log.debug(" === Running measurement {0}".format(m))
+
+            ### --- perform fit with zfit
+            from python.zfit import fit
+
+            pdb.set_trace()
+
+            fit(h2HLT, MassBin_, MassMin_, MassMax_, category="HLT 2")
+            fit(h1HLT, MassBin_, MassMin_, MassMax_, category="HLT 1")
+            fit(hIDfail, MassBin_, MassMin_, MassMax_, category="ID fail")
+            fit(hGlofail, MassBin_, MassMinSta_, MassMaxSta_, category="Glo fail")
+
+
+
+            exit()
+
+
+
+
+
+            ### --- 
 
             if not args.collect:
                 
@@ -471,36 +568,57 @@ if __name__ == '__main__':
                     
                     ROOT.set_output(outSubDir)
                     ROOT.set_luminosity(recLumi)
-    
-                    ROOT.calculateHLTEfficiencyAndYield(h2HLT, h1HLT, m, "I", sigModel, bkgModel, sigModel, bkgModel, hPV, sigTemplates )
-                    ROOT.calculateDataEfficiency(hSITpass, hSITfail, m, "Sel", "I", sigModel, bkgModel, sigModel, bkgModel, hPV, sigTemplates )
-                    ROOT.calculateDataEfficiency(hGlopass, hGlofail, m, "Glo", "I", sigModel, bkgModel, sigModel, bkgModel, hPV, sigTemplates )
-                    ROOT.calculateDataEfficiency(hStapass, hStafail, m, "Sta", "I", sigModel, bkgModel, sigModel, bkgModel, hPV, sigTemplates )
-    
-                    # ROOT.calculateAll(h2HLT, h1HLT, hSITfail, hTrkfail, hStafail, 
-                    #     m, "I", sigModel, bkgModel, hPV, sigTemplates)
-            
+
+                    ROOT.getZyield(h2HLT, m, "HLT", etaRegion, sigModel, bkgModelPass, 2, sigTemplates, 0)
+                    ROOT.getZyield(h1HLT, m, "HLT", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
+                    ROOT.getZyield(hIDfail, m, "ID", etaRegion, sigModel, bkgModelPass, 0, sigTemplates, 0)
+
+                    ROOT.set_massRange(MassMinSta_, MassMaxSta_, MassBinSta_)
+                    ROOT.getZyield(hGlopass, m, "Glo", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
+                    ROOT.getZyield(hGlofail, m, "Glo", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, 0)
+                    ROOT.set_massRange(MassMin_, MassMax_, MassBin_)
+
+                    ROOT.getZyield(hStapass, m, "Sta", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
+                    ROOT.getZyield(hStafail, m, "Sta", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, 0)
+
                     # remove the histogram templates, not needed anymore
                     os.system("rm {0}/histTemplates_*".format(outSubDir))
 
-            cIO = getCorrelationIO(hPV, correlationsIO)
+            cHLT = ROOT.extractCorrelation_HLT(sigTemplates, hPV, etaRegionZ)
+
+            cIO = getCorrelation(hPV, mcCorrelations, which="IO")
+            cID = getCorrelation(hPV, mcCorrelations, which="ID")
+            cKinematicSelection = getCorrelation(hPV, mcCorrelations, which="KinematicSelection")
+            result = extract_results(outSubDir, m, cIO, cID, cHLT, cKinematicSelection)
             
-            
-            result = extract_results(outSubDir, m, cIO)
-            
-            if result:
-                df['time'] = df['time'].apply(lambda x: to_DateTime(x, string_format = "mm/dd/yy"))
+            if result:              
+                delLumi = df['delivered(/pb)'].sum()
+                recLumi = df['recorded(/pb)'].sum()
+                # deadtime - fraction during the good lumisections
+                deadtime = recLumi / delLumi
+                timewindow = len(df) * secPerLS
+
+                # convert time string to datetime format
+                beginTime = to_DateTime(df['time'][0], string_format = "mm/dd/yy")
+                endTime = to_DateTime(df['time'][-1], string_format = "mm/dd/yy") + datetime.timedelta(seconds=secPerLS)
+                
+                # total time window from the beginning of the first to the end of the last lumisection
+                totaltimewindow = (endTime - beginTime).total_seconds()
+
+                # delivered, efficiency and deadtime corrected, Z boson count
+                delZCount = result["recZCount"] / deadtime * (totaltimewindow / timewindow)
 
                 result.update({
                     "fill": fill,
                     "run": run,
                     "measurement": m,
-                    "tdate_begin": min(df['time']).strftime("%y/%m/%d %H:%M:%S"),
-                    "tdate_end": max(df['time']).strftime("%y/%m/%d %H:%M:%S"),
-                    "lumiDel": df['delivered(/pb)'].sum(),
-                    "lumiRec": df['recorded(/pb)'].sum(),
-                    "timewindow": len(df) * secPerLS,
-                    "pileUp": df['avgpu'].mean()
+                    "beginTime": beginTime.strftime("%y/%m/%d %H:%M:%S"),
+                    "endTime": endTime.strftime("%y/%m/%d %H:%M:%S"),
+                    "delLumi": delLumi,
+                    "recLumi": recLumi,
+                    "timewindow": timewindow,
+                    "pileUp": df['avgpu'].mean(),
+                    "delZCount": delZCount,
                 })
             
                 results.append(result)
@@ -510,37 +628,31 @@ if __name__ == '__main__':
             # prepare for next measurement
             df=None
 
-            # clean the histograms for the next measurement
-            h2HLT.Reset()
-            h1HLT.Reset()
+            if args.mode == "TTrees":
+                # clean the histograms for the next measurement
+                hPV.Reset() 
+                h2HLT.Reset()
+                h1HLT.Reset()
+                hIDfail.Reset()
 
-            hSITpass.Reset()
-            hSITfail.Reset()
+                hGlopass.Reset()
+                hGlofail.Reset()
+                hStapass.Reset()
+                hStafail.Reset()
 
-            hGlopass.Reset()
-            hGlofail.Reset()
-
-            # hTrkfail.Reset()
-            hStapass.Reset()
-            hStafail.Reset()
-
-            hPV.Reset() 
 
         ### prepare for next run
-        # keep histograms
-        hPV.SetDirectory(0)
-        h2HLT.SetDirectory(0)
-        h1HLT.SetDirectory(0)
-        
-        hSITpass.SetDirectory(0)
-        hSITfail.SetDirectory(0)
+        if args.mode == "TTrees":
+            # keep histograms
+            hPV.SetDirectory(0)
+            h2HLT.SetDirectory(0)
+            h1HLT.SetDirectory(0)
+            hIDfail.SetDirectory(0)
 
-        hGlopass.SetDirectory(0)
-        hGlofail.SetDirectory(0)
-        
-        # hTrkfail.SetDirectory(0)
-        hStapass.SetDirectory(0)
-        hStafail.SetDirectory(0)    
+            hGlopass.SetDirectory(0)
+            hGlofail.SetDirectory(0)
+            hStapass.SetDirectory(0)
+            hStafail.SetDirectory(0)
 
         file_.Close()
 

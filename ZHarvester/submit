@@ -8,8 +8,10 @@ def zmonitoring(
     sigTemplates,
     bkgTemplates,
     ptCut,
+    etaCut,
     mass,
     LumiPerMeasurement,
+    mode,
     test,
     runlist = None,
     beginRun=0,
@@ -19,7 +21,6 @@ def zmonitoring(
     import os
     import pandas as pd
     import glob
-    import subprocess
     import json
 
     if runlist == None:
@@ -30,7 +31,7 @@ def zmonitoring(
             byLsCSV, sep=',', low_memory=False,
             skiprows=lambda x: byLS_lines[x].startswith('#') and not byLS_lines[x].startswith('#run'))
 
-        minLS = 5   # Consider only runs with more than least 5 LS
+        minLS = 20   # Consider only runs with more than least 5 LS
         # number of lumisections per Run
         nLS = byLS_data.pivot_table(columns=['#run:fill'], aggfunc='size')
 
@@ -50,26 +51,29 @@ def zmonitoring(
     cs_file.write("error       = condor/$(ClusterId).$(ProcId).err \n")
     cs_file.write("log         = condor/$(ClusterId).$(ProcId).log \n")
     #cs_file.write("+JobFlavour =\"testmatch\" \n") # only works at lxplus
-    #cs_file.write("+RequestRuntime = 43200 \n")  # only works at naf(desy) 43200s = 12h
-    #cs_file.write("RequestMemory = 19999 \n")
-    # if longQueue:
-    #     # long queue
-    #     cs_file.write("+RequestRuntime = 43200 \n")  # only works at naf(desy) 43200s = 12h
-    #     cs_file.write("RequestMemory = 19999 \n") 
-    # else:
-    #     # short queue: with memory < 2GB -> request 1999MB and time < 3h -> request 10799s
-    #     cs_file.write("+RequestRuntime = 10799 \n")  # only works at naf(desy) 43200s = 12h
-    #     cs_file.write("RequestMemory = 1999 \n") 
+    # cs_file.write("+RequestRuntime = 43200 \n")  # only works at naf(desy) 43200s = 12h
+    # cs_file.write("RequestMemory = 19999 \n")
+    if longQueue:
+        # long queue
+        cs_file.write("+RequestRuntime = 43200 \n")  # only works at naf(desy) 43200s = 12h
+        cs_file.write("RequestMemory = 19999 \n") 
+    else:
+        # short queue: with memory < 2GB -> request 1999MB and time < 3h -> request 10799s
+        cs_file.write("+RequestRuntime = 10799 \n")  # only works at naf(desy) 43200s = 12h
+        cs_file.write("RequestMemory = 1999 \n") 
 
+    print(f"Have {len(runlist)} runs")
+    
+    njobs=0
     runs = []
     for run in runlist:
         if int(run) < beginRun or int(run) > endRun:
             continue
-        # if len(glob.glob(dirDQM+"/000*/*{0}*.root".format(run))) == 0:
-        if len(glob.glob(dirDQM+"/*Muon_{0}*.root".format(run))) == 0:
+        if len(glob.glob(dirDQM+"/000*/*{0}*.root".format(run))) == 0:
+        #if len(glob.glob(dirDQM+"/*Muon_{0}*.root".format(run))) == 0:
             continue
         runs.append(run)
-        cs_file.write("arguments  = {0} {1} {2} {3} {4} {5} {6} {7} {8} {9} {10} {11} {12}\n".format(
+        cs_file.write("arguments  = {0} {1} {2} {3} {4} {5} {6} {7} {8} {9} {10} {11} {12} {13} {14}\n".format(
             run,
             cmsswbase,
             dirDQM,
@@ -79,11 +83,14 @@ def zmonitoring(
             sigTemplates,
             bkgTemplates,
             ptCut,
+            etaCut,
             mass[0],
             mass[1],
             mass[2],
-            LumiPerMeasurement
+            LumiPerMeasurement,
+            mode
     	))
+        njobs += 1
 
         cs_file.write("queue\n")
     cs_file.close()
@@ -92,12 +99,10 @@ def zmonitoring(
         print("condor_submit cs_tmp.sub")
         exit()
     else:
-        out = os.popen("condor_submit cs_tmp.sub").read()
+        out = os.popen("condor_submit cs_tmp.sub --verbose").read()
         print(out)
     #os.system("rm cs_tmp.sub")
-
     out = out.split("\n")[-2].split(" ")
-    njobs = int(out[0])
     clusterId = int(out[-1][:-1])
 
     # create jobinformation
@@ -113,7 +118,9 @@ def zmonitoring(
         'mass_hi': mass[1],
         'mass_bins': mass[2],
         'luminosity': LumiPerMeasurement,
+        'mode': mode,
         'ptCut': ptCut,
+        'etaCut': etaCut,
         'runs': runs,
         'njobs': njobs,
         'clusterId': clusterId
@@ -124,7 +131,7 @@ def zmonitoring(
     with open(dirOut+'/jobinfo.json'.format(clusterId), 'w') as f:
         json.dump(ji, f, indent=4, separators=(',', ': '))
 
-def check(projectdir, resubmit=False, collect=False):
+def check(projectdir, resubmit=False, collect=False, longQueue=False):
     import os
     import json
 
@@ -174,8 +181,10 @@ def check(projectdir, resubmit=False, collect=False):
                     if os.path.isfile(csvFile):
                         os.system("mv {0} {1}/csvFiles/".format(csvFile, faildir))
 
-                zmonitoring(ji['dirDQM'], ji['dirOut'], ji['byLsCSV'], ji['mcCorrections'], ji['sigTemplates'], ji['bkgTemplates'], ji['ptCut'],
-                    (ji['mass_lo'], ji['mass_hi'], ji['mass_bins']), ji['luminosity'], False,
+                zmonitoring(
+                    ji['dirDQM'], ji['dirOut'], ji['byLsCSV'], ji['mcCorrections'], ji['sigTemplates'], ji['bkgTemplates'],
+                    ji['ptCut'], ji['etaCut'], (ji['mass_lo'], ji['mass_hi'], ji['mass_bins']), 
+                    ji['luminosity'], ji['mode'], False,
                     runlist=[ji['runs'][i] for i in unfinished_jobs],
                     longQueue=longQueue)
 
@@ -213,12 +222,16 @@ if __name__ == '__main__':
         help='specify if MC template is unsigned for signal shapes'
     )
     parserA.add_argument(
-        '--bkgTemplates', default="None", type=str,
+        '--bkgTemplates', default="default", type=str,
         help='specify if MC template is unsigned for background shapes'
     )
     parserA.add_argument(
         '--LumiPerMeasurement', default=20, type=float,
         help='specify amount of luminosity per measurement in pb-1'
+    )
+    parserA.add_argument(
+        '--mode', default=4, type=int,
+        help='specify mode schemes for muon efficiency'
     )
     parserA.add_argument(
         '--mass', nargs=3, metavar=('LOW', 'HIGH', 'NBINS'), default=(60, 120, 120),
@@ -231,6 +244,10 @@ if __name__ == '__main__':
     parserA.add_argument(
         '--ptCut', type=float, default=25.,
         help='specify lower pt cut on tag and probe muons'
+    )
+    parserA.add_argument(
+        '--etaCut', type=float, default=2.4,
+        help='specify lower eta cut on tag and probe muons'
     )
     parserA.add_argument(
         '-o', '--output', default='./',
@@ -279,8 +296,10 @@ if __name__ == '__main__':
             args.sigTemplates,
             args.bkgTemplates,
             args.ptCut,
+            args.etaCut,
             args.mass,
             args.LumiPerMeasurement,
+            args.mode,
             args.test,
             beginRun=args.beginRun,
             endRun=args.endRun,
