@@ -83,7 +83,7 @@ if __name__ == '__main__':
 
             crab_status_dict = {}
 
-            status_lines = command_output_lines('crab status --json '+i_crab3_task_dir, stdout=True, stderr=False, permissive=True)
+            status_lines = command_output_lines('crab-dev status --json '+i_crab3_task_dir, stdout=True, stderr=False, permissive=True)
 
             for i_line in status_lines:
                 if i_line.startswith('{') and i_line.endswith('}'): crab_status_dict = json.loads(i_line)
@@ -198,13 +198,13 @@ if __name__ == '__main__':
                if exp_output_files_exist == len(exp_output_files):
 
                   printout_lines += [colored_text('[outputs already merged]', ['1', '95'])]
-                  print ' '.join(printout_lines)
+                  print(' '.join(printout_lines))
 
                   continue
 
                elif exp_output_files_exist > 0:
 
-                  print ' '.join(printout_lines)
+                  print(' '.join(printout_lines))
 
                   for i_exp_output_files in exp_output_files:
                       if os.path.exists(i_exp_output_files):
@@ -214,7 +214,7 @@ if __name__ == '__main__':
 
                printout_lines += [colored_text('[merging outputs...]', ['1', '93'])]
 
-               print ' '.join(printout_lines)
+               print(' '.join(printout_lines))
 
                # output to Tier-2
                if False: #OutputPrePath_str.startswith(opts.Tier2_prepath):
@@ -271,11 +271,11 @@ if __name__ == '__main__':
 
             else:
 
-               print ' '.join(printout_lines)
+               print(' '.join(printout_lines))
 
                if opts.resubmit and ('failed' in task_status_dict):
 
-                  cmd_resubmit = 'crab resubmit'
+                  cmd_resubmit = 'crab-dev resubmit'
                   if len(RESUBMIT_OPTS) > 0: cmd_resubmit += ' '+(' '.join(set(RESUBMIT_OPTS)))
                   cmd_resubmit += ' '+i_crab3_task_dir
 
@@ -283,6 +283,6 @@ if __name__ == '__main__':
 
             if opts.repeat:
                loopEnd = (iTotal == iFinished)
-               print time.strftime("%H-%M-%S:"), "Sleeping for one hour."
+               print(time.strftime("%H-%M-%S:"), "Sleeping for one hour.")
                time.sleep(3600)
     ### ---------------

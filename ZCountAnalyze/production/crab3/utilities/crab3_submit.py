@@ -21,6 +21,9 @@ if __name__ == '__main__':
     parser.add_argument('-d', '--dry-run', dest='dry_run', action='store_true', default=False,
                         help='enable dry-run mode')
 
+    parser.add_argument('--storage-site', dest='storage_site', default='T2_CH_CERN', 
+                        help='define which storage site to use')
+
     opts, opts_unknown = parser.parse_known_args()
     ###
 
@@ -62,13 +65,6 @@ if __name__ == '__main__':
         elif not (crab3_conf['Data.inputDataset'].startswith('/') and (len(crab3_conf['Data.inputDataset'].split('/')) == 4)):
            KILL(log_prx+'invalid dataset name for entry "'+i_dset_key+'" in input .json file: '+crab3_conf['Data.inputDataset'])
 
-        for i_key in crab3_conf:
-            if isinstance(crab3_conf[i_key], str):
-               crab3_conf[i_key] = crab3_conf[i_key].encode('UTF8')
-
-            elif isinstance(crab3_conf[i_key], list):
-               crab3_conf[i_key] = [(_tmp.encode('UTF8') if isinstance(_tmp, str) else _tmp) for _tmp in crab3_conf[i_key]]
-
         crab3_tag = str(i_dset_key)
 
         if os.path.exists('crab_'+crab3_tag):
@@ -104,57 +100,55 @@ if __name__ == '__main__':
                cfgf.write("config.JobType.allowUndistributedCMSSW = True \n")
 #               cfgf.write("config.JobType.outputFiles = ['"+output_filename+"']\n")
 
-               for i_key in crab3_conf:
+               for i_key, i_val in crab3_conf.items():
                    if i_key.startswith('JobType.'):
-
-                      i_out = str(crab3_conf[i_key])
-                      if isinstance(crab3_conf[i_key], str): i_out = '\''+i_out+'\''
-
-                      cfgf.write('config.'+i_key+' = '+i_out+'\n')
-
+                      if isinstance(i_val, str):
+                         cfgf.write(f"config.{i_key} = \'{i_val}\'\n")
+                      else:
+                         cfgf.write(f"config.{i_key} = {i_val}\n")
+                      
                cfgf.write("\n")
 
                cfgf.write("config.section_('User')\n")
 
                cfgf.write("\n")
                cfgf.write("config.section_('Site')\n")
-               cfgf.write("config.Site.storageSite = 'T2_CH_CERN'\n")
+               cfgf.write(f"config.Site.storageSite = \'{args.storageSite}\'\n")
 #               cfgf.write("config.Site.blacklist   = []\n")
 
-               for i_key in crab3_conf:
+               for i_key, i_val in crab3_conf.items():
                    if i_key.startswith('Site.'):
-
-                      i_out = str(crab3_conf[i_key])
-                      if isinstance(crab3_conf[i_key], str): i_out = '\''+i_out+'\''
-
-                      cfgf.write('config.'+i_key+' = '+i_out+'\n')
+                      if isinstance(i_val, str):
+                         cfgf.write(f"config.{i_key} = \'{i_val}\'\n")
+                      else:
+                         cfgf.write(f"config.{i_key} = {i_val}\n")
 
                cfgf.write("\n")
 
                cfgf.write("config.section_('Data')\n")
                cfgf.write("config.Data.publication    = False\n")
 
-               if 'Data.ignoreLocality' not in crab3_conf:
+               if 'Data.ignoreLocality' not in crab3_conf.keys():
                   cfgf.write("config.Data.ignoreLocality = False\n")
 
-               for i_key in crab3_conf:
+               for i_key, i_val in crab3_conf.items():
 
                    if i_key.startswith('Data.'):
 
                       if i_key == 'Data.ignoreLocality':
-                         i_out = 'True' if int(crab3_conf[i_key]) else 'False'
-
+                         i_out = 'True' if int(i_val) else 'False'
                       else:
-                         i_out = crab3_conf[i_key]
-                         if isinstance(i_out, str): i_out = '\''+i_out+'\''
+                         i_out = i_val
 
-                      cfgf.write('config.'+i_key+' = '+str(i_out)+'\n')
+                      if isinstance(i_val, str):
+                         cfgf.write(f"config.{i_key} = \'{i_val}\'\n")
+                      else:
+                         cfgf.write(f"config.{i_key} = {i_val}\n")
 
         print(colored_text('['+crab3_cfgfile+']', ['1', '93']))
 
         if not opts.no_submit:
 
-           EXE('crab submit -c '+crab3_cfgfile, verbose=opts.verbose, dry_run=opts.dry_run)
+           EXE('crab-dev submit -c '+crab3_cfgfile, verbose=opts.verbose, dry_run=opts.dry_run)
 
            EXE('mv '+crab3_cfgfile+' crab_'+crab3_tag, verbose=opts.verbose, dry_run=opts.dry_run)
-           #EXE('rm '+crab3_cfgfile.replace('.py', '.pyc'), verbose=opts.verbose, dry_run=opts.dry_run)

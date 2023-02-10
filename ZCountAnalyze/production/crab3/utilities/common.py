@@ -28,7 +28,7 @@ def get_output(cmd, permissive=False):
     if (not permissive) and prc.returncode:
        KILL('get_output -- shell command failed (execute command to reproduce the error):\n'+' '*14+'> '+cmd)
 
-    return (out, err)
+    return (out.decode(), err.decode())
 # --
 
 def command_output_lines(cmd, stdout=True, stderr=False, permissive=False):
@@ -41,8 +41,10 @@ def command_output_lines(cmd, stdout=True, stderr=False, permissive=False):
 
     _tmp_out = get_output(cmd, permissive=permissive)
 
-    if stdout: _tmp_out_ls += _tmp_out[0].split('\n')
-    if stderr: _tmp_out_ls += _tmp_out[1].split('\n')
+    if stdout: 
+       _tmp_out_ls += _tmp_out[0].split('\n')
+    if stderr:
+       _tmp_out_ls += _tmp_out[1].split('\n')
 
     return _tmp_out_ls
 # --
