@@ -65,10 +65,9 @@ def zmonitoring(
         # short queue: with memory < 2GB -> request 1999MB and time < 3h -> request 10799s
         cs_file.write("+RequestRuntime = 10799 \n")  # only works at naf(desy) 43200s = 12h
         cs_file.write("RequestMemory = 1999 \n") 
-
-
-    log.info(f"Have {len(runlist)} runs")
     
+    dirOut = os.path.abspath(dirOut)
+
     njobs=0
     runs = []
     for run in runlist:
@@ -103,10 +102,10 @@ def zmonitoring(
     else:
         out = os.popen("condor_submit cs_tmp.sub --verbose").read()
         # log.info(out)
-    #os.system("rm cs_tmp.sub")
-    pdb.set_trace()
-    out = out.split("\n")[-2].split(" ")
+    os.system("rm cs_tmp.sub")
     clusterId = int(next(filter(lambda x: "ClusterId" in x, out.split("\n"))).replace("ClusterId = ",""))
+
+    log.info(f"Submitted {njobs} jobs with cluster ID {clusterId}")
 
     # create jobinformation
     ji = {
