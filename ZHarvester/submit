@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 
-from python import logging
-from python import common
-
+from python import logging, common, utils
 
 def zmonitoring(
-    dirDQM,
+    dirIn,
     dirOut,
     byLsCSV,
     mcCorrections,
@@ -43,6 +41,8 @@ def zmonitoring(
         runlist = byLS_data['#run:fill'].str.split(':', expand=True)[0].drop_duplicates()
         runlist = runlist[nLS.values > minLS].tolist()
 
+    runlist = list(filter(lambda x: int(x) >= beginRun and int(x) < endRun, runlist))
+
     cmsswbase = os.environ['CMSSW_BASE']
     if not cmsswbase:
         log.error("please set cmsenv")
@@ -66,21 +66,19 @@ def zmonitoring(
         cs_file.write("+RequestRuntime = 10799 \n")  # only works at naf(desy) 43200s = 12h
         cs_file.write("RequestMemory = 1999 \n") 
 
+
     log.info(f"Have {len(runlist)} runs")
     
     njobs=0
     runs = []
     for run in runlist:
-        if int(run) < beginRun or int(run) > endRun:
-            continue
-        if len(glob.glob(dirDQM+"/000*/*{0}*.root".format(run))) == 0:
-        #if len(glob.glob(dirDQM+"/*Muon_{0}*.root".format(run))) == 0:
+        if utils.getFileName(dirIn, run) is None:
             continue
         runs.append(run)
         cs_file.write("arguments  = {0} {1} {2} {3} {4} {5} {6} {7} {8} {9} {10} {11} {12} {13} {14}\n".format(
             run,
             cmsswbase,
-            dirDQM,
+            dirIn,
             byLsCSV,
             dirOut,
             mcCorrections,
@@ -104,15 +102,16 @@ def zmonitoring(
         exit()
     else:
         out = os.popen("condor_submit cs_tmp.sub --verbose").read()
-        log.info(out)
+        # log.info(out)
     #os.system("rm cs_tmp.sub")
+    pdb.set_trace()
     out = out.split("\n")[-2].split(" ")
-    clusterId = int(out[-1][:-1])
+    clusterId = int(next(filter(lambda x: "ClusterId" in x, out.split("\n"))).replace("ClusterId = ",""))
 
     # create jobinformation
     ji = {
         'process' : 'zmonitoring',
-        'dirDQM': dirDQM,
+        'dirIn': dirIn,
         'dirOut': dirOut,
         'byLsCSV': byLsCSV,
         'mcCorrections': mcCorrections,
@@ -186,7 +185,7 @@ def check(projectdir, resubmit=False, collect=False, longQueue=False):
                         os.system("mv {0} {1}/csvFiles/".format(csvFile, faildir))
 
                 zmonitoring(
-                    ji['dirDQM'], ji['dirOut'], ji['byLsCSV'], ji['mcCorrections'], ji['sigModel'], ji['bkgModel'],
+                    ji['dirIn'], ji['dirOut'], ji['byLsCSV'], ji['mcCorrections'], ji['sigModel'], ji['bkgModel'],
                     ji['ptCut'], ji['etaCut'], (ji['mass_lo'], ji['mass_hi'], ji['mass_bins']), 
                     ji['luminosity'], ji['mode'], False,
                     runlist=[ji['runs'][i] for i in unfinished_jobs],
@@ -221,7 +220,7 @@ if __name__ == '__main__':
         help='check ZMonitoring jobs that have been submitted to HTCondor'
     )
     parserC.add_argument(
-        '-i', '--project', type=str, required=True,
+        '-p', '--project', type=str, required=True,
         help='specify directory to jobinfo.json file'
     )
     parserC.add_argument(
@@ -240,11 +239,11 @@ if __name__ == '__main__':
     # parse arguments and call subparser
     args = parser.parse_args()
 
-    log = setup_logger(__file__, args.verbose)
+    log = logging.setup_logger(__file__, args.verbose)
 
     if args.subparser == 'zmonitoring':
         zmonitoring(
-            args.inputDQM,
+            args.input,
             args.output,
             args.byLsCSV,
             args.mcCorrections,

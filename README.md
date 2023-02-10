@@ -23,9 +23,13 @@ ZUtils
 -------------
 Contains code that is used by multiple packages in this project in common.
 
-BLUE
+CombinationTools
 -------------
-Combinations of Z counts and reference luminosity with the [BLUE](https://arxiv.org/abs/2001.10310) tool.
+Combinations of Z counts and reference luminosity. 
+Scripts for two methods are available: 
+
+* Chi2 minimization using [BLUE](https://arxiv.org/abs/2001.10310). 
+* Likelihood minimization using [ZFit](https://zfit.readthedocs.io/en/latest/index.html).
 
 Useful Links
 -------------
