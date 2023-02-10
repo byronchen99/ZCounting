@@ -35,7 +35,13 @@ if not os.path.isdir(outDir):
 
 secPerLS=float(23.3)
 
-fmt = "png"
+fmt = "pdf"
+year = 2017
+
+if year >= 2022:
+    energystr = "$\sqrt{s}=13.6\,\mathrm{TeV}$"
+else:
+    energystr = "$\sqrt{s}=13\,\mathrm{TeV}$"
 
 # plotting options
 
@@ -125,24 +131,27 @@ def unorm(x):
     # for counting experiments: define ufloat with poisson uncertainty
     return unc.ufloat(x, np.sqrt(abs(x)))
 
-# sort out nan values
-nan = np.isnan(data['ZRate'])
-print(f"Sort out {sum(nan)} nan values")
-data = data.loc[nan==False]
+# # sort out nan values
+# nan = np.isnan(data['ZRate'])
+# print(f"Sort out {sum(nan)} nan values")
+# data = data.loc[nan==False]
 
-# efficiency corrected number of Z bosons in timewindow, w/o deadtime corrections
-data['zDelI_mc'] = data['ZRate'] * data['timewindow'] * data['deadtime']
+# # efficiency corrected number of Z bosons in timewindow, w/o deadtime corrections
+# data['zDelI_mc'] = data['ZRate'] * data['timewindow'] * data['deadtime']
 
-data['zDelI_mc'] = data['zDelI_mc'].apply(lambda x: unorm(x))
+# data['zDelI_mc'] = data['zDelI_mc'].apply(lambda x: unorm(x))
 
-data['zLumi_mc'] = data['zDelI_mc'] / xsecI
-data['zLumiInst_mc'] = data['zLumi_mc'] / data['timewindow'] * 1000  # convert into /nb
+if data['recZCount'].dtype==object:
+    data['recZCount'] = data['recZCount'].apply(lambda x: unc.ufloat_fromstr(x))
+
+data['zLumi_mc'] = data['recZCount'] / xsecI
+data['zLumiInst_mc'] = data['recZCount'] / data['timewindow'] * 1000  # convert into /nb
 # reference lumi during one measurement
 data['dLRec(/nb)'] = data['recLumi'] / data['timewindow'] * 1000  # convert into /nb 
 
-# # convert inputs to uncertainties
-# for key in ('HLTeff', 'Seleff', 'Gloeff', 'Staeff'):
-#     data[key] = data[key].apply(lambda x: unc.ufloat_fromstr(x))
+# convert inputs to uncertainties
+for key in ('effHLT', 'effID', 'effGlo', 'effSta'):
+    data[key] = data[key].apply(lambda x: unc.ufloat_fromstr(x))
 
 
 do_ratio=True ## activate the ratio plots 
@@ -230,20 +239,20 @@ for fill, data_fill in data.groupby("fill"):
         
     maxY = 0
     minY = 1
-    for eff, name, col in (
-        ("effGlo", "$ \epsilon_\mathrm{Glo|Sta}^\mu $", "green"), 
-        ("effSta", "$ \epsilon_\mathrm{Sta|Trk}^\mu $", "blue"), 
-        ("effSel", "$ \epsilon_\mathrm{ID|Glo}^\mu $", "red"), 
+    for eff, name, col, mkr, ms in (
+        ("effID", "$ \epsilon_\mathrm{ID|Glo}^\mu $", "red", "^", markersize*1.2), 
+        ("effGlo", "$ \epsilon_\mathrm{Glo|Sta}^\mu $", "green", "*", markersize*1.5), 
+        ("effSta", "$ \epsilon_\mathrm{Sta|Trk}^\mu $", "blue", "s", markersize), 
     ):
         
-        # y = [y.n for y in data_fill[eff].values]
-        # yErr = [y.s for y in data_fill[eff].values]
+        y = np.array([y.n for y in data_fill[eff].values])
+        yErr = np.array([y.s for y in data_fill[eff].values])
 
-        y = data_fill[eff].values
+        # y = data_fill[eff].values
 
-        ax1.errorbar(x, y, xerr=(xDown, xUp), #yerr=yErr, 
+        ax1.errorbar(x, y, xerr=(xDown, xUp), yerr=yErr, 
             label=name,
-            marker="o", linewidth=0, color=col, ecolor=col, elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
+            marker=mkr, linewidth=0, color=col, ecolor=col, elinewidth=1.0, capsize=1.0, barsabove=True, markersize=ms,
             zorder=1)
 
         # ax1.plot(x, y, label=name,
@@ -252,8 +261,8 @@ for fill, data_fill in data.groupby("fill"):
         # yMax = [y.n + y.s for y in data_fill[eff].values]
         # yMin = [y.n - y.s for y in data_fill[eff].values]
                     
-        maxY = max(maxY, max(y))
-        minY = min(minY, min(y))
+        maxY = max(maxY, max(y + yErr))
+        minY = min(minY, min(y - yErr))
 
     leg = ax1.legend(loc="lower left", ncol=3,
         frameon=True, framealpha=1.0, fancybox=False, edgecolor="black")
@@ -281,12 +290,12 @@ for fill, data_fill in data.groupby("fill"):
         ("effHLT", "$ \epsilon_\mathrm{HLT}^\mu $", "k"), 
         # ("ZIeff", "$ ( \epsilon_\mathrm{ID}^\mu ) ^2 $", "r") 
     ):    
-        # y = [y.n for y in data_fill[eff].values]
-        # yErr = [y.s for y in data_fill[eff].values]
+        y = np.array([y.n for y in data_fill[eff].values])
+        yErr = np.array([y.s for y in data_fill[eff].values])
 
-        y = data_fill[eff].values
+        # y = data_fill[eff].values
 
-        ax2.errorbar(x, y, xerr=(xDown, xUp), #yerr=yErr, 
+        ax2.errorbar(x, y, xerr=(xDown, xUp), yerr=yErr, 
             label=name,
             marker="o", linewidth=0, color=col, ecolor=col, elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
             zorder=1)
@@ -296,8 +305,8 @@ for fill, data_fill in data.groupby("fill"):
         # yMax = [y.n + y.s for y in data_fill[eff].values]
         # yMin = [y.n - y.s for y in data_fill[eff].values]
                     
-        maxY = max(maxY, max(y))
-        minY = min(minY, min(y))
+        maxY = max(maxY, max(y + yErr))
+        minY = min(minY, min(y - yErr))
 
     leg = ax2.legend(loc="upper left", ncol=1, frameon=True, framealpha=1.0, fancybox=False, edgecolor="black",
         # borderpad=1, labelspacing=1
@@ -354,7 +363,7 @@ for fill, data_fill in data.groupby("fill"):
 
     yRef = data_fill['dLRec(/nb)'].values   
     
-    ax1.errorbar(x, yRef, xerr=(xDown, xUp), label="Reference luminosity", color="blue", 
+    ax1.errorbar(x, yRef, xerr=(xDown, xUp), label="Ref. luminosity", color="red", 
         linestyle='', zorder=0)
 
     if extLumi:
@@ -362,7 +371,7 @@ for fill, data_fill in data.groupby("fill"):
             zorder=0)
 
     ax1.errorbar(x, y, xerr=(xDown, xUp), yerr=yErr, 
-        label="Z rate",# measurement",
+        label="Z boson rate",# measurement",
         fmt="ko", ecolor='black', elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
         zorder=1)
 
@@ -373,7 +382,7 @@ for fill, data_fill in data.groupby("fill"):
     yMax = max(max(y),max(yRef))
 
     yRange = yMax - yMin 
-    ax1.set_ylim([yMin - yRange*0.5, yMax + yRange*0.2])
+    ax1.set_ylim([yMin - yRange*0.45, yMax + yRange*0.15])
     ax1.set_xlim([xMin, xMax])
     ax1.set_xticks(xTicks)
     
@@ -397,7 +406,7 @@ for fill, data_fill in data.groupby("fill"):
             
         ax2.plot(np.array([xMin, xMax]), np.array([1.0, 1.0]), color="black",linestyle="-", linewidth=1)
         
-        ax2.set_ylim([0.951,1.049])
+        ax2.set_ylim([0.961,1.039])
         ax2.set_xlim([xMin, xMax])
         ax2.set_xticks(xTicks)
 
@@ -423,9 +432,9 @@ for fill, data_fill in data.groupby("fill"):
         
     ax1.set_xlabel("average pileup")
     ax1.set_ylabel(ylabelLumi)
-    ax1.text(0.54, 0.97, "\\bf{CMS}", verticalalignment='top', transform=ax1.transAxes, weight="bold")
-    ax1.text(0.65, 0.97, "\\emph{"+args.label+"}", verticalalignment='top', transform=ax1.transAxes,style='italic')        ## DPS Note    
-    ax1.text(0.54, 0.89, f"Fill {fill}", verticalalignment='top', transform=ax1.transAxes)    
+
+    ax1.text(0.97, 0.97, "\\bf{CMS} "+"\\emph{"+args.label+"} \n"+energystr+"\n Fill "+str(fill), 
+        horizontalalignment='right', verticalalignment='top', transform=ax1.transAxes)
 
     y = np.array([yy.n for yy in data_fill['zLumiInst_mc'].values])
     yErr = np.array([y.s for y in data_fill['zLumiInst_mc'].values])
@@ -433,13 +442,13 @@ for fill, data_fill in data.groupby("fill"):
     yRef = data_fill['dLRec(/nb)'].values   
     
     ax1.plot(xPU, yRef, #xerr=(xDown, xUp), 
-        label="Reference luminosity", color="blue", 
+        label="Reference luminosity", color="red", 
         marker = "_",
         linestyle='', zorder=0)
 
     ax1.errorbar(xPU, y, #xerr=(xDown, xUp), 
         yerr=yErr, 
-        label="Z rate",
+        label="Z boson rate",
         fmt="ko", ecolor='black', elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
         zorder=1)
 
@@ -467,7 +476,8 @@ for fill, data_fill in data.groupby("fill"):
         ax2.set_xlabel("average pileup")
         ax2.set_ylabel("Ratio")
         
-        ax2.errorbar(xPU, yRatio, xerr=(xDown, xUp), yerr=yRatioErr, 
+        ax2.errorbar(xPU, yRatio, #xerr=(xDown, xUp), 
+            yerr=yRatioErr, 
             label="Z rate measurement",
             fmt="ko", ecolor='black', elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
             zorder=1)

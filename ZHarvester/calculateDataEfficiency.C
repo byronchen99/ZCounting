@@ -356,7 +356,7 @@ TFile* generateTemplate(
     const TString effType,
     TH1D          *hPV
 ){
-    const TString histfilename = outputDir+"/histTemplates_"+effType+".root";
+    const TString histfilename = outputDir+"/histTemplates_Gen.root";
 
     TFile *outfile = 0;
 
@@ -376,11 +376,15 @@ TFile* generateTemplate(
 
     TFile *infile    = new TFile(mcfilename);
     TTree *eventTree = (TTree*)infile->Get(effType);
-    TH1D *hPVtemplate = (TH1D*)infile->Get("hPV");
+    TH1D *hPV_scalefactor = 0;
 
     if(hPV){
-        std::cout<<"PV reweighting with <PV> = "<<hPV->GetMean()<<std::endl;       
-        hPV->Divide(hPVtemplate);
+        std::cout<<"PV reweighting with <PV> = "<<hPV->GetMean()<<std::endl;
+
+        TH1D *hPVtemplate = (TH1D*)infile->Get("hPV");  // get primary vertex distribution in MC
+
+        hPV_scalefactor = (TH1D*)hPV->Clone("hPV_scalefactor");
+        hPV_scalefactor->Divide(hPVtemplate);
     }
 
     Double_t mass, ptTag, etaTag, ptProbe, etaProbe;
@@ -418,8 +422,8 @@ TFile* generateTemplate(
         if(fabs(etaTag) > etaCutTag) continue;
         if(fabs(etaProbe) > etaCutProbe) continue;
 
-        if(hPV)
-            wgt *= hPV->GetBinContent(hPV->FindBin(npv));
+        if(hPV_scalefactor)
+            wgt *= hPV_scalefactor->GetBinContent(hPV_scalefactor->FindBin(std::max(1,npv)));
 
         if(fabs(etaProbe) < etaBound){
             if(pass) h_mass_pass_B->Fill(mass, wgt);
@@ -450,6 +454,11 @@ TFile* generateTemplate(
     h_mass_pass_I->Add(h_mass_pass_E);
     h_mass_fail_I->Add(h_mass_fail_E);
     
+    // add passing histograms to failing ones to increase statistics
+    h_mass_fail_B->Add(h_mass_pass_B);
+    h_mass_fail_E->Add(h_mass_pass_E);
+    h_mass_fail_I->Add(h_mass_pass_I);
+
     outfile->cd();
     h_mass_pass_B->Write();
     h_mass_fail_B->Write();
@@ -493,12 +502,16 @@ TFile* generateTemplate_ZYield(
     cout << "Creating histogram templates... "; cout.flush();
 
     TFile *infile    = new TFile(mcfilename);
-    TTree *eventTree = (TTree*)infile->Get("HLT");
-    TH1D *hPVtemplate = (TH1D*)infile->Get("hPV");
-    
+    TTree *eventTree = (TTree*)infile->Get("HLT");    
+    TH1D *hPV_scalefactor = 0;
+
     if(hPV){
-        std::cout<<"PV reweighting with <PV> = "<<hPV->GetMean()<<std::endl;       
-        hPV->Divide(hPVtemplate);
+        std::cout<<"PV reweighting with <PV> = "<<hPV->GetMean()<<std::endl;
+
+        TH1D *hPVtemplate = (TH1D*)infile->Get("hPV");
+
+        hPV_scalefactor = (TH1D*)hPV->Clone("hPV_scalefactor");
+        hPV_scalefactor->Divide(hPVtemplate);
     }
 
     Double_t mass, ptTag, etaTag, ptProbe, etaProbe;
@@ -542,8 +555,8 @@ TFile* generateTemplate_ZYield(
         if(fabs(etaTag) > etaCutTag) continue;
         if(fabs(etaProbe) > etaCutProbe) continue;
 
-        if(hPV)
-            wgt *= hPV->GetBinContent(hPV->FindBin(npv));
+        if(hPV_scalefactor)
+            wgt *= hPV_scalefactor->GetBinContent(hPV_scalefactor->FindBin(std::max(1,npv)));
 
         if(fabs(etaProbe) < etaBound && fabs(etaTag) < etaBound){
             if(pass==2)         h_mass_2hlt_BB->Fill(mass, wgt);
@@ -1264,6 +1277,7 @@ void getZyield(
                 RooFit::PrintLevel(-1),
                 RooFit::Warnings(0),
                 RooFit::Strategy(2), // MINOS STRATEGY
+                (constraints != nullptr) ? RooFit::ExternalConstraints(*constraints) : RooCmdArg::none(),
                 // RooFit::IntegrateBins(integrateBinsPrecision),
                 RooFit::Minimizer(minimizer));
         }

@@ -16,7 +16,7 @@ print(os.getcwd())
 from python.corrections import apply_muon_prefire, apply_ECAL_prefire
 
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
-from ZUtils.python.utils import linear
+from ZUtils.python.utils import linear, pol2
 
 pd.options.mode.chained_assignment = None
 
@@ -62,7 +62,7 @@ if not os.path.isdir(outDir):
 def make_plots(df,
     yAxis,
     yLabel="sigma",
-    xAxis='lumi',
+    xAxis='pileUp',
     run_range=None,
     title="",
     year="2017",
@@ -77,6 +77,14 @@ def make_plots(df,
     valid xAxis: 'lumi', 'pileUp', 'measurement', 'time'
     """
 
+    if year == "2022":
+        lefttitle = "$\sqrt{s}=13.6\,\mathrm{TeV}$"
+    else:
+        lefttitle = "$\sqrt{s}=13\,\mathrm{TeV}$"
+
+    if year:
+        lefttitle += " $(\mathrm{"+year+"})$"
+
     if run_range:
         data = df.loc[(df["run"] >= run_range[0]) & (df["run"] <= run_range[1])]
         if len(df) ==0:
@@ -87,7 +95,6 @@ def make_plots(df,
     if sum(data[yAxis].isnull()) > 0:
         print(">>> sort out {0} points with nan".format(sum(data[yAxis].isnull())))
         data = data.loc[~data[yAxis].isnull()]
-
 
     # x_step: intervall in which the measurements are collected in one point
     if xAxis == 'lumi':
@@ -216,7 +223,7 @@ def make_plots(df,
         ax1.errorbar(xPoints, 
             data[yAxis].apply(lambda x: x.n).values, 
             data[yAxis].apply(lambda x: x.s).values, 
-            label="Measurements",
+            label="Measurement",
             marker="o", linewidth=0, color=colors[0], ecolor=colors[0], elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
             zorder=1)
 
@@ -256,7 +263,14 @@ def make_plots(df,
     xx = np.append(xx, xx[-1]+x_step)
     xx_centers = []
     yy = []
-    # yy0 = []
+    yy0 = []
+
+    y0Axis = yAxis.replace("_mc","")
+    
+    if normalized:
+        data[yAxis] = data[yAxis] / (sum(data[yAxis]) / len(data[yAxis].values))
+        data[y0Axis] = data[y0Axis] / ( sum(data[y0Axis]) / len(data[y0Axis].values))
+
     for i in range(0,len(xx)-1):
         dyy = data.loc[(data[xAxis] < xx[i+1]) & (data[xAxis] >= xx[i])]
 
@@ -264,11 +278,11 @@ def make_plots(df,
             continue
 
         u_y = dyy[yAxis].values
-        # u_y0 = dyy[yAxis.replace("_mc","")].values 
+        u_y0 = dyy[y0Axis].values 
         
         # 1) simple mean
         yy_avg = u_y.mean()
-        # yy0_avg = u_y0.mean()
+        yy0_avg = u_y0.mean()
 
         # # 2) or weighted average
         # yy_w = np.array([1./(y.s)**2 for y in u_y])
@@ -282,18 +296,14 @@ def make_plots(df,
 
         xx_centers.append((xx[i] + (xx[i+1] - xx[i]) / 2.))
         yy.append(yy_avg)
-        # yy0.append(yy0_avg)
+        yy0.append(yy0_avg)
 
     xx = np.array(xx_centers)
 
-    if normalized:
-        yy = np.array(yy) / (sum(yy)/len(yy))
-        # yy0 = np.array(yy0) / (sum(yy0)/len(yy0))
-
     yy_err = np.array([y.s for y in yy])
     yy = np.array([y.n for y in yy])
-    # yy0_err = np.array([y.s for y in yy0])
-    # yy0 = np.array([y.n for y in yy0])
+    yy0_err = np.array([y.s for y in yy0])
+    yy0 = np.array([y.n for y in yy0])
 
     print(">>> make fit")
     func = linear #pol2 #quad
@@ -337,8 +347,8 @@ def make_plots(df,
     yRange = abs(yMax - yMin)    
 
     # p4 = ax1.errorbar(xx, yy0, xerr=xx_err, yerr=yy0_err, label="Measurements uncorrected",
-    #     marker="o", linewidth=0, color="grey", ecolor="grey", elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
-    #     zorder=1)
+    #    marker="o", linewidth=0, color="grey", ecolor="grey", elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
+    #    zorder=1)
     
     p3 = ax1.errorbar(xx, yy, xerr=xx_err, yerr=yy_err, label="Measurements",
         marker="o", linewidth=0, color="black", ecolor="black", elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
@@ -346,15 +356,19 @@ def make_plots(df,
         
     ax1.plot(np.array([xMin-xRange*0.02,xMax+xRange*0.02]),np.array([1.,1.]), "k--", linewidth=1)
     
-    p2 = ax1.plot(xMC, yMC, color=colors[0],linestyle="solid",  label="Linear fit", linewidth=1)
+    p2 = ax1.plot(xMC, yMC, color=colors[0],linestyle="solid",  label="Fit", linewidth=1)
     
     p1 = ax1.fill_between(xMC, yMC - yErrMC, yMC + yErrMC,
                      color='grey', alpha=0.2, zorder=1) 
     p1 = ax1.fill(np.NaN, np.NaN, color='grey', alpha=0.2, linewidth=0.)    
 
-    leg_styles = [p3, (p2[0], p1[0])]
-    leg_labels = ['Measurements', 'Linear fit']
+    # make a separate entry for uncorrected
+    # leg_styles = [p3, p4, (p2[0], p1[0])]
+    # leg_labels = ['Measurements', 'Uncorrected', 'Fit']
     
+    leg_styles = [p3, (p2[0], p1[0])]
+    leg_labels = ['Measurements', 'Fit']
+
     leg = ax1.legend(leg_styles, leg_labels, loc="lower left", ncol=3,
         frameon=True, framealpha=1.0, fancybox=False, edgecolor="black")
     leg.get_frame().set_linewidth(0.8)
@@ -378,12 +392,15 @@ if args.xsec:
     # --- get Z xsec
     data_xsec = pd.read_csv(str(args.xsec), sep=',',low_memory=False)#, skiprows=[1,2,3,4,5])
 
-    data_xsec['delZCount'] = data_xsec['zDel'].apply(lambda x: unc.ufloat_fromstr(x).n)
+    if data_xsec['recZCount'].dtype==object:
+        data_xsec['recZCount'] = data_xsec['recZCount'].apply(lambda x: unc.ufloat_fromstr(x))
 
     apply_muon_prefire(data_xsec)
     apply_ECAL_prefire(data_xsec)
-    
-    xsec = sum(data_xsec['delZCount'])/sum(data_xsec['recLumi'])
+
+    print("apply prefire corrections - done")
+
+    xsec = sum(data_xsec['recZCount'])/sum(data_xsec['recLumi'])
 
     
 
@@ -399,113 +416,37 @@ invalid_runs = {
 for run in invalid_runs:
     rates = rates.loc[rates['run'] != run]
 
+# convert to uncertainties
+for key in ['recZCount',]:
+    rates[key] = rates[key].apply(lambda x: unc.ufloat_fromstr(x))
+
+rates = rates[rates['recLumi'] > 0.]
+rates = rates[rates['recZCount'] > 0.]
+
+apply_ECAL_prefire(rates, apply_on="recZCount")
+apply_muon_prefire(rates, apply_on="recZCount")
+
+# # sort out outliers
+# rates['zLumi'] = rates['recZCount'] / xsec
+# rates['zLumi_to_dLRec'] = rates['zLumi'] / rates['recLumi']
+# rates = rates.loc[abs(rates['zLumi_to_dLRec']-1) < 0.1]
+
+if args.xsec:
+    # include the lowPU data in the dataframe
+    rates = pd.concat([rates, data_xsec])
+
 rates['recLumi'] = rates['recLumi'] * 1000    # convert into /nb
 
-# convert to uncertainties
-# rates['effHLTBB'] = rates['effHLTBB'].apply(lambda x: unc.ufloat_fromstr(x))
-# rates['effHLTBE'] = rates['effHLTBE'].apply(lambda x: unc.ufloat_fromstr(x))
-# rates['effHLTEE'] = rates['effHLTEE'].apply(lambda x: unc.ufloat_fromstr(x))
-# rates['effHLTI'] = rates['effHLT'].apply(lambda x: unc.ufloat_fromstr(x))
-# rates['effSelB'] = rates['effSelB'].apply(lambda x: unc.ufloat_fromstr(x))
-# rates['effSelE'] = rates['effSelE'].apply(lambda x: unc.ufloat_fromstr(x))
-# rates['effSelI'] = rates['effSel'].apply(lambda x: unc.ufloat_fromstr(x))
-# rates['TrkeffB'] = rates['TrkeffB'].apply(lambda x: unc.ufloat_fromstr(x))
-# rates['TrkeffE'] = rates['TrkeffE'].apply(lambda x: unc.ufloat_fromstr(x))
-# rates['TrkeffI'] = rates['Trkeff'].apply(lambda x: unc.ufloat_fromstr(x))
-# rates['effStaB'] = rates['effStaB'].apply(lambda x: unc.ufloat_fromstr(x))
-# rates['effStaE'] = rates['effStaE'].apply(lambda x: unc.ufloat_fromstr(x))
-# rates['effStaI'] = rates['effSta'].apply(lambda x: unc.ufloat_fromstr(x))
-# rates['effGloB'] = rates['effGloB'].apply(lambda x: unc.ufloat_fromstr(x))
-# rates['effGloE'] = rates['effGloE'].apply(lambda x: unc.ufloat_fromstr(x))
-# rates['effGloI'] = rates['effGloI'].apply(lambda x: unc.ufloat_fromstr(x))
-# rates['ZBBeff'] = rates['ZBBeff'].apply(lambda x: unc.ufloat_fromstr(x))
-# rates['ZBEeff'] = rates['ZBEeff'].apply(lambda x: unc.ufloat_fromstr(x))
-# rates['ZEEeff'] = rates['ZEEeff'].apply(lambda x: unc.ufloat_fromstr(x))
-# rates['ZIeff'] = rates['ZIeff'].apply(lambda x: unc.ufloat_fromstr(x))
-# 
-# # take uncertainties from uncorrected zDel
-# rates['zDelBB_mc'] = rates['zDelBB_mc'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
-# rates['zDelBE_mc'] = rates['zDelBE_mc'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
-# rates['zDelEE_mc'] = rates['zDelEE_mc'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
-# rates['delZCount_mc'] = rates['delZCount_mc'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
-# 
-# rates['zDelBB'] = rates['zDelBB'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
-# rates['zDelBE'] = rates['zDelBE'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
-# rates['zDelEE'] = rates['zDelEE'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
-# rates['delZCount'] = rates['zDel'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
-# rates['delZCount'] = rates['zDel'].apply(lambda x: unc.ufloat_fromstr(x))
-# rates['effHLT']      = rates['effHLT'].apply(lambda x: unc.ufloat_fromstr(x).n)
-# rates['effSel']      = rates['effSel'].apply(lambda x: unc.ufloat_fromstr(x).n)
-# rates['effSta']      = rates['effSta'].apply(lambda x: unc.ufloat_fromstr(x).n)
-# rates['effGlo']      = rates['effGlo'].apply(lambda x: unc.ufloat_fromstr(x).n)
-# # calculate correct statistical uncertainties - before HLT selection
-# rates['NZ']       = rates['zReco'].apply(lambda x: unc.ufloat_fromstr(x).n)
-# rates['NbkgHLTFail'] = rates['NbkgHLTFail'].apply(lambda x: unc.ufloat_fromstr(x).n)
-# rates['NbkgHLTPass'] = rates['NbkgHLTPass'].apply(lambda x: unc.ufloat_fromstr(x).n)
-# rates['N1'] = 2*rates['effHLT']*(1-rates['cHLT']*rates['effHLT'])*rates['NZ'] + rates['NbkgHLTFail']
-# rates['N2'] = rates['effHLT']**2 * rates['cHLT'] * rates['NZ'] + rates['NbkgHLTPass']
-# rates['N1'] = rates['N1'].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
-# rates['N2'] = rates['N2'].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
-# rates['N1bkg'] = rates['NbkgHLTFail'].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
-# rates['N2bkg'] = rates['NbkgHLTPass'].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
-# rates['N1sig'] = rates['N1'] - rates['N1bkg']
-# rates['N2sig'] = rates['N2'] - rates['N2bkg']
-# rates['effHLT'] = (2 * rates['N2sig']) / (2 * rates['N2sig'] + rates['N1sig'])
-# rates['zRecI'] = (rates['N2sig'] + 0.5*rates['N1sig'])**2/rates['N2sig'] * rates['cHLT']
+rates['xsec_mc'] = rates['recZCount'] / rates['recLumi']
 
-# # calculate correct statistical uncertainty for ID selection efficiency
-# for eff in ("Sel","Glo","Sta"):
-#     rates['Nsig{0}'.format(eff)]     = rates['Nsig{0}'.format(eff)].apply(lambda x: unc.ufloat_fromstr(x).n)
-#     rates['Nbkg{0}Pass'.format(eff)] = rates['Nbkg{0}Pass'.format(eff)].apply(lambda x: unc.ufloat_fromstr(x).n)
-#     rates['Nbkg{0}Fail'.format(eff)] = rates['Nbkg{0}Fail'.format(eff)].apply(lambda x: unc.ufloat_fromstr(x).n)
-
-#     rates['N{0}Pass'.format(eff)] = rates['Nsig{0}'.format(eff)]*rates['eff{0}'.format(eff)] + rates['Nbkg{0}Pass'.format(eff)]
-#     rates['N{0}Fail'.format(eff)] = rates['Nsig{0}'.format(eff)]*(1-rates['eff{0}'.format(eff)]) + rates['Nbkg{0}Fail'.format(eff)]
-
-#     rates['N{0}Pass'.format(eff)] = rates['N{0}Pass'.format(eff)].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
-#     rates['N{0}Fail'.format(eff)] = rates['N{0}Fail'.format(eff)].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
-#     rates['Nbkg{0}Pass'.format(eff)] = rates['Nbkg{0}Pass'.format(eff)].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
-#     rates['Nbkg{0}Fail'.format(eff)] = rates['Nbkg{0}Fail'.format(eff)].apply(lambda x: unc.ufloat(x, np.sqrt(x)) )
-
-#     rates['Nsig{0}Pass'.format(eff)] = rates['N{0}Pass'.format(eff)] - rates['Nbkg{0}Pass'.format(eff)]
-#     rates['Nsig{0}Fail'.format(eff)] = rates['N{0}Fail'.format(eff)] - rates['Nbkg{0}Fail'.format(eff)]
-
-# rates['effSel'] = (2 * rates['N2sig'] + rates['N1sig']) / (2 * rates['N2sig'] + rates['N1sig'] + rates['NsigSelFail'])
-# rates['effGlo'] = rates["NsigGloPass"] / (rates["NsigGloPass"]+rates["NsigGloFail"])
-# rates['effSta'] = rates["NsigStaPass"] / (rates["NsigStaPass"]+rates["NsigStaFail"])
-
-# # calculate correct statistical uncertainty for number of events before selection
-# rates['delZCount'] = rates['zRecI'] / (
-#     (2 * rates['N2sig'] + rates['N1sig']) / (2 * rates['N2sig'] + rates['N1sig'] + rates['NsigSelFail']) 
-#     * rates['effSta']*rates['effGlo'])**2
-
-if year in (2016, 2017, 2018):
-    apply_muon_prefire(rates)
-    apply_ECAL_prefire(rates)
-
-#rates = rates[rates['delZCount'] > 0]
-#rates['delZCount'] = rates['delZCount'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
-
-#rates['xsec'] = rates['delZCount'] / rates['recLumi']
-
-rates['recZCount'] = rates['ZRate'] * rates['timewindow'] * rates['deadtime']
-rates = rates[rates['recZCount'] > 0]
-rates['recZCount'] = rates['recZCount'].apply(lambda x: unc.ufloat(x, np.sqrt(x)))
-
-rates['xsec'] = rates['recZCount'] / rates['recLumi']
-
-
-# rates['xsecI_mc'] = rates['xsecI'] * rates['cIO']**2 
+rates['xsec'] = rates['xsec_mc'] / (rates['cIO']**2 * rates['cID'] * rates['cHLT'] * rates['cKinematicSelection'])
 
 # only keep necessary data
-rates = rates[["xsec","recLumi", "timewindow", "run", "pileUp"]]
+rates = rates[["xsec_mc", "xsec", "recLumi", "timewindow", "run", "pileUp"]]
 
-for yy, ylabel, region, mcRes in (
-    ("xsec", "sigma", "", ""),
-    # ("xsecBB", "sigma", "BB", ""),
-    # ("xsecBE", "sigma", "BE", ""),
-    # ("xsecEE", "sigma", "EE", ""),
-    # ("xsecI_mc", "sigma", "I", ""),
+for yy, ylabel, region, mcRes, xAxis in (
+    # ("xsec_mc", "sigma", "I", "", "pileUp"),
+    ("xsec_mc", "sigma", "I", "", "lumi"),
     # # ("xsec_mc", "sigma", "", ""),
     # ("xsecBB_mc", "sigma", "BB", ""),
     # ("xsecBE_mc", "sigma", "BE", ""),
@@ -554,18 +495,18 @@ for yy, ylabel, region, mcRes in (
     # # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018 D", run_range=(320673,325175), normalized=False)
 
     # # # total 2016
-    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016", run_range=(272007,294645), normalized=True)
-    # # total 2016 pre VFP
-    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 pre VFP", run_range=(272007,278769), normalized=True)
-    # # total 2016 post VFP
-    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 post VFP", run_range=(278769,294645), normalized=True)
-    # # # total 2017
-    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2017", run_range=(297046,306462), normalized=True)
-    # # # ## total 2018
-    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018", run_range=(315252,325175), normalized=True)
+    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016", run_range=(272007,294645), normalized=True, xAxis=xAxis)
+    # total 2016 pre VFP
+    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 pre VFP", run_range=(272007,278769), normalized=True, xAxis=xAxis)
+    # total 2016 post VFP
+    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 post VFP", run_range=(278769,294645), normalized=True, xAxis=xAxis)
+    # # total 2017
+    make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2017", run_range=(297046,307083), normalized=True, xAxis=xAxis)
+    # # ## total 2018
+    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018", run_range=(315252,325175), normalized=True, xAxis=xAxis)
 
     ### Run 3
     # 2022
-    make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2022", normalized=True, xAxis='lumi')
-    make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2022", normalized=True, xAxis='pileUp')
+    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2022", normalized=True, xAxis='lumi')
+    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2022", normalized=True, xAxis='pileUp')
 

@@ -46,11 +46,15 @@ def to_DateTime(time, string_format = "yy/mm/dd"):
 
     if string_format == "yy/mm/dd":     # format agreed upon ATLAS and CMS
         year, month, day = [int(x) for x in time[0].split("/")]
+        year += 2000
+        hour, min, sec   = [int(x) for x in time[1].split(":")]
     elif string_format == "mm/dd/yy":   # brilcalc format
         month, day, year = [int(x) for x in time[0].split("/")]
-
-    hour, min, sec   = [int(x) for x in time[1].split(":")]
-    year += 2000
+        year += 2000
+        hour, min, sec   = [int(x) for x in time[1].split(":")]
+    else:   # default format
+        year, month, day = [int(x) for x in time[0].split("-")]
+        hour, min, sec   = [int(float(x)) for x in time[1].split(":")]
     
     return datetime(year, month, day, hour, min, sec)
 

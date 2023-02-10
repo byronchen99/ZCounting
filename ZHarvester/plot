@@ -1,0 +1,31 @@
+#!/bin/bash
+
+csvDir=$1
+csvLowPUDir=$2
+
+#echo "plot chi2"
+#python3 Plotting/plot_chi2.py -r $csvDir/csvFiles/Mergedcsvfile_perMeasurement.csv -s $csvDir/plot_chi2
+
+#echo "plot ZvsL"
+#python3 Plotting/plot_ZvsL.py -r $csvDir/csvFiles/Mergedcsvfile_perMeasurement.csv -x $csvLowPUDir/csvFiles/Mergedcsvfile_perMeasurement.csv -s $csvDir/plot_ZvsL
+
+#echo "plot ZSummary"
+#python3 Plotting/plot_ZSummary.py -r $csvDir/csvFiles/Mergedcsvfile_perMeasurement.csv -x $csvLowPUDir/csvFiles/Mergedcsvfile_perMeasurement.csv -s $csvDir/plot_ZSummary
+
+echo "plot fills"
+python3 Plotting/plot_ZLumi_RefLumi.py --label Preliminary -r $csvDir/csvFiles/Mergedcsvfile_perMeasurement.csv -f 4947 5030 5106 5282 5340 5421 5849 6255 6362 6931 7221 7328 -s $csvDir/plot_Fills
+
+# echo "make summary"
+
+#python3 Plotting/make_summary.py -r $csvDir/csvFiles/Mergedcsvfile_perMeasurement.csv -x $csvLowPUDir/csvFiles/Mergedcsvfile_perMeasurement.csv -s $csvDir/summary
+
+#for var in binWidth025 binWidth1 lumi30 lumi15 altSigMC altSigMCxCB altSigGen mass50to130 mass70to110 
+#do
+#    python3 Plotting/make_summary.py -r ${csvDir}_${var}/csvFiles/Mergedcsvfile_perMeasurement.csv -x ${csvLowPUDir}_${var}/csvFiles/Mergedcsvfile_perMeasurement.csv -s $csvDir/summary_${var}
+#done
+
+#python3 Plotting/make_summary.py -r ${csvDir}_altBkg/csvFiles/Mergedcsvfile_perMeasurement.csv -x ${csvLowPUDir}_altBkg/csvFiles/Mergedcsvfile_perMeasurement.csv -s $csvDir/summary_altBkg \
+#--rnominal ${csvDir}/csvFiles/Mergedcsvfile_perMeasurement.csv --xnominal ${csvLowPUDir}/csvFiles/Mergedcsvfile_perMeasurement.csv
+
+#echo "make summary table"
+#python3 Plotting/summary_table_Run2.py -i $csvDir/summary/infoI.json -s $csvDir/summary/

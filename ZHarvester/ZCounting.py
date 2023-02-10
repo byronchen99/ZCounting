@@ -160,8 +160,7 @@ if __name__ == '__main__':
     ########################################
     # link to resouces
     eosDir  = args.eosDir
-    # resPath = cmsswbase + "/src/ZCounting/ZHarvester/res/"
-    resPath = "/eos/home-d/dwalter/Lumi/ZCounting_Standalone/CMSSW_12_4_10/src/ZCounting/ZHarvester"
+    resPath = cmsswbase + "/src/ZCounting/ZHarvester/res/"
     if( args.beginRun >= 272007 and args.beginRun < 278808
         # there is an overlap for 2016 F in runs with pre and post VFP settings
         and args.beginRun not in [278769, 278801, 278802, 278803, 278804, 278805, 278808]
@@ -211,45 +210,54 @@ if __name__ == '__main__':
     log.info("Lumi per Measurement:    {0}".format(args.LumiPerMeasurement))
     log.info("----------------------------------")
     
-    # signal model 
-    if args.sigTemplates == "MCxGauss" or args.sigTemplates == "default":
-        sigModel = 2 # MC, folding with gauss
+    # signal model (or definde additional convolutoin - smearing)
+    if args.sigTemplates in ["default","MCxGauss"]:
+        sigModel = 2        # MC, folding with gauss
+        sigModelSta = 2     # MC, folding with gauss
+    elif args.sigTemplates == "Gen":
+        sigModel = 16       # Gen, folding with crystal ball
+        sigModelSta = 2     # MC, folding with gauss
     elif args.sigTemplates == "MC":
         sigModel = 4 # MC, no folding
+        sigModelSta = 4     # MC, folding with gauss
     elif args.sigTemplates == "BW":
         sigModel = 3 # BW, no folding
+        sigModelSta = 3     # MC, folding with gauss
     elif args.sigTemplates == "BWxCB":
         sigModel = 1 # BW, folding with crystal ball
+        sigModelSta = 1     # MC, folding with gauss
     elif args.sigTemplates == "BWxGaus":
         sigModel = 5 # BW, folding with gauss
+        sigModelSta = 5     # MC, folding with gauss
     elif args.sigTemplates == "MCxCB":
         sigModel = 6 # MC, folding with crystal ball
+        sigModelSta = 6     # MC, folding with gauss
     else:
         log.warning("signal model {0} unknown! exit()".format(args.sigTemplates))
         exit()
 
     # background model 
     if args.bkgTemplates == "default" :
-        bkgModelPass = 1    # exp
-        bkgModelFail = 6    # RooCMSShape
+        bkgModelSmpl = 1    # exp
+        bkgModelCplx = 6    # RooCMSShape
     elif args.bkgTemplates == "alt" :
-        bkgModelPass = 0    # constant
-        bkgModelFail = 4    # Das
+        bkgModelSmpl = 0    # constant
+        bkgModelCplx = 4    # Das
     elif args.bkgTemplates == "Exp":
-        bkgModelFail = 1
-        bkgModelPass = 1
+        bkgModelCplx = 1
+        bkgModelSmpl = 1
     elif args.bkgTemplates == "Quad":
-        bkgModelFail = 2
-        bkgModelPass = 2
+        bkgModelCplx = 2
+        bkgModelSmpl = 2
     elif args.bkgTemplates == "QuadPlusExp":
-        bkgModelFail = 3
-        bkgModelPass = 3
+        bkgModelCplx = 3
+        bkgModelSmpl = 3
     elif args.bkgTemplates == "Das":
-        bkgModelFail = 4
-        bkgModelPass = 4
+        bkgModelCplx = 4
+        bkgModelSmpl = 4
     elif args.bkgTemplates == "CMSShape":
-        bkgModelFail = 6
-        bkgModelPass = 6
+        bkgModelCplx = 6
+        bkgModelSmpl = 6
     else:
         log.warning("background model {0} unknown! exit()".format(args.bkgTemplates))
         exit()
@@ -286,12 +294,12 @@ if __name__ == '__main__':
     MassMaxSta_ = int(130)
     MassBinSta_ = int(MassMaxSta_ - MassMinSta_)*2
 
-    npvMin_ = -0.5  # lower boundary for npv histogram
-    npvMax_ = 74.5  # upper boundary for npv histogram
-
     if args.mode == "DQM":
         npvMin_ = 0.5     
         npvMax_ = 100.5   
+    else:
+        npvMin_ = -0.5
+        npvMax_ = 74.5
 
     npvBin_ = npvMax_ - npvMin_
 
@@ -392,7 +400,6 @@ if __name__ == '__main__':
             if fileName is None:
                 continue
             log.info(f"Found file `{fileName}`")
-
 
         log.debug(" === Have lumi secion list {0}".format(LSlist))        
         log.info(" === Looping over measurements...")
@@ -495,6 +502,24 @@ if __name__ == '__main__':
                     # hStapass += load(f"h_mass_Sta_pass_EE")
                     # hStafail += load(f"h_mass_Sta_fail_BE")
                     # hStafail += load(f"h_mass_Sta_fail_EE")
+
+            # mask_HLT2 = "pass==2 && "+mask_lumi+acceptance
+            # mask_HLT1 = "pass==1 && "+mask_lumi+acceptance
+
+            # dHLT2 = dHLT.Filter("pass==2 && "+mask_lumi+acceptance).AsNumpy(["mass"])
+            # dHLT1 = dHLT.Filter("pass==1 && "+mask_lumi+acceptance).AsNumpy(["mass"])
+
+            # mass = ROOT.RooRealVar("mass", "mass", 60, 120)
+
+            # data = ROOT.RooDataSet.from_numpy({"x": dHLT2}, [mass])
+
+            # read ttree into RooDataSet
+            # m
+            # dHLT2 = dHLT.Filter("pass==2 && "+mask_lumi+acceptance).Take['float']("mass")
+            # dHLT1 = dHLT.Filter("pass==2 && "+mask_lumi+acceptance).Take['float']("mass")
+
+
+
 
             if df is None:
                 df = byLS_m

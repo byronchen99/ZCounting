@@ -6,13 +6,19 @@ import pickle
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
 from ZUtils.python.utils import exp, pexp, plinear, plinear_step, pquad
 
-def apply_muon_prefire(df):
+def apply_muon_prefire(df, apply_on="recZCount", region="I"):
 
-    print("apply muon prefire corrections")
+    resource = 'res/prefiring.json'
 
     # --- get prefire corrections
-    with open('res/prefiring.json') as file_prefire:
+    with open(resource) as file_prefire:
         res_prefire = json.load(file_prefire)
+
+    if apply_on not in df.keys():
+        print("WARNING: Requested key was not found in input dataframe")
+        return
+
+    print("apply muon prefire corrections")
 
     for lo, hi, era in (
         (272007, 278769, "2016preVFP"),
@@ -22,53 +28,34 @@ def apply_muon_prefire(df):
         (315252, 325274, "2018"),
         ):
 
-        loc = (df['run'] >= lo) & (df['run'] < hi)
-
-        for region in ("BB","BE","EE","I"):
-            if 'zDel{0}_mc'.format(region) not in df.keys():
-                continue
-            factor = float(res_prefire[era]["prefMuon"][region]['nominal'])
-            df.loc[loc,'zDel{0}_mc'.format(region)] *= factor
-
-def apply_pileup_correction(df):
-    print("apply pileup corrections")
-
-    # --- get pileup corrections
-
-    for lo, hi, era in (
-        (272007, 278769, "2016preVFP"),
-        (278769, 284045, "2016postVFP"),
-        (297020, 307083, "2017"),
-        (315252, 325274, "2018"),
-        ):
+        if region not in res_prefire[era]["prefMuon"].keys():
+            print("WARNING: Requested key was not found in resource `{0}`".format(resource))
+            continue
 
         loc = (df['run'] >= lo) & (df['run'] < hi)
-
         if sum(loc) == 0:
             continue
 
-        # --- get pileup corrections
-        with open('res/mcCorrections/corrections_nPU_{0}.p'.format(era), "r") as file_pileup:
-            functions = pickle.load(file_pileup)
+        factor = float(res_prefire[era]["prefMuon"][region]['nominal'])
 
-        for region in ("BB","BE","EE","I"):
-            if 'zDel{0}_mc'.format(region) not in df.keys():
-                continue
-            function = functions["effReco"+region]
-            params = function['params']
-            name = function['name']
-            if name == "linear_step":
-                df.loc[loc, 'zDel{0}_mc'.format(region)] *= plinear_step(df.loc[loc,'pileUp'], *params)
-            elif name == "linear":
-                df.loc[loc, 'zDel{0}_mc'.format(region)] *= plinear(df.loc[loc,'pileUp'], *params)
+        # for debugging
+        print("Apply on {0} factors of: {1}".format(era, factor))
 
+        df.loc[loc, apply_on] *= factor
 
-def apply_ECAL_prefire(df):
-    print("apply ECAL prefire corrections")
+def apply_ECAL_prefire(df, apply_on="recZCount", region="I"):
+
+    resource = 'res/prefiring.json'
 
     # --- get prefire corrections
-    with open('res/prefiring.json') as file_prefire:
+    with open(resource) as file_prefire:
         res_prefire = json.load(file_prefire)
+
+    if apply_on not in df.keys():
+        print("WARNING: Requested key was not found in input dataframe")
+        return
+
+    print("apply ECAL prefire corrections")
 
     for lo, hi, era, func in (
         (272007, 278769, "2016preVFP", pexp),
@@ -76,12 +63,18 @@ def apply_ECAL_prefire(df):
         (297020, 306926, "2017", pexp),
         (306926, 307083, "2017H", pquad),
         ):
-        
+
+        if region not in res_prefire[era]["prefECAL"].keys():
+            print("WARNING: Requested key was not found in resource `{0}`".format(resource))
+            continue
 
         loc = (df['run'] >= lo) & (df['run'] < hi)
+        if sum(loc) == 0:
+            continue
 
-        for region in ("BB","BE","EE","I"):
-            if 'zDel{0}_mc'.format(region) not in df.keys():
-                continue
-            params = res_prefire[era]["prefECAL"][region]['nominal']
-            df.loc[loc, 'zDel{0}_mc'.format(region)] *= func(df.loc[loc,'pileUp'], *params)
+        params = res_prefire[era]["prefECAL"][region]['nominal']
+        factor = func(df.loc[loc,'pileUp'], *params)
+        # for debugging
+        print("Apply on {0} factors of (mean): {1}".format(era, sum(factor)/len(factor)))
+
+        df.loc[loc, apply_on] *= factor
