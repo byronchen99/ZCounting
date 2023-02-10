@@ -29,7 +29,6 @@ etaCut = 2.4
 if __name__ == '__main__':
     import argparse
 
-
     parser = argparse.ArgumentParser()
 
     parser.add_argument("-o", "--output", help="Output directory to the histogram file",

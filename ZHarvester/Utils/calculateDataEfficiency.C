@@ -17,9 +17,9 @@
 #include <TPad.h>
 #include <TLatex.h>
 
-#include "Utils/ZMMSignals.hh"
-#include "Utils/ZMMBackgrounds.hh"
-#include "Utils/RooGaussDoubleSidedExp.h"
+#include "ZMMSignals.hh"
+#include "ZMMBackgrounds.hh"
+#include "RooGaussDoubleSidedExp.h"
 #endif
 
 // RooFit headers

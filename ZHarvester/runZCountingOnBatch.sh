@@ -14,8 +14,6 @@ eval `scramv1 runtime -sh`
 cd $TOP
 
 cp -r ${workdir}/Utils $TOP
-cp -r ${workdir}/.rootlogon.C $TOP
-cp ${workdir}/calculateDataEfficiency.C $TOP
 cp ${workdir}/ZCounting.py $TOP
 
-python3 ZCounting.py -b $runNum -e $(($runNum + 1)) --dirDQM $3 --byLsCSV $4 -o $5 --mcCorrections $6 --sigTemplates $7 --bkgTemplates $8 --ptCut $9 --etaCut ${10} --mass ${11} ${12} ${13} --LumiPerMeasurement ${14} --mode ${15}
+python3 ZCounting.py -b $runNum -e $(($runNum + 1)) --dirDQM $3 --byLsCSV $4 -o $5 --mcCorrections $6 --sigModels $7 --bkgModels $8 --ptCut $9 --etaCut ${10} --mass ${11} ${12} ${13} --LumiPerMeasurement ${14} --mode ${15}

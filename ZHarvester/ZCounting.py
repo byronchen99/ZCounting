@@ -281,10 +281,12 @@ if __name__ == '__main__':
         etaRegionZ = "I"
 
     if not args.collect:
-        log.info("Loading C marco...")
+        log.info("Loading C marcos...")
         # load functions for fitting
-        ROOT.gROOT.LoadMacro(os.path.dirname(os.path.realpath(
-            __file__)) + "/calculateDataEfficiency.C")
+        ROOT.gROOT.LoadMacro(os.path.dirname(os.path.realpath(__file__)) + "Utils/calculateDataEfficiency.C")
+
+        if args.bkgModel == "Das":
+            ROOT.gROOT.LoadMacro(os.path.dirname(os.path.realpath(__file__)) + "Utils/RooGaussDoubleSidedExp.cc+")
 
         ROOT.set_massRange(MassMin_, MassMax_, MassBin_)
 
