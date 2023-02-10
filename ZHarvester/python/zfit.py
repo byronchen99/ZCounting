@@ -47,18 +47,27 @@ def fit(hist, nBins, binLo, binHi, category):
     # plot_comp_model(model_nobin, data, name="prefit", bkg=bkg)x
 
     model = zfit.pdf.BinnedFromUnbinnedPDF(model_nobin, obs)
-    loss = zfit.loss.ExtendedBinnedNLL(model, data)
+    loss = zfit.loss.ExtendedBinnedNLL(model, data, options = { "numhess" : False })
 
     # minimization
-    minimizer = zfit.minimize.Minuit()
-    # minimizer = zfit.minimize.Adam()
+    # minimizer = zfit.minimize.Minuit()
+    minimizer = zfit.minimize.ScipyTrustConstrV1(hessian = "zfit")
     result = minimizer.minimize(loss)
 
-    # calculate hesse
-    result.hesse()
+    status = result.valid
 
-    # calculate minuit error by doing likelihood scan
-    # errors, new_result = result.errors(params=[sig_yield,], name='errors')
+    print(f"status: {status}")
+
+    try:
+        hessval = result.loss.hessian(list(result.params)).numpy()
+        cov = np.linalg.inv(hessval)
+        eigvals = np.linalg.eigvalsh(hessval)
+        covstatus = eigvals[0] > 0.
+    except:
+        cov = None
+        covstatus = False
+
+    print(f"covariance status: {covstatus}")
 
     print(result)
 

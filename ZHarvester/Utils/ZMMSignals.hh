@@ -21,7 +21,7 @@ protected:
     const double ZMASS = 91.1876;
     const double ZWIDTH = 2.4952;
 
-    const int ipOrder = 2;
+    const int ipOrder = 3;
     
 public:
     CSignalModel():model(0){}
@@ -179,24 +179,15 @@ CBreitWignerConvCrystalBall::CBreitWignerConvCrystalBall(RooRealVar &m, const Bo
 
     sprintf(vname,"sig_mean%s",name);  mean  = new RooRealVar(vname,vname,0,-2.5,2.5);
     sprintf(vname,"sig_sigma%s",name); sigma = new RooRealVar(vname,vname,2,0.1, 5);
-<<<<<<< HEAD
     sprintf(vname,"sig_alpha%s",name); alpha = new RooRealVar(vname,vname,5,0,20);
     sprintf(vname,"sig_n%s",name);     n     = new RooRealVar(vname,vname,5,0.5,10);
-=======
-    sprintf(vname,"sig_alpha%s",name); alpha = new RooRealVar(vname,vname,5,1.0,20);
-    sprintf(vname,"sig_n%s",name);     n     = new RooRealVar(vname,vname,5,1.0,10);
->>>>>>> bc6b7f1419132555a447bb33282f947c53682305
 
 
     sprintf(vname,"sig_cb%s",name);
     cb = new RooCBShape(vname,vname,m,*mean,*sigma,*alpha,*n);
 
     sprintf(vname,"signal%s",name);
-<<<<<<< HEAD
-    model = new RooFFTConvPdf(vname,"BW x CB",m,*bw,*cb, 3);
-=======
     model = new RooFFTConvPdf(vname,"BW x CB",m,*bw,*cb, ipOrder);
->>>>>>> bc6b7f1419132555a447bb33282f947c53682305
 }
 
 void CBreitWignerConvCrystalBall::Reset(){
@@ -249,11 +240,7 @@ CBreitWignerConvGaussian::CBreitWignerConvGaussian(RooRealVar &m, const Bool_t p
     sprintf(vname,"sig_gaus%s",name);  gaus  = new RooGaussian(vname,vname,m,*mean,*sigma);
 
     sprintf(vname,"signal%s",name);
-<<<<<<< HEAD
-    model = new RooFFTConvPdf(vname,"BW x Gaus",m,*bw,*gaus, 3);
-=======
     model = new RooFFTConvPdf(vname,"BW x Gaus",m,*bw,*gaus, ipOrder);
->>>>>>> bc6b7f1419132555a447bb33282f947c53682305
 }
 
 void CBreitWignerConvGaussian::Reset(){
@@ -350,13 +337,8 @@ CMCTemplateConvCrystalBall::CMCTemplateConvCrystalBall(RooRealVar &m, TH1D* hist
 
     sprintf(vname,"sig_mean%s",name);  mean  = new RooRealVar(vname,vname,0,-2.5,2.5);
     sprintf(vname,"sig_sigma%s",name); sigma = new RooRealVar(vname,vname,2,0.1, 5);
-<<<<<<< HEAD
     sprintf(vname,"sig_alpha%s",name); alpha = new RooRealVar(vname,vname,5,0,20);
     sprintf(vname,"sig_n%s",name);     n     = new RooRealVar(vname,vname,5,0.5,10);
-=======
-    sprintf(vname,"sig_alpha%s",name); alpha = new RooRealVar(vname,vname,5,1.0,20);
-    sprintf(vname,"sig_n%s",name);     n     = new RooRealVar(vname,vname,5,1.0,10);
->>>>>>> bc6b7f1419132555a447bb33282f947c53682305
 
     sprintf(vname,"sig_cb%s",name);    
     cb = new RooCBShape(vname,vname,m,*mean,*sigma,*alpha,*n);

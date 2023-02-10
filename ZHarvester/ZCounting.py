@@ -1,5 +1,4 @@
-import logging as log
-# import ROOT
+import ROOT
 import pandas as pd
 import glob
 import os
@@ -10,6 +9,7 @@ import numpy as np
 
 from python.utils import writeSummaryCSV, getFileName, load_input_csv, get_ls_for_next_measurement, load_histogram, getCorrelation, to_DateTime
 
+from python.logging import setup_logger
 
 # disable panda warnings when assigning a new column in the dataframe
 pd.options.mode.chained_assignment = None
@@ -113,7 +113,7 @@ if __name__ == '__main__':
     import argparse
     import os
 
-    # cmsswbase = os.environ['CMSSW_BASE']
+    cmsswbase = os.environ['CMSSW_BASE']
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-b", "--beginRun", help="first run to analyze [%(default)s]", type=int, default=272007)
@@ -150,10 +150,8 @@ if __name__ == '__main__':
     parser.add_argument("-o", "--dirOut", help="where to store the output files", default="./")
 
     args = parser.parse_args()
-    if args.verbose:
-        log.basicConfig(format="%(levelname)s: %(message)s", level=log.DEBUG)
-    else:
-        log.basicConfig(format="%(levelname)s: %(message)s", level=log.INFO)
+
+    log = setup_logger(__file__, args.verbose)
 
     prefix_dqm="ZCountingInOut-V17_38-"
 
@@ -192,12 +190,19 @@ if __name__ == '__main__':
     elif args.beginRun >= 355100:                               # 2022
         currentYear = 2022
         byLsCSV = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/brilcalcByLS/byLS_Collisions22_355100_356615_Golden.csv"
-        mcCorrelations   = "/eos/cms/store//group/comm_luminosity/ZCounting/2022/CorrelationFactors/c_nPV_2022.root"
+        mcCorrelations   = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/CorrelationFactors/c_nPV_2022.root"
         prefix_dqm =  "ZCountingAll-V01-"
         sigTemplates = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/SignalTemplates/ZCountingAll-V01-Winter22-DYJetsToLL_M_50_LO.root"
+    elif args.beginRun >= 362760:                               # 2023
+        currentYear = 2023
     else:
         log.warning("specified begin run {0} unknown! exit()".format(args.beginRun))
         exit()
+
+    if currentYear >= 2022:
+        energy = 13.6
+    else:
+        energy = 13
 
     byLsCSV          = byLsCSV          if args.byLsCSV       == "default"   else args.byLsCSV
     measurement      = args.measurement
@@ -312,20 +317,20 @@ if __name__ == '__main__':
         etaRegion = "I"
         etaRegionZ = "I"
 
-    # if not args.collect:
-    #     log.info(" Loading C marco...")
-    #     # load functions for fitting
-    #     ROOT.gROOT.LoadMacro(os.path.dirname(os.path.realpath(
-    #         __file__)) + "/calculateDataEfficiency.C")
+    if not args.collect:
+        log.info(" Loading C marco...")
+        # load functions for fitting
+        ROOT.gROOT.LoadMacro(os.path.dirname(os.path.realpath(
+            __file__)) + "/calculateDataEfficiency.C")
 
-    #     ROOT.set_massRange(MassMin_, MassMax_, MassBin_)
+        ROOT.set_massRange(MassMin_, MassMax_, MassBin_)
 
-    #     ROOT.set_npvRange(npvMin_, npvMax_)
-    #     if currentYear >= 2022:
-    #         ROOT.set_energy(13.6)
+        ROOT.set_npvRange(npvMin_, npvMax_)
+        if currentYear >= 2022:
+            ROOT.set_energy(energy)
 
-    #     ROOT.set_ptCut(args.ptCut)
-    #     ROOT.set_etaCut(args.etaCut)
+        ROOT.set_ptCut(args.ptCut)
+        ROOT.set_etaCut(args.etaCut)
     
     byLS_data = load_input_csv(byLS_filename)
     byLS_data = byLS_data.loc[(byLS_data['run'] >= int(args.beginRun)) & (byLS_data['run'] < int(args.endRun))]
@@ -514,7 +519,6 @@ if __name__ == '__main__':
             # data = ROOT.RooDataSet.from_numpy({"x": dHLT2}, [mass])
 
             # read ttree into RooDataSet
-            # m
             # dHLT2 = dHLT.Filter("pass==2 && "+mask_lumi+acceptance).Take['float']("mass")
             # dHLT1 = dHLT.Filter("pass==2 && "+mask_lumi+acceptance).Take['float']("mass")
 
@@ -564,22 +568,14 @@ if __name__ == '__main__':
             log.debug(" === Running measurement {0}".format(m))
 
             ### --- perform fit with zfit
-            from python.zfit import fit
+            # from python.zfit import fit
 
-            pdb.set_trace()
+            # pdb.set_trace()
 
-            fit(h2HLT, MassBin_, MassMin_, MassMax_, category="HLT 2")
-            fit(h1HLT, MassBin_, MassMin_, MassMax_, category="HLT 1")
-            fit(hIDfail, MassBin_, MassMin_, MassMax_, category="ID fail")
-            fit(hGlofail, MassBin_, MassMinSta_, MassMaxSta_, category="Glo fail")
-
-
-
-            exit()
-
-
-
-
+            # fit(h2HLT, MassBin_, MassMin_, MassMax_, category="HLT 2")
+            # fit(h1HLT, MassBin_, MassMin_, MassMax_, category="HLT 1")
+            # fit(hIDfail, MassBin_, MassMin_, MassMax_, category="ID fail")
+            # fit(hGlofail, MassBin_, MassMinSta_, MassMaxSta_, category="Glo fail")
 
             ### --- 
 
@@ -594,17 +590,17 @@ if __name__ == '__main__':
                     ROOT.set_output(outSubDir)
                     ROOT.set_luminosity(recLumi)
 
-                    ROOT.getZyield(h2HLT, m, "HLT", etaRegion, sigModel, bkgModelPass, 2, sigTemplates, 0)
-                    ROOT.getZyield(h1HLT, m, "HLT", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
-                    ROOT.getZyield(hIDfail, m, "ID", etaRegion, sigModel, bkgModelPass, 0, sigTemplates, 0)
+                    ROOT.getZyield(h2HLT, m, "HLT", etaRegion, sigModel, bkgModelSmpl, 2, sigTemplates, 0)
+                    ROOT.getZyield(h1HLT, m, "HLT", etaRegion, sigModel, bkgModelSmpl, 1, sigTemplates, 0)
+                    ROOT.getZyield(hIDfail, m, "ID", etaRegion, sigModel, bkgModelSmpl, 0, sigTemplates, 0)
 
                     ROOT.set_massRange(MassMinSta_, MassMaxSta_, MassBinSta_)
-                    ROOT.getZyield(hGlopass, m, "Glo", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
-                    ROOT.getZyield(hGlofail, m, "Glo", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, 0)
+                    ROOT.getZyield(hGlopass, m, "Glo", etaRegion, sigModel, bkgModelSmpl, 1, sigTemplates, 0)
+                    ROOT.getZyield(hGlofail, m, "Glo", etaRegion, sigModel, bkgModelCplx, 0, sigTemplates, 0)
                     ROOT.set_massRange(MassMin_, MassMax_, MassBin_)
 
-                    ROOT.getZyield(hStapass, m, "Sta", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
-                    ROOT.getZyield(hStafail, m, "Sta", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, 0)
+                    ROOT.getZyield(hStapass, m, "Sta", etaRegion, sigModel, bkgModelSmpl, 1, sigTemplates, 0)
+                    ROOT.getZyield(hStafail, m, "Sta", etaRegion, sigModel, bkgModelCplx, 0, sigTemplates, 0)
 
                     # remove the histogram templates, not needed anymore
                     os.system("rm {0}/histTemplates_*".format(outSubDir))
