@@ -54,6 +54,7 @@ def zmonitoring(
     cs_file.write("output      = condor/$(ClusterId).$(ProcId).out \n")
     cs_file.write("error       = condor/$(ClusterId).$(ProcId).err \n")
     cs_file.write("log         = condor/$(ClusterId).$(ProcId).log \n")
+    # cs_file.write("InteractiveJob = True \n")
     #cs_file.write("+JobFlavour =\"testmatch\" \n") # only works at lxplus
     # cs_file.write("+RequestRuntime = 43200 \n")  # only works at naf(desy) 43200s = 12h
     # cs_file.write("RequestMemory = 19999 \n")
@@ -102,7 +103,7 @@ def zmonitoring(
     else:
         out = os.popen("condor_submit cs_tmp.sub --verbose").read()
         # log.info(out)
-    os.system("rm cs_tmp.sub")
+    # os.system("rm cs_tmp.sub")
     clusterId = int(next(filter(lambda x: "ClusterId" in x, out.split("\n"))).replace("ClusterId = ",""))
 
     log.info(f"Submitted {njobs} jobs with cluster ID {clusterId}")

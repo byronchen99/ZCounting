@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import ROOT
 import pandas as pd
 import glob
@@ -150,6 +152,7 @@ def extract_results_dqm(directory, m, cHLT):
 
 ################################################################################
 if __name__ == '__main__':
+    print("Main")
     import os
 
     cmsswbase = os.environ['CMSSW_BASE']
@@ -163,6 +166,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     log = logging.setup_logger(__file__, args.verbose)
+
+    log.info("start main ...")
+
 
     prefix_dqm="ZCountingInOut-V17_38-"
 
@@ -199,7 +205,7 @@ if __name__ == '__main__':
         sigTemplates     = args.input+"/"+prefix_dqm+"Autumn18-DYJetsToLL_M_50_LO.root"
     elif args.beginRun >= 355100 and args.beginRun < 362760:    # 2022
         year = 2022
-        byLsCSV = f"{args.input}/2022/brilcalcByLS/byLS_Collisions22_355100_362760_Muon_20230210.csv"
+        byLsCSV = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/brilcalcByLS/byLS_Collisions22_355100_362760_Muon_20230210.csv"
         mcCorrelations   = f"{args.input}/2022/CorrelationFactors/c_nPV_2022.root"
         prefix_dqm =  "ZCountingAll-V01-"
         sigTemplates = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/SignalTemplates/ZCountingAll-V01-Winter22-DYJetsToLL_M_50_LO.root"
