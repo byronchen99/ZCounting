@@ -23,7 +23,7 @@ def hadd_sequence(output_file, input_files, options, remove_inputs=False):
 
     MAX_INPUT_LENGTH = int(256)
 
-    INPUT_BLOCKS = [input_files[_tmp_idx:_tmp_idx + MAX_INPUT_LENGTH] for _tmp_idx in xrange(0, len(input_files), MAX_INPUT_LENGTH)]
+    INPUT_BLOCKS = [input_files[_tmp_idx:_tmp_idx + MAX_INPUT_LENGTH] for _tmp_idx in range(0, len(input_files), MAX_INPUT_LENGTH)]
 
 
     if len(INPUT_BLOCKS) < 2:
@@ -131,7 +131,7 @@ if __name__ == '__main__':
 
     output_postfix_format = '{:d}' # '{:0'+str(1+int(math.log10(N_BLOCKS - 1)))+'d}'
 
-    ifile_blocks = [IFILE_LS[tmp_i::N_BLOCKS] for tmp_i in xrange(N_BLOCKS)]
+    ifile_blocks = [IFILE_LS[tmp_i::N_BLOCKS] for tmp_i in range(N_BLOCKS)]
 
     for i_block in range(len(ifile_blocks)):
 
