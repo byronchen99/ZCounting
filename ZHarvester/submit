@@ -54,7 +54,7 @@ def zmonitoring(
     cs_file.write("output      = condor/$(ClusterId).$(ProcId).out \n")
     cs_file.write("error       = condor/$(ClusterId).$(ProcId).err \n")
     cs_file.write("log         = condor/$(ClusterId).$(ProcId).log \n")
-    # cs_file.write("InteractiveJob = True \n")
+    cs_file.write('requirements = (OpSysAndVer =?= "CentOS8") \n')
     #cs_file.write("+JobFlavour =\"testmatch\" \n") # only works at lxplus
     # cs_file.write("+RequestRuntime = 43200 \n")  # only works at naf(desy) 43200s = 12h
     # cs_file.write("RequestMemory = 19999 \n")
@@ -153,13 +153,13 @@ def check(projectdir, resubmit=False, collect=False, longQueue=False):
 
     unfinished_jobs = []
     for ijob in range(ji['njobs']):
-        outfilename = "condor/{0}.{1}.err".format(ji['clusterId'], ijob)
+        outfilename = "condor/{0}.{1}.out".format(ji['clusterId'], ijob)
         if not os.path.isfile(outfilename) or os.stat(outfilename).st_size == 0: #file does not exist or is empty?
             unfinished_jobs.append(ijob)
             continue
         with open(outfilename, "r") as f:
             lastline = f.readlines()[-1]
-        if lastline != "INFO:ZCounting.py:Done\n":
+        if lastline != "Job done!\n":
             unfinished_jobs.append(ijob)
     if len(unfinished_jobs) == 0:
         log.info("all jobs done!")
@@ -207,6 +207,10 @@ if __name__ == '__main__':
     )
     parserA = common.parser_zharvest(parserA)
     parserA.add_argument(
+        '--mode', default="DQM", type=str, choices=["DQM", "TTrees"],
+        help='specify the type of input files'
+    )
+    parserA.add_argument(
         '-t', '--test', default=False, action="store_true",
         help='test without submitting, just create the submit script'
     )
@@ -235,6 +239,11 @@ if __name__ == '__main__':
         '--longQueue', default=False, action="store_true",
         help='resubmit on the long queue'
     )
+
+    initargs,_ = parserA.parse_known_args()
+    if initargs.mode == "DQM":
+        common.set_parser_default(parserA, "mass", [66,116,50])
+        common.set_parser_default(parserA, "ptCut", 27)        
 
     # parse arguments and call subparser
     args = parser.parse_args()

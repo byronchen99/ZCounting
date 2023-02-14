@@ -1,6 +1,19 @@
 from python.logging import child_logger
 log = child_logger(__name__)
 
+from datetime import datetime
+import pandas as pd
+import numpy as np
+import uncertainties as unc
+import glob
+import uproot 
+import ROOT
+import boost_histogram as bh
+from hist import Hist
+import json, os
+
+import pdb
+
 # ------------------------------------------------------------------------------
 def load_input_csv(byLS_data):
     """
@@ -11,8 +24,6 @@ def load_input_csv(byLS_data):
     byLS_data : str
         path to the file by lumisection CSV file
     """
-
-    import pandas as pd
     
     byLS_file = open(str(byLS_data))
     byLS_lines = byLS_file.readlines()
@@ -43,7 +54,6 @@ def load_input_csv(byLS_data):
 def to_DateTime(time, string_format = "yy/mm/dd"):
 
     # converts time string to python datetime
-    from datetime import datetime
     time = time.split(" ")
 
     if string_format == "yy/mm/dd":     # format agreed upon ATLAS and CMS
@@ -72,7 +82,6 @@ def getFileName(directory, run):
     run : integer
         run number for the rootfile to load
     """
-    import glob
 
     # check if run was processed already
     eosFileList = glob.glob(directory + '/*' + str(run) + '*.root')
@@ -127,10 +136,6 @@ def load_histogram(
     pileup : Boolean
         If the pileup histogram is to be returned
     """
-
-    import uproot 
-    import numpy as np
-    import pdb
 
     with uproot.open("{0}:{1}{2}".format(fileName, prefix, name)) as th_:
 
@@ -193,19 +198,16 @@ def np_to_hist(y, nBins=None, binLow=None, binHigh=None, histtype="TH1", name=""
         return y
 
     if histtype == "boost":
-        import boost_histogram as bh
         hist = bh.Histogram(bh.axis.Regular(bins=nBins, start=binLow, stop=binHigh))
         hist[:] = y
         return hist
 
     if histtype == "hist":
-        from hist import Hist
         hist = Hist.new.Regular(nBins, binLow, binHigh, name="x").Double()
         hist[:] = y
         return hist
 
     if histtype == "TH1":
-        import ROOT
         hist = ROOT.TH1D(name, name, nBins, binLow, binHigh)
         for i, v in enumerate(y):
             hist.SetBinContent(i, v)
@@ -290,7 +292,9 @@ def get_ls_for_next_measurement(
                 # if we have collected enough luminosity sections
                 if not mergeMeasurements_ and len(list_good_ls_) >= lsPerMeasurement:
                     break
-                
+
+        log.debug("Selected lumi section list {0}".format(list_good_ls_))
+
         yield list_good_ls_
 
 # ------------------------------------------------------------------------------
@@ -309,8 +313,6 @@ def getCorrelation(hPV_data, correlationsFileName, which, region="I"):
     region: str
         eta region for the correlation factor, can be: "I", "BB", "BE", "EE"
     """
-    import numpy as np
-    import ROOT
     ROOT.gROOT.SetBatch(True) # disable root prompts
 
     tfile = ROOT.TFile(correlationsFileName,"READ")
@@ -330,7 +332,16 @@ def getCorrelation(hPV_data, correlationsFileName, which, region="I"):
     return corr
 
 # ------------------------------------------------------------------------------
-def writeSummaryCSV(outCSVDir, outName="Mergedcsvfile", writeByLS=True, keys=None):
+def writePerRunCSV(results, outCSVDir, run):
+    ## Write per measurement csv file - one per run
+    log.info("Writing per Run CSV file")
+    results = pd.concat([pd.DataFrame([result]) for result in results], ignore_index=True, sort=False)
+
+    with open(outCSVDir + '/csvfile{0}.csv'.format(run), 'w') as file:
+        results.to_csv(file, index=False)
+
+# ------------------------------------------------------------------------------
+def writeSummaryCSV(outCSVDir, outName="Mergedcsvfile", writeByLS=False, keys=None):
     """
     Collect "by LS" (and "by measurement") csv files and write one big csv file
     
@@ -341,10 +352,6 @@ def writeSummaryCSV(outCSVDir, outName="Mergedcsvfile", writeByLS=True, keys=Non
     writeByLS : boolean, optional
         Boolean if a summary should be created for csv files that contain the Z rates for each lumisection
     """
-
-    import logging as log
-    import pandas as pd
-    import glob
     
     log.info("Writing overall CSV file")
     rateFileList = sorted(glob.glob(outCSVDir + '/csvfile??????.csv'))
@@ -373,6 +380,38 @@ def writeSummaryCSV(outCSVDir, outName="Mergedcsvfile", writeByLS=True, keys=Non
 
         with open(outCSVDir + '/' + outName + '_perLS.csv', 'w') as file:
             df_merged.to_csv(file, index=False)
+
+# ------------------------------------------------------------------------------
+def open_workspace(directory, filename, m):
+    # loading root workspace
+    file_result = f"{directory}/{filename}_{m}.root"
+    
+    if not os.path.isfile(file_result):
+        log.warning("No result for `{0}`".format(file_result))
+        return None, None
+    
+    f = ROOT.TFile(file_result,"READ")
+    w = f.Get("workspace")
+    return f, w
+
+def open_workspace_yield(directory, filename, m):
+    # reading fit result from root workspace
+
+    f, w = open_workspace(directory, "workspace_yield_"+filename, m)
+    
+    Nsig = w.var("Nsig").getVal()
+    chi2 = w.arg("chi2").getVal()
+    
+    f.Close()
+    f.Delete()
+    w.Delete()
+    return Nsig, chi2
+
+def unorm(value):
+    if value > 0:
+        return unc.ufloat(value, np.sqrt(value))
+    else: 
+        return unc.ufloat(value, value)
 
 # ------------------------------------------------------------------------------
 def getEra(run):        
@@ -436,7 +475,6 @@ def getEra(run):
 
 # ------------------------------------------------------------------------------
 def chart_to_js(_chart, _name, _data="data.csv"):
-    import json, os
     
     chart_json = _chart.to_dict()
     # delete in line data

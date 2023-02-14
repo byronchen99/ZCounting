@@ -5,7 +5,6 @@ import pandas as pd
 import glob
 import os
 import pdb
-import uncertainties as unc
 import datetime
 import numpy as np
 
@@ -18,13 +17,13 @@ pd.options.mode.chained_assignment = None
 ROOT.gROOT.SetBatch(True)
 
 # -------------------------------------------------------------------------------------
-def extract_results(directory, m, cIO, cID, cHLT, cKinematicSelection):
+def extract_results(directory, m, cHLT):
     log.info("Extracting fit results in {0} for {1}".format(directory,m))  
 
     # --- For identification (ID) efficiency        
     NsigHLT2, chi2HLT2 = utils.open_workspace_yield(directory, "HLT_{0}_2".format(etaRegion), m)
     NsigHLT1, chi2HLT1 = utils.open_workspace_yield(directory, "HLT_{0}_1".format(etaRegion), m)
-    NsigIDFail, chi2ID = utils.open_workspace_yield(directory, "ID_{0}_0".format(etaRegion), m)
+    NsigIDFail, chi2ID = utils.open_workspace_yield(directory, "Sel_{0}_0".format(etaRegion), m)
 
     NsigHLT2 = utils.unorm(NsigHLT2)
     NsigHLT1 = utils.unorm(NsigHLT1)
@@ -33,51 +32,31 @@ def extract_results(directory, m, cIO, cID, cHLT, cKinematicSelection):
     effHLT = (2 * NsigHLT2) / (2 * NsigHLT2 + NsigHLT1)
     effID = (2 * NsigHLT2 + NsigHLT1) / (2 * NsigHLT2 + NsigHLT1 + NsigIDFail)
 
-    NsigGloPass, chi2GloPass = utils.open_workspace_yield(directory, "Glo_{0}_1".format(etaRegion), m)
     NsigGloFail, chi2GloFail = utils.open_workspace_yield(directory, "Glo_{0}_0".format(etaRegion), m)
 
-    NsigStaPass, chi2StaPass = utils.open_workspace_yield(directory, "Sta_{0}_1".format(etaRegion), m)
-    NsigStaFail, chi2StaFail = utils.open_workspace_yield(directory, "Sta_{0}_0".format(etaRegion), m)
-
-    NsigGloPass = utils.unorm(NsigGloPass)
     NsigGloFail = utils.unorm(NsigGloFail)
 
-    NsigStaPass = utils.unorm(NsigStaPass)
-    NsigStaFail = utils.unorm(NsigStaFail)
+    effGlo = (2 * NsigHLT2 + NsigHLT1 + NsigIDFail) / (2 * NsigHLT2 + NsigHLT1 + NsigIDFail + NsigGloFail)
 
-    effGlo = NsigGloPass / (NsigGloPass + NsigGloFail)
-    effSta = NsigStaPass / (NsigStaPass + NsigStaFail)
-
-    effMu = effID*effGlo*effSta
+    effMu = effID*effGlo
 
     res = {
         "NsigHLT2": NsigHLT2,
         "NsigHLT1": NsigHLT1,
         "NsigIDFail": NsigIDFail,
-        "NsigGloPass": NsigGloPass,
         "NsigGloFail": NsigGloFail,
-        "NsigStaPass": NsigStaPass,
-        "NsigStaFail": NsigStaFail,
         "chi2HLT2": chi2HLT2,
         "chi2HLT1": chi2HLT1,
-        "chi2GloPass": chi2GloPass,
         "chi2GloFail": chi2GloFail,
-        "chi2StaPass": chi2StaPass,
-        "chi2StaFail": chi2StaFail,
         "effHLT": effHLT,
         "effID": effID,
         "effGlo": effGlo,
-        "effSta": effSta,
         "effMu": effMu,
         "cHLT": cHLT,
-        "cIO": cIO,
-        "cID": cID,
-        "cKinematicSelection": cKinematicSelection,
-        "recZCount": (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 / effMu**2 * cHLT * cID * cIO**2 * cKinematicSelection
+        "recZCount": (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 / effMu**2 * cHLT
     }
 
     return res
-
 
 ################################################################################
 if __name__ == '__main__':
@@ -87,6 +66,10 @@ if __name__ == '__main__':
 
     parser.add_argument("-m", "--measurement", type=int, default=None, 
         help="Only fit a specific measurement of the run")
+
+    common.set_parser_default(parser, "mass", [66,116,50])
+    common.set_parser_default(parser, "ptCut", 27)     
+
     args = parser.parse_args()
 
     log = logging.setup_logger(__file__, args.verbose)
@@ -190,8 +173,8 @@ if __name__ == '__main__':
     MassMaxSta_ = int(130)
     MassBinSta_ = int((MassMaxSta_ - MassMinSta_)/MassBinWidth)
 
-    npvMin_ = -0.5
-    npvMax_ = 74.5
+    npvMin_ = 0.5     
+    npvMax_ = 100.5   
 
     npvBin_ = int(npvMax_ - npvMin_)
 
@@ -223,34 +206,12 @@ if __name__ == '__main__':
     
     byLS_data = utils.load_input_csv(byLS_filename)
     byLS_data = byLS_data.loc[(byLS_data['run'] >= int(args.beginRun)) & (byLS_data['run'] < int(args.endRun))]
-
-    # Define histograms for fitting
-    hPV = ROOT.TH1D("h_PV","", npvBin_, npvMin_, npvMax_)
-
-    h2HLT = ROOT.TH1D("h_mass_2HLT_Z","",MassBin_, MassMin_, MassMax_)
-    h1HLT = ROOT.TH1D("h_mass_1HLT_Z","",MassBin_, MassMin_, MassMax_)
-    hIDfail = ROOT.TH1D("h_mass_ID_fail","",MassBin_, MassMin_, MassMax_)
-
-    hGlopass = ROOT.TH1D("h_mass_Glo_pass","",MassBinSta_, MassMinSta_, MassMaxSta_)
-    hGlofail = ROOT.TH1D("h_mass_Glo_fail","",MassBinSta_, MassMinSta_, MassMaxSta_)
-
-    hStapass = ROOT.TH1D("h_mass_Sta_pass","",MassBin_, MassMin_, MassMax_)
-    hStafail = ROOT.TH1D("h_mass_Sta_fail","",MassBin_, MassMin_, MassMax_)
     
     #####################################   
     recLumi = 0
-    firstRun = 0
-    lastRun = 0
-    df=None
     results = []
-    mergeNextRun=False
     log.info(f"Looping over runs... {args.beginRun} to {args.endRun}")
     for run, byLS_run in byLS_data.groupby('run', sort=True):
-        
-        # first and last run of the measurement
-        if firstRun == 0:
-            firstRun = run
-        lastRun = run
 
         fill = byLS_run.drop_duplicates('fill')['fill'].values[0]
         LSlist = byLS_run['ls'].values.tolist()
@@ -258,35 +219,12 @@ if __name__ == '__main__':
 
         log.info(f"Running Fill {fill}")
         log.info(f"Running Run {run}")
-        
-        eosFile = f"{eosDir}/{prefix_dqm}*Muon_{run}*.root"
-        eosFiles = glob.glob(eosFile)
-        if len(eosFiles) == 1:
-            eosFile = eosFiles[0]
-        else:
-            log.warning("No file or more than one was found! - continue")
-            log.warning(f"Was looking for: {eosFile}")            
+
+        log.info(f"Now at run {run}")
+        fileName = utils.getFileName(eosDir,run)
+        if fileName is None:
             continue
-        file_ = ROOT.TFile(eosFile,"READ")
-
-        # histograms need to be in same directory so that they can get filled
-        hPV.SetDirectory(file_)
-        h2HLT.SetDirectory(file_)
-        h1HLT.SetDirectory(file_)
-        hIDfail.SetDirectory(file_)
-        hGlopass.SetDirectory(file_)
-        hGlofail.SetDirectory(file_)
-        hStapass.SetDirectory(file_)
-        hStafail.SetDirectory(file_)
-
-        # trees with muon pairs
-        tHLT = file_.Get("HLT")
-        tID  = file_.Get("ID")
-        tGlo = file_.Get("Glo")
-        tSta = file_.Get("Sta")
-
-        # ZCountlist = [tHLT.GetEntries("lumiBlock=={0}".format(l)) for l in LSlist]
-
+        log.info(f"Found file `{fileName}`")
 
         log.debug("Have lumi secion list {0}".format(LSlist))        
         log.info("Looping over measurements...")
@@ -299,81 +237,63 @@ if __name__ == '__main__':
                     
             # create datafram byLS for measurement
             byLS_m = byLS_run.loc[byLS_run['ls'].isin(goodLSlist)]
+
+            # get histograms from good lumisections
+            log.info("Load histograms ...")
+            prefix=f"DQMData/Run {run}/ZCounting/Run summary/Histograms/"
             
-            ### fill histograms
-            file_.cd() # switch to directory where ttrees and histograms are placed
+            # get histogram with primary vertex distribution
+            hPV = utils.load_histogram("h_npv", fileName, goodLSlist, run=run, prefix=prefix, suffix="new", pileup=True)
 
-            # define acceptance cuts
-            acceptance = " && mass>={0} && mass<{1} && ptTag > {2} && ptProbe > {2} && abs(etaTag) < {3} && abs(etaProbe) < {3}".format(MassMin_, MassMax_, args.ptCut, args.etaCut)
-            acceptanceSta = " && mass>={0} && mass<{1} && ptTag > {2} && ptProbe > {2} && abs(etaTag) < {3} && abs(etaProbe) < {3}".format(MassMinSta_, MassMaxSta_, args.ptCut, args.etaCut)
-
-            log.info("Fill histograms for measurement {0} ...".format(m))                        
-            for iLS in goodLSlist:
-                    
-                tHLT.Draw("nPV>>+h_PV","lumiBlock=={0}".format(iLS))
-                
-                n2Before = h2HLT.Integral()
-                n1Before = h1HLT.Integral()
-
-                tHLT.Draw("mass>>+h_mass_2HLT_Z", "pass==2 && lumiBlock=={0} {1}".format(iLS, acceptance))
-                tHLT.Draw("mass>>+h_mass_1HLT_Z", "pass==1 && lumiBlock=={0} {1}".format(iLS, acceptance))
-                tID.Draw("mass>>+h_mass_ID_fail", "pass==0 && lumiBlock=={0} {1}".format(iLS, acceptance))
-                
-                tGlo.Draw("mass>>+h_mass_Glo_pass","pass==1 && lumiBlock=={0} {1}".format(iLS, acceptanceSta))                
-                tGlo.Draw("mass>>+h_mass_Glo_fail","pass==0 && lumiBlock=={0} {1}".format(iLS, acceptanceSta))                
-
-                tSta.Draw("mass>>+h_mass_Sta_pass","pass==1 && lumiBlock=={0} {1}".format(iLS, acceptance))   
-                tSta.Draw("mass>>+h_mass_Sta_fail","pass==0 && lumiBlock=={0} {1}".format(iLS, acceptance))  
-
-                n2After = h2HLT.Integral()
-                n1After = h1HLT.Integral()
-                
-                # store the number of 1hlt and 2hlt events in each lumisection
-                n2 = n2After - n2Before
-                n1 = n1After - n1Before
-
-                byLS_m.loc[byLS_m['ls'] == iLS, 'N2HLT'] = n2
-                byLS_m.loc[byLS_m['ls'] == iLS, 'N1HLT'] = n1                    
-
-
-            if df is None:
-                df = byLS_m
-            else:
-                df = df.append(byLS_m, sort=False)
+            # get histograms binned in mass
+            def load(name_):
+                return utils.load_histogram(name_, fileName, goodLSlist, run=run, 
+                    MassBin=MassBin_, MassMin=MassMin_, MassMax=MassMax_, 
+                    prefix=prefix, 
+                    suffix="new")
             
-            recLumi = df['recorded(/pb)'].sum()
+            # load histograms for hlt efficiency and Z yield
+            h2HLT = load(f"h_mass_2HLT_BB")
+            h1HLT = load(f"h_mass_1HLT_BB")
+
+            # load histograms with probes that fail selection, for selection efficiency
+            hIDfail = load(f"h_mass_SIT_fail_BB")
+
+            # load histograms for global muon efficiency
+            # hGlopass = load(f"h_mass_Glo_pass_BB")
+            hGlofail = load(f"h_mass_Glo_fail_BB")
+
+            # load histograms for standalone muon efficiency
+            # hStapass = load(f"h_mass_Sta_pass_BB")
+            # hStafail = load(f"h_mass_Sta_fail_BB")
+
+            if etaRegion == "I":
+                h2HLT += load(f"h_mass_2HLT_BE")
+                h2HLT += load(f"h_mass_2HLT_EE")
+
+                h1HLT += load(f"h_mass_1HLT_BE")
+                h1HLT += load(f"h_mass_1HLT_EE")
+
+                hIDfail += load(f"h_mass_SIT_fail_BE")
+                hIDfail += load(f"h_mass_SIT_fail_EE")
+
+                # hGlopass += load(f"h_mass_Glo_pass_BE")
+                # hGlopass += load(f"h_mass_Glo_pass_EE")
+                hGlofail += load(f"h_mass_Glo_fail_BE")
+                hGlofail += load(f"h_mass_Glo_fail_EE")
+                
+                # hStapass += load(f"h_mass_Sta_pass_BE")
+                # hStapass += load(f"h_mass_Sta_pass_EE")
+                # hStafail += load(f"h_mass_Sta_fail_BE")
+                # hStafail += load(f"h_mass_Sta_fail_EE")
+
+            recLumi = byLS_m['recorded(/pb)'].sum()
 
             log.info("Have now recorded lumi = {0}".format(recLumi))            
-            # log.info("Have now {0} | {1} events".format(df['N2HLT'].sum(), h2HLT.Integral()))
-            
-            # check if upcoming runs make enough data for a measurement
-            lumi=0
-            mergeNextRun=True
-            nextRun = run+1
-            for r, dr in byLS_data.groupby('run'):
-                if r <= run or r >= int(args.endRun):
-                    continue
-                # if utils.getFileName(eosDir, r) is None: # check if file of next run exists
-                #     continue
-                nextRun = r
-                LS = dr['ls'].values.tolist()
-                lumi += sum(dr.loc[dr['ls'].isin(LS)]['recorded(/pb)'].values)
-                if lumi > 0.5 * LumiPerMeasurement:
-                    mergeNextRun = False
-                    break
-            
-            mergeNextRun = nextRun < int(args.endRun) and (mergeNextRun or recLumi < 0.5 * LumiPerMeasurement)            
-
-            if mergeNextRun:
-                log.info("Merge with next run ... ")
-                continue
 
             log.info("Histograms filled ...")  
 
-            if firstRun != lastRun:
-                outSubDir = outDir + "Run{0}to{1}".format(firstRun,lastRun)
-            else:
-                outSubDir = outDir + "Run{0}/".format(run)
+            outSubDir = outDir + "Run{0}/".format(run)
 
             log.debug("Running measurement {0}".format(m))
 
@@ -388,36 +308,49 @@ if __name__ == '__main__':
                     ROOT.set_output(outSubDir)
                     ROOT.set_luminosity(recLumi)
 
+                    hPV = utils.np_to_hist(hPV, npvBin_, npvMin_, npvMax_, "TH1", "hPV")
+
+                    def to_hist(h_, name):
+                        return utils.np_to_hist(h_, MassBin_, MassMin_, MassMax_, "TH1", name)
+                    
+                    h2HLT = to_hist(h2HLT, "HLT2")
+                    h1HLT = to_hist(h1HLT, "HLT1")
+                    hIDfail = to_hist(hIDfail, "IDfail")
+                    # hGlopass = to_hist(hGlopass, "Glopass")
+                    hGlofail = to_hist(hGlofail, "Glofail")
+                    # hStapass = to_hist(hStapass, "Stapass")
+                    # hStafail = to_hist(hStafail, "Stafail")
+
                     ROOT.getZyield(h2HLT, m, "HLT", etaRegion, sigModel, bkgModelPass, 2, sigTemplates, 0)
                     ROOT.getZyield(h1HLT, m, "HLT", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
-                    ROOT.getZyield(hIDfail, m, "ID", etaRegion, sigModel, bkgModelPass, 0, sigTemplates, 0)
+                    ROOT.getZyield(hIDfail, m, "Sel", etaRegion, sigModel, bkgModelPass, 0, sigTemplates, 0)
 
                     ROOT.set_massRange(MassMinSta_, MassMaxSta_, MassBinSta_)
-                    ROOT.getZyield(hGlopass, m, "Glo", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
+                    # ROOT.getZyield(hGlopass, m, "Glo", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
                     ROOT.getZyield(hGlofail, m, "Glo", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, 0)
                     ROOT.set_massRange(MassMin_, MassMax_, MassBin_)
 
-                    ROOT.getZyield(hStapass, m, "Sta", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
-                    ROOT.getZyield(hStafail, m, "Sta", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, 0)                        
+                    # ROOT.getZyield(hStapass, m, "Sta", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
+                    # ROOT.getZyield(hStafail, m, "Sta", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, 0)
 
+                    # remove the histogram templates, not needed anymore
+                    os.system("rm {0}/histTemplates_*".format(outSubDir))
 
             cHLT = ROOT.extractCorrelation_HLT(sigTemplates, hPV, etaRegionZ)
-            cID = utils.getCorrelation(hPV, mcCorrelations, which="ID")
-            cIO = utils.getCorrelation(hPV, mcCorrelations, which="IO")
-            cKinematicSelection = utils.getCorrelation(hPV, mcCorrelations, which="KinematicSelection")
-            result = extract_results(outSubDir, m, cIO, cID, cHLT, cKinematicSelection)
 
+            result = extract_results(outSubDir, m, cHLT)
 
-            if result:              
-                delLumi = df['delivered(/pb)'].sum()
-                recLumi = df['recorded(/pb)'].sum()
+            if result:
+                delLumi = byLS_m['delivered(/pb)'].sum()
+                recLumi = byLS_m['recorded(/pb)'].sum()
+
                 # deadtime - fraction during the good lumisections
                 deadtime = recLumi / delLumi
-                timewindow = len(df) * secPerLS
+                timewindow = len(byLS_m) * secPerLS
 
                 # convert time string to datetime format
-                beginTime = utils.to_DateTime(df['time'][0], string_format = "mm/dd/yy")
-                endTime = utils.to_DateTime(df['time'][-1], string_format = "mm/dd/yy") + datetime.timedelta(seconds=secPerLS)
+                beginTime = utils.to_DateTime(byLS_m['time'][0], string_format = "mm/dd/yy")
+                endTime = utils.to_DateTime(byLS_m['time'][-1], string_format = "mm/dd/yy") + datetime.timedelta(seconds=secPerLS)
                 
                 # total time window from the beginning of the first to the end of the last lumisection
                 totaltimewindow = (endTime - beginTime).total_seconds()
@@ -434,53 +367,20 @@ if __name__ == '__main__':
                     "delLumi": delLumi,
                     "recLumi": recLumi,
                     "timewindow": timewindow,
-                    "pileUp": df['avgpu'].mean(),
+                    "pileUp": byLS_m['avgpu'].mean(),
                     "delZCount": delZCount,
                 })
             
                 results.append(result)
             else:
                 log.info("No result - continue")
-            
-            # prepare for next measurement
-            df=None
-
-            # clean the histograms for the next measurement
-            hPV.Reset() 
-            h2HLT.Reset()
-            h1HLT.Reset()
-            hIDfail.Reset()
-
-            hGlopass.Reset()
-            hGlofail.Reset()
-            hStapass.Reset()
-            hStafail.Reset()
-
-
-        ### prepare for next run
-        # keep histograms
-        hPV.SetDirectory(0)
-        h2HLT.SetDirectory(0)
-        h1HLT.SetDirectory(0)
-        hIDfail.SetDirectory(0)
-
-        hGlopass.SetDirectory(0)
-        hGlofail.SetDirectory(0)
-        hStapass.SetDirectory(0)
-        hStafail.SetDirectory(0)
-
-        file_.Close()
-
-        if mergeNextRun:
-            continue
         
         if measurement is None or measurement == m:
             utils.writePerRunCSV(results, outCSVDir, run)
 
-        firstRun = 0
         results = []
 
     if args.writeSummaryCSV:
-        utils.writeSummaryCSV(outCSVDir, writeByLS=False)
+        utils.writeSummaryCSV(outCSVDir)
 
     log.info("Done")
