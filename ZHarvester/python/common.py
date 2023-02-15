@@ -1,4 +1,6 @@
 import argparse
+from python.logging import child_logger
+log = child_logger(__name__)
 
 # basic signal models (index for root)
 sigModels = {
@@ -72,9 +74,17 @@ def parser_zharvest(parser):
                         help='specify amount of luminosity per measurement in pb-1')
     parser.add_argument('--collect', default=False, action="store_true",
                         help='specify whether or not to run the fits or just collect the results')
-    parser.add_argument('--mode', default="DQM", type=str, choices=["DQM", "TTrees"],
-                        help='specify the type of input files')
     parser.add_argument("-o", "--output", default="./", 
                         help="where to store the output files")
 
     return parser
+
+def set_parser_default(parser, argument, newDefault):
+    # change the default argument of the parser, must be called before parse_arguments
+    f = next((x for x in parser._actions if x.dest ==argument), None)
+    if f:
+        log.info(f" Modifying default of {f.dest} from {f.default} to {newDefault}")
+        f.default = newDefault
+    else:
+        log.warning(f" Parser argument {argument} not found!")
+

@@ -1,0 +1,48 @@
+{
+    "Muon_Run2022E": {
+      "OutputSplitFiles": 1,
+      "crab3": {
+        "Data.inputDataset": "/Muon/Run2022E-PromptReco-v1/AOD",
+        "Data.lumiMask": "/eos/user/c/cmsdqm/www/CAF/certification/Collisions22/Cert_Collisions2022_eraE_359022_360331_Golden.json",
+        "Data.splitting": "LumiBased",
+        "Data.unitsPerJob": 100,
+        "JobType.maxMemoryMB": 2500,
+        "JobType.pyCfgParams": [
+          "year=2022",
+          "samplename=smu",
+          "outputFile=Muon_Run2022E"
+        ]
+      }
+    },
+    "Muon_Run2022F": {
+      "OutputSplitFiles": 1,
+      "crab3": {
+        "Data.inputDataset": "/Muon/Run2022F-PromptReco-v1/AOD",
+        "Data.lumiMask": "/eos/user/c/cmsdqm/www/CAF/certification/Collisions22/Cert_Collisions2022_eraF_360390_362167_Golden.json",
+        "Data.splitting": "LumiBased",
+        "Data.unitsPerJob": 100,
+        "JobType.maxMemoryMB": 2500,
+        "JobType.pyCfgParams": [
+          "year=2022",
+          "samplename=smu",
+          "outputFile=Muon_Run2022F"
+        ]
+      }
+    },
+    "Muon_Run2022G": {
+      "OutputSplitFiles": 1,
+      "crab3": {
+        "Data.inputDataset": "/Muon/Run2022G-PromptReco-v1/AOD",
+        "Data.lumiMask": "/eos/user/c/cmsdqm/www/CAF/certification/Collisions22/Cert_Collisions2022_eraG_362433_362760_Golden.json",
+        "Data.splitting": "LumiBased",
+        "Data.unitsPerJob": 100,
+        "JobType.maxMemoryMB": 2500,
+        "JobType.pyCfgParams": [
+          "year=2022",
+          "samplename=smu",
+          "outputFile=Muon_Run2022G"
+        ]
+      }
+    }
+  }
+    
