@@ -113,7 +113,7 @@ if __name__ == '__main__':
 
                cfgf.write("\n")
                cfgf.write("config.section_('Site')\n")
-               cfgf.write(f"config.Site.storageSite = \'{opts.storageSite}\'\n")
+               cfgf.write(f"config.Site.storageSite = \'{opts.storage_site}\'\n")
 #               cfgf.write("config.Site.blacklist   = []\n")
 
                for i_key, i_val in crab3_conf.items():
