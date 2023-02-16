@@ -17,12 +17,13 @@ pd.options.mode.chained_assignment = None
 ROOT.gROOT.SetBatch(True)
 
 # -------------------------------------------------------------------------------------
-def extract_results(directory, m, cHLT):
+# -------------------------------------------------------------------------------------
+def extract_results(directory, m, cIO, cID, cHLT, cKinematicSelection):
     log.info("Extracting fit results in {0} for {1}".format(directory,m))  
 
     # --- For identification (ID) efficiency        
-    NsigHLT2, chi2HLT2 = utils.open_workspace_yield(directory, "HLT_{0}_2".format(etaRegion), m)
-    NsigHLT1, chi2HLT1 = utils.open_workspace_yield(directory, "HLT_{0}_1".format(etaRegion), m)
+    NsigHLT2, chi2HLT2 = utils.open_workspace_yield(directory, "HLT_{0}_2".format(etaRegionZ), m)
+    NsigHLT1, chi2HLT1 = utils.open_workspace_yield(directory, "HLT_{0}_1".format(etaRegionZ), m)
     NsigIDFail, chi2ID = utils.open_workspace_yield(directory, "Sel_{0}_0".format(etaRegion), m)
 
     NsigHLT2 = utils.unorm(NsigHLT2)
@@ -32,28 +33,47 @@ def extract_results(directory, m, cHLT):
     effHLT = (2 * NsigHLT2) / (2 * NsigHLT2 + NsigHLT1)
     effID = (2 * NsigHLT2 + NsigHLT1) / (2 * NsigHLT2 + NsigHLT1 + NsigIDFail)
 
+    NsigGloPass, chi2GloPass = utils.open_workspace_yield(directory, "Glo_{0}_1".format(etaRegion), m)
     NsigGloFail, chi2GloFail = utils.open_workspace_yield(directory, "Glo_{0}_0".format(etaRegion), m)
 
+    NsigStaPass, chi2StaPass = utils.open_workspace_yield(directory, "Sta_{0}_1".format(etaRegion), m)
+    NsigStaFail, chi2StaFail = utils.open_workspace_yield(directory, "Sta_{0}_0".format(etaRegion), m)
+
+    NsigGloPass = utils.unorm(NsigGloPass)
     NsigGloFail = utils.unorm(NsigGloFail)
 
-    effGlo = (2 * NsigHLT2 + NsigHLT1 + NsigIDFail) / (2 * NsigHLT2 + NsigHLT1 + NsigIDFail + NsigGloFail)
+    NsigStaPass = utils.unorm(NsigStaPass)
+    NsigStaFail = utils.unorm(NsigStaFail)
 
-    effMu = effID*effGlo
+    effGlo = NsigGloPass / (NsigGloPass + NsigGloFail)
+    effSta = NsigStaPass / (NsigStaPass + NsigStaFail)
+
+    effMu = effID*effGlo*effSta
 
     res = {
         "NsigHLT2": NsigHLT2,
         "NsigHLT1": NsigHLT1,
         "NsigIDFail": NsigIDFail,
+        "NsigGloPass": NsigGloPass,
         "NsigGloFail": NsigGloFail,
+        "NsigStaPass": NsigStaPass,
+        "NsigStaFail": NsigStaFail,
         "chi2HLT2": chi2HLT2,
         "chi2HLT1": chi2HLT1,
+        "chi2GloPass": chi2GloPass,
         "chi2GloFail": chi2GloFail,
+        "chi2StaPass": chi2StaPass,
+        "chi2StaFail": chi2StaFail,
         "effHLT": effHLT,
         "effID": effID,
         "effGlo": effGlo,
+        "effSta": effSta,
         "effMu": effMu,
         "cHLT": cHLT,
-        "recZCount": (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 / effMu**2 * cHLT
+        "cIO": cIO,
+        "cID": cID,
+        "cKinematicSelection": cKinematicSelection,
+        "recZCount": (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 / effMu**2 * cHLT * cID * cIO**2 * cKinematicSelection
     }
 
     return res
@@ -183,9 +203,13 @@ if __name__ == '__main__':
     if args.etaCut == 0.9:
         etaRegion = "B"
         etaRegionZ = "BB"
-    else:
+    elif args.etaCut == 2.4:
         etaRegion = "I"
         etaRegionZ = "I"
+    else:
+        log.error(f"Eta cut {args.etaCut} not supported for DQM histograms!")
+
+    etaRegions = ["BB","BE","EE"] if etaRegion == "I" else ["BB"]
 
     if not args.collect:
         log.info("Loading C marcos...")
@@ -227,9 +251,20 @@ if __name__ == '__main__':
         log.info(f"Found file `{fileName}`")
 
         log.debug("Have lumi secion list {0}".format(LSlist))        
-        log.info("Looping over measurements...")
+
+        # path in root file where the histograms are stored
+        dqmPrefix=f"DQMData/Run {run}/ZCounting/Run summary/Histograms/"
+
+        # get list of Z boson candidates per lumisection
+        ZCountlist = utils.load_histogram(
+            [f"h_mass_2HLT_{r}" for r in etaRegions]+[f"h_mass_1HLT_{r}" for r in etaRegions], 
+            fileName, LSlist, run=run, 
+            prefix=dqmPrefix, 
+            entries=True)
+
+        log.info(f"Looping over measurements in intervals of {LumiPerMeasurement}/pb")
         for m, goodLSlist in enumerate(
-            utils.get_ls_for_next_measurement(lumisections=LSlist, luminosities=Lumilist, #zcounts=ZCountlist, 
+            utils.get_ls_for_next_measurement(lumisections=LSlist, luminosities=Lumilist, zcounts=ZCountlist, 
                 lumiPerMeasurement=LumiPerMeasurement)
         ):
             if measurement is not None and measurement < m:
@@ -240,56 +275,35 @@ if __name__ == '__main__':
 
             # get histograms from good lumisections
             log.info("Load histograms ...")
-            prefix=f"DQMData/Run {run}/ZCounting/Run summary/Histograms/"
             
             # get histogram with primary vertex distribution
-            hPV = utils.load_histogram("h_npv", fileName, goodLSlist, run=run, prefix=prefix, suffix="new", pileup=True)
+            hPV = utils.load_histogram("h_npv", fileName, goodLSlist, run=run, prefix=dqmPrefix, pileup=True)
 
             # get histograms binned in mass
             def load(name_):
-                return utils.load_histogram(name_, fileName, goodLSlist, run=run, 
+                return utils.load_histogram([f"h_mass_{name_}_{r}" for r in etaRegions], fileName, goodLSlist, run=run, 
                     MassBin=MassBin_, MassMin=MassMin_, MassMax=MassMax_, 
-                    prefix=prefix, 
-                    suffix="new")
-            
+                    prefix=dqmPrefix)
+
             # load histograms for hlt efficiency and Z yield
-            h2HLT = load(f"h_mass_2HLT_BB")
-            h1HLT = load(f"h_mass_1HLT_BB")
+            h2HLT = load("2HLT")
+            h1HLT = load("1HLT")
 
             # load histograms with probes that fail selection, for selection efficiency
-            hIDfail = load(f"h_mass_SIT_fail_BB")
+            hIDfail = load("ID_fail")
 
             # load histograms for global muon efficiency
-            # hGlopass = load(f"h_mass_Glo_pass_BB")
-            hGlofail = load(f"h_mass_Glo_fail_BB")
+            hGlopass = load("Glo_pass")
+            hGlofail = load("Glo_fail")
 
             # load histograms for standalone muon efficiency
-            # hStapass = load(f"h_mass_Sta_pass_BB")
-            # hStafail = load(f"h_mass_Sta_fail_BB")
-
-            if etaRegion == "I":
-                h2HLT += load(f"h_mass_2HLT_BE")
-                h2HLT += load(f"h_mass_2HLT_EE")
-
-                h1HLT += load(f"h_mass_1HLT_BE")
-                h1HLT += load(f"h_mass_1HLT_EE")
-
-                hIDfail += load(f"h_mass_SIT_fail_BE")
-                hIDfail += load(f"h_mass_SIT_fail_EE")
-
-                # hGlopass += load(f"h_mass_Glo_pass_BE")
-                # hGlopass += load(f"h_mass_Glo_pass_EE")
-                hGlofail += load(f"h_mass_Glo_fail_BE")
-                hGlofail += load(f"h_mass_Glo_fail_EE")
-                
-                # hStapass += load(f"h_mass_Sta_pass_BE")
-                # hStapass += load(f"h_mass_Sta_pass_EE")
-                # hStafail += load(f"h_mass_Sta_fail_BE")
-                # hStafail += load(f"h_mass_Sta_fail_EE")
+            hStapass = load("Sta_pass")
+            hStafail = load("Sta_fail")
 
             recLumi = byLS_m['recorded(/pb)'].sum()
 
             log.info("Have now recorded lumi = {0}".format(recLumi))            
+            log.info("Have now {0} ({1}) HLT 2 (1) events".format(sum(h2HLT), sum(h1HLT)))
 
             log.info("Histograms filled ...")  
 
@@ -316,29 +330,29 @@ if __name__ == '__main__':
                     h2HLT = to_hist(h2HLT, "HLT2")
                     h1HLT = to_hist(h1HLT, "HLT1")
                     hIDfail = to_hist(hIDfail, "IDfail")
-                    # hGlopass = to_hist(hGlopass, "Glopass")
+                    hGlopass = to_hist(hGlopass, "Glopass")
                     hGlofail = to_hist(hGlofail, "Glofail")
-                    # hStapass = to_hist(hStapass, "Stapass")
-                    # hStafail = to_hist(hStafail, "Stafail")
+                    hStapass = to_hist(hStapass, "Stapass")
+                    hStafail = to_hist(hStafail, "Stafail")
 
-                    ROOT.getZyield(h2HLT, m, "HLT", etaRegion, sigModel, bkgModelPass, 2, sigTemplates, 0)
-                    ROOT.getZyield(h1HLT, m, "HLT", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
+                    ROOT.getZyield(h2HLT, m, "HLT", etaRegionZ, sigModel, bkgModelPass, 2, sigTemplates, 0)
+                    ROOT.getZyield(h1HLT, m, "HLT", etaRegionZ, sigModel, bkgModelPass, 1, sigTemplates, 0)
                     ROOT.getZyield(hIDfail, m, "Sel", etaRegion, sigModel, bkgModelPass, 0, sigTemplates, 0)
 
                     ROOT.set_massRange(MassMinSta_, MassMaxSta_, MassBinSta_)
-                    # ROOT.getZyield(hGlopass, m, "Glo", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
+                    ROOT.getZyield(hGlopass, m, "Glo", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
                     ROOT.getZyield(hGlofail, m, "Glo", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, 0)
                     ROOT.set_massRange(MassMin_, MassMax_, MassBin_)
 
-                    # ROOT.getZyield(hStapass, m, "Sta", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
-                    # ROOT.getZyield(hStafail, m, "Sta", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, 0)
+                    ROOT.getZyield(hStapass, m, "Sta", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
+                    ROOT.getZyield(hStafail, m, "Sta", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, 0)
 
                     # remove the histogram templates, not needed anymore
                     os.system("rm {0}/histTemplates_*".format(outSubDir))
 
             cHLT = ROOT.extractCorrelation_HLT(sigTemplates, hPV, etaRegionZ)
 
-            result = extract_results(outSubDir, m, cHLT)
+            result = extract_results(outSubDir, m, 1., 1., cHLT, 1.)
 
             if result:
                 delLumi = byLS_m['delivered(/pb)'].sum()

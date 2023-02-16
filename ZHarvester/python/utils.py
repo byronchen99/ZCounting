@@ -110,9 +110,10 @@ def load_histogram(
     fileName,
     lumisections=[0,],
     run=0, 
-    prefix="", suffix="", 
+    prefix="",
     MassBin=50, MassMin=66, MassMax=116, 
-    pileup=False
+    pileup=False,
+    entries=False,
 ):
     """
     load 2D histograms, project the specified lumisections to the mass axis: 
@@ -121,28 +122,45 @@ def load_histogram(
     
     Parameters
     ----------
-    name : str
+    name : str or list
         name of the histogram to load
     fileName : str
         file where the histogram is stored
     lumisections : list
         list of lumisections that are taken from the histogram
     run : integer
-        run number 
-    prefix/suffix : str
-        prefix for naming         
+        run number        
     MassBin/MassMin/MassMax : int
         For rebinning, Number of bins / Lower bound / Upper bound 
     pileup : Boolean
         If the pileup histogram is to be returned
+    entries : Boolean
+        Return the number of entries per lumisection
     """
 
+    # in case multiple names are specified, the hists with the corresponding names are summed together
+    if isinstance(name,list):
+        hist_summed = None
+        for n in name:
+            hist = load_histogram(n, fileName, lumisections, run, prefix, MassBin, MassMin, MassMax, pileup, entries)
+            if hist is None:
+                log.error(f"Not able to get histogram for {n}")
+                return None
+            elif hist_summed is None:
+                hist_summed = hist
+            else:
+                hist_summed += hist
+        return hist_summed
+        
     with uproot.open("{0}:{1}{2}".format(fileName, prefix, name)) as th_:
 
         h_ = th_.to_numpy()
         
         # x-axis is mass or primary vertices
         bins_x = h_[2]
+
+        if entries:
+            return np.sum(h_[0][lumisections], axis=1)
 
         # select lumisections
         h_ = np.sum(h_[0][lumisections], axis=0)
@@ -210,7 +228,8 @@ def np_to_hist(y, nBins=None, binLow=None, binHigh=None, histtype="TH1", name=""
     if histtype == "TH1":
         hist = ROOT.TH1D(name, name, nBins, binLow, binHigh)
         for i, v in enumerate(y):
-            hist.SetBinContent(i, v)
+            # Have to add +1 because first bin is bin 1; bin 0 is underflow bin
+            hist.SetBinContent(i+1, v)
         return hist
 
 
@@ -244,11 +263,18 @@ def get_ls_for_next_measurement(
         If the luminosity in one lumisection is above this value and the number z counts is zero, the ls is skipped 
     """
     
-    if luminosities:
+    if luminosities is not None:
         # make measurement based on number of lumisections
         if len(lumisections) != len(luminosities):
             log.error("Same length of lumisections and luminosities is required!")
-        
+        luminosities = list(luminosities)
+
+    if zcounts is not None:
+        # make measurement based on number of zcounts
+        if len(lumisections) != len(zcounts):
+            log.error("Same length of lumisections and zcounts is required!")
+        zcounts = list(zcounts)
+
     while len(lumisections) > 0:
         
         # merge data to one measuement if remaining luminosity is too less for two measuements
@@ -262,13 +288,13 @@ def get_ls_for_next_measurement(
         list_good_ls_ = []
         while len(lumisections) > 0:
             
-            if luminosities and zcounts:
+            if luminosities is not None and zcounts is not None:
                 # consider lumisections where we would expect to have at least any z count 
                 #   (for lumi > 0.01 /pb we expect 0.01*500 = 5 Z bosons, the probability to find 0 is < 1%)
                 #   (for lumi > 0.02 /pb we expect 0.02*500 = 10 Z bosons, the probability to find 0 is < 0.01%)
                 # sort out lumisections without any Z candidate (maybe trigger was off)
                 if luminosities[0] > threshold and zcounts[0] == 0:
-                    log.warning("Zero Z boson candidates found {0}/pb while we would expect {1} -> skip lumi section {2}".format(luminosities[0], luminosities[0]*500, lumisections[0]))
+                    log.warning("Zero Z boson candidates found in lumisection with {0}/pb. Would expect {1} -> skip lumi section {2}".format(luminosities[0], luminosities[0]*500, lumisections[0]))
                     del lumisections[0]
                     del luminosities[0]
                     del zcounts[0]
@@ -277,14 +303,13 @@ def get_ls_for_next_measurement(
             list_good_ls_.append(lumisections[0])
             del lumisections[0]
             
-            if zcounts:
+            if zcounts is not None:
                 del zcounts[0]
                 
-            if luminosities:
+            if luminosities is not None:
                 recLumi_ += luminosities[0]
                 del luminosities[0]
 
-                
                 # if we have collected enough luminosity
                 if not mergeMeasurements_ and recLumi_ >= lumiPerMeasurement:
                     break
