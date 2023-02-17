@@ -273,7 +273,11 @@ if __name__ == '__main__':
         tGlo = file_.Get("Glo")
         tSta = file_.Get("Sta")
 
-        ZCountlist = [tHLT.GetEntries("lumiBlock=={0}".format(l)) for l in LSlist]
+        # define acceptance cuts
+        acceptance = " && mass>={0} && mass<{1} && ptTag > {2} && ptProbe > {2} && abs(etaTag) < {3} && abs(etaProbe) < {3}".format(MassMin_, MassMax_, args.ptCut, args.etaCut)
+        acceptanceSta = " && mass>={0} && mass<{1} && ptTag > {2} && ptProbe > {2} && abs(etaTag) < {3} && abs(etaProbe) < {3}".format(MassMinSta_, MassMaxSta_, args.ptCut, args.etaCut)
+
+        ZCountlist = np.array([tHLT.GetEntries("lumiBlock=={0} && pass>=1".format(l)+acceptance) for l in LSlist])
 
         log.debug("Have lumi secion list {0}".format(LSlist))        
         log.info("Looping over measurements...")
@@ -289,10 +293,6 @@ if __name__ == '__main__':
             
             ### fill histograms
             file_.cd() # switch to directory where ttrees and histograms are placed
-
-            # define acceptance cuts
-            acceptance = " && mass>={0} && mass<{1} && ptTag > {2} && ptProbe > {2} && abs(etaTag) < {3} && abs(etaProbe) < {3}".format(MassMin_, MassMax_, args.ptCut, args.etaCut)
-            acceptanceSta = " && mass>={0} && mass<{1} && ptTag > {2} && ptProbe > {2} && abs(etaTag) < {3} && abs(etaProbe) < {3}".format(MassMinSta_, MassMaxSta_, args.ptCut, args.etaCut)
 
             log.info("Fill histograms for measurement {0} ...".format(m))                        
             for iLS in goodLSlist:

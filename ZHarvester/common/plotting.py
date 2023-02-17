@@ -5,6 +5,7 @@ def set_matplotlib_style():
 
     textsize = 16
     markersize = 4.0
+    labelsize =  12.5
 
     plt.rcParams.update({
         "text.usetex": True,

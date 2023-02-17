@@ -84,7 +84,7 @@ def getFileName(directory, run):
     """
 
     # check if run was processed already
-    eosFileList = glob.glob(directory + '/*' + str(run) + '*.root')
+    eosFileList = glob.glob(directory + '/DQM_V0000*' + str(run) + '*.root')
 
     # look one level deeper
     if len(eosFileList) == 0:
@@ -159,11 +159,13 @@ def load_histogram(
         # x-axis is mass or primary vertices
         bins_x = h_[2]
 
+        # lumisections need to subtract -1 because lumisection 1 is at index 0 etc.
+
         if entries:
-            return np.sum(h_[0][lumisections], axis=1)
+            return np.sum(h_[0][np.array(lumisections)-1], axis=1).astype(int)
 
         # select lumisections
-        h_ = np.sum(h_[0][lumisections], axis=0)
+        h_ = np.sum(h_[0][np.array(lumisections)-1], axis=0).astype(int)
 
         if sum(h_) <= 0:
             log.warning(f"No entries found in histogram {name}")
@@ -174,7 +176,7 @@ def load_histogram(
         bins_new = np.linspace(MassMin, MassMax, MassBin+1)
 
         # no rebinning if bins are already the same
-        if bins_new == bins_x or (len(bins_new)==len(bins_x) and (bins_new == bins_x).all()):
+        if len(bins_new)==len(bins_x) and (bins_new == bins_x).all():
             return h_
         
         binWidth = bins_x[1:]-bins_x[:-1]
