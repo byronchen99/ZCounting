@@ -14,27 +14,30 @@ latex = ROOT.TLatex()
 latex.SetNDC()
 
 sys.path.append(os.getcwd())
-print(os.getcwd())
 
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
-from python.utils import to_DateTime
+from common.utils import to_DateTime
+from common import parsing, plotting
+from common.logging import child_logger
+log = child_logger(__name__)
 
 ROOT.gROOT.SetBatch(True)
 ROOT.gStyle.SetCanvasPreferGL(1)
 ROOT.gStyle.SetTitleX(.3)
 
-parser = argparse.ArgumentParser()
+parser = parsing.parser_plot()
 
 parser.add_argument("-r","--rates", required=True, type=str, help="csv file with z rates per measurement")
-parser.add_argument("-s","--saveDir",  default='./',  type=str, help="give output dir")
 parser.add_argument("-y","--year",  default="Run-II",  type=str, help="give data taking era for labeling")
 args = parser.parse_args()
 
 year = args.year
 
-outDir = args.saveDir
+outDir = args.output
 if not os.path.isdir(outDir):
     os.mkdir(outDir)
+
+colors, textsize, labelsize, markersize = plotting.set_matplotlib_style()
 
 
 ########## Data Acquisition ##########
@@ -59,19 +62,19 @@ data = data.replace([np.inf, -np.inf], np.nan).dropna().dropna()
 
 ### chi2 values of each category
 for category in filter(lambda x: "chi2" in x,data.keys()):
-    print("Now {0}".format(category))
+    log.info("Now {0}".format(category))
 
     # only consider fits != -1 as those are dummy values
     yy = data[data[category] != -1][category]
     xx = data[data[category] != -1]['time']
 
     # list of fits that might have failed, based on chi2_threshold
-    print("Runs that might have a failed fit:")
+    log.info("Runs that might have a failed fit:")
     failed_fits = []
     chi2_threshold = 5.0
     for x, r, m, l in data[data[category] != -1][[category,"run","measurement", "recLumi"]].values:
         if x > 5.0 or x < 0.:
-            print(int(r),int(m),x, l)
+            log.info(int(r),int(m),x, l)
 
     graph_chi2 = ROOT.TGraph(len(xx.values),xx.values,yy.values)
     graph_chi2.SetName("graph_chi2")

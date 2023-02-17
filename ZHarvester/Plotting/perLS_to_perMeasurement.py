@@ -10,13 +10,15 @@ ROOT.gROOT.SetBatch(True)
 ROOT.gStyle.SetCanvasPreferGL(1)
 ROOT.gStyle.SetTitleX(.3)
 
-parser = argparse.ArgumentParser()
+from common import parsing
+from common.logging import child_logger
+log = child_logger(__name__)
 
+parser = parsing.parser_plot()
 parser.add_argument("-i", "--input", required=True, type=str, help="Nominator csv file with z rates per lumisection")
-parser.add_argument("-s","--saveDir",  default='./',  type=str, help="give output dir")
 args = parser.parse_args()
 
-outDir = args.saveDir
+outDir = args.output
 if not os.path.isdir(outDir):
     os.mkdir(outDir)
 

@@ -9,7 +9,6 @@ import pdb
 from scipy.optimize import curve_fit
 import pandas as pd
 import os, sys
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 import argparse
 
@@ -18,36 +17,21 @@ os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
 
 from ZUtils.python.utils import linear
 
-parser = argparse.ArgumentParser()
+from common import parsing, plotting
+from common.logging import child_logger
+log = child_logger(__name__)
 
-parser.add_argument("-o","--outDir",  default='./',  type=str, help="give output dir")
+parser = parsing.parser_plot()
+
 args = parser.parse_args()
 
-outDir = args.outDir
-if not os.path.isdir(outDir):
-    os.mkdir(outDir)
+output = args.output
+if not os.path.isdir(output):
+    os.mkdir(output)
 
-textsize = 16
-markersize = 4
+colors, textsize, labelsize, markersize = plotting.set_matplotlib_style()
+
 ylabel = "Correlation factor"
-
-plt.rcParams.update({
-    "text.usetex": True,
-    "font.family": "serif",
-    "font.serif": ["Palatino",],
-    "font.size": textsize,
-    'text.latex.preamble': [r"""\usepackage{bm}"""]
-})
-
-mpl.rcParams.update({
-    "legend.fontsize" : "medium",
-    "axes.labelsize" : "medium",
-    "axes.titlesize" : "medium",
-    "xtick.labelsize" : "medium",
-    "ytick.labelsize" : "medium",
-})
-
-colors = ["#e74c3c","#2980b9","#27ae60","#f1c40f","#8e44ad"]
 
 xLabels = {
     "nPV": "Number of primary vertices",
@@ -158,9 +142,9 @@ def finalizePlot(ax, legend="best", prefix="", cmsTag="", year="", nameTag="", r
         ax.set_ylim(yRange)
 
     outputname = "MCClosure_{0}_{1}_{2}_{3}".format(prefix, year[1], nameTag, region)
-    print(outDir+"/"+outputname+".png")
-    plt.savefig(outDir+"/"+outputname+".png")
-    plt.savefig(outDir+"/"+outputname+".pdf")
+    print(output+"/"+outputname+".png")
+    plt.savefig(output+"/"+outputname+".png")
+    plt.savefig(output+"/"+outputname+".pdf")
     plt.close()
 
 for xVar in [
@@ -168,10 +152,10 @@ for xVar in [
     "nPV",
 ]:
     for year in [
-        ["2016preVFP","Summer16preVFP"],
-        ["2016postVFP","Summer16postVFP"],
+        # ["2016preVFP","Summer16preVFP"],
+        # ["2016postVFP","Summer16postVFP"],
         ["2017","Fall17"],
-        ["2018","Autumn18"]
+        # ["2018","Autumn18"]
     ]:
             
         if year[0] == "2016preVFP":
@@ -198,7 +182,7 @@ for xVar in [
         if useCorrIO:
             # tfileIO = ROOT.TFile("/nfs/dust/cms/user/dwalter/ZCounting/CMSSW_12_4_9/src/ZCounting/ZHarvester/res/mcCorrections/correlations_V17_38/c_{0}_{1}.root".format(xVar, year[0]),"READ")
 
-            tfileIO = ROOT.TFile("/nfs/dust/cms/user/dwalter/CMSSW_10_2_20_UL/src/potato-zcount/plots/MCClosureGen-V17_38-d20221212-t113835/c_{0}_{1}.root".format(xVar, year[0]),"READ")
+            tfileIO = ROOT.TFile("/eos/home-d/dwalter/Lumi/ZCounting_potato/CMSSW_10_2_20_UL/src/potato-zcount/plots/MCClosureGen-V17_38-d20221212-t113835/c_{0}_{1}.root".format(xVar, year[0]),"READ")
 
             def hist2array(name):
                 _h = tfileIO.Get(name)
@@ -210,8 +194,9 @@ for xVar in [
             arr_cIO = hist2array("cIO_I")
             arr_CID = hist2array("CID_I")
 
-        tfile = ROOT.TFile("/nfs/dust/cms/user/dwalter/CMSSW_10_2_20_UL/src/potato-zcount/zcount/output/ZCountingInOut-V17_38-DYFlat-d20221212-t110355/ZCountingInOut-V17_38-{0}-DYJetsToLL_M_50_LO.root".format(year[1]),"READ")
-        
+        # tfile = ROOT.TFile("/eos/home-d/dwalter/Lumi/ZCounting_potato/CMSSW_10_2_20_UL/src/potato-zcount/None/ZCountingInOut-V19_01-{0}-DYJetsToLL_M_50_LO-jobI-d20230214-t190442.root".format(year[1]),"READ")
+        # tfile = ROOT.TFile("/eos/home-d/dwalter/Lumi/ZCounting_potato/CMSSW_10_2_20_UL/src/potato-zcount/None/ZCountingInOut-V19_02-{0}-DYJetsToLL_M_50_LO-jobI-d20230214-t193941.root".format(year[1]),"READ")
+        tfile = ROOT.TFile("/eos/home-d/dwalter/Lumi/ZCounting_potato/CMSSW_10_2_20_UL/src/potato-zcount/None/ZCountingInOut-V19_06-{0}-DYJetsToLL_M_50_LO-jobI-d20230215-t172321.root".format(year[1]),"READ")
 
         print("load events in arrays")
     
@@ -584,7 +569,7 @@ for xVar in [
 
         df["CAcceptance"] = 1./df["RZ_corrIOandIDandHLT"].apply(lambda x: x.n)
 
-        outputname = "{0}/c_{1}_{2}.root".format(outDir, xVar, year[0])
+        outputname = "{0}/c_{1}_{2}.root".format(output, xVar, year[0])
         tFile = ROOT.TFile(outputname, "RECREATE")    
 
         for key in ["CID", "CIO", "CAcceptance"]:

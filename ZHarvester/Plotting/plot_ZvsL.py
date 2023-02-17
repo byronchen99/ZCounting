@@ -1,4 +1,3 @@
-import ROOT
 import pandas as pd
 import numpy as np
 import argparse
@@ -6,55 +5,34 @@ import pdb
 import os, sys
 import uncertainties as unc
 from scipy.optimize import curve_fit
-
 import matplotlib.pyplot as plt
-import matplotlib as mpl
 
 sys.path.append(os.getcwd())
-print(os.getcwd())
+log.info(os.getcwd())
 
-from python.corrections import apply_muon_prefire, apply_ECAL_prefire
+from common.corrections import apply_muon_prefire, apply_ECAL_prefire
 
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
 from ZUtils.python.utils import linear, pol2
 
 pd.options.mode.chained_assignment = None
 
-ROOT.gROOT.SetBatch(True)
-ROOT.gStyle.SetCanvasPreferGL(1)
+from common import parsing, plotting
+from common.logging import child_logger
+log = child_logger(__name__)
 
-textsize = 16
-markersize = 4.0
-
-plt.rcParams.update({
-    "text.usetex": True,
-    "font.family": "serif",
-    "font.serif": ["Palatino",],
-    "font.size": textsize,
-    'text.latex.preamble': [r"""\usepackage{bm}"""]
-})
-
-mpl.rcParams.update({
-    "legend.fontsize" : "medium",
-    "axes.labelsize" : "medium",
-    "axes.titlesize" : "medium",
-    "xtick.labelsize" : "medium",
-    "ytick.labelsize" : "medium",
-})
-colors = ["#e74c3c","#f1c40f","#16a085","#27ae60","#2980b9","#8e44ad"]
-
-parser = argparse.ArgumentParser()
+parser = parsing.parser_plot()
 
 parser.add_argument("-r","--rates", required=True, type=str, help="csv file with z rates per Measurement")
 parser.add_argument("-x","--xsec",  type=str, help="csv file where xsec should be taken from (e.g. from low pileup run)")
-parser.add_argument("--label",  default='Work in progress',  type=str, help="specify label ('Work in progress', 'Preliminary', )")
-parser.add_argument("-s","--saveDir",  default='./',  type=str, help="give output dir")
 
 args = parser.parse_args()
 
 year = 2022
 
-outDir = args.saveDir
+colors, textsize, labelsize, markersize = plotting.set_matplotlib_style()
+
+outDir = args.output
 if not os.path.isdir(outDir):
     os.mkdir(outDir)
 
@@ -93,7 +71,7 @@ def make_plots(df,
         data = df
 
     if sum(data[yAxis].isnull()) > 0:
-        print(">>> sort out {0} points with nan".format(sum(data[yAxis].isnull())))
+        log.info("sort out {0} points with nan".format(sum(data[yAxis].isnull())))
         data = data.loc[~data[yAxis].isnull()]
 
     # x_step: intervall in which the measurements are collected in one point
@@ -105,7 +83,6 @@ def make_plots(df,
     elif xAxis == 'time':
         data['time'] = data['tdate_begin'] + (data['tdate_end'] - data['tdate_begin'])/2
         #data['time'] -= 7200
-        data['time'] -= (ROOT.TDatime(2042,1,1,12,00,00).Convert() - ROOT.TDatime(2017,1,1,12,00,00).Convert())
         xTitle="time"
         x_step = 1
     elif xAxis == 'pileUp':
@@ -126,11 +103,11 @@ def make_plots(df,
     elif resource != "":
         # plot an efficiency on y axis - load necessery resources
 
-        # >>>  load MC info and format
+        #  load MC info and format
         if len(year.split(" ")) == 1:
             suffix = year
         elif len(year.split(" ")) == 0:
-            print("Invalid year")
+            log.info("Invalid year")
         elif year.split(" ")[0] == "2016":
             if year == "2016 pre VFP" or year.split(" ")[1] in ("B","C","D","E","F"):
                 suffix="2016preVFP"
@@ -167,11 +144,11 @@ def make_plots(df,
         iTrue.reset_index(drop=True)
 
     # data['relstat'] = data[yAxis].apply(lambda x: x.s / x.n)    
-    # print(">>> sort out {0} points with low statistic".format(len(data['relstat'] > 0.05)))
+    # log.info("sort out {0} points with low statistic".format(len(data['relstat'] > 0.05)))
     # data = data.loc[data["relstat"] < 0.05]
 
     if plot_fills:
-        print(">>> make plots for each fill")
+        log.info("make plots for each fill")
         # For each Fill
         for fill, data_fill in data.groupby('fill'):
 
@@ -206,7 +183,7 @@ def make_plots(df,
 
 
     if plot_all:
-        print(">>> make plot for all measurements")
+        log.info("make plot for all measurements")
         if xAxis == 'measurement':
             xPoints = np.arange(0,len(data),1.)
         else:
@@ -242,11 +219,11 @@ def make_plots(df,
         plt.close()
 
 
-        print(">>> Producing all cross sections")
-        print(">>> the simple average cross section is "+str(sum(data['y'].values)/len(data)))
+        log.info("Producing all cross sections")
+        log.info("the simple average cross section is "+str(sum(data['y'].values)/len(data)))
 
     # make fit taking into account all points
-    #print(">>> make fit")
+    #log.info("make fit")
     #func = linear #pol2 #quad
     #popt, pcov = curve_fit(func, data[xAxis], data['y'], sigma=data['y_Err'], absolute_sigma=True)
 
@@ -258,7 +235,7 @@ def make_plots(df,
     #yMC = np.array([f(x).n for x in xMC])
     #yErrMC = np.array([f(x).s for x in xMC])
 
-    print(">>> make plot and combine measurements into bins")
+    log.info("make plot and combine measurements into bins")
     xx = np.arange(data[xAxis].min()*(1./x_step)//1/(1./x_step), data[xAxis].max()*(1./x_step)//1/(1./x_step), x_step)
     xx = np.append(xx, xx[-1]+x_step)
     xx_centers = []
@@ -305,7 +282,7 @@ def make_plots(df,
     yy0_err = np.array([y.s for y in yy0])
     yy0 = np.array([y.n for y in yy0])
 
-    print(">>> make fit")
+    log.info("make fit")
     func = linear #pol2 #quad
     popt, pcov = curve_fit(func, xx, yy, sigma=yy_err, absolute_sigma=True)
 
@@ -317,8 +294,8 @@ def make_plots(df,
     yMC = np.array([f(x).n for x in xMC])
     yErrMC = np.array([f(x).s for x in xMC])
 
-    print(">>> make plots")
-    print(params)
+    log.info("make plots")
+    log.info(params)
 
     xx_err = np.ones(len(xx_centers))*x_step/2
     
@@ -387,7 +364,7 @@ def make_plots(df,
 
 plot_lowPU = False
 if args.xsec:
-    print(">>> load low pileup data")
+    log.info("load low pileup data")
     plot_lowPU = True
     # --- get Z xsec
     data_xsec = pd.read_csv(str(args.xsec), sep=',',low_memory=False)#, skiprows=[1,2,3,4,5])
@@ -398,14 +375,14 @@ if args.xsec:
     apply_muon_prefire(data_xsec)
     apply_ECAL_prefire(data_xsec)
 
-    print("apply prefire corrections - done")
+    log.info("apply prefire corrections - done")
 
     xsec = sum(data_xsec['recZCount'])/sum(data_xsec['recLumi'])
 
     
 
 # ------------------------------------------------------------------------------
-print(">>> load csv file in dataframe")
+log.info("load csv file in dataframe")
 
 rates = pd.read_csv(args.rates, sep=',')
 

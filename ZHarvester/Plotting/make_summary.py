@@ -11,8 +11,11 @@ sys.path.append(os.getcwd())
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
 from ZUtils.python.utils import pexp, pquad
 
-parser = argparse.ArgumentParser()
+from common import parsing
+from common.logging import child_logger
+log = child_logger(__name__)
 
+parser = parsing.parser_plot()
 parser.add_argument("-r","--rates", required=True, nargs='+', help="Nominator csv file with z rates per lumisection")
 parser.add_argument("-x","--xsec",  default=None, type=str,
     help="csv file with z rates per lumisection where xsec should be taken from (e.g. from low pileup run)")
@@ -22,11 +25,9 @@ parser.add_argument("--xnominal",  default=None, type=str,
     help="csv file with z rates per lumisection where xsec should be taken from (e.g. from low pileup run) for nominal")
 parser.add_argument('--mode', default=4, type=int,
                     help='specify measurement mode')
-parser.add_argument("-s","--saveDir",  default='./',  type=str, help="give output dir")
-
 args = parser.parse_args()
 
-outDir = args.saveDir
+outDir = args.output
 if not os.path.isdir(outDir):
     os.mkdir(outDir)
 

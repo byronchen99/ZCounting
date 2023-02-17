@@ -1,4 +1,4 @@
-from python.logging import child_logger
+from common.logging import child_logger
 log = child_logger(__name__)
 
 from datetime import datetime
