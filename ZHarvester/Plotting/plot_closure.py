@@ -47,40 +47,37 @@ triggers = {
     "2016postVFP": "HLT\_IsoMu24 or HLT\_IsoTkMu24",
     "2017": "HLT\_IsoMu24",
     "2018": "HLT\_IsoMu24",
+    "2022": "HLT\_IsoMu24",
     "Summer16preVFP": "HLT\_IsoMu24 or HLT\_IsoTkMu24",
     "Summer16postVFP": "HLT\_IsoMu24 or HLT\_IsoTkMu24",
     "Fall17": "HLT\_IsoMu24",
-    "Autumn18": "HLT\_IsoMu24"
+    "Autumn18": "HLT\_IsoMu24",
+    "Winter22": "HLT\_IsoMu24"
 }
 yearnames = {
     "2016preVFP": "2016 preVFP",
     "2016postVFP": "2016 postVFP",
     "2017": "2017",
     "2018": "2018",
+    "2022": "2022",
     "Summer16preVFP": "2016 preVFP",
     "Summer16postVFP": "2016 postVFP",
     "Fall17": "2017",
-    "Autumn18": "2018"
+    "Autumn18": "2018",
+    "Winter22": "2022"
 }
 
-ptCut_ = 25.
+ptCut = 27.
+etaCut = 2.4
+
 delR_ = 0.0
 
-massMin_ = 60
-massMax_ = 120
+massMin_ = 66
+massMax_ = 116
 
 massMinSta_ = 50
 massMaxSta_ = 130
 
-# nBinsX = 18
-# minX = -0.5
-# maxX = 71.5
-
-nBinsX = 75
-minX = -0.5
-maxX = 74.5
-
-widthX = (maxX - minX )/nBinsX
 useCorrIO=True
 
 def preparePlot(yLabel, observable=""):
@@ -154,9 +151,23 @@ for xVar in [
     for year in [
         # ["2016preVFP","Summer16preVFP"],
         # ["2016postVFP","Summer16postVFP"],
-        ["2017","Fall17"],
-        # ["2018","Autumn18"]
+        # ["2017","Fall17"],
+        # ["2018","Autumn18"],
+        ["2022","Winter22"],
     ]:
+
+        if year[0] == "2022":
+            nBinsX = 70
+            minX = -0.5
+            maxX = 69.5
+            ptCut = 27
+        else:
+            nBinsX = 75
+            minX = -0.5
+            maxX = 74.5
+            ptCut = 25
+
+        widthX = (maxX - minX )/nBinsX
             
         if year[0] == "2016preVFP":
             rangeX = [0,54]
@@ -182,7 +193,7 @@ for xVar in [
         if useCorrIO:
             # tfileIO = ROOT.TFile("/nfs/dust/cms/user/dwalter/ZCounting/CMSSW_12_4_9/src/ZCounting/ZHarvester/res/mcCorrections/correlations_V17_38/c_{0}_{1}.root".format(xVar, year[0]),"READ")
 
-            tfileIO = ROOT.TFile("/eos/home-d/dwalter/Lumi/ZCounting_potato/CMSSW_10_2_20_UL/src/potato-zcount/plots/MCClosureGen-V17_38-d20221212-t113835/c_{0}_{1}.root".format(xVar, year[0]),"READ")
+            tfileIO = ROOT.TFile("/eos/home-d/dwalter/Lumi/ZCounting_potato/CMSSW_10_2_20_UL/src/potato-zcount/plots/MCClosureGen-V19_07-d20230218-t160908/c_{0}_{1}.root".format(xVar, year[0]),"READ")
 
             def hist2array(name):
                 _h = tfileIO.Get(name)
@@ -196,7 +207,7 @@ for xVar in [
 
         # tfile = ROOT.TFile("/eos/home-d/dwalter/Lumi/ZCounting_potato/CMSSW_10_2_20_UL/src/potato-zcount/None/ZCountingInOut-V19_01-{0}-DYJetsToLL_M_50_LO-jobI-d20230214-t190442.root".format(year[1]),"READ")
         # tfile = ROOT.TFile("/eos/home-d/dwalter/Lumi/ZCounting_potato/CMSSW_10_2_20_UL/src/potato-zcount/None/ZCountingInOut-V19_02-{0}-DYJetsToLL_M_50_LO-jobI-d20230214-t193941.root".format(year[1]),"READ")
-        tfile = ROOT.TFile("/eos/home-d/dwalter/Lumi/ZCounting_potato/CMSSW_10_2_20_UL/src/potato-zcount/None/ZCountingInOut-V19_06-{0}-DYJetsToLL_M_50_LO-jobI-d20230215-t172321.root".format(year[1]),"READ")
+        tfile = ROOT.TFile("/eos/cms/store/group/comm_luminosity/ZCounting/2022/SignalTemplates/ZCountingInOut-V19_07-{0}-DYJetsToLL_M_50_LO.root".format(year[1]),"READ")
 
         print("load events in arrays")
     
@@ -221,7 +232,7 @@ for xVar in [
         staPassGen = ROOT.TH1D("staPassGen","sta Pass gen", nBinsX,minX,maxX)
         staFailGen = ROOT.TH1D("staFailGen","sta Fail gen", nBinsX,minX,maxX)
 
-        genCuts = "ptGen1 > 25 && ptGen2 > 25 && abs(etaGen1) < 2.4 && abs(etaGen2) < 2.4 && massGen > 60 && massGen < 120"
+        genCuts = f"ptGen1 > {ptCut} && ptGen2 > {ptCut} && abs(etaGen1) < {etaCut} && abs(etaGen2) < {etaCut} && massGen > {massMin_} && massGen < {massMax_}"
 
         tTruth.Draw("{0}>>htruth".format(xVar),genCuts)
 
@@ -251,8 +262,8 @@ for xVar in [
         staPass = ROOT.TH1D("staPass","staPass", nBinsX,minX,maxX)
         staFail = ROOT.TH1D("staFail","staFail", nBinsX,minX,maxX)
 
-        recoCuts    = "mass>{0} && mass<{1} && ptTag > {2} && ptProbe > {2}".format(massMin_,massMax_, ptCut_)
-        recoCutsSta = "mass>{0} && mass<{1} && ptTag > {2} && ptProbe > {2}".format(massMinSta_,massMaxSta_, ptCut_)
+        recoCuts    = "mass>{0} && mass<{1} && ptTag > {2} && ptProbe > {2}".format(massMin_,massMax_, ptCut)
+        recoCutsSta = "mass>{0} && mass<{1} && ptTag > {2} && ptProbe > {2}".format(massMinSta_,massMaxSta_, ptCut)
 
         tHLT.Draw("{0}>>hlt0".format(xVar),"match1 && match2 && pass==0    && {0}".format(recoCuts))
         tHLT.Draw("{0}>>hlt1".format(xVar),"match1 && match2 && pass==1    && {0}".format(recoCuts))
@@ -575,7 +586,7 @@ for xVar in [
         for key in ["CID", "CIO", "CAcceptance"]:
 
             thc = ROOT.TH1D("{0}_{1}".format(key, "I"), 
-                "{0} {1}".format(key,"I"), 75, -0.5, 74.5)
+                "{0} {1}".format(key,"I"), nBinsX, minX, maxX)
             for x, y in df[["x", key]].values:
                 thc.SetBinContent(thc.FindBin(x), y)
 

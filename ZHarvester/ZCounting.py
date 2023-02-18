@@ -19,7 +19,7 @@ pd.options.mode.chained_assignment = None
 ROOT.gROOT.SetBatch(True)
 
 # -------------------------------------------------------------------------------------
-def extract_results(directory, m, cIO, cID, cHLT, cKinematicSelection):
+def extract_results(directory, m, cIO, cID, cHLT, cAcceptance):
     log.info("Extracting fit results in {0} for {1}".format(directory,m))  
 
     # --- For identification (ID) efficiency        
@@ -73,8 +73,8 @@ def extract_results(directory, m, cIO, cID, cHLT, cKinematicSelection):
         "cHLT": cHLT,
         "cIO": cIO,
         "cID": cID,
-        "cKinematicSelection": cKinematicSelection,
-        "recZCount": (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 / effMu**2 * cHLT * cID * cIO**2 * cKinematicSelection
+        "cAcceptance": cAcceptance,
+        "recZCount": (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 / effMu**2 * cHLT * cID * cIO**2 * cAcceptance
     }
 
     return res
@@ -128,9 +128,9 @@ if __name__ == '__main__':
     elif args.beginRun >= 355100 and args.beginRun < 362760:    # 2022
         year = 2022
         byLsCSV = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/brilcalcByLS/byLS_Collisions22_355100_362760_Muon_20230210.csv"
-        mcCorrelations   = f"/eos/cms/store/group/comm_luminosity/ZCounting/2022/CorrelationFactors/cMu_nPV_2022.root"
+        mcCorrelations   = f"{args.input}/2022/CorrelationFactors/MCClosure_V19_07/c_nPV_2022.root"
         prefix_dqm =  "ZCountingInOut-V19_07-Run2022"
-        sigTemplates = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/SignalTemplates/ZCountingAll-V01-Winter22-DYJetsToLL_M_50_LO.root"
+        sigTemplates = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/SignalTemplates/ZCountingInOut-V19_07-Winter22-DYJetsToLL_M_50_LO.root"
     elif args.beginRun >= 362760:                               # 2023
         year = 2023
     else:
@@ -388,15 +388,13 @@ if __name__ == '__main__':
                     ROOT.getZyield(hStafail, m, "Sta", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, 0)                        
 
 
-            # cHLT = ROOT.extractCorrelation_HLT(sigTemplates, hPV, etaRegionZ)
-            # cID = utils.getCorrelation(hPV, mcCorrelations, which="ID")
-            # cIO = utils.getCorrelation(hPV, mcCorrelations, which="IO")
-            # cKinematicSelection = utils.getCorrelation(hPV, mcCorrelations, which="KinematicSelection")
-            # result = extract_results(outSubDir, m, cIO, cID, cHLT, cKinematicSelection)
-
             cHLT = ROOT.extractCorrelation_HLT(sigTemplates, hPV, etaRegionZ)
+            cID = utils.getCorrelation(hPV, mcCorrelations, which="ID")
+            cIO = utils.getCorrelation(hPV, mcCorrelations, which="IO")
+            cAcceptance = utils.getCorrelation(hPV, mcCorrelations, which="CAcceptance")
+            result = extract_results(outSubDir, m, cIO, cID, cHLT, cAcceptance)
 
-            result = extract_results(outSubDir, m, 1., 1., cHLT, 1.)
+            result = extract_results(outSubDir, m, cIO, cID, cHLT, cAcceptance)
 
             if result:              
                 delLumi = df['delivered(/pb)'].sum()

@@ -340,20 +340,23 @@ def getCorrelation(hPV_data, correlationsFileName, which, region="I"):
     region: str
         eta region for the correlation factor, can be: "I", "BB", "BE", "EE"
     """
-    ROOT.gROOT.SetBatch(True) # disable root prompts
 
-    tfile = ROOT.TFile(correlationsFileName,"READ")
-
-    # normalize pileup histogram
-    hPV_data.Scale(1./hPV_data.Integral())
     avgPV = hPV_data.GetMean()
-    hC = tfile.Get("C{0}_{1}".format(which, region))
 
-    hC.Multiply(hPV_data)
+    with uproot.open(f"{correlationsFileName}:C{which}_{region}") as th_:
+        h_, x_ = th_.to_numpy()
+        xCenter = x_[:-1] + (x_[1:] - x_[:-1])/2.
+        
+        # underflow bin is for nPV=0 in hPV_data -> we take from element 0
+        hPV_ = np.array([hPV_data.GetBinContent(hPV_data.FindBin(xCenter[i])) for i in range(min(len(xCenter),hPV_data.GetNbinsX()+1))])
 
-    corr = hC.Integral()
+        # normalize pileup histogram
+        hPV_ = hPV_/sum(hPV_)
 
-    tfile.Close()
+        # if histograms have different range
+        hi = max(len(h_), len(hPV_))
+        corr = sum(h_[:hi] * hPV_[:hi])
+
     log.info("Correlation coefficienct c{0}_{1} = {2}".format(which, region, corr))
     log.info("For average primary vertices of <pv> = {0}".format(avgPV))
     return corr

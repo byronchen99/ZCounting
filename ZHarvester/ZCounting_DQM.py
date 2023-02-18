@@ -19,13 +19,13 @@ ROOT.gROOT.SetBatch(True)
 
 # -------------------------------------------------------------------------------------
 # -------------------------------------------------------------------------------------
-def extract_results(directory, m, cIO, cID, cHLT, cKinematicSelection):
+def extract_results(directory, m, cIO, cID, cHLT, cAcceptance):
     log.info("Extracting fit results in {0} for {1}".format(directory,m))  
 
     # --- For identification (ID) efficiency        
     NsigHLT2, chi2HLT2 = utils.open_workspace_yield(directory, "HLT_{0}_2".format(etaRegionZ), m)
     NsigHLT1, chi2HLT1 = utils.open_workspace_yield(directory, "HLT_{0}_1".format(etaRegionZ), m)
-    NsigIDFail, chi2ID = utils.open_workspace_yield(directory, "Sel_{0}_0".format(etaRegion), m)
+    NsigIDFail, chi2ID = utils.open_workspace_yield(directory, "ID_{0}_0".format(etaRegion), m)
 
     NsigHLT2 = utils.unorm(NsigHLT2)
     NsigHLT1 = utils.unorm(NsigHLT1)
@@ -73,8 +73,8 @@ def extract_results(directory, m, cIO, cID, cHLT, cKinematicSelection):
         "cHLT": cHLT,
         "cIO": cIO,
         "cID": cID,
-        "cKinematicSelection": cKinematicSelection,
-        "recZCount": (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 / effMu**2 * cHLT * cID * cIO**2 * cKinematicSelection
+        "cAcceptance": cAcceptance,
+        "recZCount": (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 / effMu**2 * cHLT * cID * cIO**2 * cAcceptance
     }
 
     return res
@@ -97,7 +97,6 @@ if __name__ == '__main__':
 
     ########################################
     # link to resouces
-    prefix_dqm="ZCountingInOut-V17_38-"
     cmsswbase = os.environ['CMSSW_BASE']
     resPath = cmsswbase + "/src/ZCounting/ZHarvester/res/"
     if( args.beginRun >= 272007 and args.beginRun < 278808
@@ -107,33 +106,27 @@ if __name__ == '__main__':
         year = 2016
         byLsCSV          = resPath+"/FillByLs_2016.csv"
         mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2016preVFP.root"
-        sigTemplates     = args.input+"/"+prefix_dqm+"Summer16preVFP-DYJetsToLL_M_50_LO.root"
     elif args.beginRun < 294645:                                # 2016 post VFP
         year = 2016
         byLsCSV          = resPath+"/FillByLs_2016.csv"
         mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2016postVFP.root"
-        sigTemplates     = args.input+"/"+prefix_dqm+"Summer16postVFP-DYJetsToLL_M_50_LO.root"
     elif args.beginRun > 297020 and args.beginRun < 306828:     # 2017
         year = 2017
         byLsCSV          = resPath+"/FillByLs_2017_IsoMu24.csv"
         mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2017.root"
-        sigTemplates     = args.input+"/"+prefix_dqm+"Fall17-DYJetsToLL_M_50_LO.root"
     elif args.beginRun >= 306926 and args.beginRun < 307083:    # 2017 H
         year = 2017
         byLsCSV          = resPath+"/FillByLs_2017_lowPU.csv"
         mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2017.root"
-        sigTemplates     = args.input+"/"+prefix_dqm+"Fall17-DYJetsToLL_M_50_LO.root"
     elif args.beginRun >= 315252 and args.beginRun < 325273:    # 2018
         year = 2018
         byLsCSV          = resPath+"/FillByLs_2018.csv"
         mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2018.root"
-        sigTemplates     = args.input+"/"+prefix_dqm+"Autumn18-DYJetsToLL_M_50_LO.root"
     elif args.beginRun >= 355100 and args.beginRun < 362760:    # 2022
         year = 2022
         byLsCSV = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/brilcalcByLS/byLS_Collisions22_355100_362760_Muon_20230210.csv"
-        mcCorrelations   = f"{args.input}/2022/CorrelationFactors/c_nPV_2022.root"
-        prefix_dqm =  "ZCountingAll-V01-"
-        sigTemplates = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/SignalTemplates/ZCountingAll-V01-Winter22-DYJetsToLL_M_50_LO.root"
+        mcCorrelations  = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/CorrelationFactors/MCClosure_V19_07/c_nPV_2022.root"
+        sigTemplates = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/SignalTemplates/ZCountingInOut-V19_07-Winter22-DYJetsToLL_M_50_LO.root"
     elif args.beginRun >= 362760:                               # 2023
         year = 2023
     else:
@@ -267,7 +260,7 @@ if __name__ == '__main__':
             hPV = utils.np_to_hist(hPV, npvBin_, npvMin_, npvMax_, "TH1", "hPV")
 
             # get histograms binned in mass
-            def load(name_):
+            def load(name_, mBins=MassBin_, mMin=MassMin_, mMax=MassMax_):
                 hist_np = utils.load_histogram([f"h_mass_{name_}_{r}" for r in etaRegions], fileName, goodLSlist, run=run, 
                     MassBin=MassBin_, MassMin=MassMin_, MassMax=MassMax_, 
                     prefix=dqmPrefix)
@@ -277,12 +270,12 @@ if __name__ == '__main__':
             h2HLT = load("2HLT")
             h1HLT = load("1HLT")
 
-            # load histograms with probes that fail selection, for selection efficiency
+            # load histograms with probes that fail ID, for ID efficiency
             hIDfail = load("ID_fail")
 
             # load histograms for global muon efficiency
-            hGlopass = load("Glo_pass")
-            hGlofail = load("Glo_fail")
+            hGlopass = load("Glo_pass", MassBinSta_, MassMin_, MassMax_)
+            hGlofail = load("Glo_fail", MassBinSta_, MassMin_, MassMax_)
 
             # load histograms for standalone muon efficiency
             hStapass = load("Sta_pass")
@@ -312,7 +305,7 @@ if __name__ == '__main__':
 
                     ROOT.getZyield(h2HLT, m, "HLT", etaRegionZ, sigModel, bkgModelPass, 2, sigTemplates, 0)
                     ROOT.getZyield(h1HLT, m, "HLT", etaRegionZ, sigModel, bkgModelPass, 1, sigTemplates, 0)
-                    ROOT.getZyield(hIDfail, m, "Sel", etaRegion, sigModel, bkgModelPass, 0, sigTemplates, 0)
+                    ROOT.getZyield(hIDfail, m, "ID", etaRegion, sigModel, bkgModelPass, 0, sigTemplates, 0)
 
                     ROOT.set_massRange(MassMinSta_, MassMaxSta_, MassBinSta_)
                     ROOT.getZyield(hGlopass, m, "Glo", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
@@ -326,8 +319,12 @@ if __name__ == '__main__':
                     os.system("rm {0}/histTemplates_*".format(outSubDir))
 
             cHLT = ROOT.extractCorrelation_HLT(sigTemplates, hPV, etaRegionZ)
+            cID = utils.getCorrelation(hPV, mcCorrelations, which="ID")
+            cIO = utils.getCorrelation(hPV, mcCorrelations, which="IO")
+            cAcceptance = utils.getCorrelation(hPV, mcCorrelations, which="Acceptance")
+            result = extract_results(outSubDir, m, cIO, cID, cHLT, cAcceptance)
 
-            result = extract_results(outSubDir, m, 1., 1., cHLT, 1.)
+            result = extract_results(outSubDir, m, cIO, cID, cHLT, cAcceptance)
 
             if result:
                 delLumi = byLS_m['delivered(/pb)'].sum()
