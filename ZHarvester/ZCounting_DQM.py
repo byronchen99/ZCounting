@@ -19,7 +19,7 @@ ROOT.gROOT.SetBatch(True)
 
 # -------------------------------------------------------------------------------------
 # -------------------------------------------------------------------------------------
-def extract_results(directory, m, cIO, cID, cHLT, cAcceptance):
+def extract_results(directory, m, cHLT, hPV, mcCorrelations):
     log.info("Extracting fit results in {0} for {1}".format(directory,m))  
 
     # --- For identification (ID) efficiency        
@@ -51,6 +51,11 @@ def extract_results(directory, m, cIO, cID, cHLT, cAcceptance):
 
     effMu = effID*effGlo*effSta
 
+    cID = utils.getCorrelation(hPV, mcCorrelations, which="ID")
+    cIO = utils.getCorrelation(hPV, mcCorrelations, which="IO")
+    cAcceptanceInner = utils.getCorrelation(hPV, mcCorrelations, which="AcceptanceInner")
+    cAcceptanceOuter = utils.getCorrelation(hPV, mcCorrelations, which="AcceptanceOuter")
+
     res = {
         "NsigHLT2": NsigHLT2,
         "NsigHLT1": NsigHLT1,
@@ -73,8 +78,9 @@ def extract_results(directory, m, cIO, cID, cHLT, cAcceptance):
         "cHLT": cHLT,
         "cIO": cIO,
         "cID": cID,
-        "cAcceptance": cAcceptance,
-        "recZCount": (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 / effMu**2 * cHLT * cID * cIO**2 * cAcceptance
+        "cAcceptanceInner": cAcceptanceInner,
+        "cAcceptanceOuter": cAcceptanceOuter,
+        "recZCount": (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 / effMu**2 * cHLT * cID * cIO**2 * cAcceptanceInner *cAcceptanceOuter
     }
 
     return res
@@ -182,8 +188,8 @@ if __name__ == '__main__':
     MassBin_ = int(args.mass[2])
     MassBinWidth = (MassMax_ - MassMin_)/MassBin_
 
-    MassMinSta_ = int(50)
-    MassMaxSta_ = int(130)
+    MassMinSta_ = int(56)
+    MassMaxSta_ = int(126)
     MassBinSta_ = int((MassMaxSta_ - MassMinSta_)/MassBinWidth)
 
     npvMin_ = 0.5     
@@ -262,9 +268,9 @@ if __name__ == '__main__':
             # get histograms binned in mass
             def load(name_, mBins=MassBin_, mMin=MassMin_, mMax=MassMax_):
                 hist_np = utils.load_histogram([f"h_mass_{name_}_{r}" for r in etaRegions], fileName, goodLSlist, run=run, 
-                    MassBin=MassBin_, MassMin=MassMin_, MassMax=MassMax_, 
+                    MassBin=mBins, MassMin=mMin, MassMax=mMax, 
                     prefix=dqmPrefix)
-                return utils.np_to_hist(hist_np, MassBin_, MassMin_, MassMax_, "TH1", name_) #convert numpy array into ROOT.TH1
+                return utils.np_to_hist(hist_np, mBins, mMin, mMax, "TH1", name_) #convert numpy array into ROOT.TH1
 
             # load histograms for hlt efficiency and Z yield
             h2HLT = load("2HLT")
@@ -274,8 +280,8 @@ if __name__ == '__main__':
             hIDfail = load("ID_fail")
 
             # load histograms for global muon efficiency
-            hGlopass = load("Glo_pass", MassBinSta_, MassMin_, MassMax_)
-            hGlofail = load("Glo_fail", MassBinSta_, MassMin_, MassMax_)
+            hGlopass = load("Glo_pass", MassBinSta_, MassMinSta_, MassMaxSta_)
+            hGlofail = load("Glo_fail", MassBinSta_, MassMinSta_, MassMaxSta_)
 
             # load histograms for standalone muon efficiency
             hStapass = load("Sta_pass")
@@ -319,12 +325,7 @@ if __name__ == '__main__':
                     os.system("rm {0}/histTemplates_*".format(outSubDir))
 
             cHLT = ROOT.extractCorrelation_HLT(sigTemplates, hPV, etaRegionZ)
-            cID = utils.getCorrelation(hPV, mcCorrelations, which="ID")
-            cIO = utils.getCorrelation(hPV, mcCorrelations, which="IO")
-            cAcceptance = utils.getCorrelation(hPV, mcCorrelations, which="Acceptance")
-            result = extract_results(outSubDir, m, cIO, cID, cHLT, cAcceptance)
-
-            result = extract_results(outSubDir, m, cIO, cID, cHLT, cAcceptance)
+            result = extract_results(outSubDir, m, cHLT, hPV, mcCorrelations)
 
             if result:
                 delLumi = byLS_m['delivered(/pb)'].sum()

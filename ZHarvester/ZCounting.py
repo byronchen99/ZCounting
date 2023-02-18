@@ -19,7 +19,7 @@ pd.options.mode.chained_assignment = None
 ROOT.gROOT.SetBatch(True)
 
 # -------------------------------------------------------------------------------------
-def extract_results(directory, m, cIO, cID, cHLT, cAcceptance):
+def extract_results(directory, m, cHLT, hPV, mcCorrelations):
     log.info("Extracting fit results in {0} for {1}".format(directory,m))  
 
     # --- For identification (ID) efficiency        
@@ -51,6 +51,11 @@ def extract_results(directory, m, cIO, cID, cHLT, cAcceptance):
 
     effMu = effID*effGlo*effSta
 
+    cID = utils.getCorrelation(hPV, mcCorrelations, which="ID")
+    cIO = utils.getCorrelation(hPV, mcCorrelations, which="IO")
+    cAcceptanceInner = utils.getCorrelation(hPV, mcCorrelations, which="AcceptanceInner")
+    cAcceptanceOuter = utils.getCorrelation(hPV, mcCorrelations, which="AcceptanceOuter")
+
     res = {
         "NsigHLT2": NsigHLT2,
         "NsigHLT1": NsigHLT1,
@@ -73,8 +78,9 @@ def extract_results(directory, m, cIO, cID, cHLT, cAcceptance):
         "cHLT": cHLT,
         "cIO": cIO,
         "cID": cID,
-        "cAcceptance": cAcceptance,
-        "recZCount": (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 / effMu**2 * cHLT * cID * cIO**2 * cAcceptance
+        "cAcceptanceInner": cAcceptanceInner,
+        "cAcceptanceOuter": cAcceptanceOuter,
+        "recZCount": (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 / effMu**2 * cHLT * cID * cIO**2 * cAcceptanceInner *cAcceptanceOuter
     }
 
     return res
@@ -387,14 +393,8 @@ if __name__ == '__main__':
                     ROOT.getZyield(hStapass, m, "Sta", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
                     ROOT.getZyield(hStafail, m, "Sta", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, 0)                        
 
-
             cHLT = ROOT.extractCorrelation_HLT(sigTemplates, hPV, etaRegionZ)
-            cID = utils.getCorrelation(hPV, mcCorrelations, which="ID")
-            cIO = utils.getCorrelation(hPV, mcCorrelations, which="IO")
-            cAcceptance = utils.getCorrelation(hPV, mcCorrelations, which="CAcceptance")
-            result = extract_results(outSubDir, m, cIO, cID, cHLT, cAcceptance)
-
-            result = extract_results(outSubDir, m, cIO, cID, cHLT, cAcceptance)
+            result = extract_results(outSubDir, m, cHLT, hPV, mcCorrelations)
 
             if result:              
                 delLumi = df['delivered(/pb)'].sum()

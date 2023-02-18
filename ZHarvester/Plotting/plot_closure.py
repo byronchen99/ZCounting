@@ -400,12 +400,12 @@ for xVar in [
 
 
         # ----- make plot for difference between reco and gen
-        df["ReffID"]  = (df["effIDGen"]**2)  / (df["effID"]**2)
-        df["ReffGlo"] = (df["effGloGen"]**2) / (df["effGlo"]**2)
-        df["ReffSta"] = (df["effStaGen"]**2) / (df["effSta"]**2)
+        df["ReffID"]  = (df["effIDGen"]**2)  / df["effID"]**2
+        df["ReffGlo"] = (df["effGloGen"]**2) / df["effGlo"]**2
+        df["ReffSta"] = (df["effStaGen"]**2) / df["effSta"]**2
         df["RCHLT"]   = df["CHLT"] / df["CHLTGen"]
         
-        df["RNZ_reco"] = df["NZ_reco"] / df["NZ_recoGen"] 
+        df["RNZ_reco"] = df["NZ_reco"] / (df["NZ_recoGen"])
 
         ax = preparePlot("Reco / Gen", xVar)
 
@@ -580,10 +580,28 @@ for xVar in [
 
         df["CAcceptance"] = 1./df["RZ_corrIOandIDandHLT"].apply(lambda x: x.n)
 
+        df["CAcceptanceOuter"] = 1./df["ReffSta"].apply(lambda x: x.n)
+        df["CAcceptanceInner"] = df["ReffSta"].apply(lambda x: x.n) / df["RZ_corrIOandIDandHLT"].apply(lambda x: x.n)
+
+        ax = preparePlot("Measurement / Truth", xVar)
+        ax.plot([min(xx), max(xx+widthX)], [1,1], "k--")
+
+        yy0 = df["CAcceptanceOuter"].values
+        yy0 = np.append(yy0, yy0[-1])
+
+        ax.plot(xx0, yy0, label="A(outer)", drawstyle='steps-mid', color=colors[0], zorder=2)   
+
+        yy0 = df["CAcceptanceInner"].values
+        yy0 = np.append(yy0, yy0[-1])
+
+        ax.plot(xx0, yy0, label="A(inner)", drawstyle='steps-mid', color=colors[2], zorder=3)   
+
+        finalizePlot(ax, "lower left", "Acceptance", region="I", cmsTag="center left", year=year, nameTag=xVar, yRange=[0.981,1.024])                
+
         outputname = "{0}/c_{1}_{2}.root".format(output, xVar, year[0])
         tFile = ROOT.TFile(outputname, "RECREATE")    
 
-        for key in ["CID", "CIO", "CAcceptance"]:
+        for key in ["CID", "CIO", "CAcceptanceOuter", "CAcceptanceInner"]:
 
             thc = ROOT.TH1D("{0}_{1}".format(key, "I"), 
                 "{0} {1}".format(key,"I"), nBinsX, minX, maxX)
