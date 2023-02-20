@@ -24,9 +24,7 @@ ROOT.gStyle.SetLegendFont(42)
 ROOT.gStyle.SetLegendBorderSize(0)
 ROOT.gStyle.SetEndErrorSize(2)
 
-from common import parsing, plotting
-from common.logging import child_logger
-log = child_logger(__name__)
+from common import parsing, plotting, logging
 
 parser = parsing.parser_plot()
 parser.add_argument("-c", "--rates", required=True, type=str, help="csv file with z rates per measurement")
@@ -34,6 +32,7 @@ parser.add_argument("-f", "--fill",  default=0, type=int, help="specify a single
 parser.add_argument("-m", "--mcCorrections",  default=None, type=str, help="specify MC correction file")
 parser.add_argument("-y", "--year",  default="2017", type=str, help="specify year for MC comparison")
 args = parser.parse_args()
+log = logging.setup_logger(__file__, args.verbose)
 
 outDir = args.output
 if not os.path.isdir(outDir):

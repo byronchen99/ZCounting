@@ -17,9 +17,7 @@ from common import parsing, plotting
 from common.logging import child_logger
 log = child_logger(__name__)
 
-from common import parsing, plotting
-from common.logging import child_logger
-log = child_logger(__name__)
+from common import parsing, plotting, logging
 
 parser = parsing.parser_plot()
 parser.add_argument("-w","--workspace", required=True, type=str, help="Workspace in .root format")
@@ -28,6 +26,7 @@ parser.add_argument("--year",  default=2022,  type=int, help="specify year for l
 parser.add_argument("--logscale",  default=False,  type=bool, help="plot y-axis in logscale")
 parser.add_argument("--pulls",  default=True,  type=bool, help="add panel with pull distribution")
 args = parser.parse_args()
+log = logging.setup_logger(__file__, args.verbose)
 
 # settings
 colors, textsize, labelsize, markersize = plotting.set_matplotlib_style()

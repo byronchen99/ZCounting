@@ -10,13 +10,12 @@ import argparse
 import os,sys
 import json
 
-from common import parsing, plotting
-from common.logging import child_logger
-log = child_logger(__name__)
+from common import parsing, plotting, logging
 
 parser = parsing.parser_plot()
 parser.add_argument("-i","--input", required=True, type=str, help="Give input dir")
 args = parser.parse_args()
+log = logging.setup_logger(__file__, args.verbose)
 
 outDir = args.output
 if not os.path.isdir(outDir):

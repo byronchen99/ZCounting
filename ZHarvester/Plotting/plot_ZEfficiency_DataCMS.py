@@ -10,14 +10,13 @@ ROOT.gROOT.SetBatch(True)
 ROOT.gStyle.SetCanvasPreferGL(1)
 ROOT.gStyle.SetTitleX(.3)
 
-from common import parsing, plotting
-from common.logging import child_logger
-log = child_logger(__name__)
+from common import parsing, plotting, logging
 
 parser = parsing.parser_plot()
 parser.add_argument("-c", "--cms", nargs='+', help="give the CMS csv per Measurement as input", required=True)
 parser.add_argument("-f", "--fills", nargs='*', default=[], type=str, help="Specify fills to plot efficiencies")
 args = parser.parse_args()
+log = logging.setup_logger(__file__, args.verbose)
 
 outDir = args.output
 if not os.path.isdir(outDir):

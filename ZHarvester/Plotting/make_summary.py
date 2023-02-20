@@ -11,9 +11,7 @@ sys.path.append(os.getcwd())
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
 from ZUtils.python.utils import pexp, pquad
 
-from common import parsing
-from common.logging import child_logger
-log = child_logger(__name__)
+from common import parsing, logging
 
 parser = parsing.parser_plot()
 parser.add_argument("-r","--rates", required=True, nargs='+', help="Nominator csv file with z rates per lumisection")
@@ -26,6 +24,7 @@ parser.add_argument("--xnominal",  default=None, type=str,
 parser.add_argument('--mode', default=4, type=int,
                     help='specify measurement mode')
 args = parser.parse_args()
+log = logging.setup_logger(__file__, args.verbose)
 
 outDir = args.output
 if not os.path.isdir(outDir):

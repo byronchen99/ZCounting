@@ -18,17 +18,16 @@ from common.utils import to_DateTime, load_input_csv
 # disable panda warnings when assigning a new column in the dataframe
 pd.options.mode.chained_assignment = None
 
-from common import parsing, plotting
-from common.logging import child_logger
-log = child_logger(__name__)
+from common import parsing, plotting, logging
 
 parser = parsing.parser_plot()
 parser.add_argument("-r", "--rates", required=True, type=str, help="csv file with z rates per measurement")
 parser.add_argument("-l", "--refLumi", default="", type=str, help="give a ByLs.csv as input for additional reference Luminosity")
 parser.add_argument("-x", "--xsec", default="", type=str, help="csv file with z rates per measurement for absolute scale")
 parser.add_argument("-f", "--fill", nargs="*",  type=int, default=[], help="specify a single fill to plot")
-
 args = parser.parse_args()
+log = logging.setup_logger(__file__, args.verbose)
+
 outDir = args.output
 if not os.path.isdir(outDir):
     os.mkdir(outDir)

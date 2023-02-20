@@ -17,19 +17,17 @@ sys.path.append(os.getcwd())
 
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
 from common.utils import to_DateTime
-from common import parsing, plotting
-from common.logging import child_logger
-log = child_logger(__name__)
+from common import parsing, plotting, logging
 
 ROOT.gROOT.SetBatch(True)
 ROOT.gStyle.SetCanvasPreferGL(1)
 ROOT.gStyle.SetTitleX(.3)
 
 parser = parsing.parser_plot()
-
 parser.add_argument("-r","--rates", required=True, type=str, help="csv file with z rates per measurement")
 parser.add_argument("-y","--year",  default="Run-II",  type=str, help="give data taking era for labeling")
 args = parser.parse_args()
+log = logging.setup_logger(__file__, args.verbose)
 
 year = args.year
 

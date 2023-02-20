@@ -17,16 +17,13 @@ from ZUtils.python.utils import linear, pol2
 
 pd.options.mode.chained_assignment = None
 
-from common import parsing, plotting
-from common.logging import child_logger
-log = child_logger(__name__)
+from common import parsing, plotting, logging
 
 parser = parsing.parser_plot()
-
 parser.add_argument("-r","--rates", required=True, type=str, help="csv file with z rates per Measurement")
 parser.add_argument("-x","--xsec",  type=str, help="csv file where xsec should be taken from (e.g. from low pileup run)")
-
 args = parser.parse_args()
+log = logging.setup_logger(__file__, args.verbose)
 
 year = 2022
 

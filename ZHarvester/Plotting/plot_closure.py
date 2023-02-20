@@ -17,13 +17,11 @@ os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
 
 from ZUtils.python.utils import linear
 
-from common import parsing, plotting
-from common.logging import child_logger
-log = child_logger(__name__)
+from common import parsing, plotting, logging
 
 parser = parsing.parser_plot()
-
 args = parser.parse_args()
+log = logging.setup_logger(__file__, args.verbose)
 
 output = args.output
 if not os.path.isdir(output):

@@ -18,16 +18,14 @@ os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
 from common.utils import to_DateTime
 from common.corrections import apply_muon_prefire, apply_ECAL_prefire
 
-from common import parsing, plotting
-from common.logging import child_logger
-log = child_logger(__name__)
+from common import parsing, plotting, logging
 
 parser = parsing.parser_plot()
-
 parser.add_argument("-r","--rates", required=True, nargs='+', help="Nominator csv file with z rates per measurement")
 parser.add_argument("-x","--xsec", type=str,
     help="csv file with z rates per measurement where xsec should be taken from (e.g. from low pileup run)")
 args = parser.parse_args()
+log = logging.setup_logger(__file__, args.verbose)
 
 outDir = args.output
 if not os.path.isdir(outDir):

@@ -16,17 +16,15 @@ ROOT.gROOT.SetBatch(True)
 ROOT.gStyle.SetCanvasPreferGL(1)
 ROOT.gStyle.SetTitleX(.3)
 
-from common import parsing
-from common.logging import child_logger
-log = child_logger(__name__)
+from common import parsing, logging
 
 parser = parsing.parser_plot()
-
 parser.add_argument("--rates", required=True, nargs='+', help="Nominator csv file with z rates perLS")
 parser.add_argument("--xsec",  required=True, type=str,
     help="csv file with z rates per measurement where xsec should be taken from (e.g. from low pileup run)")
 parser.add_argument("--refLumi",  required=True, nargs='+', help="give a ByLs.csv as input for reference Luminosity")
 args = parser.parse_args()
+log = logging.setup_logger(__file__, args.verbose)
 
 outDir = args.output
 if not os.path.isdir(outDir):
