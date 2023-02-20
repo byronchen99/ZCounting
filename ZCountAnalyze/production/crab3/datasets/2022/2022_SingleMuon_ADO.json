@@ -5,7 +5,7 @@
       "Data.inputDataset": "/SingleMuon/Run2022B-PromptReco-v1/AOD",
       "Data.lumiMask": "/eos/user/c/cmsdqm/www/CAF/certification/Collisions22/Cert_Collisions2022_eraB_355100_355769_Golden.json",
       "Data.splitting": "LumiBased",
-      "Data.unitsPerJob": 100,
+      "Data.unitsPerJob": 1,
       "JobType.maxMemoryMB": 2500,
       "JobType.pyCfgParams": [
         "year=2022",
