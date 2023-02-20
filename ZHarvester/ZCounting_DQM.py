@@ -188,8 +188,8 @@ if __name__ == '__main__':
     MassBin_ = int(args.mass[2])
     MassBinWidth = (MassMax_ - MassMin_)/MassBin_
 
-    MassMinSta_ = int(56)
-    MassMaxSta_ = int(126)
+    MassMinSta_ = int(min(MassMin_, 56))
+    MassMaxSta_ = int(max(MassMax_, 126))
     MassBinSta_ = int((MassMaxSta_ - MassMinSta_)/MassBinWidth)
 
     npvMin_ = 0.5     

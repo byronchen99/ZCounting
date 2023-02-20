@@ -25,7 +25,7 @@ def extract_results(directory, m, cHLT, hPV, mcCorrelations):
     # --- For identification (ID) efficiency        
     NsigHLT2, chi2HLT2 = utils.open_workspace_yield(directory, "HLT_{0}_2".format(etaRegionZ), m)
     NsigHLT1, chi2HLT1 = utils.open_workspace_yield(directory, "HLT_{0}_1".format(etaRegionZ), m)
-    NsigIDFail, chi2ID = utils.open_workspace_yield(directory, "Sel_{0}_0".format(etaRegion), m)
+    NsigIDFail, chi2ID = utils.open_workspace_yield(directory, "ID_{0}_0".format(etaRegion), m)
 
     NsigHLT2 = utils.unorm(NsigHLT2)
     NsigHLT1 = utils.unorm(NsigHLT1)
@@ -134,8 +134,8 @@ if __name__ == '__main__':
     elif args.beginRun >= 355100 and args.beginRun < 362760:    # 2022
         year = 2022
         byLsCSV = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/brilcalcByLS/byLS_Collisions22_355100_362760_Muon_20230210.csv"
-        mcCorrelations   = f"{args.input}/2022/CorrelationFactors/MCClosure_V19_07/c_nPV_2022.root"
-        prefix_dqm =  "ZCountingInOut-V19_07-Run2022"
+        mcCorrelations  = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/CorrelationFactors/MCClosure_V19_07/c_nPV_2022.root"
+        prefix_dqm =  "ZCountingInOut-"
         sigTemplates = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/SignalTemplates/ZCountingInOut-V19_07-Winter22-DYJetsToLL_M_50_LO.root"
     elif args.beginRun >= 362760:                               # 2023
         year = 2023
@@ -383,7 +383,7 @@ if __name__ == '__main__':
 
                     ROOT.getZyield(h2HLT, m, "HLT", etaRegionZ, sigModel, bkgModelPass, 2, sigTemplates, 0)
                     ROOT.getZyield(h1HLT, m, "HLT", etaRegionZ, sigModel, bkgModelPass, 1, sigTemplates, 0)
-                    ROOT.getZyield(hIDfail, m, "Sel", etaRegion, sigModel, bkgModelPass, 0, sigTemplates, 0)
+                    ROOT.getZyield(hIDfail, m, "ID", etaRegion, sigModel, bkgModelPass, 0, sigTemplates, 0)
 
                     ROOT.set_massRange(MassMinSta_, MassMaxSta_, MassBinSta_)
                     ROOT.getZyield(hGlopass, m, "Glo", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
