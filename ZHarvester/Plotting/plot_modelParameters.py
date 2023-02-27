@@ -10,33 +10,21 @@ import argparse
 import os,sys
 import json
 
-plt.rcParams.update({
-    "text.usetex": True,
-    "font.family": "serif",
-    "font.serif": ["Palatino",],
-    "font.size": 16,
-    'text.latex.preamble': [r"""\usepackage{bm}"""]
-})
+from common import parsing, plotting, logging
 
-mpl.rcParams.update({
-    "legend.fontsize" : "medium",
-    "axes.labelsize" : "medium",
-    "axes.titlesize" : "medium",
-    "xtick.labelsize" : "medium",
-    "ytick.labelsize" : "medium",
-})
-
-parser = argparse.ArgumentParser()
-
+parser = parsing.parser_plot()
 parser.add_argument("-i","--input", required=True, type=str, help="Give input dir")
-parser.add_argument("-o","--output", default='./', type=str, help="Give output dir")
 args = parser.parse_args()
+log = logging.setup_logger(__file__, args.verbose)
 
 outDir = args.output
 if not os.path.isdir(outDir):
     os.mkdir(outDir)
 
 inputDir = args.input
+
+colors, textsize, labelsize, markersize = plotting.set_matplotlib_style()
+
 
 etaRegion = "I"
 etaRegionZ = "I"

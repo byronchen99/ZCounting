@@ -9,6 +9,7 @@ import numpy as np
 import json
 import pdb
 import uncertainties as unc
+from roofit.utils import load_makros
 
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
 
@@ -39,10 +40,9 @@ if __name__ == '__main__':
 
     signal_templates_path = "/nfs/dust/cms/user/dwalter/ZCounting/CMSSW_10_6_26/src/ZCounting/ZHarvester/res/sigTemplates/V13_02_02/"
 
-    print("INFO: Loading C marco...")
-    # load functions for fitting
-    ROOT.gROOT.LoadMacro(os.path.dirname(os.path.realpath(
-        __file__)) + "/calculateDataEfficiency.C")
+    bkgModel = 6
+
+    load_makros(bkgModel, 30, 2.4, 2017, 70, 250, 180, 0, 75)
 
     ROOT.set_massRange(70, 250, 180)
 
@@ -128,7 +128,7 @@ if __name__ == '__main__':
                 xHi_ = abs(bins[ibin+1] - xCenter_)
 
                 if not args.collect:
-                    ROOT.calculateHLTCorrelation(h0_, h1_, h2_, ibin, region, 2, 6, 0, signal_template)
+                    ROOT.calculateHLTCorrelation(h0_, h1_, h2_, ibin, region, 2, bkgModel, 0, signal_template)
 
                 # collect results and write in dictionary
                 file = ROOT.TFile(subdir+"/workspace_{0}_{1}.root".format(region,ibin),"READ")

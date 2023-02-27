@@ -7,8 +7,9 @@ import os
 import pdb
 import datetime
 import numpy as np
+from roofit.utils import load_makros
 
-from python import utils, logging, common
+from common import utils, logging, parsing
 
 # disable panda warnings when assigning a new column in the dataframe
 pd.options.mode.chained_assignment = None
@@ -17,13 +18,14 @@ pd.options.mode.chained_assignment = None
 ROOT.gROOT.SetBatch(True)
 
 # -------------------------------------------------------------------------------------
-def extract_results(directory, m, cHLT):
+# -------------------------------------------------------------------------------------
+def extract_results(directory, m, cHLT, hPV, mcCorrelations):
     log.info("Extracting fit results in {0} for {1}".format(directory,m))  
 
     # --- For identification (ID) efficiency        
-    NsigHLT2, chi2HLT2 = utils.open_workspace_yield(directory, "HLT_{0}_2".format(etaRegion), m)
-    NsigHLT1, chi2HLT1 = utils.open_workspace_yield(directory, "HLT_{0}_1".format(etaRegion), m)
-    NsigIDFail, chi2ID = utils.open_workspace_yield(directory, "Sel_{0}_0".format(etaRegion), m)
+    NsigHLT2, chi2HLT2 = utils.open_workspace_yield(directory, "HLT_{0}_2".format(etaRegionZ), m)
+    NsigHLT1, chi2HLT1 = utils.open_workspace_yield(directory, "HLT_{0}_1".format(etaRegionZ), m)
+    NsigIDFail, chi2ID = utils.open_workspace_yield(directory, "ID_{0}_0".format(etaRegion), m)
 
     NsigHLT2 = utils.unorm(NsigHLT2)
     NsigHLT1 = utils.unorm(NsigHLT1)
@@ -32,28 +34,53 @@ def extract_results(directory, m, cHLT):
     effHLT = (2 * NsigHLT2) / (2 * NsigHLT2 + NsigHLT1)
     effID = (2 * NsigHLT2 + NsigHLT1) / (2 * NsigHLT2 + NsigHLT1 + NsigIDFail)
 
+    NsigGloPass, chi2GloPass = utils.open_workspace_yield(directory, "Glo_{0}_1".format(etaRegion), m)
     NsigGloFail, chi2GloFail = utils.open_workspace_yield(directory, "Glo_{0}_0".format(etaRegion), m)
 
+    NsigStaPass, chi2StaPass = utils.open_workspace_yield(directory, "Sta_{0}_1".format(etaRegion), m)
+    NsigStaFail, chi2StaFail = utils.open_workspace_yield(directory, "Sta_{0}_0".format(etaRegion), m)
+
+    NsigGloPass = utils.unorm(NsigGloPass)
     NsigGloFail = utils.unorm(NsigGloFail)
 
-    effGlo = (2 * NsigHLT2 + NsigHLT1 + NsigIDFail) / (2 * NsigHLT2 + NsigHLT1 + NsigIDFail + NsigGloFail)
+    NsigStaPass = utils.unorm(NsigStaPass)
+    NsigStaFail = utils.unorm(NsigStaFail)
 
-    effMu = effID*effGlo
+    effGlo = NsigGloPass / (NsigGloPass + NsigGloFail)
+    effSta = NsigStaPass / (NsigStaPass + NsigStaFail)
+
+    effMu = effID*effGlo*effSta
+
+    cID = utils.getCorrelation(hPV, mcCorrelations, which="ID")
+    cIO = utils.getCorrelation(hPV, mcCorrelations, which="IO")
+    cAcceptanceInner = utils.getCorrelation(hPV, mcCorrelations, which="AcceptanceInner")
+    cAcceptanceOuter = utils.getCorrelation(hPV, mcCorrelations, which="AcceptanceOuter")
 
     res = {
         "NsigHLT2": NsigHLT2,
         "NsigHLT1": NsigHLT1,
         "NsigIDFail": NsigIDFail,
+        "NsigGloPass": NsigGloPass,
         "NsigGloFail": NsigGloFail,
+        "NsigStaPass": NsigStaPass,
+        "NsigStaFail": NsigStaFail,
         "chi2HLT2": chi2HLT2,
         "chi2HLT1": chi2HLT1,
+        "chi2GloPass": chi2GloPass,
         "chi2GloFail": chi2GloFail,
+        "chi2StaPass": chi2StaPass,
+        "chi2StaFail": chi2StaFail,
         "effHLT": effHLT,
         "effID": effID,
         "effGlo": effGlo,
+        "effSta": effSta,
         "effMu": effMu,
         "cHLT": cHLT,
-        "recZCount": (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 / effMu**2 * cHLT
+        "cIO": cIO,
+        "cID": cID,
+        "cAcceptanceInner": cAcceptanceInner,
+        "cAcceptanceOuter": cAcceptanceOuter,
+        "recZCount": (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 / effMu**2 * cHLT * cID * cIO**2 * cAcceptanceInner *cAcceptanceOuter
     }
 
     return res
@@ -61,14 +88,13 @@ def extract_results(directory, m, cHLT):
 ################################################################################
 if __name__ == '__main__':
 
-    parser = common.parser()
-    parser = common.parser_zharvest(parser)
+    parser = parsing.parser_zharvest()
 
     parser.add_argument("-m", "--measurement", type=int, default=None, 
         help="Only fit a specific measurement of the run")
 
-    common.set_parser_default(parser, "mass", [66,116,50])
-    common.set_parser_default(parser, "ptCut", 27)     
+    parsing.set_parser_default(parser, "mass", [66,116,50])
+    parsing.set_parser_default(parser, "ptCut", 27)     
 
     args = parser.parse_args()
 
@@ -77,7 +103,6 @@ if __name__ == '__main__':
 
     ########################################
     # link to resouces
-    prefix_dqm="ZCountingInOut-V17_38-"
     cmsswbase = os.environ['CMSSW_BASE']
     resPath = cmsswbase + "/src/ZCounting/ZHarvester/res/"
     if( args.beginRun >= 272007 and args.beginRun < 278808
@@ -87,33 +112,27 @@ if __name__ == '__main__':
         year = 2016
         byLsCSV          = resPath+"/FillByLs_2016.csv"
         mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2016preVFP.root"
-        sigTemplates     = args.input+"/"+prefix_dqm+"Summer16preVFP-DYJetsToLL_M_50_LO.root"
     elif args.beginRun < 294645:                                # 2016 post VFP
         year = 2016
         byLsCSV          = resPath+"/FillByLs_2016.csv"
         mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2016postVFP.root"
-        sigTemplates     = args.input+"/"+prefix_dqm+"Summer16postVFP-DYJetsToLL_M_50_LO.root"
     elif args.beginRun > 297020 and args.beginRun < 306828:     # 2017
         year = 2017
         byLsCSV          = resPath+"/FillByLs_2017_IsoMu24.csv"
         mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2017.root"
-        sigTemplates     = args.input+"/"+prefix_dqm+"Fall17-DYJetsToLL_M_50_LO.root"
     elif args.beginRun >= 306926 and args.beginRun < 307083:    # 2017 H
         year = 2017
         byLsCSV          = resPath+"/FillByLs_2017_lowPU.csv"
         mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2017.root"
-        sigTemplates     = args.input+"/"+prefix_dqm+"Fall17-DYJetsToLL_M_50_LO.root"
     elif args.beginRun >= 315252 and args.beginRun < 325273:    # 2018
         year = 2018
         byLsCSV          = resPath+"/FillByLs_2018.csv"
         mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2018.root"
-        sigTemplates     = args.input+"/"+prefix_dqm+"Autumn18-DYJetsToLL_M_50_LO.root"
     elif args.beginRun >= 355100 and args.beginRun < 362760:    # 2022
         year = 2022
         byLsCSV = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/brilcalcByLS/byLS_Collisions22_355100_362760_Muon_20230210.csv"
-        mcCorrelations   = f"{args.input}/2022/CorrelationFactors/c_nPV_2022.root"
-        prefix_dqm =  "ZCountingAll-V01-"
-        sigTemplates = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/SignalTemplates/ZCountingAll-V01-Winter22-DYJetsToLL_M_50_LO.root"
+        mcCorrelations  = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/CorrelationFactors/MCClosure_V19_07/c_nPV_2022.root"
+        sigTemplates = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/SignalTemplates/ZCountingInOut-V19_07-Winter22-DYJetsToLL_M_50_LO.root"
     elif args.beginRun >= 362760:                               # 2023
         year = 2023
     else:
@@ -135,10 +154,10 @@ if __name__ == '__main__':
     log.info("Lumi per Measurement:    {0}".format(args.LumiPerMeasurement))
     log.info("----------------------------------")
     
-    sigModel = common.sigModels[args.sigModel]
-    sigModelSta = common.sigModels[args.sigModel.replace("Gen","MCxGauss")]    # for standalone we don't use Gen
-    bkgModelPass = common.bkgModelsPass[args.bkgModel]
-    bkgModelFail = common.bkgModelsFail[args.bkgModel]
+    sigModel = parsing.sigModels[args.sigModel]
+    sigModelSta = parsing.sigModels[args.sigModel.replace("Gen","MCxGauss")]    # for standalone we don't use Gen
+    bkgModelPass = parsing.bkgModelsPass[args.bkgModel]
+    bkgModelFail = parsing.bkgModelsFail[args.bkgModel]
 
     ########## Input configuration ##########
     # ByLS csv inputs generated by testBRIL.sh
@@ -169,8 +188,8 @@ if __name__ == '__main__':
     MassBin_ = int(args.mass[2])
     MassBinWidth = (MassMax_ - MassMin_)/MassBin_
 
-    MassMinSta_ = int(50)
-    MassMaxSta_ = int(130)
+    MassMinSta_ = int(min(MassMin_, 56))
+    MassMaxSta_ = int(max(MassMax_, 126))
     MassBinSta_ = int((MassMaxSta_ - MassMinSta_)/MassBinWidth)
 
     npvMin_ = 0.5     
@@ -183,27 +202,17 @@ if __name__ == '__main__':
     if args.etaCut == 0.9:
         etaRegion = "B"
         etaRegionZ = "BB"
-    else:
+    elif args.etaCut == 2.4:
         etaRegion = "I"
         etaRegionZ = "I"
+    else:
+        log.error(f"Eta cut {args.etaCut} not supported for DQM histograms!")
+
+    etaRegions = ["BB","BE","EE"] if etaRegion == "I" else ["BB"]
 
     if not args.collect:
-        log.info("Loading C marcos...")
-        # load functions for fitting
-        ROOT.gROOT.LoadMacro(os.path.dirname(os.path.realpath(__file__)) + "/Utils/calculateDataEfficiency.C")
+        load_makros(args.bkgModel, args.ptCut, args.etaCut, year, MassMin_, MassMax_, MassBin_, npvMin_, npvMax_)
 
-        if args.bkgModel == "Das":
-            ROOT.gROOT.LoadMacro(os.path.dirname(os.path.realpath(__file__)) + "/Utils/RooGaussDoubleSidedExp.cc+")
-
-        ROOT.set_massRange(MassMin_, MassMax_, MassBin_)
-
-        ROOT.set_npvRange(npvMin_, npvMax_)
-        if year >= 2022:
-            ROOT.set_energy(energy)
-
-        ROOT.set_ptCut(args.ptCut)
-        ROOT.set_etaCut(args.etaCut)
-    
     byLS_data = utils.load_input_csv(byLS_filename)
     byLS_data = byLS_data.loc[(byLS_data['run'] >= int(args.beginRun)) & (byLS_data['run'] < int(args.endRun))]
     
@@ -227,9 +236,20 @@ if __name__ == '__main__':
         log.info(f"Found file `{fileName}`")
 
         log.debug("Have lumi secion list {0}".format(LSlist))        
-        log.info("Looping over measurements...")
+
+        # path in root file where the histograms are stored
+        dqmPrefix=f"DQMData/Run {run}/ZCounting/Run summary/Histograms/"
+
+        # get list of Z boson candidates per lumisection
+        ZCountlist = utils.load_histogram(
+            [f"h_mass_2HLT_{r}" for r in etaRegions]+[f"h_mass_1HLT_{r}" for r in etaRegions], 
+            fileName, LSlist, run=run, 
+            prefix=dqmPrefix, 
+            entries=True)
+
+        log.info(f"Looping over measurements in intervals of {LumiPerMeasurement}/pb")
         for m, goodLSlist in enumerate(
-            utils.get_ls_for_next_measurement(lumisections=LSlist, luminosities=Lumilist, #zcounts=ZCountlist, 
+            utils.get_ls_for_next_measurement(lumisections=LSlist, luminosities=Lumilist, zcounts=ZCountlist, 
                 lumiPerMeasurement=LumiPerMeasurement)
         ):
             if measurement is not None and measurement < m:
@@ -240,56 +260,37 @@ if __name__ == '__main__':
 
             # get histograms from good lumisections
             log.info("Load histograms ...")
-            prefix=f"DQMData/Run {run}/ZCounting/Run summary/Histograms/"
             
             # get histogram with primary vertex distribution
-            hPV = utils.load_histogram("h_npv", fileName, goodLSlist, run=run, prefix=prefix, suffix="new", pileup=True)
+            hPV = utils.load_histogram("h_npv", fileName, goodLSlist, run=run, prefix=dqmPrefix, pileup=True)
+            hPV = utils.np_to_hist(hPV, npvBin_, npvMin_, npvMax_, "TH1", "hPV")
 
             # get histograms binned in mass
-            def load(name_):
-                return utils.load_histogram(name_, fileName, goodLSlist, run=run, 
-                    MassBin=MassBin_, MassMin=MassMin_, MassMax=MassMax_, 
-                    prefix=prefix, 
-                    suffix="new")
-            
-            # load histograms for hlt efficiency and Z yield
-            h2HLT = load(f"h_mass_2HLT_BB")
-            h1HLT = load(f"h_mass_1HLT_BB")
+            def load(name_, mBins=MassBin_, mMin=MassMin_, mMax=MassMax_):
+                hist_np = utils.load_histogram([f"h_mass_{name_}_{r}" for r in etaRegions], fileName, goodLSlist, run=run, 
+                    MassBin=mBins, MassMin=mMin, MassMax=mMax, 
+                    prefix=dqmPrefix)
+                return utils.np_to_hist(hist_np, mBins, mMin, mMax, "TH1", name_) #convert numpy array into ROOT.TH1
 
-            # load histograms with probes that fail selection, for selection efficiency
-            hIDfail = load(f"h_mass_SIT_fail_BB")
+            # load histograms for hlt efficiency and Z yield
+            h2HLT = load("2HLT")
+            h1HLT = load("1HLT")
+
+            # load histograms with probes that fail ID, for ID efficiency
+            hIDfail = load("ID_fail")
 
             # load histograms for global muon efficiency
-            # hGlopass = load(f"h_mass_Glo_pass_BB")
-            hGlofail = load(f"h_mass_Glo_fail_BB")
+            hGlopass = load("Glo_pass", MassBinSta_, MassMinSta_, MassMaxSta_)
+            hGlofail = load("Glo_fail", MassBinSta_, MassMinSta_, MassMaxSta_)
 
             # load histograms for standalone muon efficiency
-            # hStapass = load(f"h_mass_Sta_pass_BB")
-            # hStafail = load(f"h_mass_Sta_fail_BB")
-
-            if etaRegion == "I":
-                h2HLT += load(f"h_mass_2HLT_BE")
-                h2HLT += load(f"h_mass_2HLT_EE")
-
-                h1HLT += load(f"h_mass_1HLT_BE")
-                h1HLT += load(f"h_mass_1HLT_EE")
-
-                hIDfail += load(f"h_mass_SIT_fail_BE")
-                hIDfail += load(f"h_mass_SIT_fail_EE")
-
-                # hGlopass += load(f"h_mass_Glo_pass_BE")
-                # hGlopass += load(f"h_mass_Glo_pass_EE")
-                hGlofail += load(f"h_mass_Glo_fail_BE")
-                hGlofail += load(f"h_mass_Glo_fail_EE")
-                
-                # hStapass += load(f"h_mass_Sta_pass_BE")
-                # hStapass += load(f"h_mass_Sta_pass_EE")
-                # hStafail += load(f"h_mass_Sta_fail_BE")
-                # hStafail += load(f"h_mass_Sta_fail_EE")
+            hStapass = load("Sta_pass")
+            hStafail = load("Sta_fail")
 
             recLumi = byLS_m['recorded(/pb)'].sum()
 
             log.info("Have now recorded lumi = {0}".format(recLumi))            
+            log.info("Have now {0} ({1}) HLT 2 (1) events".format(sum(h2HLT), sum(h1HLT)))
 
             log.info("Histograms filled ...")  
 
@@ -308,37 +309,23 @@ if __name__ == '__main__':
                     ROOT.set_output(outSubDir)
                     ROOT.set_luminosity(recLumi)
 
-                    hPV = utils.np_to_hist(hPV, npvBin_, npvMin_, npvMax_, "TH1", "hPV")
-
-                    def to_hist(h_, name):
-                        return utils.np_to_hist(h_, MassBin_, MassMin_, MassMax_, "TH1", name)
-                    
-                    h2HLT = to_hist(h2HLT, "HLT2")
-                    h1HLT = to_hist(h1HLT, "HLT1")
-                    hIDfail = to_hist(hIDfail, "IDfail")
-                    # hGlopass = to_hist(hGlopass, "Glopass")
-                    hGlofail = to_hist(hGlofail, "Glofail")
-                    # hStapass = to_hist(hStapass, "Stapass")
-                    # hStafail = to_hist(hStafail, "Stafail")
-
-                    ROOT.getZyield(h2HLT, m, "HLT", etaRegion, sigModel, bkgModelPass, 2, sigTemplates, 0)
-                    ROOT.getZyield(h1HLT, m, "HLT", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
-                    ROOT.getZyield(hIDfail, m, "Sel", etaRegion, sigModel, bkgModelPass, 0, sigTemplates, 0)
+                    ROOT.getZyield(h2HLT, m, "HLT", etaRegionZ, sigModel, bkgModelPass, 2, sigTemplates, 0)
+                    ROOT.getZyield(h1HLT, m, "HLT", etaRegionZ, sigModel, bkgModelPass, 1, sigTemplates, 0)
+                    ROOT.getZyield(hIDfail, m, "ID", etaRegion, sigModel, bkgModelPass, 0, sigTemplates, 0)
 
                     ROOT.set_massRange(MassMinSta_, MassMaxSta_, MassBinSta_)
-                    # ROOT.getZyield(hGlopass, m, "Glo", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
+                    ROOT.getZyield(hGlopass, m, "Glo", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
                     ROOT.getZyield(hGlofail, m, "Glo", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, 0)
                     ROOT.set_massRange(MassMin_, MassMax_, MassBin_)
 
-                    # ROOT.getZyield(hStapass, m, "Sta", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
-                    # ROOT.getZyield(hStafail, m, "Sta", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, 0)
+                    ROOT.getZyield(hStapass, m, "Sta", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
+                    ROOT.getZyield(hStafail, m, "Sta", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, 0)
 
                     # remove the histogram templates, not needed anymore
                     os.system("rm {0}/histTemplates_*".format(outSubDir))
 
             cHLT = ROOT.extractCorrelation_HLT(sigTemplates, hPV, etaRegionZ)
-
-            result = extract_results(outSubDir, m, cHLT)
+            result = extract_results(outSubDir, m, cHLT, hPV, mcCorrelations)
 
             if result:
                 delLumi = byLS_m['delivered(/pb)'].sum()
@@ -383,4 +370,4 @@ if __name__ == '__main__':
     if args.writeSummaryCSV:
         utils.writeSummaryCSV(outCSVDir)
 
-    log.info("Done")
+    print("Done!") # needed for submit script to check if job is completed

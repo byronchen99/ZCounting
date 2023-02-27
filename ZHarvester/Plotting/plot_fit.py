@@ -13,40 +13,26 @@ import os
 import matplotlib.gridspec as gridspec
 import matplotlib.ticker as ticker
 
-textsize = 16
-markersize = 4
-fmt='png'
+from common import parsing, plotting
+from common.logging import child_logger
+log = child_logger(__name__)
 
-plt.rcParams.update({
-    "text.usetex": True,
-    "font.family": "serif",
-    "font.serif": ["Palatino",],
-    "font.size": textsize,
-    'text.latex.preamble': [r"""\usepackage{bm}"""],
-    'figure.figsize': [7, 4.5]
-})
+from common import parsing, plotting, logging
 
-mpl.rcParams.update({
-    "legend.fontsize" : "medium",
-    "axes.labelsize" : "medium",
-    "axes.titlesize" : "medium",
-    "xtick.labelsize" : "medium",
-    "ytick.labelsize" : "medium",
-})
-
-markersize = 4
-
-parser = argparse.ArgumentParser()
-
+parser = parsing.parser_plot()
 parser.add_argument("-w","--workspace", required=True, type=str, help="Workspace in .root format")
 parser.add_argument("--label",  default='Work in progress',  type=str, help="give cms label ")
 parser.add_argument("--year",  default=2022,  type=int, help="specify year for labeling ")
 parser.add_argument("--logscale",  default=False,  type=bool, help="plot y-axis in logscale")
 parser.add_argument("--pulls",  default=True,  type=bool, help="add panel with pull distribution")
-parser.add_argument("-s","--saveDir",  default='./',  type=str, help="give output dir")
 args = parser.parse_args()
+log = logging.setup_logger(__file__, args.verbose)
 
 # settings
+colors, textsize, labelsize, markersize = plotting.set_matplotlib_style()
+
+fmt='png'
+
 logscale = args.logscale
 pulls = args.pulls
 xlabel = "Z boson candidate mass [GeV]"
@@ -58,8 +44,8 @@ if year >= 2022:
 else: 
     energy = 13
 
-if not os.path.isdir(args.saveDir):
-    os.mkdir(args.saveDir)
+if not os.path.isdir(args.output):
+    os.mkdir(args.output)
 
 # need to load RooCMS shape to read background model
 ROOT.gROOT.LoadMacro(os.path.dirname(os.path.realpath(__file__))+"/RooCMSShape.cc")
@@ -285,8 +271,8 @@ def plot_fill(name, nSig, nBkg, mSig, mBkg, hist, chi2,
         ax2.yaxis.set_label_coords(-0.12, 0.5)
 
     #ax1.yaxis.set_label_coords(-0.12, 0.5)
-    print("Plot {0}/fit_{1}.{2}".format(args.saveDir, name, fmt))
-    plt.savefig(args.saveDir+"/fit_{0}.{1}".format(name, fmt))
+    print("Plot {0}/fit_{1}.{2}".format(args.output, name, fmt))
+    plt.savefig(args.output+"/fit_{0}.{1}".format(name, fmt))
     plt.close()
 
 for i in range(len(names)):

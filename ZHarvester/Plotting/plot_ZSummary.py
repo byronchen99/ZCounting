@@ -1,5 +1,4 @@
 import os,sys
-import ROOT
 import argparse
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
@@ -14,51 +13,30 @@ from pandas.plotting import register_matplotlib_converters
 register_matplotlib_converters()
 
 sys.path.append(os.getcwd())
-print(os.getcwd())
-
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
-from python.utils import to_DateTime
-from python.corrections import apply_muon_prefire, apply_ECAL_prefire
-from python.utils import to_DateTime
 
-ROOT.gROOT.SetBatch(True)
-ROOT.gStyle.SetCanvasPreferGL(1)
-ROOT.gStyle.SetTitleX(.3)
+from common.utils import to_DateTime
+from common.corrections import apply_muon_prefire, apply_ECAL_prefire
 
-parser = argparse.ArgumentParser()
+from common import parsing, plotting, logging
 
+parser = parsing.parser_plot()
 parser.add_argument("-r","--rates", required=True, nargs='+', help="Nominator csv file with z rates per measurement")
 parser.add_argument("-x","--xsec", type=str,
     help="csv file with z rates per measurement where xsec should be taken from (e.g. from low pileup run)")
-parser.add_argument("--label",  default='Work in progress',  type=str, help="specify label ('Work in progress', 'Preliminary', )")
-parser.add_argument("-s","--saveDir",  default='./',  type=str, help="give output dir")
 args = parser.parse_args()
+log = logging.setup_logger(__file__, args.verbose)
 
-outDir = args.saveDir
+outDir = args.output
 if not os.path.isdir(outDir):
     os.mkdir(outDir)
 
 # --- settings
 run2 = True
 secPerLS=float(23.3)
-labelsize = 12.5
-textsize = 15
 
-plt.rcParams.update({
-    "text.usetex": True,
-    "font.family": "serif",
-    "font.serif": ["Palatino",],
-    "font.size": textsize,
-    'text.latex.preamble': [r"""\usepackage{bm}"""]
-})
+colors, textsize, labelsize, markersize = plotting.set_matplotlib_style()
 
-mpl.rcParams.update({
-    "legend.fontsize" : "medium",
-    "axes.labelsize" : "medium",
-    "axes.titlesize" : "medium",
-    "xtick.labelsize" : "medium",
-    "ytick.labelsize" : "medium",
-})
 
 # --- PHYSICS luminosity
 
@@ -71,10 +49,10 @@ unc_2016 = np.sqrt((0.012)**2 + (0.017)**2 - 2*0.012*0.017*0.26)
 unc_2017 = np.sqrt((0.023)**2 + (0.017)**2 - 2*0.023*0.017*0.76)
 unc_2018 = np.sqrt((0.025)**2 + (0.017)**2 - 2*0.025*0.017*0.43)
 
-print("relative uncertainties attributed to PHYSICS: ")
-print("2016: "+str(unc_2016))
-print("2017: "+str(unc_2017))
-print("2018: "+str(unc_2018))
+log.info("relative uncertainties attributed to PHYSICS: ")
+log.info("2016: "+str(unc_2016))
+log.info("2017: "+str(unc_2017))
+log.info("2018: "+str(unc_2018))
 
 # --- if averages should be plotted
 plot_averages = run2
@@ -84,7 +62,7 @@ plot_averages = run2
 
 # --- get Z xsec
 if args.xsec:
-    print("get Z cross section")
+    log.info("get Z cross section")
     data_xsec = pd.read_csv(str(args.xsec), sep=',',low_memory=False)#, skiprows=[1,2,3,4,5])
 
     if data_xsec['recZCount'].dtype==object:
@@ -93,7 +71,7 @@ if args.xsec:
     apply_muon_prefire(data_xsec)
     apply_ECAL_prefire(data_xsec)
 
-    print("apply prefire corrections - done")
+    log.info("apply prefire corrections - done")
 
     xsec = sum(data_xsec['recZCount'])/sum(data_xsec['recLumi'])
     normalize = False
@@ -107,7 +85,7 @@ else:
     # normalize = False
     
 # --- z luminosity
-print("get Z luminosity")
+log.info("get Z luminosity")
 data = pd.concat([pd.read_csv(csv, sep=',',low_memory=False) for csv in args.rates], ignore_index=True, sort=False)
 
 if data['recZCount'].dtype==object:
@@ -155,22 +133,22 @@ if False:
         lumi+= data_invalid['recLumi'].sum()/1000.
         lumi_diff+= (data_invalid['recLumi'] / data['zLumi_to_dLRec'] * 0.95).sum()/1000.
 
-    print("effected luminosity: {0}/fb".format(lumi))
-    print("estimated luminosity difference: {0}/fb".format(lumi-lumi_diff))
+    log.info("effected luminosity: {0}/fb".format(lumi))
+    log.info("estimated luminosity difference: {0}/fb".format(lumi-lumi_diff))
 
-print("sort out invalid runs")
+log.info("sort out invalid runs")
 for run in invalid_runs:
     data = data.loc[data['run'] != run]
 
 data['weightLumi'] = data['recLumi']
 
-print("analyze {0} fb^-1 of data (reference lumi)".format(data['weightLumi'].sum()/1000.))
-print("analyze {0} fb^-1 of data (z lumi)".format(data['zLumi'].sum()/1000.))
-print("ratio: z lumi/ ref. lumi = {0}".format(data['zLumi'].sum()/data['weightLumi'].sum()))
+log.info("analyze {0} fb^-1 of data (reference lumi)".format(data['weightLumi'].sum()/1000.))
+log.info("analyze {0} fb^-1 of data (z lumi)".format(data['zLumi'].sum()/1000.))
+log.info("ratio: z lumi/ ref. lumi = {0}".format(data['zLumi'].sum()/data['weightLumi'].sum()))
 
-print("Outliers:")
+log.info("Outliers:")
 data_out = data.loc[abs(data['zLumi_to_dLRec']-1) > 0.1]
-print(data_out[["recLumi","run","fill", "measurement","zLumi_to_dLRec","recZCount"]])
+log.info(data_out[["recLumi","run","fill", "measurement","zLumi_to_dLRec","recZCount"]])
 
 # sort out outliers
 data = data.loc[abs(data['zLumi_to_dLRec']-1) < 0.1]
@@ -264,7 +242,7 @@ def make_hist(
         ax.set_xlim(range)
 
         histname = "/hist_weighted_"+saveas if weighted else "/hist_"+saveas
-        print("save histogram as {0}".format(outDir+histname))
+        log.info("save histogram as {0}".format(outDir+histname))
         plt.xticks(fontsize = labelsize)
         plt.yticks(fontsize = labelsize)
 
@@ -321,7 +299,7 @@ def make_hist(
 
             # ww = data['weightLumi'].values,
             # rms = (sum((ww*yy)**2)/sum(ww))**0.5
-            # print(f"RMS = {rms}")
+            # log.info(f"RMS = {rms}")
 
             if suffix1 == "lumi" and plot_averages:
                 # average lumi bars at centered at half of the lumi in each bar
@@ -401,7 +379,7 @@ def make_hist(
             if suffix1 in ("time", ):
                 xfmt = mdates.DateFormatter('%Y-%m-%d')
                 ax.xaxis.set_major_formatter(xfmt)
-            print("save scatter as {0}".format(outDir+"/scatter_"+suffix+"_"+suffix1+"_"+saveas))
+            log.info("save scatter as {0}".format(outDir+"/scatter_"+suffix+"_"+suffix1+"_"+saveas))
             plt.xticks(fontsize = labelsize)
             plt.yticks(fontsize = labelsize)
             if "lower" in legend:

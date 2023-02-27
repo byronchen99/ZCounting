@@ -1,4 +1,4 @@
-from python.logging import child_logger
+from common.logging import child_logger
 log = child_logger(__name__)
 
 from datetime import datetime
@@ -84,7 +84,7 @@ def getFileName(directory, run):
     """
 
     # check if run was processed already
-    eosFileList = glob.glob(directory + '/*' + str(run) + '*.root')
+    eosFileList = glob.glob(directory + '/DQM_V0000*' + str(run) + '*.root')
 
     # look one level deeper
     if len(eosFileList) == 0:
@@ -110,9 +110,10 @@ def load_histogram(
     fileName,
     lumisections=[0,],
     run=0, 
-    prefix="", suffix="", 
+    prefix="",
     MassBin=50, MassMin=66, MassMax=116, 
-    pileup=False
+    pileup=False,
+    entries=False,
 ):
     """
     load 2D histograms, project the specified lumisections to the mass axis: 
@@ -121,22 +122,36 @@ def load_histogram(
     
     Parameters
     ----------
-    name : str
+    name : str or list
         name of the histogram to load
     fileName : str
         file where the histogram is stored
     lumisections : list
         list of lumisections that are taken from the histogram
     run : integer
-        run number 
-    prefix/suffix : str
-        prefix for naming         
+        run number        
     MassBin/MassMin/MassMax : int
         For rebinning, Number of bins / Lower bound / Upper bound 
     pileup : Boolean
         If the pileup histogram is to be returned
+    entries : Boolean
+        Return the number of entries per lumisection
     """
 
+    # in case multiple names are specified, the hists with the corresponding names are summed together
+    if isinstance(name,list):
+        hist_summed = None
+        for n in name:
+            hist = load_histogram(n, fileName, lumisections, run, prefix, MassBin, MassMin, MassMax, pileup, entries)
+            if hist is None:
+                log.error(f"Not able to get histogram for {n}")
+                return None
+            elif hist_summed is None:
+                hist_summed = hist
+            else:
+                hist_summed += hist
+        return hist_summed
+        
     with uproot.open("{0}:{1}{2}".format(fileName, prefix, name)) as th_:
 
         h_ = th_.to_numpy()
@@ -144,8 +159,13 @@ def load_histogram(
         # x-axis is mass or primary vertices
         bins_x = h_[2]
 
+        # lumisections need to subtract -1 because lumisection 1 is at index 0 etc.
+
+        if entries:
+            return np.sum(h_[0][np.array(lumisections)-1], axis=1).astype(int)
+
         # select lumisections
-        h_ = np.sum(h_[0][lumisections], axis=0)
+        h_ = np.sum(h_[0][np.array(lumisections)-1], axis=0).astype(int)
 
         if sum(h_) <= 0:
             log.warning(f"No entries found in histogram {name}")
@@ -156,7 +176,7 @@ def load_histogram(
         bins_new = np.linspace(MassMin, MassMax, MassBin+1)
 
         # no rebinning if bins are already the same
-        if bins_new == bins_x or (len(bins_new)==len(bins_x) and (bins_new == bins_x).all()):
+        if len(bins_new)==len(bins_x) and (bins_new == bins_x).all():
             return h_
         
         binWidth = bins_x[1:]-bins_x[:-1]
@@ -210,7 +230,8 @@ def np_to_hist(y, nBins=None, binLow=None, binHigh=None, histtype="TH1", name=""
     if histtype == "TH1":
         hist = ROOT.TH1D(name, name, nBins, binLow, binHigh)
         for i, v in enumerate(y):
-            hist.SetBinContent(i, v)
+            # Have to add +1 because first bin is bin 1; bin 0 is underflow bin
+            hist.SetBinContent(i+1, v)
         return hist
 
 
@@ -244,11 +265,18 @@ def get_ls_for_next_measurement(
         If the luminosity in one lumisection is above this value and the number z counts is zero, the ls is skipped 
     """
     
-    if luminosities:
+    if luminosities is not None:
         # make measurement based on number of lumisections
         if len(lumisections) != len(luminosities):
             log.error("Same length of lumisections and luminosities is required!")
-        
+        luminosities = list(luminosities)
+
+    if zcounts is not None:
+        # make measurement based on number of zcounts
+        if len(lumisections) != len(zcounts):
+            log.error("Same length of lumisections and zcounts is required!")
+        zcounts = list(zcounts)
+
     while len(lumisections) > 0:
         
         # merge data to one measuement if remaining luminosity is too less for two measuements
@@ -262,13 +290,13 @@ def get_ls_for_next_measurement(
         list_good_ls_ = []
         while len(lumisections) > 0:
             
-            if luminosities and zcounts:
+            if luminosities is not None and zcounts is not None:
                 # consider lumisections where we would expect to have at least any z count 
                 #   (for lumi > 0.01 /pb we expect 0.01*500 = 5 Z bosons, the probability to find 0 is < 1%)
                 #   (for lumi > 0.02 /pb we expect 0.02*500 = 10 Z bosons, the probability to find 0 is < 0.01%)
                 # sort out lumisections without any Z candidate (maybe trigger was off)
                 if luminosities[0] > threshold and zcounts[0] == 0:
-                    log.warning("Zero Z boson candidates found {0}/pb while we would expect {1} -> skip lumi section {2}".format(luminosities[0], luminosities[0]*500, lumisections[0]))
+                    log.warning("Zero Z boson candidates found in lumisection with {0}/pb. Would expect {1} -> skip lumi section {2}".format(luminosities[0], luminosities[0]*500, lumisections[0]))
                     del lumisections[0]
                     del luminosities[0]
                     del zcounts[0]
@@ -277,14 +305,13 @@ def get_ls_for_next_measurement(
             list_good_ls_.append(lumisections[0])
             del lumisections[0]
             
-            if zcounts:
+            if zcounts is not None:
                 del zcounts[0]
                 
-            if luminosities:
+            if luminosities is not None:
                 recLumi_ += luminosities[0]
                 del luminosities[0]
 
-                
                 # if we have collected enough luminosity
                 if not mergeMeasurements_ and recLumi_ >= lumiPerMeasurement:
                     break
@@ -313,20 +340,23 @@ def getCorrelation(hPV_data, correlationsFileName, which, region="I"):
     region: str
         eta region for the correlation factor, can be: "I", "BB", "BE", "EE"
     """
-    ROOT.gROOT.SetBatch(True) # disable root prompts
 
-    tfile = ROOT.TFile(correlationsFileName,"READ")
-
-    # normalize pileup histogram
-    hPV_data.Scale(1./hPV_data.Integral())
     avgPV = hPV_data.GetMean()
-    hC = tfile.Get("C{0}_{1}".format(which, region))
 
-    hC.Multiply(hPV_data)
+    with uproot.open(f"{correlationsFileName}:C{which}_{region}") as th_:
+        h_, x_ = th_.to_numpy()
+        xCenter = x_[:-1] + (x_[1:] - x_[:-1])/2.
+        
+        # underflow bin is for nPV=0 in hPV_data -> we take from element 0
+        hPV_ = np.array([hPV_data.GetBinContent(hPV_data.FindBin(xCenter[i])) for i in range(min(len(xCenter),hPV_data.GetNbinsX()+1))])
 
-    corr = hC.Integral()
+        # normalize pileup histogram
+        hPV_ = hPV_/sum(hPV_)
 
-    tfile.Close()
+        # if histograms have different range
+        hi = max(len(h_), len(hPV_))
+        corr = sum(h_[:hi] * hPV_[:hi])
+
     log.info("Correlation coefficienct c{0}_{1} = {2}".format(which, region, corr))
     log.info("For average primary vertices of <pv> = {0}".format(avgPV))
     return corr

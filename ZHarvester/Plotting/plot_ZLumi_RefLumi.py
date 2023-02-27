@@ -12,22 +12,23 @@ import pdb
 sys.path.append(os.getcwd())
 
 os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
-from python.corrections import apply_muon_prefire, apply_ECAL_prefire
-from python.utils import to_DateTime, load_input_csv
+from common.corrections import apply_muon_prefire, apply_ECAL_prefire
+from common.utils import to_DateTime, load_input_csv
 
 # disable panda warnings when assigning a new column in the dataframe
 pd.options.mode.chained_assignment = None
 
-parser = argparse.ArgumentParser()
+from common import parsing, plotting, logging
 
+parser = parsing.parser_plot()
 parser.add_argument("-r", "--rates", required=True, type=str, help="csv file with z rates per measurement")
 parser.add_argument("-l", "--refLumi", default="", type=str, help="give a ByLs.csv as input for additional reference Luminosity")
 parser.add_argument("-x", "--xsec", default="", type=str, help="csv file with z rates per measurement for absolute scale")
 parser.add_argument("-f", "--fill", nargs="*",  type=int, default=[], help="specify a single fill to plot")
-parser.add_argument("--label",  default='Work in progress',  type=str, help="specify label ('Work in progress', 'Preliminary', )")
-parser.add_argument("-s", "--saveDir",  default='./',  type=str, help="give output dir")
 args = parser.parse_args()
-outDir = args.saveDir
+log = logging.setup_logger(__file__, args.verbose)
+
+outDir = args.output
 if not os.path.isdir(outDir):
     os.mkdir(outDir)
 
@@ -44,29 +45,13 @@ else:
     energystr = "$\sqrt{s}=13\,\mathrm{TeV}$"
 
 # plotting options
+colors, textsize, labelsize, markersize = plotting.set_matplotlib_style()
 
-textsize = 16
-markersize = 4.0
 lefttitle = "$\sqrt{s}=13\,\mathrm{TeV}$"
 xlabel = "LHC runtime [h]"
 ylabelLumi = "Inst. luminosity [nb$^{-1}$s$^{-1}$]"
 ylabelEff = "Efficiency"
 
-plt.rcParams.update({
-    "text.usetex": True,
-    "font.family": "serif",
-    "font.serif": ["Palatino",],
-    "font.size": textsize,
-    'text.latex.preamble': [r"""\usepackage{bm}"""]
-})
-
-mpl.rcParams.update({
-    "legend.fontsize" : "medium",
-    "axes.labelsize" : "medium",
-    "axes.titlesize" : "medium",
-    "xtick.labelsize" : "medium",
-    "ytick.labelsize" : "medium",
-})
 
     
 ########## Data Acquisition ##########
@@ -80,7 +65,7 @@ if args.refLumi != "":
     if args.fill != []:
         data_ref = data_ref.loc[data_ref['fill'].isin(args.fill)]
     else:
-        print("Plot all fills")
+        log.info("Plot all fills")
 
     data_ref['time'] = data_ref['time'].apply(lambda x: to_DateTime(x, string_format = "mm/dd/yy"))
     data_ref['time'] = mpl.dates.date2num(data_ref['time'])
@@ -96,14 +81,14 @@ else:
 
 # --- absolute scale for z luminosity
 if args.xsec != "":
-    print("get Z cross section")
+    log.info("get Z cross section")
     data_xsec = pd.read_csv(str(args.xsec), sep=',',low_memory=False)#, skiprows=[1,2,3,4,5])
     data_xsec['zDelI'] = data_xsec['zDel'].apply(lambda x: unc.ufloat_fromstr(x).n)
 
     apply_muon_prefire(data_xsec)
     apply_ECAL_prefire(data_xsec)
 
-    print("apply prefire corrections - done")
+    log.info("apply prefire corrections - done")
 
     xsecI = sum(data_xsec['zDelI'])/sum(data_xsec['lumiRec'])
 else:
@@ -133,7 +118,7 @@ def unorm(x):
 
 # # sort out nan values
 # nan = np.isnan(data['ZRate'])
-# print(f"Sort out {sum(nan)} nan values")
+# log.info(f"Sort out {sum(nan)} nan values")
 # data = data.loc[nan==False]
 
 # # efficiency corrected number of Z bosons in timewindow, w/o deadtime corrections
@@ -157,11 +142,11 @@ for key in ('effHLT', 'effID', 'effGlo', 'effSta'):
 do_ratio=True ## activate the ratio plots 
 
 for fill, data_fill in data.groupby("fill"):
-    print(f"Now at fill {fill}")
+    log.info(f"Now at fill {fill}")
 
     
     if len(data_fill) == 1:
-        print("Only one measurement, next fill ")
+        log.info("Only one measurement, next fill ")
         continue
 
     if extLumi:
@@ -173,7 +158,7 @@ for fill, data_fill in data.groupby("fill"):
         ref_fill = data_ref.loc[data_ref["fill"] == fill]
 
         if len(ref_fill) == 0:
-            print("WARNING! Fill is not present in external luminosity source!")
+            log.warning("Fill is not present in external luminosity source!")
 
         ref_fill_lumi = []
         for tUp, tDown in data_fill[['timeUp','timeDown']].values:
