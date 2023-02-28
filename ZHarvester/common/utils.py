@@ -93,7 +93,8 @@ def getFileName(directory, run):
         eosFileList = glob.glob(f'{directory}/Muon/000{str(run)[:-2]}xx/*{run}*.root')
     if len(eosFileList) == 0:
         eosFileList = glob.glob(f'{directory}/SingleMuon/000{str(run)[:-2]}xx/*{run}*.root')
-
+    if len(eosFileList) == 0:
+        eosFileList = glob.glob(f'{directory}/*/*{run}*.root')
     if not len(eosFileList) > 0:
         log.warning(f"The file does not (yet) exist for run: {run}")
         return None
