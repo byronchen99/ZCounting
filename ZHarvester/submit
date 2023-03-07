@@ -60,12 +60,14 @@ def zmonitoring(
     # cs_file.write("RequestMemory = 19999 \n")
     if longQueue:
         # long queue
-        cs_file.write("+RequestRuntime = 43200 \n")  # only works at naf(desy) 43200s = 12h
-        cs_file.write("RequestMemory = 19999 \n") 
+        #cs_file.write("+RequestRuntime = 43200 \n")  # only works at naf(desy) 43200s = 12h
+        cs_file.write("+JobFlavour = \"workday\" \n") # only works at CERN (workday = 8 hours)
+        #cs_file.write("RequestMemory = 19999 \n") 
     else:
         # short queue: with memory < 2GB -> request 1999MB and time < 3h -> request 10799s
-        cs_file.write("+RequestRuntime = 10799 \n")  # only works at naf(desy) 43200s = 12h
-        cs_file.write("RequestMemory = 1999 \n") 
+        #cs_file.write("+RequestRuntime = 10799 \n")  # only works at naf(desy) 43200s = 12h
+        cs_file.write("+JobFlavour = \"longlunch\" \n")  # only works at CERN (longlunch = 2 hours)
+        #cs_file.write("RequestMemory = 1999 \n") 
     
     dirOut = os.path.abspath(dirOut)
 
