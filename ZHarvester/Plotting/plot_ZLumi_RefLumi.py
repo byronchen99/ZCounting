@@ -37,12 +37,6 @@ if not os.path.isdir(outDir):
 secPerLS=float(23.3)
 
 fmt = "pdf"
-year = 2017
-
-if year >= 2022:
-    energystr = "$\sqrt{s}=13.6\,\mathrm{TeV}$"
-else:
-    energystr = "$\sqrt{s}=13\,\mathrm{TeV}$"
 
 # plotting options
 colors, textsize, labelsize, markersize = plotting.set_matplotlib_style()
@@ -51,8 +45,6 @@ lefttitle = "$\sqrt{s}=13\,\mathrm{TeV}$"
 xlabel = "LHC runtime [h]"
 ylabelLumi = "Inst. luminosity [nb$^{-1}$s$^{-1}$]"
 ylabelEff = "Efficiency"
-
-
     
 ########## Data Acquisition ##########
 
@@ -144,6 +136,10 @@ do_ratio=True ## activate the ratio plots
 for fill, data_fill in data.groupby("fill"):
     log.info(f"Now at fill {fill}")
 
+    if int(fill) >= 8000:
+        energystr = "$13.6\,\mathrm{TeV} (2022)$"
+    else:
+        energystr = "$13\,\mathrm{TeV} (2017)$"
     
     if len(data_fill) == 1:
         log.info("Only one measurement, next fill ")
@@ -211,13 +207,9 @@ for fill, data_fill in data.groupby("fill"):
     plt.clf()
     fig = plt.figure()
     
-    # ax1 = fig.add_subplot(111)
+    ax1 = fig.add_subplot(111)
     
-    gs = gridspec.GridSpec(2, 1)
-    ax1 = plt.subplot(gs[0])
-    ax2 = plt.subplot(gs[1])
-    
-    fig.subplots_adjust(left=0.15, right=0.95, top=0.95, bottom=0.125, hspace=0.0)
+    fig.subplots_adjust(left=0.15, right=0.97, top=0.97, bottom=0.125, hspace=0.0)
 
     ax1.set_xlabel(xlabel)
     ax1.set_ylabel(ylabelEff)
@@ -225,9 +217,10 @@ for fill, data_fill in data.groupby("fill"):
     maxY = 0
     minY = 1
     for eff, name, col, mkr, ms in (
-        ("effID", "$ \epsilon_\mathrm{ID|Glo}^\mu $", "red", "^", markersize*1.2), 
         ("effGlo", "$ \epsilon_\mathrm{Glo|Sta}^\mu $", "green", "*", markersize*1.5), 
+        ("effID", "$ \epsilon_\mathrm{ID|Glo}^\mu $", "red", "^", markersize*1.2), 
         ("effSta", "$ \epsilon_\mathrm{Sta|Trk}^\mu $", "blue", "s", markersize), 
+        ("effHLT", "$ \epsilon_\mathrm{HLT}^\mu $", "black", "s", markersize), 
     ):
         
         y = np.array([y.n for y in data_fill[eff].values])
@@ -249,70 +242,20 @@ for fill, data_fill in data.groupby("fill"):
         maxY = max(maxY, max(y + yErr))
         minY = min(minY, min(y - yErr))
 
-    leg = ax1.legend(loc="lower left", ncol=3,
-        frameon=True, framealpha=1.0, fancybox=False, edgecolor="black")
-    leg.get_frame().set_linewidth(0.8)
+    leg = ax1.legend(loc="lower left", ncol=4)
     
     yRange = maxY - minY
-    ax1.set_ylim([minY-yRange*0.05, maxY + yRange*0.5])
-    #ax1.set_xlim([xMin, xMax])
-    ax1.set_ylim([0.96,1.005])
+    ax1.set_ylim([minY-yRange*0.25, 1.01])
+    ax1.set_xlim([xMin, xMax])
     ax1.set_xticks(xTicks)
 
-    ax1.xaxis.set_major_locator(ticker.NullLocator())
+    ax1.set_xticks(xTicks)
 
-    ax2.set_xlabel(xlabel)
-    ax2.set_ylabel(ylabelEff)
-
-    ax2.text(0.30, 0.97, "\\bf{CMS}", verticalalignment='top', transform=ax2.transAxes, fontsize="small", fontweight="bold")
-    ax2.text(0.41, 0.97, "\\emph{"+args.label+"}", verticalalignment='top', transform=ax2.transAxes, fontsize="small", style='italic') ## DPS Note
-    ax2.text(0.30, 0.86, f"13.6 TeV (2022)", verticalalignment='top', transform=ax2.transAxes, fontsize="small")    
-    ax2.text(0.30, 0.75, f"Fill {fill}", verticalalignment='top', transform=ax2.transAxes, fontsize="small")   
-
-    maxY = 0
-    minY = 1
-    for eff, name, col in (
-        ("effHLT", "$ \epsilon_\mathrm{HLT}^\mu $", "k"), 
-        # ("ZIeff", "$ ( \epsilon_\mathrm{ID}^\mu ) ^2 $", "r") 
-    ):    
-        y = np.array([y.n for y in data_fill[eff].values])
-        yErr = np.array([y.s for y in data_fill[eff].values])
-
-        # y = data_fill[eff].values
-
-        ax2.errorbar(x, y, xerr=(xDown, xUp), yerr=yErr, 
-            label=name,
-            marker="o", linewidth=0, color=col, ecolor=col, elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
-            zorder=1)
-
-        # ax2.plot(x, y, label=name,
-        #     marker="o", linewidth=0, color=col, markersize=markersize)
-        # yMax = [y.n + y.s for y in data_fill[eff].values]
-        # yMin = [y.n - y.s for y in data_fill[eff].values]
-                    
-        maxY = max(maxY, max(y + yErr))
-        minY = min(minY, min(y - yErr))
-
-    leg = ax2.legend(loc="upper left", ncol=1, frameon=True, framealpha=1.0, fancybox=False, edgecolor="black",
-        # borderpad=1, labelspacing=1
-        )    
-    leg.get_frame().set_linewidth(0.8)
-        
-    yRange = maxY - minY
-    ax2.set_ylim([minY-yRange*0.05, maxY + yRange*0.4])
-    #ax2.set_xlim([xMin, xMax])
-    ax2.set_ylim([0.86,0.899])
-    ax2.set_xticks(xTicks)
-
-    
-    # align y labels
-    ax1.yaxis.set_label_coords(-0.12, 0.5)
-    ax2.yaxis.set_label_coords(-0.12, 0.5)
+    ax1.text(0.02, 0.6, "{\\bf{CMS}} "+"\\emph{"+args.label+"} \n"+energystr+"\n Fill "+str(fill), verticalalignment='top', transform=ax1.transAxes)
 
     plt.savefig(outDir+f"/fill{fill}_eff.{fmt}")
     plt.close()    
-    
-    
+
     ### Make plot for lumi vs time
     plt.clf()
     fig = plt.figure()
@@ -327,12 +270,8 @@ for fill, data_fill in data.groupby("fill"):
         
     ax1.set_xlabel(xlabel)
     ax1.set_ylabel(ylabelLumi)
-    ax1.text(0.54, 0.97, "\\bf{CMS}", verticalalignment='top', transform=ax1.transAxes, weight="bold")
-    ax1.text(0.65, 0.97, "\\emph{"+args.label+"}", verticalalignment='top', transform=ax1.transAxes,style='italic')        ## DPS Note
-    ax1.text(0.54, 0.89, f"13.6 TeV (2022)", verticalalignment='top', transform=ax1.transAxes)    
-    ax1.text(0.54, 0.81, f"Fill {fill}", verticalalignment='top', transform=ax1.transAxes)   
+    ax1.text(0.97, 0.97, "{\\bf{CMS}} "+"\\emph{"+args.label+"} \n"+energystr+"\n Fill "+str(fill), horizontalalignment='right', verticalalignment='top', transform=ax1.transAxes)
 
-    
         
     if args.xsec == "":
         # normalize Z luminosity to reference luminosity    
@@ -360,8 +299,7 @@ for fill, data_fill in data.groupby("fill"):
         fmt="ko", ecolor='black', elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
         zorder=1)
 
-    leg = ax1.legend(loc="lower left", ncol=2, frameon=True, framealpha=1.0, fancybox=False, edgecolor="black")
-    leg.get_frame().set_linewidth(0.8)
+    leg = ax1.legend(loc="lower left", ncol=2)
 
     yMin = min(min(y),min(yRef))
     yMax = max(max(y),max(yRef))
@@ -369,11 +307,12 @@ for fill, data_fill in data.groupby("fill"):
     yRange = yMax - yMin 
     ax1.set_ylim([yMin - yRange*0.45, yMax + yRange*0.15])
     ax1.set_xlim([xMin, xMax])
+    
     ax1.set_xticks(xTicks)
-    
+
     if do_ratio:
-        ax1.xaxis.set_major_locator(ticker.NullLocator())
-    
+        ax1.set(xticklabels=[])
+
         ratios = []
         for zlumi, lumi in data_fill[['zLumi_mc','recLumi']].values:
             ratios.append(zlumi/lumi)
@@ -418,8 +357,7 @@ for fill, data_fill in data.groupby("fill"):
     ax1.set_xlabel("average pileup")
     ax1.set_ylabel(ylabelLumi)
 
-    ax1.text(0.97, 0.97, "\\bf{CMS} "+"\\emph{"+args.label+"} \n"+energystr+"\n Fill "+str(fill), 
-        horizontalalignment='right', verticalalignment='top', transform=ax1.transAxes)
+    ax1.text(0.02, 0.97, "{\\bf{CMS}} "+"\\emph{"+args.label+"} \n"+energystr+"\n Fill "+str(fill), horizontalalignment='left', verticalalignment='top', transform=ax1.transAxes)
 
     y = np.array([yy.n for yy in data_fill['zLumiInst_mc'].values])
     yErr = np.array([y.s for y in data_fill['zLumiInst_mc'].values])
@@ -437,8 +375,7 @@ for fill, data_fill in data.groupby("fill"):
         fmt="ko", ecolor='black', elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
         zorder=1)
 
-    leg = ax1.legend(loc="lower left", ncol=2, frameon=True, framealpha=1.0, fancybox=False, edgecolor="black")
-    leg.get_frame().set_linewidth(0.8)
+    leg = ax1.legend(loc="lower left", ncol=2)
 
     yMin = min(min(y),min(yRef))
     yMax = max(max(y),max(yRef))
@@ -446,11 +383,10 @@ for fill, data_fill in data.groupby("fill"):
     yRange = yMax - yMin 
     ax1.set_ylim([yMin - yRange*0.5, yMax + yRange*0.2])
     ax1.set_xlim([xMinPU, xMaxPU])
-    # ax1.set_xticks(xTicksPU)
-    
+
     if do_ratio:
-        ax1.xaxis.set_major_locator(ticker.NullLocator())
-    
+        ax1.set(xticklabels=[])
+
         ratios = []
         for zlumi, lumi in data_fill[['zLumi_mc','recLumi']].values:
             ratios.append(zlumi/lumi)

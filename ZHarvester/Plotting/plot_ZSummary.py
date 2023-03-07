@@ -8,6 +8,7 @@ import pandas as pd
 import uncertainties as unc
 import pdb
 from scipy.stats import norm    # for gauss function
+import matplotlib.ticker as ticker
 
 from pandas.plotting import register_matplotlib_converters
 register_matplotlib_converters()
@@ -167,9 +168,9 @@ def make_hist(
     rangey=[0.89,1.11]
 ):
     if "2022" in title:
-        lefttitle = "$\sqrt{s}=13.6\,\mathrm{TeV}$"
+        lefttitle = "$13.6\,\mathrm{TeV}$"
     else:
-        lefttitle = "$\sqrt{s}=13\,\mathrm{TeV}$"
+        lefttitle = "$13\,\mathrm{TeV}$"
 
     if title:
         lefttitle += " $(\mathrm{"+title+"})$"
@@ -210,6 +211,8 @@ def make_hist(
     range = (mean - width, mean + width)
     nBins = 60
 
+    plt.rcParams['font.size'] = '17.5'
+
     # --- make histogram
     # include overflow and underflow in last and first bin
     xx = np.array([min(max(v, mean-width), mean+width) for v in data['lumiratio'].values])
@@ -221,10 +224,10 @@ def make_hist(
 
         if weighted:
             nEntries, bins, _ = ax.hist(xx, weights=data['weightLumi'].values, bins=nBins, range=range)
-            ax.set_ylabel("Integrated luminosity [pb$^{-1}$]", fontsize=textsize)
+            ax.set_ylabel("Integrated luminosity [pb$^{-1}$]")
         else:
             nEntries, bins, _ = ax.hist(xx, bins=nBins, range=range)
-            ax.set_ylabel("Number of entries", fontsize=textsize)
+            ax.set_ylabel("Number of entries")
         
         if True:
             # # plot a gaussian function with mean and std from distribution for comparison
@@ -234,7 +237,7 @@ def make_hist(
             plt.plot(x, hist_integral*norm.pdf(x,mean,std), color="red", linestyle="solid")
 
             
-        ax.set_xlabel(label, fontsize=textsize)
+        ax.set_xlabel(label)
         ax.text(0.03, 0.97, "{\\bf{CMS}} "+"\\emph{"+args.label+"} \n"+lefttitle, verticalalignment='top', transform=ax.transAxes)
         ax.text(0.97, 0.97, "$\\mu$ = {0} \n $\\sigma$ = {1}".format(round(mean,3), round(std,3)), 
             verticalalignment='top', horizontalalignment="right", transform=ax.transAxes)
@@ -243,18 +246,19 @@ def make_hist(
 
         histname = "/hist_weighted_"+saveas if weighted else "/hist_"+saveas
         log.info("save histogram as {0}".format(outDir+histname))
-        plt.xticks(fontsize = labelsize)
-        plt.yticks(fontsize = labelsize)
 
         plt.savefig(outDir+histname+".png")
         plt.savefig(outDir+histname+".pdf")
         plt.close()
 
+
+    plt.rcParams['font.size'] = '16'
+
     # --- make scatter
     for xx, xxSum, xlabel, suffix1 in (
-        # (data['time'].values, time.values, "Time", "time"),
-        # (data['fill'].values, fill.values, "Fill number", "fill"),
-        # (data['run'].values, run.values, "Run number", "run"),
+        (data['time'].values, time.values, "Time", "time"),
+        (data['fill'].values, fill.values, "Fill number", "fill"),
+        (data['run'].values, run.values, "Run number", "run"),
         (data['weightLumi'].cumsum().values/1000, weight.cumsum().values/1000., "Integrated luminosity [fb$^{-1}$]", "lumi"),
     ):
         rangex = min(xx)-(max(xx)-min(xx))*0.01, max(xx)+(max(xx)-min(xx))*0.01
@@ -317,9 +321,8 @@ def make_hist(
 
             ax.text(0.02, 0.97, "{\\bf{CMS}} "+"\\emph{"+args.label+"} \n"+lefttitle, verticalalignment='top', transform=ax.transAxes)
 
-
-            ax.set_xlabel(xlabel, fontsize=textsize)
-            ax.set_ylabel(ylabel, fontsize=textsize)
+            ax.set_xlabel(xlabel)
+            ax.set_ylabel(ylabel)
             # ax.set_ylim(rangey)
             ax.set_ylim(rangey)
             ax.set_xlim(rangex)
@@ -386,8 +389,8 @@ def make_hist(
                 ncol = 3
             else:
                 ncol = 2
-            ax.legend(loc=legend, ncol=ncol, markerscale=3, scatteryoffsets=[0.5], fontsize=textsize, frameon=True, framealpha=1.0, fancybox=False, edgecolor="black")
 
+            ax.legend(loc=legend, ncol=ncol, markerscale=3, scatteryoffsets=[0.5])
             ax.xaxis.set_label_coords(0.5, -0.1)
 
             plt.savefig(outDir+"/scatter_"+suffix+"_"+suffix1+"_"+saveas+".png")
@@ -405,21 +408,21 @@ def make_hist(
 # make_hist(data, label="ZCount(EE) / PHYSICS", saveas="zcountEE")
 # # make_hist(data, label="ZCount(I) / PHYSICS", saveas="zcountI")
 
-make_hist(data, run_range=(272007,294645), saveas="2016_zcount", title="2016",rangey=[0.92,1.08])#, rangey=[0.7,1.08])
-make_hist(data, run_range=(272007,278769), saveas="2016preVFP_zcount", title="2016\ pre\ VFP",rangey=[0.92,1.08])
-make_hist(data, run_range=(278769,294645), saveas="2016postVFP_zcount", title="2016\ post\ VFP",rangey=[0.92,1.08])
+# make_hist(data, run_range=(272007,294645), saveas="2016_zcount", title="2016",rangey=[0.92,1.08])#, rangey=[0.7,1.08])
+# make_hist(data, run_range=(272007,278769), saveas="2016preVFP_zcount", title="2016\ pre\ VFP",rangey=[0.92,1.08])
+# make_hist(data, run_range=(278769,294645), saveas="2016postVFP_zcount", title="2016\ post\ VFP",rangey=[0.92,1.08])
 
 # make_hist(data, run_range=(297046,299329), saveas="2017B_zcount", title="2017 B")#,rangey=[0.85,1.15])
 # make_hist(data, run_range=(303434,304797), saveas="2017E_zcount", title="2017 E")#,rangey=[0.85,1.15])
 # make_hist(data, run_range=(305040,306462), saveas="2017F_zcount", title="2017 F")#,rangey=[0.85,1.15])
 
-make_hist(data, run_range=(297046,306462), saveas="2017_zcount", title="2017",  legend="lower right",rangey=[0.92,1.08])#)
+# make_hist(data, run_range=(297046,306462), saveas="2017_zcount", title="2017",  legend="lower right",rangey=[0.92,1.08])#)
 # make_hist(data, run_range=(297046,306462), label="ZCount(I) / PHYSICS", saveas="2017_zcountI", title="2017")#,rangey=[0.85,1.15])
 # make_hist(data, run_range=(297046,306462), label="ZCount(BB) / PHYSICS", saveas="2017_zcountBB", title="2017")#,rangey=[0.85,1.15])
 # make_hist(data, run_range=(297046,306462), label="ZCount(BE) / PHYSICS", saveas="2017_zcountBE", title="2017")#,rangey=[0.85,1.15])
 # make_hist(data, run_range=(297046,306462), label="ZCount(EE) / PHYSICS", saveas="2017_zcountEE", title="2017")#,rangey=[0.85,1.15])
 # 
-make_hist(data, run_range=(315252,325175), saveas="2018_zcount", title="2018",rangey=[0.92,1.08])
+# make_hist(data, run_range=(315252,325175), saveas="2018_zcount", title="2018",rangey=[0.92,1.08])
 
-# make_hist(data, saveas="zcount", year="2022")
+make_hist(data, saveas="2022_zcount", title="2022",  legend="lower right")
 

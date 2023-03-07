@@ -8,7 +8,6 @@ from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 
 sys.path.append(os.getcwd())
-log.info(os.getcwd())
 
 from common.corrections import apply_muon_prefire, apply_ECAL_prefire
 
@@ -168,9 +167,7 @@ def make_plots(df,
                 marker="o", linewidth=0, color=colors[0], ecolor=colors[0], elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
                 zorder=1)
 
-            leg = ax1.legend(loc="upper left", ncol=3,
-                frameon=True, framealpha=1.0, fancybox=False, edgecolor="black")
-            leg.get_frame().set_linewidth(0.8)
+            leg = ax1.legend(loc="upper left", ncol=3)
             
             # ax1.set_ylim([minY-yRange*0.05, maxY + yRange*0.5])
             # ax1.set_xlim([xMin, xMax])
@@ -201,9 +198,7 @@ def make_plots(df,
             marker="o", linewidth=0, color=colors[0], ecolor=colors[0], elinewidth=1.0, capsize=1.0, barsabove=True, markersize=markersize,
             zorder=1)
 
-        leg = ax1.legend(loc="upper left", ncol=3,
-            frameon=True, framealpha=1.0, fancybox=False, edgecolor="black")
-        leg.get_frame().set_linewidth(0.8)
+        leg = ax1.legend(loc="upper left", ncol=3)
 
         # ax1.set_ylim([minY-yRange*0.05, maxY + yRange*0.5])
         # ax1.set_xlim([xMin, xMax])
@@ -343,9 +338,7 @@ def make_plots(df,
     leg_styles = [p3, (p2[0], p1[0])]
     leg_labels = ['Measurements', 'Fit']
 
-    leg = ax1.legend(leg_styles, leg_labels, loc="lower left", ncol=3,
-        frameon=True, framealpha=1.0, fancybox=False, edgecolor="black")
-    leg.get_frame().set_linewidth(0.8)
+    leg = ax1.legend(leg_styles, leg_labels, loc="lower left", ncol=len(leg_labels))
 
     ax1.set_ylim([yMin-yRange*0.05, yMax+yRange*0.05])
     ax1.set_xlim([xMin-xRange*0.02, xMax+xRange*0.02])
@@ -413,7 +406,7 @@ rates['recLumi'] = rates['recLumi'] * 1000    # convert into /nb
 
 rates['xsec_mc'] = rates['recZCount'] / rates['recLumi']
 
-rates['xsec'] = rates['xsec_mc'] / (rates['cIO']**2 * rates['cID'] * rates['cHLT'] * rates['cKinematicSelection'])
+rates['xsec'] = rates['xsec_mc'] / (rates['cIO']**2 * rates['cID'] * rates['cHLT'] * rates['cAcceptanceInner'] * rates['cAcceptanceOuter'])
 
 # only keep necessary data
 rates = rates[["xsec_mc", "xsec", "recLumi", "timewindow", "run", "pileUp"]]
@@ -475,12 +468,12 @@ for yy, ylabel, region, mcRes, xAxis in (
     # total 2016 post VFP
     # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2016 post VFP", run_range=(278769,294645), normalized=True, xAxis=xAxis)
     # # total 2017
-    make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2017", run_range=(297046,307083), normalized=True, xAxis=xAxis)
+    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2017", run_range=(297046,307083), normalized=True, xAxis=xAxis)
     # # ## total 2018
     # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2018", run_range=(315252,325175), normalized=True, xAxis=xAxis)
 
     ### Run 3
     # 2022
-    # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2022", normalized=True, xAxis='lumi')
+    make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2022", normalized=True, xAxis='lumi')
     # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2022", normalized=True, xAxis='pileUp')
 
