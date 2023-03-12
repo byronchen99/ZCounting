@@ -54,8 +54,9 @@ def zmonitoring(
     cs_file.write("output      = condor/$(ClusterId).$(ProcId).out \n")
     cs_file.write("error       = condor/$(ClusterId).$(ProcId).err \n")
     cs_file.write("log         = condor/$(ClusterId).$(ProcId).log \n")
-    cs_file.write('requirements = (OpSysAndVer =?= "CentOS8") \n')
-    #cs_file.write("+JobFlavour =\"testmatch\" \n") # only works at lxplus
+    cs_file.write("MY.WantOS   = \"el8\" \n") # OS selection via container
+    # cs_file.write('requirements = (OpSysAndVer =?= "CentOS8") \n')
+    # cs_file.write("+JobFlavour =\"testmatch\" \n") # only works at lxplus
     # cs_file.write("+RequestRuntime = 43200 \n")  # only works at naf(desy) 43200s = 12h
     # cs_file.write("RequestMemory = 19999 \n")
     if longQueue:

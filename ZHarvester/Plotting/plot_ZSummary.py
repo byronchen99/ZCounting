@@ -289,15 +289,19 @@ def make_hist(
                 elif title and "2018" in title:
                     heights = np.array([unc_2018*2,])
                     bottoms = np.array([1. - unc_2018,])
-                else:
+                elif title and "Run2" in title:
                     starts = np.array([rangex[0], lumi_2016, lumi_2016+lumi_2017])
                     heights = np.array([unc_2016*2, unc_2017*2, unc_2018*2])
                     widths = np.array([abs(rangex[0])+lumi_2016, lumi_2017, rangex[1]-(lumi_2016+lumi_2017)])
                     bottoms = np.array([1. - unc_2016, 1. - unc_2017, 1. - unc_2018])
-
-                ax.bar(starts, height=heights, width=widths, bottom=bottoms, align='edge',
-                    color="grey", alpha=0.4, hatch='/', zorder=4, #, alpha=0.6
-                    label="Ref. luminosity uncertainty")
+                else:
+                    heights=None
+                    bottoms=None
+                
+                if heights != None and bottoms!=None:
+                    ax.bar(starts, height=heights, width=widths, bottom=bottoms, align='edge',
+                        color="grey", alpha=0.4, hatch='/', zorder=4, #, alpha=0.6
+                        label="Ref. luminosity uncertainty")
 
             ax.scatter(xx, yy, s=data['weightLumi'].values, marker='.', color='green', zorder=1, label="Measurement")
 
@@ -425,4 +429,6 @@ def make_hist(
 # make_hist(data, run_range=(315252,325175), saveas="2018_zcount", title="2018",rangey=[0.92,1.08])
 
 make_hist(data, saveas="2022_zcount", title="2022",  legend="lower right")
+make_hist(data, saveas="2022BCD_zcount", title="2022(B,C,D)",  legend="lower right", run_range=(355065, 359021))
+make_hist(data, saveas="2022EFG_zcount", title="2022(E,F,G)",  legend="lower right", run_range=(359022, 362760))
 

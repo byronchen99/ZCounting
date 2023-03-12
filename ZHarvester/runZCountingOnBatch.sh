@@ -17,13 +17,14 @@ cd $TOP
 cp -r ${workdir}/roofit $TOP
 cp -r ${workdir}/common $TOP
 
-echo "run ZCounting.py"
-echo "./ZCounting.py -b ${runNum} -e ${runNumEnd} --input ${3} --byLsCSV ${4} -o ${5} --mcCorrections ${6} --sigModel ${7} --bkgModel ${8} --ptCut ${9} --etaCut ${10} --mass ${11} ${12} ${13} --LumiPerMeasurement ${14}"
 
 if [[ "${15}" == "DQM" ]]; then
+    echo "./ZCounting_DQM.py -b ${runNum} -e ${runNumEnd} --input ${3} --byLsCSV ${4} -o ${5} --mcCorrections ${6} --sigModel ${7} --bkgModel ${8} --ptCut ${9} --etaCut ${10} --mass ${11} ${12} ${13} --LumiPerMeasurement ${14}"
+
     cp ${workdir}/ZCounting_DQM.py $TOP    
     ./ZCounting_DQM.py -b $runNum -e ${runNumEnd} --input $3 --byLsCSV $4 -o $5 --mcCorrections $6 --sigModel $7 --bkgModel $8 --ptCut $9 --etaCut ${10} --mass ${11} ${12} ${13} --LumiPerMeasurement ${14} 
 else 
+    echo "./ZCounting.py -b ${runNum} -e ${runNumEnd} --input ${3} --byLsCSV ${4} -o ${5} --mcCorrections ${6} --sigModel ${7} --bkgModel ${8} --ptCut ${9} --etaCut ${10} --mass ${11} ${12} ${13} --LumiPerMeasurement ${14}"
     cp ${workdir}/ZCounting.py $TOP
     ./ZCounting.py -b $runNum -e ${runNumEnd} --input $3 --byLsCSV $4 -o $5 --mcCorrections $6 --sigModel $7 --bkgModel $8 --ptCut $9 --etaCut ${10} --mass ${11} ${12} ${13} --LumiPerMeasurement ${14}
 fi

@@ -60,11 +60,12 @@ def make_plots(df,
         lefttitle += " $(\mathrm{"+year+"})$"
 
     if run_range:
-        data = df.loc[(df["run"] >= run_range[0]) & (df["run"] <= run_range[1])]
-        if len(df) ==0:
+        df_selected = df.loc[(df["run"] >= run_range[0]) & (df["run"] <= run_range[1])]
+        if len(df_selected) ==0:
             return
+        data = df_selected.copy()
     else:
-        data = df
+        data = df.copy()
 
     if sum(data[yAxis].isnull()) > 0:
         log.info("sort out {0} points with nan".format(sum(data[yAxis].isnull())))
@@ -240,6 +241,8 @@ def make_plots(df,
         data[yAxis] = data[yAxis] / (sum(data[yAxis]) / len(data[yAxis].values))
         data[y0Axis] = data[y0Axis] / ( sum(data[y0Axis]) / len(data[y0Axis].values))
 
+    log.info("1")
+
     for i in range(0,len(xx)-1):
         dyy = data.loc[(data[xAxis] < xx[i+1]) & (data[xAxis] >= xx[i])]
 
@@ -266,6 +269,8 @@ def make_plots(df,
         xx_centers.append((xx[i] + (xx[i+1] - xx[i]) / 2.))
         yy.append(yy_avg)
         yy0.append(yy0_avg)
+
+    log.info("2")
 
     xx = np.array(xx_centers)
 
@@ -303,9 +308,9 @@ def make_plots(df,
     ax1.text(0.74, 0.89, "13.6 TeV (2022)", verticalalignment='top', transform=ax1.transAxes,style='italic')    
 
     nround = 5
-#    ax1.text(0.01, 0.97, 
- #       f"$f(x) = ({round(params[0].n,nround)} \\pm {round(params[0].s,nround)}) x + {round(params[1].n,nround)} \\pm {round(params[1].s,nround)}$", 
-  #      verticalalignment='top', transform=ax1.transAxes,style='italic')    
+    ax1.text(0.01, 0.97, 
+       f"$f(x) = ({round(params[0].n,nround)} \\pm {round(params[0].s,nround)}) x + {round(params[1].n,nround)} \\pm {round(params[1].s,nround)}$", 
+      verticalalignment='top', transform=ax1.transAxes,style='italic')    
 
     xMin = min(xx_centers) - x_step/2
     xMax = max(xx_centers) + x_step/2
@@ -412,7 +417,7 @@ rates['xsec'] = rates['xsec_mc'] / (rates['cIO']**2 * rates['cID'] * rates['cHLT
 rates = rates[["xsec_mc", "xsec", "recLumi", "timewindow", "run", "pileUp"]]
 
 for yy, ylabel, region, mcRes, xAxis in (
-    # ("xsec_mc", "sigma", "I", "", "pileUp"),
+    ("xsec_mc", "sigma", "I", "", "pileUp"),
     ("xsec_mc", "sigma", "I", "", "lumi"),
     # # ("xsec_mc", "sigma", "", ""),
     # ("xsecBB_mc", "sigma", "BB", ""),
@@ -474,6 +479,8 @@ for yy, ylabel, region, mcRes, xAxis in (
 
     ### Run 3
     # 2022
-    make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2022", normalized=True, xAxis='lumi')
+    make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2022", normalized=True, xAxis=xAxis)
+    make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2022 BCD", run_range=(355065,359021), normalized=True, xAxis=xAxis)
+    make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2022 EFG", run_range=(359022,362760), normalized=True, xAxis=xAxis)
     # make_plots(rates, yAxis=yy, yLabel=ylabel, region=region, resource=mcRes, title="corrected", year="2022", normalized=True, xAxis='pileUp')
 
