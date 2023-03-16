@@ -6,6 +6,7 @@ import os, sys
 import uncertainties as unc
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
+from scipy.stats import chisquare
 
 sys.path.append(os.getcwd())
 
@@ -281,7 +282,24 @@ def make_plots(df,
 
     log.info("make fit")
     func = linear #pol2 #quad
-    popt, pcov = curve_fit(func, xx, yy, sigma=yy_err, absolute_sigma=True)
+    #popt, pcov = curve_fit(func, xx, yy, sigma=yy_err, absolute_sigma=True)
+    popt, pcov, infodict, mesg, ier = curve_fit(func, xx, yy, sigma=yy_err, absolute_sigma=True, full_output = True)
+
+    #log.info("start 1")
+    #log.info(infodict)
+    #log.info(mesg)
+    #log.info(ier)
+    #log.info("end 1")
+
+
+    # Compute chi square
+    r = yy - func(xx, *popt)
+    chisq = np.sum((r/yy_err)**2)
+    log.info(chisq)
+    #ndf = len(yy) - len(popt)
+    ndf = len(yy) - 2
+    chisq_ndf = chisq/ndf
+
 
     perr = np.sqrt(np.diag(pcov))
     params = unc.correlated_values(popt, pcov)
@@ -305,7 +323,18 @@ def make_plots(df,
     ax1.set_ylabel(yLabel)
     ax1.text(0.74, 0.97, "\\bf{CMS}", verticalalignment='top', transform=ax1.transAxes, weight="bold")
     ax1.text(0.81, 0.97, "\\emph{"+args.label+"}", verticalalignment='top', transform=ax1.transAxes,style='italic')    
-    ax1.text(0.74, 0.89, "13.6 TeV (2022)", verticalalignment='top', transform=ax1.transAxes,style='italic')    
+    ax1.text(0.74, 0.89, "13.6 TeV (2022)", verticalalignment='top', transform=ax1.transAxes,style='italic') 
+    ax1.text(0.13, 0.87, chisq_ndf , verticalalignment='top', transform=ax1.transAxes,style='italic')
+    ax1.text(0.01, 0.87, " $\chi^2/ndf$ = ", verticalalignment='top', transform=ax1.transAxes, weight="bold")
+    #ax1.text(0.08, 0.87, chisq , verticalalignment='top', transform=ax1.transAxes,style='italic')
+    #ax1.text(0.01, 0.87, " $\chi^2$ = ", verticalalignment='top', transform=ax1.transAxes, weight="bold")
+    #ax1.text(0.08, 0.77, ndf , verticalalignment='top', transform=ax1.transAxes,style='italic')
+    #ax1.text(0.01, 0.77, " $ndf$ = ", verticalalignment='top', transform=ax1.transAxes, weight="bold")
+    #ax1.text(0.13, 0.67, chisq_ndf , verticalalignment='top', transform=ax1.transAxes,style='italic')
+    #ax1.text(0.01, 0.67, " $\chi^2/ndf$ = ", verticalalignment='top', transform=ax1.transAxes, weight="bold")
+
+
+
 
     nround = 5
     ax1.text(0.01, 0.97, 
