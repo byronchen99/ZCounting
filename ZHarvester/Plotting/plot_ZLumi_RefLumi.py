@@ -20,6 +20,10 @@ pd.options.mode.chained_assignment = None
 
 from common import parsing, plotting, logging
 
+from ZUtils.python.utils import linear, pol2
+from scipy.optimize import curve_fit
+
+
 parser = parsing.parser_plot()
 parser.add_argument("-r", "--rates", required=True, type=str, help="csv file with z rates per measurement")
 parser.add_argument("-l", "--refLumi", default="", type=str, help="give a ByLs.csv as input for additional reference Luminosity")
@@ -36,7 +40,7 @@ if not os.path.isdir(outDir):
 
 secPerLS=float(23.3)
 
-fmt = "pdf"
+fmt = "png"
 
 # plotting options
 colors, textsize, labelsize, markersize = plotting.set_matplotlib_style()
@@ -45,7 +49,14 @@ lefttitle = "$\sqrt{s}=13\,\mathrm{TeV}$"
 xlabel = "LHC runtime [h]"
 ylabelLumi = "Inst. luminosity [nb$^{-1}$s$^{-1}$]"
 ylabelEff = "Efficiency"
-    
+
+# Store the slops of the fits
+slopes = {}   
+
+# Store the lumi of each fill
+yRef_lumi_per_fill = {}
+
+ 
 ########## Data Acquisition ##########
 
 if args.refLumi != "":
@@ -285,7 +296,10 @@ for fill, data_fill in data.groupby("fill"):
     y = np.array([yy.n for yy in data_fill['zLumiInst_mc'].values])
     yErr = np.array([y.s for y in data_fill['zLumiInst_mc'].values])
 
-    yRef = data_fill['dLRec(/nb)'].values   
+    yRef = data_fill['dLRec(/nb)'].values
+
+    yRef_lumi_per_fill[fill] = yRef.sum()
+
     
     ax1.errorbar(x, yRef, xerr=(xDown, xUp), label="Ref. luminosity", color="red", 
         linestyle='', zorder=0)
@@ -329,10 +343,34 @@ for fill, data_fill in data.groupby("fill"):
             zorder=1)
             
         ax2.plot(np.array([xMin, xMax]), np.array([1.0, 1.0]), color="black",linestyle="-", linewidth=1)
+       
+        log.info("Make fit")
         
+        func = linear
+        popt, pcov = curve_fit(func, x, yRatio, sigma=yRatioErr, absolute_sigma=True)
+        perr = np.sqrt(np.diag(pcov))
+        params = unc.correlated_values(popt, pcov)
+        log.info(params)     
+
+        f = lambda x: func(x, *params)
+        xMC = np.arange(0,100,0.5)
+        yMC = np.array([f(x).n for x in xMC])
+        yErrMC = np.array([f(x).s for x in xMC])
+
+
+        nround = 3
+        slopes[fill] = params[1].n 
+        
+        ax2.text(0.01, 0.97, f"$f(x) = ({round(params[0].n,nround)} \\pm {round(params[0].s,nround)}) x + {round(params[1].n,nround)} \\pm {round(params[1].s,nround)}$",  verticalalignment='top', transform=ax2.transAxes,style='italic',fontsize=10)    
+        ax2.plot(xMC, yMC, color="lime", linestyle="dashed", label="Fit")
+
+
         ax2.set_ylim([0.961,1.039])
         ax2.set_xlim([xMin, xMax])
         ax2.set_xticks(xTicks)
+        leg_lower = ax2.legend(loc="lower right", ncol=2,fontsize=10)
+
+
 
     # align y labels
     ax1.yaxis.set_label_coords(-0.12, 0.5)
@@ -415,3 +453,93 @@ for fill, data_fill in data.groupby("fill"):
 
     plt.savefig(outDir+f"/fill{fill}_lumi_pileup.{fmt}")
     plt.close()
+  
+    
+    ## make plot eff vs. pileup
+    plt.clf()
+    fig = plt.figure()
+
+    ax1 = fig.add_subplot(111)
+
+    fig.subplots_adjust(left=0.15, right=0.97, top=0.97, bottom=0.125, hspace=0.0)
+    
+    ax1.set_xlabel("average pileup")
+    ax1.set_ylabel(ylabelEff)
+        
+    maxY = 0
+    minY = 1
+    for eff, name, col, mkr, ms in (
+        ("effGlo", "$ \epsilon_\mathrm{Glo|Sta}^\mu $", "green", "*", markersize*1.5), 
+        ("effID", "$ \epsilon_\mathrm{ID|Glo}^\mu $", "red", "^", markersize*1.2), 
+        ("effSta", "$ \epsilon_\mathrm{Sta|Trk}^\mu $", "blue", "s", markersize), 
+        ("effHLT", "$ \epsilon_\mathrm{HLT}^\mu $", "black", "s", markersize), 
+    ):
+        
+        y = np.array([y.n for y in data_fill[eff].values])
+        yErr = np.array([y.s for y in data_fill[eff].values])
+
+        # y = data_fill[eff].values
+
+        ax1.errorbar(xPU, y, yerr=yErr, 
+            label=name,
+            marker=mkr, linewidth=0, color=col, ecolor=col, elinewidth=1.0, capsize=1.0, barsabove=True, markersize=ms,
+            zorder=1)
+
+        # xerr=(xDown, xUp)
+        maxY = max(maxY, max(y + yErr))
+        minY = min(minY, min(y - yErr))
+
+    leg = ax1.legend(loc="lower left", ncol=4)
+    
+    yRange = maxY - minY
+    ax1.set_ylim([minY-yRange*0.25, 1.01])
+    ax1.set_xlim([xMinPU, xMaxPU])
+    #ax1.set_xticks(xTicksPU)
+
+
+    ax1.text(0.02, 0.6, "{\\bf{CMS}} "+"\\emph{"+args.label+"} \n"+energystr+"\n Fill "+str(fill), verticalalignment='top', transform=ax1.transAxes)
+
+
+
+    plt.savefig(outDir+f"/fill{fill}_eff_pileup.{fmt}")
+    plt.close()
+ 
+# Bar plot: fill x slopes
+
+fig = plt.figure()
+axs = fig.add_subplot(111)
+
+plt.bar(list(slopes.keys()), slopes.values(), color='g')
+axs.set_xlabel("Fills")
+axs.set_ylabel("Slopes of fits")
+plt.savefig(outDir+f"/slopes.{fmt}")
+plt.close()
+
+# Histo for the fit slopes (for each fill)
+
+fig = plt.figure()
+axh = fig.add_subplot(111)
+
+axh.set_xlabel("Slopes of fits")
+axh.set_ylabel("Number of fills")
+axh.hist(slopes.values(), bins=len(slopes))
+axh.text(0.97, 0.97, "$\\mu$ = {0} \n $\\sigma$ = {1}".format(round(np.mean(list(slopes.values())),3), round(np.std(list(slopes.values())),3)),verticalalignment='top', horizontalalignment="right", transform=axh.transAxes)
+plt.savefig(outDir+f"/hist_slopes.{fmt}")
+plt.close()
+
+
+# Weighted histo for the fit slopes (for each fill)
+
+fig = plt.figure()
+axh = fig.add_subplot(111)
+
+axh.set_xlabel("Slopes of fits")
+axh.set_ylabel("Integrated luminosity [/pb]")
+#log.info(slopes)
+#log.info(yRef_lumi_per_fill)
+axh.hist(slopes.values(), weights=yRef_lumi_per_fill.values(), bins=len(slopes))
+axh.text(0.97, 0.97, "$\\mu$ = {0} \n $\\sigma$ = {1}".format(round(np.mean(list(slopes.values())),3), round(np.std(list(slopes.values())),3)),verticalalignment='top', horizontalalignment="right", transform=axh.transAxes)
+plt.savefig(outDir+f"/weighted_hist_slopes.{fmt}")
+plt.close()
+
+
