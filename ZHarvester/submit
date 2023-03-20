@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from common import logging, parsing, utils
+import os
 
 def zmonitoring(
     dirIn,
@@ -18,14 +19,14 @@ def zmonitoring(
     runlist = None,
     beginRun=0,
     endRun=400000,
-    longQueue=False # submit on the long queue
+    longQueue=False, # submit on the long queue
+    jobinfo={}
 ):
-    import os
     import pandas as pd
     import glob
     import json
 
-    if runlist == None:
+    if runlist is None:
         log.info("create runlist from byLsCSV file")
         with open(byLsCSV) as file:
             byLS_lines = file.readlines()
@@ -70,8 +71,6 @@ def zmonitoring(
         cs_file.write("+JobFlavour = \"longlunch\" \n")  # only works at CERN (longlunch = 2 hours)
         #cs_file.write("RequestMemory = 1999 \n") 
     
-    dirOut = os.path.abspath(dirOut)
-
     njobs=0
     runs = []
     for run in runlist:
@@ -100,19 +99,18 @@ def zmonitoring(
         cs_file.write("queue\n")
     cs_file.close()
     if test:
-        log.info("Execute command to run jobs: ")
-        log.info("condor_submit cs_tmp.sub")
-        exit()
+        log.info("This is a test, no submission is done!")
+        clusterId = None
     else:
         out = os.popen("condor_submit cs_tmp.sub --verbose").read()
-        # log.info(out)
-    # os.system("rm cs_tmp.sub")
-    clusterId = int(next(filter(lambda x: "ClusterId" in x, out.split("\n"))).replace("ClusterId = ",""))
+        log.debug(out)
+        # os.system("rm cs_tmp.sub")
+        clusterId = int(next(filter(lambda x: "ClusterId" in x, out.split("\n"))).replace("ClusterId = ",""))
 
-    log.info(f"Submitted {njobs} jobs with cluster ID {clusterId}")
+        log.info(f"Submitted {njobs} jobs with cluster ID {clusterId}")
 
     # create jobinformation
-    ji = {
+    jobinfo.update({
         'process' : 'zmonitoring',
         'dirIn': dirIn,
         'dirOut': dirOut,
@@ -130,12 +128,11 @@ def zmonitoring(
         'runs': runs,
         'njobs': njobs,
         'clusterId': clusterId
-    }
+    })
+
     # write jobinformation
-    if not os.path.isdir(dirOut):
-        os.mkdir(dirOut)
     with open(dirOut+'/jobinfo.json'.format(clusterId), 'w') as f:
-        json.dump(ji, f, indent=4, separators=(',', ': '))
+        json.dump(jobinfo, f, indent=4, separators=(',', ': '))
 
 def check(projectdir, resubmit=False, collect=False, longQueue=False):
     import os
@@ -216,6 +213,22 @@ if __name__ == '__main__':
         help='specify the type of input files'
     )
     parserA.add_argument(
+        '--make-byLS-csv', default=False, action="store_true",
+        help='create a new make-byLS-csv file using brilcalc'
+    )
+    parserA.add_argument(
+        '--datatag', default=None, type=str,
+        help='Luminosity datatag to use to create byLS csv'
+    )
+    parserA.add_argument(
+        '--normtag', default="normtag_BRIL.json", type=str,
+        help='Luminosity normtag to use to create byLS csv'
+    )
+    parserA.add_argument(
+        '--lumimask', default=None, type=str,
+        help='lumimask .json file to use to create the byLS csv'
+    )
+    parserA.add_argument(
         '-t', '--test', default=False, action="store_true",
         help='test without submitting, just create the submit script'
     )
@@ -257,10 +270,28 @@ if __name__ == '__main__':
     log = logging.setup_logger(__file__, args.verbose)
 
     if args.subparser == 'zmonitoring':
+
+        output = os.path.abspath(args.output)
+        if not os.path.isdir(output):
+            os.mkdir(output)
+
+        if args.make_byLS_csv:
+            info = utils.make_byLS_csv(args.beginRun, args.endRun, 
+                output_directory=args.output, 
+                datatag=args.datatag, 
+                filename_lumimask=args.lumimask, 
+                filename_normtag=args.normtag)
+
+            byLsCSV = info["byLsCSV"]
+
+        else:
+            byLsCSV = args.byLsCSV
+            info={}
+
         zmonitoring(
             args.input,
-            args.output,
-            args.byLsCSV,
+            output,
+            byLsCSV,
             args.mcCorrections,
             args.sigModel,
             args.bkgModel,
@@ -272,7 +303,8 @@ if __name__ == '__main__':
             args.test,
             beginRun=args.beginRun,
             endRun=args.endRun,
-            longQueue=args.longQueue)
+            longQueue=args.longQueue,
+            jobinfo = info)
     if args.subparser == 'check':
         check(
             args.project, 

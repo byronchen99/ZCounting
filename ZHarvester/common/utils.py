@@ -11,8 +11,74 @@ import ROOT
 import boost_histogram as bh
 from hist import Hist
 import json, os
+import matplotlib as mpl
 
 import pdb
+
+# ------------------------------------------------------------------------------
+def make_byLS_csv(run_begin, run_end, output_directory, datatag=None, filename_lumimask=None, filename_normtag="normtag_BRIL.json"):
+    """
+    make a byLS csv file
+    """
+    
+    output_directory = os.path.abspath(output_directory)
+
+    log.info("Make a byLS .csv file using brilcalc")
+    # get lumimask
+    if filename_lumimask is None:
+        year = get_year_by_run(run_begin)
+        if year != get_year_by_run(run_end):
+            # TODO: combine byLS csv from different years
+            raise IOError("'run_begin' and 'run_end' are from a different year! not able to get a lumimask.")
+        
+        year_str = str(year)[2:]
+        filename_lumimask = f"/eos/user/c/cmsdqm/www/CAF/certification/Collisions{year_str}/"
+
+        if year == 2022:
+            filename_lumimask += "Cert_Collisions2022_355100_362760_Golden.json"
+        # TODO: pick correct DCS Json for quasi online z monitoring (in 2023 and onwards)
+
+    if not os.path.isfile(filename_lumimask):
+        raise IOError(f"Can not find lumimask file '{filename_lumimask}'")
+
+    # get new normtag
+    os.system(f"wget https://raw.githubusercontent.com/CMS-LUMI-POG/Normtags/master/{filename_normtag}")
+
+    if not os.path.isfile(filename_normtag):
+        raise IOError(f"Can not find normtag file '{filename_normtag}'")
+
+    # set brilcalc environment
+    #   get the current path
+    path = os.environ['PATH']
+    #   add the directories to the path variable
+    path_dirs = [os.path.expanduser('~/.local/bin'), '/cvmfs/cms-bril.cern.ch/brilconda3/bin']
+    path = os.pathsep.join(path_dirs) + os.pathsep + path
+    #   set the PATH environment variable
+    os.environ['PATH'] = path
+
+    # create byLS .csv
+    command_datatag = "" if datatag is None else f" --datatag {datatag}"
+    filename_byLS = f"{output_directory}/byLS.csv"
+    os.system(f"""
+    brilcalc lumi --begin {run_begin} --end {run_end} -b "STABLE BEAMS" --byls -u /fb \
+    --normtag={filename_normtag} \
+    -i {filename_lumimask} {command_datatag}\
+    -o {filename_byLS}
+    """)
+
+    # normtag file is not needed anymore and can be reduced
+    os.system(f"rm {filename_normtag}")
+
+    if not os.path.isfile(f"{output_directory}/byLS.csv"):
+        raise IOError(f"Was not able to create output file '{filename_byLS}'")
+
+    info = {
+        "lumimask": filename_lumimask,
+        "normtag": filename_normtag,
+        "datatag": datatag,
+        "byLsCSV": filename_byLS
+    }
+    return info
 
 # ------------------------------------------------------------------------------
 def load_input_csv(byLS_data):
@@ -49,6 +115,23 @@ def load_input_csv(byLS_data):
     byLS_data = byLS_data.drop_duplicates(['fill', 'run', 'ls'])
     
     return byLS_data
+
+def load_result(files):
+    # load result .csv file(s)
+
+    data = pd.concat([pd.read_csv(csv, sep=',',low_memory=False) for csv in files], ignore_index=True, sort=False)
+
+    data['timeDown'] = data['beginTime'].apply(lambda x: to_DateTime(x))
+    data['timeUp'] = data['endTime'].apply(lambda x: to_DateTime(x))
+
+    # bring them in format to sort and plot them
+    data['timeDown'] = mpl.dates.date2num(data['timeDown'])
+    data['timeUp'] = mpl.dates.date2num(data['timeUp'])
+
+    # center of each time slice
+    data['time'] = data['timeDown'] + (data['timeUp'] - data['timeDown'])/2
+
+    return data
 
 # ------------------------------------------------------------------------------
 def to_DateTime(time, string_format = "yy/mm/dd"):
@@ -425,18 +508,32 @@ def open_workspace(directory, filename, m):
     w = f.Get("workspace")
     return f, w
 
-def open_workspace_yield(directory, filename, m):
+def open_workspace_yield(directory, filename, m, signal_parameters=False):
     # reading fit result from root workspace
+    #   if signal_parameters is true, return the mean and standard deviation of the resolution function
 
     f, w = open_workspace(directory, "workspace_yield_"+filename, m)
     
     Nsig = w.var("Nsig").getVal()
     chi2 = w.arg("chi2").getVal()
+
+    if signal_parameters:
+        mean = None
+        sigma = None
+        for p in w.allVars():
+
+            if p.GetName().startswith("sig_mean"):
+                mean = p.getVal()
+            if p.GetName().startswith("sig_sigma"):
+                sigma = p.getVal()
+            
+            if mean is not None and sigma is not None:
+                break
     
     f.Close()
     f.Delete()
     w.Delete()
-    return Nsig, chi2
+    return Nsig, chi2, mean, sigma
 
 def unorm(value):
     if value > 0:
@@ -495,15 +592,27 @@ def getEra(run):
         return "Run2018C"
     if run <= 325273:
         return "Run2018D"     
-    if run <= 355769:
+    if run <= 355064:
+        return "Run2022A"   
+    if run <= 355793:
         return "Run2022B"   
-    if run <= 357482:
+    if run <= 357486:
         return "Run2022C"
-    if run <= 357900:
+    if run <= 359021:
         return "Run2022D"
+    if run <= 360331:
+        return "Run2022E"
+    if run <= 362180:
+        return "Run2022F"
+    if run <= 362760:
+        return "Run2022G"
 
-    return "Run2022" #default 
+    return "Run2023" #default 
 
+def get_year_by_run(run):
+    era = getEra(run)
+    return int(era.replace("Run","")[:4])
+       
 # ------------------------------------------------------------------------------
 def chart_to_js(_chart, _name, _data="data.csv"):
     

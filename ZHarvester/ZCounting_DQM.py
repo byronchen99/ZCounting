@@ -23,9 +23,9 @@ def extract_results(directory, m, cHLT, hPV, mcCorrelations):
     log.info("Extracting fit results in {0} for {1}".format(directory,m))  
 
     # --- For identification (ID) efficiency        
-    NsigHLT2, chi2HLT2 = utils.open_workspace_yield(directory, "HLT_{0}_2".format(etaRegionZ), m)
-    NsigHLT1, chi2HLT1 = utils.open_workspace_yield(directory, "HLT_{0}_1".format(etaRegionZ), m)
-    NsigIDFail, chi2ID = utils.open_workspace_yield(directory, "ID_{0}_0".format(etaRegion), m)
+    NsigHLT2, chi2HLT2, meanHLT2, sigmaHLT2 = utils.open_workspace_yield(directory, "HLT_{0}_2".format(etaRegionZ), m, signal_parameters=True)
+    NsigHLT1, chi2HLT1, meanHLT1, sigmaHLT1 = utils.open_workspace_yield(directory, "HLT_{0}_1".format(etaRegionZ), m, signal_parameters=True)
+    NsigIDFail, chi2ID, meanIDFail, sigmaIDFail = utils.open_workspace_yield(directory, "ID_{0}_0".format(etaRegion), m, signal_parameters=True)
 
     NsigHLT2 = utils.unorm(NsigHLT2)
     NsigHLT1 = utils.unorm(NsigHLT1)
@@ -34,11 +34,11 @@ def extract_results(directory, m, cHLT, hPV, mcCorrelations):
     effHLT = (2 * NsigHLT2) / (2 * NsigHLT2 + NsigHLT1)
     effID = (2 * NsigHLT2 + NsigHLT1) / (2 * NsigHLT2 + NsigHLT1 + NsigIDFail)
 
-    NsigGloPass, chi2GloPass = utils.open_workspace_yield(directory, "Glo_{0}_1".format(etaRegion), m)
-    NsigGloFail, chi2GloFail = utils.open_workspace_yield(directory, "Glo_{0}_0".format(etaRegion), m)
+    NsigGloPass, chi2GloPass, meanGloPass, sigmaGloPass = utils.open_workspace_yield(directory, "Glo_{0}_1".format(etaRegion), m, signal_parameters=True)
+    NsigGloFail, chi2GloFail, meanGloFail, sigmaGloFail = utils.open_workspace_yield(directory, "Glo_{0}_0".format(etaRegion), m, signal_parameters=True)
 
-    NsigStaPass, chi2StaPass = utils.open_workspace_yield(directory, "Sta_{0}_1".format(etaRegion), m)
-    NsigStaFail, chi2StaFail = utils.open_workspace_yield(directory, "Sta_{0}_0".format(etaRegion), m)
+    NsigStaPass, chi2StaPass, meanStaPass, sigmaStaPass = utils.open_workspace_yield(directory, "Sta_{0}_1".format(etaRegion), m, signal_parameters=True)
+    NsigStaFail, chi2StaFail, meanStaFail, sigmaStaFail = utils.open_workspace_yield(directory, "Sta_{0}_0".format(etaRegion), m, signal_parameters=True)
 
     NsigGloPass = utils.unorm(NsigGloPass)
     NsigGloFail = utils.unorm(NsigGloFail)
@@ -57,6 +57,23 @@ def extract_results(directory, m, cHLT, hPV, mcCorrelations):
     cAcceptanceOuter = utils.getCorrelation(hPV, mcCorrelations, which="AcceptanceOuter")
 
     res = {
+        # mean of gaussian signal resolution function
+        "meanHLT2": meanHLT2,
+        "meanHLT1": meanHLT1,
+        "meanIDFail": meanIDFail,
+        "meanGloPass": meanGloPass,
+        "meanGloFail": meanGloFail,
+        "meanStaPass": meanStaPass,
+        "meanStaFail": meanStaFail,
+        # standard deviation of gaussian signal resolution function
+        "sigmaHLT2": sigmaHLT2,
+        "sigmaHLT1": sigmaHLT1,
+        "sigmaIDFail": sigmaIDFail,
+        "sigmaGloPass": sigmaGloPass,
+        "sigmaGloFail": sigmaGloFail,
+        "sigmaStaPass": sigmaStaPass,
+        "sigmaStaFail": sigmaStaFail,
+        # Signal numbers in mutual exclusive categories
         "NsigHLT2": NsigHLT2,
         "NsigHLT1": NsigHLT1,
         "NsigIDFail": NsigIDFail,
@@ -64,22 +81,26 @@ def extract_results(directory, m, cHLT, hPV, mcCorrelations):
         "NsigGloFail": NsigGloFail,
         "NsigStaPass": NsigStaPass,
         "NsigStaFail": NsigStaFail,
+        # Chi2s from fits
         "chi2HLT2": chi2HLT2,
         "chi2HLT1": chi2HLT1,
         "chi2GloPass": chi2GloPass,
         "chi2GloFail": chi2GloFail,
         "chi2StaPass": chi2StaPass,
         "chi2StaFail": chi2StaFail,
+        # Efficiencies
         "effHLT": effHLT,
         "effID": effID,
         "effGlo": effGlo,
         "effSta": effSta,
         "effMu": effMu,
+        # Corrections from MC
         "cHLT": cHLT,
         "cIO": cIO,
         "cID": cID,
         "cAcceptanceInner": cAcceptanceInner,
         "cAcceptanceOuter": cAcceptanceOuter,
+        # Efficiency corrected number of Z bosons
         "recZCount": (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 / effMu**2 * cHLT * cID * cIO**2 * cAcceptanceInner *cAcceptanceOuter
     }
 
@@ -103,43 +124,34 @@ if __name__ == '__main__':
 
     ########################################
     # link to resouces
+    year = utils.get_year_by_run(args.beginRun)
+    energy = 13.6 if year >= 2022 else 13
+
     cmsswbase = os.environ['CMSSW_BASE']
     resPath = cmsswbase + "/src/ZCounting/ZHarvester/res/"
     if( args.beginRun >= 272007 and args.beginRun < 278808
         # there is an overlap for 2016 F in runs with pre and post VFP settings
         and args.beginRun not in [278769, 278801, 278802, 278803, 278804, 278805, 278808]
     ):                                                          # 2016 pre VFP
-        year = 2016
         byLsCSV          = resPath+"/FillByLs_2016.csv"
         mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2016preVFP.root"
     elif args.beginRun < 294645:                                # 2016 post VFP
-        year = 2016
         byLsCSV          = resPath+"/FillByLs_2016.csv"
         mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2016postVFP.root"
     elif args.beginRun > 297020 and args.beginRun < 306828:     # 2017
-        year = 2017
         byLsCSV          = resPath+"/FillByLs_2017_IsoMu24.csv"
         mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2017.root"
     elif args.beginRun >= 306926 and args.beginRun < 307083:    # 2017 H
-        year = 2017
         byLsCSV          = resPath+"/FillByLs_2017_lowPU.csv"
         mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2017.root"
     elif args.beginRun >= 315252 and args.beginRun < 325273:    # 2018
-        year = 2018
         byLsCSV          = resPath+"/FillByLs_2018.csv"
         mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2018.root"
     elif args.beginRun >= 355100 and args.beginRun < 362760:    # 2022
-        year = 2022
         byLsCSV = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/brilcalcByLS/byLS_Collisions22_355100_362760_Muon_20230210.csv"
         mcCorrelations  = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/CorrelationFactors/MCClosure_V19_07/c_nPV_2022.root"
         sigTemplates = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/SignalTemplates/ZCountingInOut-V19_07-Winter22-DYJetsToLL_M_50_LO.root"
-    elif args.beginRun >= 362760:                               # 2023
-        year = 2023
-    else:
-        log.warning("specified begin run {0} unknown! exit()".format(args.beginRun))
-        exit()
 
-    energy = 13.6 if year >= 2022 else 13
 
     byLsCSV = byLsCSV          if args.byLsCSV       == "default"   else args.byLsCSV
     eosDir  = args.input
@@ -344,10 +356,7 @@ if __name__ == '__main__':
 
                 # delivered, efficiency and deadtime corrected, Z boson count
                 delZCount = result["recZCount"] / deadtime * (totaltimewindow / timewindow)
-             
-                # instantaneous delivered Z rate (corrected for deadtime)                
-                ZRate = result["recZCount"] / (timewindow * deadtime)
-      
+
                 result.update({
                     "fill": fill,
                     "run": run,
@@ -359,9 +368,6 @@ if __name__ == '__main__':
                     "timewindow": timewindow,
                     "pileUp": byLS_m['avgpu'].mean(),
                     "delZCount": delZCount,
-                    "instDelLumi": delLumi / timewindow,
-                    "ZRate": ZRate 
-
                 })
             
                 results.append(result)

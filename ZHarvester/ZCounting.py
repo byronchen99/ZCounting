@@ -100,6 +100,9 @@ if __name__ == '__main__':
 
     ########################################
     # link to resouces
+    year = utils.get_year_by_run(args.beginRun)
+    energy = 13.6 if year >= 2022 else 13
+
     prefix_dqm="ZCountingInOut-V17_38-"
     cmsswbase = os.environ['CMSSW_BASE']
     resPath = cmsswbase + "/src/ZCounting/ZHarvester/res/"
@@ -107,43 +110,31 @@ if __name__ == '__main__':
         # there is an overlap for 2016 F in runs with pre and post VFP settings
         and args.beginRun not in [278769, 278801, 278802, 278803, 278804, 278805, 278808]
     ):                                                          # 2016 pre VFP
-        year = 2016
         byLsCSV          = resPath+"/FillByLs_2016.csv"
         mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2016preVFP.root"
         sigTemplates     = args.input+"/"+prefix_dqm+"Summer16preVFP-DYJetsToLL_M_50_LO.root"
     elif args.beginRun < 294645:                                # 2016 post VFP
-        year = 2016
         byLsCSV          = resPath+"/FillByLs_2016.csv"
         mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2016postVFP.root"
         sigTemplates     = args.input+"/"+prefix_dqm+"Summer16postVFP-DYJetsToLL_M_50_LO.root"
     elif args.beginRun > 297020 and args.beginRun < 306828:     # 2017
-        year = 2017
         byLsCSV          = resPath+"/FillByLs_2017_IsoMu24.csv"
         mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2017.root"
         sigTemplates     = args.input+"/"+prefix_dqm+"Fall17-DYJetsToLL_M_50_LO.root"
     elif args.beginRun >= 306926 and args.beginRun < 307083:    # 2017 H
-        year = 2017
         byLsCSV          = resPath+"/FillByLs_2017_lowPU.csv"
         mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2017.root"
         sigTemplates     = args.input+"/"+prefix_dqm+"Fall17-DYJetsToLL_M_50_LO.root"
     elif args.beginRun >= 315252 and args.beginRun < 325273:    # 2018
-        year = 2018
         byLsCSV          = resPath+"/FillByLs_2018.csv"
         mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2018.root"
         sigTemplates     = args.input+"/"+prefix_dqm+"Autumn18-DYJetsToLL_M_50_LO.root"
     elif args.beginRun >= 355100 and args.beginRun < 362760:    # 2022
-        year = 2022
         byLsCSV = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/brilcalcByLS/byLS_Collisions22_355100_362760_Muon_20230210.csv"
         mcCorrelations  = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/CorrelationFactors/MCClosure_V19_07/c_nPV_2022.root"
         prefix_dqm =  "ZCountingInOut-"
         sigTemplates = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/SignalTemplates/ZCountingInOut-V19_07-Winter22-DYJetsToLL_M_50_LO.root"
-    elif args.beginRun >= 362760:                               # 2023
-        year = 2023
-    else:
-        log.warning("specified begin run {0} unknown! exit()".format(args.beginRun))
-        exit()
 
-    energy = 13.6 if year >= 2022 else 13
 
     byLsCSV = byLsCSV          if args.byLsCSV       == "default"   else args.byLsCSV
     eosDir  = args.input
