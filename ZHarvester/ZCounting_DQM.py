@@ -357,6 +357,9 @@ if __name__ == '__main__':
                 # delivered, efficiency and deadtime corrected, Z boson count
                 delZCount = result["recZCount"] / deadtime * (totaltimewindow / timewindow)
 
+                # instantaneous delivered Z rate (corrected for deadtime)
+                ZRate = result["recZCount"] / (timewindow * deadtime)
+
                 result.update({
                     "fill": fill,
                     "run": run,
@@ -368,6 +371,8 @@ if __name__ == '__main__':
                     "timewindow": timewindow,
                     "pileUp": byLS_m['avgpu'].mean(),
                     "delZCount": delZCount,
+                    "instDelLumi": delLumi/timewindow,
+                    "ZRate": ZRate
                 })
             
                 results.append(result)
