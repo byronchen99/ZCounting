@@ -22,29 +22,42 @@ ROOT.gROOT.SetBatch(True)
 def extract_results(directory, m, cHLT, hPV, mcCorrelations):
     log.info("Extracting fit results in {0} for {1}".format(directory,m))  
 
-    # --- For identification (ID) efficiency        
-    NsigHLT2, chi2HLT2, meanHLT2, sigmaHLT2 = utils.open_workspace_yield(directory, "HLT_{0}_2".format(etaRegionZ), m, signal_parameters=True)
-    NsigHLT1, chi2HLT1, meanHLT1, sigmaHLT1 = utils.open_workspace_yield(directory, "HLT_{0}_1".format(etaRegionZ), m, signal_parameters=True)
-    NsigIDFail, chi2ID, meanIDFail, sigmaIDFail = utils.open_workspace_yield(directory, "ID_{0}_0".format(etaRegion), m, signal_parameters=True)
-
+    # --- For identification (ID) efficiency  
+    #
+    # New function version       
+    NsigHLT2, NbkgHLT2, chi2HLT2, meanHLT2, sigmaHLT2 = utils.open_workspace_yield(directory, "HLT_{0}_2".format(etaRegionZ), m, signal_parameters=True)
+    NsigHLT1, NbkgHLT1, chi2HLT1, meanHLT1, sigmaHLT1 = utils.open_workspace_yield(directory, "HLT_{0}_1".format(etaRegionZ), m, signal_parameters=True)
+    NsigIDFail, NbkgIDFail, chi2ID, meanIDFail, sigmaIDFail = utils.open_workspace_yield(directory, "ID_{0}_0".format(etaRegion), m, signal_parameters=True)
+ 
     NsigHLT2 = utils.unorm(NsigHLT2)
     NsigHLT1 = utils.unorm(NsigHLT1)
     NsigIDFail = utils.unorm(NsigIDFail)
 
+    NbkgHLT2 = utils.unorm(NbkgHLT2)
+    NbkgHLT1 = utils.unorm(NbkgHLT1)
+    NbkgIDFail = utils.unorm(NbkgIDFail)
+
     effHLT = (2 * NsigHLT2) / (2 * NsigHLT2 + NsigHLT1)
     effID = (2 * NsigHLT2 + NsigHLT1) / (2 * NsigHLT2 + NsigHLT1 + NsigIDFail)
+    
+    # Extract signal and bkg quantities 
+    NsigGloPass, NbkgGloPass, chi2GloPass, meanGloPass, sigmaGloPass = utils.open_workspace_yield(directory, "Glo_{0}_1".format(etaRegion), m, signal_parameters=True)
+    NsigGloFail, NbkgGloFail, chi2GloFail, meanGloFail, sigmaGloFail = utils.open_workspace_yield(directory, "Glo_{0}_0".format(etaRegion), m, signal_parameters=True)
 
-    NsigGloPass, chi2GloPass, meanGloPass, sigmaGloPass = utils.open_workspace_yield(directory, "Glo_{0}_1".format(etaRegion), m, signal_parameters=True)
-    NsigGloFail, chi2GloFail, meanGloFail, sigmaGloFail = utils.open_workspace_yield(directory, "Glo_{0}_0".format(etaRegion), m, signal_parameters=True)
-
-    NsigStaPass, chi2StaPass, meanStaPass, sigmaStaPass = utils.open_workspace_yield(directory, "Sta_{0}_1".format(etaRegion), m, signal_parameters=True)
-    NsigStaFail, chi2StaFail, meanStaFail, sigmaStaFail = utils.open_workspace_yield(directory, "Sta_{0}_0".format(etaRegion), m, signal_parameters=True)
+    NsigStaPass, NbkgStaPass, chi2StaPass, meanStaPass, sigmaStaPass = utils.open_workspace_yield(directory, "Sta_{0}_1".format(etaRegion), m, signal_parameters=True)
+    NsigStaFail, NbkgStaFail, chi2StaFail, meanStaFail, sigmaStaFail = utils.open_workspace_yield(directory, "Sta_{0}_0".format(etaRegion), m, signal_parameters=True)
 
     NsigGloPass = utils.unorm(NsigGloPass)
     NsigGloFail = utils.unorm(NsigGloFail)
 
     NsigStaPass = utils.unorm(NsigStaPass)
     NsigStaFail = utils.unorm(NsigStaFail)
+
+    NbkgGloPass = utils.unorm(NbkgGloPass)
+    NbkgGloFail = utils.unorm(NbkgGloFail)
+
+    NbkgStaPass = utils.unorm(NbkgStaPass)
+    NbkgStaFail = utils.unorm(NbkgStaFail)
 
     effGlo = NsigGloPass / (NsigGloPass + NsigGloFail)
     effSta = NsigStaPass / (NsigStaPass + NsigStaFail)
@@ -81,6 +94,14 @@ def extract_results(directory, m, cHLT, hPV, mcCorrelations):
         "NsigGloFail": NsigGloFail,
         "NsigStaPass": NsigStaPass,
         "NsigStaFail": NsigStaFail,
+        # Background numbers in mutual exclusive categories
+        "NbkgHLT1": NbkgHLT1,
+        "NbkgHLT2": NbkgHLT2,
+        "NbkgIDFail": NbkgIDFail,
+        "NbkgGloPass": NbkgGloPass,
+        "NbkgGloFail": NbkgGloFail,
+        "NbkgStaPass": NbkgStaPass,
+        "NbkgStaFail": NbkgStaFail,
         # Chi2s from fits
         "chi2HLT2": chi2HLT2,
         "chi2HLT1": chi2HLT1,
@@ -113,7 +134,7 @@ if __name__ == '__main__':
 
     parser.add_argument("-m", "--measurement", type=int, default=None, 
         help="Only fit a specific measurement of the run")
-
+    
     parsing.set_parser_default(parser, "mass", [66,116,50])
     parsing.set_parser_default(parser, "ptCut", 27)     
 
@@ -381,10 +402,17 @@ if __name__ == '__main__':
         
         if measurement is None or measurement == m:
             utils.writePerRunCSV(results, outCSVDir, run)
+            
 
         results = []
 
-    if args.writeSummaryCSV:
-        utils.writeSummaryCSV(outCSVDir)
+
+    #if args.writeSummaryCSV:
+    #    utils.writeSummaryCSV(outCSVDir)
+    #    utils.writeSummaryCSV(outCSVDir, outName="cms_2.4", keys=["fill","run"])
+    
+    # To build the merge csv file locally 
+    utils.writeSummaryCSV(outCSVDir)
+    utils.writeSummaryCSV(outCSVDir, outName="cms_2.4", keys=['fill','beginTime','endTime','ZRate','instDelLumi','delLumi','delZCount'])
 
     print("Done!") # needed for submit script to check if job is completed

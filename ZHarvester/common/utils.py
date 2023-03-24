@@ -446,14 +446,21 @@ def getCorrelation(hPV_data, correlationsFileName, which, region="I"):
     return corr
 
 # ------------------------------------------------------------------------------
-def writePerRunCSV(results, outCSVDir, run):
+def writePerRunCSV(results, outCSVDir, run, outName=None, keys=None):
     ## Write per measurement csv file - one per run
     log.info("Writing per Run CSV file")
     results = pd.concat([pd.DataFrame([result]) for result in results], ignore_index=True, sort=False)
 
+    # Add the keys option
+    if keys:
+        results = results[keys]
+
+    if outName:
+        with open(outCSVDir + "/" +outName + 'csvfile{0}.csv'.format(run), 'w') as file:
+            results.to_csv(file, index=False)
+
     with open(outCSVDir + '/csvfile{0}.csv'.format(run), 'w') as file:
         results.to_csv(file, index=False)
-
 # ------------------------------------------------------------------------------
 def writeSummaryCSV(outCSVDir, outName="Mergedcsvfile", writeByLS=False, keys=None):
     """
@@ -515,6 +522,7 @@ def open_workspace_yield(directory, filename, m, signal_parameters=False):
     f, w = open_workspace(directory, "workspace_yield_"+filename, m)
     
     Nsig = w.var("Nsig").getVal()
+    Nbkg = w.var("Nbkg").getVal()
     chi2 = w.arg("chi2").getVal()
 
     if signal_parameters:
@@ -533,7 +541,7 @@ def open_workspace_yield(directory, filename, m, signal_parameters=False):
     f.Close()
     f.Delete()
     w.Delete()
-    return Nsig, chi2, mean, sigma
+    return Nsig, Nbkg, chi2, mean, sigma
 
 def unorm(value):
     if value > 0:
