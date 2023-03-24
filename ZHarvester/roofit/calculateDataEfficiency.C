@@ -1144,7 +1144,7 @@ void getZyield(
     RooGaussian *constraint_sig_mean = 0;
     RooGaussian *constraint_sig_sigma = 0;
     RooGaussian *constraint_sig_alpha = 0;
-    if(sigMod%10 == 1 || sigMod%10 == 2 || sigMod%10 == 5 || sigMod%10 == 6){
+    /*if(sigMod%10 == 1 || sigMod%10 == 2 || sigMod%10 == 5 || sigMod%10 == 6){
 
         if(effType == "Trk" || effType == "Glo"){
             std::cout<<">>> set constraints on signal model parameters "<< std::endl; 
@@ -1163,7 +1163,7 @@ void getZyield(
                 constraints->add(*constraint_sig_alpha);
             }
         }
-    }
+    }*/
 
     RooGaussian *constraint_alpha = 0;
     RooGaussian *constraint_beta = 0;
