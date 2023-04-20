@@ -47,7 +47,7 @@ data['weight'] = data['recLumi']
 # sort out runs with low stat
 data = data.loc[data['recLumi'] > 10]
 
-pdb.set_trace()
+#pdb.set_trace()
 
 def make_hist(
     df,
@@ -151,7 +151,7 @@ def make_hist(
     # --- make scatter
     for xx, xxSum, xlabel, suffix1 in (
         # (data['time'].values, time.values, "Time", "time"),
-        # (data['fill'].values, fill.values, "Fill number", "fill"),
+        (data['fill'].values, fill.values, "Fill number", "fill"),
         # (data['run'].values, run.values, "Run number", "run"),
         (data['weight'].cumsum().values/1000, weight.cumsum().values/1000., "Integrated luminosity [fb$^{-1}$]", "lumi"),
     ):
@@ -297,6 +297,7 @@ for p in ["HLT", "ID", "Glo", "Sta"]:
 for c in ["HLT2", "HLT1", "IDFail", "GloFail", "GloPass", "StaFail", "StaPass"]:
     for p in ["mean", "sigma"]:
 
+        log.info(f"Start param = {p+c}")
         param = p+c
 
         if param.startswith("mean"):
@@ -306,5 +307,11 @@ for c in ["HLT2", "HLT1", "IDFail", "GloFail", "GloPass", "StaFail", "StaPass"]:
 
         make_hist(data, param, label=label, saveas="2022_zcount", title="2022",  legend="lower right")
         make_hist(data, param, label=label, saveas="2022BCD_zcount", title="2022(B,C,D)",  legend="lower right", run_range=(355065, 359021))
-        # make_hist(data, param, label=label, saveas="2022EFG_zcount", title="2022(E,F,G)",  legend="lower right", run_range=(359022, 362760))
+        make_hist(data, param, label=label, saveas="2022EFG_zcount", title="2022(E,F,G)",  legend="lower right", run_range=(359022, 362760))
 
+# plot fractions
+for p in ["fracGloPass","fracGloFail","fracHLT1","fracHLT2","fracIDFail","fracStaPass","fracStaFail"]:
+    log.info(f"Start param {p}")
+    
+    label = p
+    make_hist(data, p, label=label, saveas="2022_zcount", title="2022", legend="lower right")	
