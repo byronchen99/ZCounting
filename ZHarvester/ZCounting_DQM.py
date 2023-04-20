@@ -99,9 +99,17 @@ def extract_results(directory, m, cHLT, hPV, mcCorrelations):
         "NbkgHLT2": NbkgHLT2,
         "NbkgIDFail": NbkgIDFail,
         "NbkgGloPass": NbkgGloPass,
-        "NbkgGloFail": NbkgGloFail,
+         "NbkgGloFail": NbkgGloFail,
         "NbkgStaPass": NbkgStaPass,
         "NbkgStaFail": NbkgStaFail,
+        # fractions
+        "fracHLT1":NbkgHLT1/(NbkgHLT1 + NsigHLT1),
+        "fracHLT2":NbkgHLT2/(NbkgHLT2 + NsigHLT2),
+        "fracIDFail": NbkgIDFail/(NbkgIDFail/NsigIDFail),
+        "fracGloPass": NbkgGloPass/(NbkgGloPass+NsigGloPass), 
+        "fracGloFail": NbkgGloFail/(NbkgGloFail+NsigGloFail),
+        "fracStaPass": NbkgStaPass/(NbkgStaPass+NsigStaPass), 
+        "fracStaFail": NbkgStaFail/(NbkgStaFail+NsigStaFail), 
         # Chi2s from fits
         "chi2HLT2": chi2HLT2,
         "chi2HLT1": chi2HLT1,
@@ -232,19 +240,28 @@ if __name__ == '__main__':
 
     maximumLS = 2500        # maximum luminosity block number that is stored in the DQM histograms
 
-    if args.etaCut == 0.9:
+    if args.etaCut == 0.9 and args.etaMin == 0.0:
         etaRegion = "B"
         etaRegionZ = "BB"
-    elif args.etaCut == 2.4:
+        etaRegions = ["BB"]
+    elif args.etaCut == 2.4 and args.etaMin == 0.9:
+        etaRegion = "E"
+        etaRegionZ = "EE"
+        etaRegions = ["EE"]
+    elif args.etaCut == 2.4 and args.etaMin == 0.0:
         etaRegion = "I"
         etaRegionZ = "I"
+        etaRegions = ["BB","BE","EE"]
     else:
-        log.error(f"Eta cut {args.etaCut} not supported for DQM histograms!")
+        log.error(f"Eta cut and {args.etaMin} < |eta| < {args.etaCut} not supported for DQM histograms!")
 
-    etaRegions = ["BB","BE","EE"] if etaRegion == "I" else ["BB"]
+    #etaRegions = ["BB","BE","EE"] if etaRegion == "I" else ["BB"]
 
     if not args.collect:
-        load_makros(args.bkgModel, args.ptCut, args.etaCut, year, MassMin_, MassMax_, MassBin_, npvMin_, npvMax_)
+        #load_makros(args.bkgModel, args.ptCut, args.etaCut, year, MassMin_, MassMax_, MassBin_, npvMin_, npvMax_)
+        
+        load_makros(args.bkgModel, args.ptCut, args.etaMin, args.etaCut, year, MassMin_, MassMax_, MassBin_, npvMin_, npvMax_)
+
 
     byLS_data = utils.load_input_csv(byLS_filename)
     byLS_data = byLS_data.loc[(byLS_data['run'] >= int(args.beginRun)) & (byLS_data['run'] < int(args.endRun))]
@@ -414,5 +431,4 @@ if __name__ == '__main__':
     # To build the merge csv file locally 
     utils.writeSummaryCSV(outCSVDir)
     utils.writeSummaryCSV(outCSVDir, outName="cms_2.4", keys=['fill','beginTime','endTime','ZRate','instDelLumi','delLumi','delZCount'])
-
     print("Done!") # needed for submit script to check if job is completed

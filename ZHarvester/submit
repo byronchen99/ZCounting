@@ -11,6 +11,7 @@ def zmonitoring(
     sigModel,
     bkgModel,
     ptCut,
+    etaMin,
     etaCut,
     mass,
     LumiPerMeasurement,
@@ -55,7 +56,7 @@ def zmonitoring(
     cs_file.write("output      = condor/$(ClusterId).$(ProcId).out \n")
     cs_file.write("error       = condor/$(ClusterId).$(ProcId).err \n")
     cs_file.write("log         = condor/$(ClusterId).$(ProcId).log \n")
-    cs_file.write("MY.WantOS   = \"el8\" \n") # OS selection via container
+    #cs_file.write("MY.WantOS   = \"el8\" \n") # OS selection via container
     # cs_file.write('requirements = (OpSysAndVer =?= "CentOS8") \n')
     # cs_file.write("+JobFlavour =\"testmatch\" \n") # only works at lxplus
     # cs_file.write("+RequestRuntime = 43200 \n")  # only works at naf(desy) 43200s = 12h
@@ -77,7 +78,7 @@ def zmonitoring(
         if utils.getFileName(dirIn, run) is None:
             continue
         runs.append(run)
-        cs_file.write("arguments  = {0} {1} {2} {3} {4} {5} {6} {7} {8} {9} {10} {11} {12} {13} {14}\n".format(
+        cs_file.write("arguments  = {0} {1} {2} {3} {4} {5} {6} {7} {8} {9} {10} {11} {12} {13} {14} {15}\n".format(
             run,
             cmsswbase,
             dirIn,
@@ -87,6 +88,7 @@ def zmonitoring(
             sigModel,
             bkgModel,
             ptCut,
+            etaMin,
             etaCut,
             mass[0],
             mass[1],
@@ -124,6 +126,7 @@ def zmonitoring(
         'luminosity': LumiPerMeasurement,
         'mode': mode,
         'ptCut': ptCut,
+        'etaMin': etaMin,
         'etaCut': etaCut,
         'runs': runs,
         'njobs': njobs,
@@ -141,6 +144,8 @@ def check(projectdir, resubmit=False, collect=False, longQueue=False):
     if collect:
         from common.utils import writeSummaryCSV     
         writeSummaryCSV(projectdir+"/csvFiles/", writeByLS=False)
+        writeSummaryCSV(projectdir+"/csvFiles/", outName="cms", keys=['fill','beginTime','endTime','ZRate','instDelLumi','delLumi','delZCount'])
+        writeSummaryCSV(projectdir+"/csvFiles/", outName="bkgfrac", keys=['fill','run','fracGloPass','fracGloFail'])
 
     with open(projectdir+'/jobinfo.json', 'r') as f:
         ji = json.load(f)
@@ -186,7 +191,7 @@ def check(projectdir, resubmit=False, collect=False, longQueue=False):
 
                 zmonitoring(
                     ji['dirIn'], ji['dirOut'], ji['byLsCSV'], ji['mcCorrections'], ji['sigModel'], ji['bkgModel'],
-                    ji['ptCut'], ji['etaCut'], (ji['mass_lo'], ji['mass_hi'], ji['mass_bins']), 
+                    ji['ptCut'], ji['etaMin'], ji['etaCut'], (ji['mass_lo'], ji['mass_hi'], ji['mass_bins']), 
                     ji['luminosity'], ji['mode'], False,
                     runlist=[ji['runs'][i] for i in unfinished_jobs],
                     longQueue=longQueue)
@@ -262,7 +267,9 @@ if __name__ == '__main__':
     initargs,_ = parserA.parse_known_args()
     if initargs.mode == "DQM":
         parsing.set_parser_default(parserA, "mass", [66,116,50])
-        parsing.set_parser_default(parserA, "ptCut", 27)        
+        parsing.set_parser_default(parserA, "ptCut", 27)
+        parsing.set_parser_default(parserA, "etaCut", 2.4)
+        parsing.set_parser_default(parserA, "etaMin", 0.0)
 
     # parse arguments and call subparser
     args = parser.parse_args()
@@ -296,6 +303,7 @@ if __name__ == '__main__':
             args.sigModel,
             args.bkgModel,
             args.ptCut,
+            args.etaMin,
             args.etaCut,
             args.mass,
             args.LumiPerMeasurement,

@@ -118,6 +118,13 @@ void set_etaCut(Float_t eta_){
     std::cout<<"Set eta cut of tag and probe muons to |eta| < "<<eta_<<" "<<std::endl;
 }
 
+void set_etaRange(Float_t etaMin, Float_t etaMax){
+    etaMin < etaCutTag < etaMax;
+    etaMin < etaCutProbe < etaMax;
+    std::cout<<"Set eta cut of tag and probe muons to " << etaMin << " < |eta| < " << etaMax <<" "<<std::endl;
+}
+
+
 void set_etaBound(Float_t eta_){
     // set the boundary where barrel and endcap is defined
     etaBound = eta_;
@@ -1144,7 +1151,7 @@ void getZyield(
     RooGaussian *constraint_sig_mean = 0;
     RooGaussian *constraint_sig_sigma = 0;
     RooGaussian *constraint_sig_alpha = 0;
-    /*if(sigMod%10 == 1 || sigMod%10 == 2 || sigMod%10 == 5 || sigMod%10 == 6){
+    if(sigMod%10 == 1 || sigMod%10 == 2 || sigMod%10 == 5 || sigMod%10 == 6){
 
         if(effType == "Trk" || effType == "Glo"){
             std::cout<<">>> set constraints on signal model parameters "<< std::endl; 
@@ -1163,7 +1170,7 @@ void getZyield(
                 constraints->add(*constraint_sig_alpha);
             }
         }
-    }*/
+    }
 
     RooGaussian *constraint_alpha = 0;
     RooGaussian *constraint_beta = 0;

@@ -71,6 +71,8 @@ def parser_zharvest(pars=None):
                         help="Choose one of the options for background model.")
     pars.add_argument('--ptCut', type=float, default=25.,
                         help='specify lower pt cut on tag and probe muons')
+    pars.add_argument('--etaMin', type=float, default=0.0,
+                        help='specify lower |eta| cut on tag and probe muons')
     pars.add_argument('--etaCut', type=float, default=2.4,
                         help='specify upper |eta| cut on tag and probe muons')
     pars.add_argument('--mass', nargs=3, metavar=('LOW', 'HIGH', 'NUMBER'), default=(60,120,120), type=int,
