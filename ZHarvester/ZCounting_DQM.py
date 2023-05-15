@@ -180,6 +180,10 @@ if __name__ == '__main__':
         byLsCSV = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/brilcalcByLS/byLS_Collisions22_355100_362760_Muon_20230210.csv"
         mcCorrelations  = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/CorrelationFactors/MCClosure_V19_07/c_nPV_2022.root"
         sigTemplates = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/SignalTemplates/ZCountingInOut-V19_07-Winter22-DYJetsToLL_M_50_LO.root"
+    elif args.beginRun >= 366403:    # 2023
+        byLsCSV = "/eos/cms/store/group/comm_luminosity/ZCounting/2023/brilcalcByLS/byLS_Collisions23_366403_367111_Muon_20230508.csv"
+        mcCorrelations  = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/CorrelationFactors/MCClosure_V19_07/c_nPV_2022.root"
+        sigTemplates = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/SignalTemplates/ZCountingInOut-V19_07-Winter22-DYJetsToLL_M_50_LO.root"
 
 
     byLsCSV = byLsCSV          if args.byLsCSV       == "default"   else args.byLsCSV
