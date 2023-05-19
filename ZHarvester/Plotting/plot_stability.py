@@ -279,39 +279,51 @@ def make_hist(
             plt.close()
 
 
-# plot efficiencies
-for p in ["HLT", "ID", "Glo", "Sta"]:
+# # plot efficiencies
+# for p in ["HLT", "ID", "Glo", "Sta"]:
 
-    param = "eff"+p
+#     param = "eff"+p
 
-    label = "$\epsilon$ ("+p+")"
+#     label = "$\epsilon$ ("+p+")"
 
-    color_hist="orange"
-    color_scatter="red"
+#     color_hist="orange"
+#     color_scatter="red"
 
-    make_hist(data, param, label=label, saveas="2022_zcount", title="2022",  legend="lower right", color_hist=color_hist, color_scatter=color_scatter)
-    make_hist(data, param, label=label, saveas="2022BCD_zcount", title="2022(B,C,D)",  legend="lower right", run_range=(355065, 359021), color_hist=color_hist, color_scatter=color_scatter)
+#     make_hist(data, param, label=label, saveas="2022_zcount", title="2022",  legend="lower right", color_hist=color_hist, color_scatter=color_scatter)
+#     make_hist(data, param, label=label, saveas="2022BCD_zcount", title="2022(B,C,D)",  legend="lower right", run_range=(355065, 359021), color_hist=color_hist, color_scatter=color_scatter)
 
 
-# plot signal model parameters
-for c in ["HLT2", "HLT1", "IDFail", "GloFail", "GloPass", "StaFail", "StaPass"]:
-    for p in ["mean", "sigma"]:
+# # plot signal model parameters
+# for c in ["HLT2", "HLT1", "IDFail", "GloFail", "GloPass", "StaFail", "StaPass"]:
+#     for p in ["mean", "sigma"]:
 
-        log.info(f"Start param = {p+c}")
-        param = p+c
+#         log.info(f"Start param = {p+c}")
+#         param = p+c
 
-        if param.startswith("mean"):
-            label = "$\mu$("+param.replace("mean","")+")    "
-        elif param.startswith("sigma"):
-            label = "$\sigma$("+param.replace("sigma","")+")    "
+#         if param.startswith("mean"):
+#             label = "$\mu$("+param.replace("mean","")+")    "
+#         elif param.startswith("sigma"):
+#             label = "$\sigma$("+param.replace("sigma","")+")    "
 
-        make_hist(data, param, label=label, saveas="2022_zcount", title="2022",  legend="lower right")
-        make_hist(data, param, label=label, saveas="2022BCD_zcount", title="2022(B,C,D)",  legend="lower right", run_range=(355065, 359021))
-        make_hist(data, param, label=label, saveas="2022EFG_zcount", title="2022(E,F,G)",  legend="lower right", run_range=(359022, 362760))
+#         make_hist(data, param, label=label, saveas="2022_zcount", title="2022",  legend="lower right")
+#         make_hist(data, param, label=label, saveas="2022BCD_zcount", title="2022(B,C,D)",  legend="lower right", run_range=(355065, 359021))
+#         make_hist(data, param, label=label, saveas="2022EFG_zcount", title="2022(E,F,G)",  legend="lower right", run_range=(359022, 362760))
 
-# plot fractions
+# plot background fractions
 for p in ["fracGloPass","fracGloFail","fracHLT1","fracHLT2","fracIDFail","fracStaPass","fracStaFail"]:
     log.info(f"Start param {p}")
-    
+
+    # compute background fraction from signal and background yields
+    k_sig = p.replace("frac","Nsig")
+    k_bkg = p.replace("frac","Nbkg")
+
+    if data[k_bkg].dtype==object:
+        data[k_bkg] = data[k_bkg].apply(lambda x: unc.ufloat_fromstr(x).n)
+    if data[k_sig].dtype==object:
+        data[k_sig] = data[k_sig].apply(lambda x: unc.ufloat_fromstr(x).n)
+
+    data[p] = data[k_bkg] / (data[k_bkg]+data[k_sig])
+    data[p] = data[p].replace(np.nan,0)
+
     label = p
     make_hist(data, p, label=label, saveas="2022_zcount", title="2022", legend="lower right")	

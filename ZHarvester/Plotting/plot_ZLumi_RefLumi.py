@@ -27,8 +27,10 @@ from scipy.optimize import curve_fit
 parser = parsing.parser_plot()
 parser.add_argument("-r", "--rates", required=True, type=str, help="csv file with z rates per measurement")
 parser.add_argument("-l", "--refLumi", default="", type=str, help="give a ByLs.csv as input for additional reference Luminosity")
-parser.add_argument("-x", "--xsec", default="", type=str, help="csv file with z rates per measurement for absolute scale")
+parser.add_argument("-x", "--xsec", default="", type=str, help="csv file with z rates per measurement for absolute scale. Or number for cross section in pb to be used")
 parser.add_argument("-f", "--fill", nargs="*",  type=int, default=[], help="specify a single fill to plot")
+parser.add_argument("--rrange", nargs=2,  type=float, default=[0.961,1.039], help="Specify range in ratio plot")
+parser.add_argument("--noFit", action="store_true", default=False, help="Don't do a fit")
 args = parser.parse_args()
 log = logging.setup_logger(__file__, args.verbose)
 
@@ -84,16 +86,20 @@ else:
 
 # --- absolute scale for z luminosity
 if args.xsec != "":
-    log.info("get Z cross section")
-    data_xsec = pd.read_csv(str(args.xsec), sep=',',low_memory=False)#, skiprows=[1,2,3,4,5])
-    data_xsec['zDelI'] = data_xsec['zDel'].apply(lambda x: unc.ufloat_fromstr(x).n)
+    if os.path.isfile(args.xsec):
+        log.info("get Z cross section")
+        data_xsec = pd.read_csv(args.xsec, sep=',',low_memory=False)#, skiprows=[1,2,3,4,5])
+        data_xsec['zDelI'] = data_xsec['zDel'].apply(lambda x: unc.ufloat_fromstr(x).n)
 
-    apply_muon_prefire(data_xsec)
-    apply_ECAL_prefire(data_xsec)
+        apply_muon_prefire(data_xsec)
+        apply_ECAL_prefire(data_xsec)
 
-    log.info("apply prefire corrections - done")
+        log.info("apply prefire corrections - done")
 
-    xsecI = sum(data_xsec['zDelI'])/sum(data_xsec['lumiRec'])
+        xsecI = sum(data_xsec['zDelI'])/sum(data_xsec['lumiRec'])
+
+    else:
+        xsecI = int(args.xsec)
 else:
     xsecI = 1
 
@@ -133,7 +139,7 @@ if data['recZCount'].dtype==object:
     data['recZCount'] = data['recZCount'].apply(lambda x: unc.ufloat_fromstr(x))
 
 data['zLumi_mc'] = data['recZCount'] / xsecI
-data['zLumiInst_mc'] = data['recZCount'] / data['timewindow'] * 1000  # convert into /nb
+data['zLumiInst_mc'] = data['zLumi_mc'] / data['timewindow'] * 1000  # convert into /nb
 # reference lumi during one measurement
 data['dLRec(/nb)'] = data['recLumi'] / data['timewindow'] * 1000  # convert into /nb 
 
@@ -147,7 +153,9 @@ do_ratio=True ## activate the ratio plots
 for fill, data_fill in data.groupby("fill"):
     log.info(f"Now at fill {fill}")
 
-    if int(fill) >= 8000:
+    if int(fill) >= 8496:
+        energystr = "$13.6\,\mathrm{TeV} (2023)$"
+    elif int(fill) >= 8000:
         energystr = "$13.6\,\mathrm{TeV} (2022)$"
     else:
         energystr = "$13\,\mathrm{TeV} (2017)$"
@@ -236,10 +244,13 @@ for fill, data_fill in data.groupby("fill"):
         
         y = np.array([y.n for y in data_fill[eff].values])
         yErr = np.array([y.s for y in data_fill[eff].values])
+        
+        # sort out zeros
+        mask = y>0
+        yErr = yErr[mask]
+        y = y[mask]
 
-        # y = data_fill[eff].values
-
-        ax1.errorbar(x, y, xerr=(xDown, xUp), yerr=yErr, 
+        ax1.errorbar(x[mask], y, xerr=(xDown[mask], xUp[mask]), yerr=yErr, 
             label=name,
             marker=mkr, linewidth=0, color=col, ecolor=col, elinewidth=1.0, capsize=1.0, barsabove=True, markersize=ms,
             zorder=1)
@@ -344,28 +355,27 @@ for fill, data_fill in data.groupby("fill"):
             
         ax2.plot(np.array([xMin, xMax]), np.array([1.0, 1.0]), color="black",linestyle="-", linewidth=1)
        
-        log.info("Make fit")
-        
-        func = linear
-        popt, pcov = curve_fit(func, x, yRatio, sigma=yRatioErr, absolute_sigma=True)
-        perr = np.sqrt(np.diag(pcov))
-        params = unc.correlated_values(popt, pcov)
-        log.info(params)     
+        if not args.noFit:
+            log.info("Make fit")
+            
+            func = linear
+            popt, pcov = curve_fit(func, x, yRatio, sigma=yRatioErr, absolute_sigma=True)
+            perr = np.sqrt(np.diag(pcov))
+            params = unc.correlated_values(popt, pcov)
+            log.info(params)     
 
-        f = lambda x: func(x, *params)
-        xMC = np.arange(0,100,0.5)
-        yMC = np.array([f(x).n for x in xMC])
-        yErrMC = np.array([f(x).s for x in xMC])
+            f = lambda x: func(x, *params)
+            xMC = np.arange(0,100,0.5)
+            yMC = np.array([f(x).n for x in xMC])
+            yErrMC = np.array([f(x).s for x in xMC])
 
+            nround = 3
+            slopes[fill] = params[1].n 
+            
+            ax2.text(0.01, 0.97, f"$f(x) = ({round(params[0].n,nround)} \\pm {round(params[0].s,nround)}) x + {round(params[1].n,nround)} \\pm {round(params[1].s,nround)}$",  verticalalignment='top', transform=ax2.transAxes,style='italic',fontsize=10)    
+            ax2.plot(xMC, yMC, color="lime", linestyle="dashed", label="Fit")
 
-        nround = 3
-        slopes[fill] = params[1].n 
-        
-        ax2.text(0.01, 0.97, f"$f(x) = ({round(params[0].n,nround)} \\pm {round(params[0].s,nround)}) x + {round(params[1].n,nround)} \\pm {round(params[1].s,nround)}$",  verticalalignment='top', transform=ax2.transAxes,style='italic',fontsize=10)    
-        ax2.plot(xMC, yMC, color="lime", linestyle="dashed", label="Fit")
-
-
-        ax2.set_ylim([0.961,1.039])
+        ax2.set_ylim(args.rrange)
         ax2.set_xlim([xMin, xMax])
         ax2.set_xticks(xTicks)
         leg_lower = ax2.legend(loc="lower right", ncol=2,fontsize=10)
@@ -442,8 +452,8 @@ for fill, data_fill in data.groupby("fill"):
             zorder=1)
             
         ax2.plot(np.array([xMinPU, xMaxPU]), np.array([1.0, 1.0]), color="black",linestyle="-", linewidth=1)
-        
-        ax2.set_ylim([0.951,1.049])
+
+        ax2.set_ylim(args.rrange)
         ax2.set_xlim([xMinPU, xMaxPU])
         # ax2.set_xticks(xTicksPU)
 
@@ -478,9 +488,14 @@ for fill, data_fill in data.groupby("fill"):
         y = np.array([y.n for y in data_fill[eff].values])
         yErr = np.array([y.s for y in data_fill[eff].values])
 
+        # sort out zeros
+        mask = y>0
+        yErr = yErr[mask]
+        y = y[mask]
+
         # y = data_fill[eff].values
 
-        ax1.errorbar(xPU, y, yerr=yErr, 
+        ax1.errorbar(xPU[mask], y, yerr=yErr, 
             label=name,
             marker=mkr, linewidth=0, color=col, ecolor=col, elinewidth=1.0, capsize=1.0, barsabove=True, markersize=ms,
             zorder=1)
@@ -505,41 +520,40 @@ for fill, data_fill in data.groupby("fill"):
     plt.close()
  
 # Bar plot: fill x slopes
+if not args.noFit:
+    fig = plt.figure()
+    axs = fig.add_subplot(111)
 
-fig = plt.figure()
-axs = fig.add_subplot(111)
+    plt.bar(list(slopes.keys()), slopes.values(), color='g')
+    axs.set_xlabel("Fills")
+    axs.set_ylabel("Slopes of fits")
+    plt.savefig(outDir+f"/slopes.{fmt}")
+    plt.close()
 
-plt.bar(list(slopes.keys()), slopes.values(), color='g')
-axs.set_xlabel("Fills")
-axs.set_ylabel("Slopes of fits")
-plt.savefig(outDir+f"/slopes.{fmt}")
-plt.close()
+    # Histo for the fit slopes (for each fill)
 
-# Histo for the fit slopes (for each fill)
+    fig = plt.figure()
+    axh = fig.add_subplot(111)
 
-fig = plt.figure()
-axh = fig.add_subplot(111)
+    axh.set_xlabel("Slopes of fits")
+    axh.set_ylabel("Number of fills")
+    axh.hist(slopes.values(), bins=len(slopes))
+    axh.text(0.97, 0.97, "$\\mu$ = {0} \n $\\sigma$ = {1}".format(round(np.mean(list(slopes.values())),3), round(np.std(list(slopes.values())),3)),verticalalignment='top', horizontalalignment="right", transform=axh.transAxes)
+    plt.savefig(outDir+f"/hist_slopes.{fmt}")
+    plt.close()
 
-axh.set_xlabel("Slopes of fits")
-axh.set_ylabel("Number of fills")
-axh.hist(slopes.values(), bins=len(slopes))
-axh.text(0.97, 0.97, "$\\mu$ = {0} \n $\\sigma$ = {1}".format(round(np.mean(list(slopes.values())),3), round(np.std(list(slopes.values())),3)),verticalalignment='top', horizontalalignment="right", transform=axh.transAxes)
-plt.savefig(outDir+f"/hist_slopes.{fmt}")
-plt.close()
+    # Weighted histo for the fit slopes (for each fill)
 
+    fig = plt.figure()
+    axh = fig.add_subplot(111)
 
-# Weighted histo for the fit slopes (for each fill)
-
-fig = plt.figure()
-axh = fig.add_subplot(111)
-
-axh.set_xlabel("Slopes of fits")
-axh.set_ylabel("Integrated luminosity [/pb]")
-#log.info(slopes)
-#log.info(yRef_lumi_per_fill)
-axh.hist(slopes.values(), weights=yRef_lumi_per_fill.values(), bins=len(slopes))
-axh.text(0.97, 0.97, "$\\mu$ = {0} \n $\\sigma$ = {1}".format(round(np.mean(list(slopes.values())),3), round(np.std(list(slopes.values())),3)),verticalalignment='top', horizontalalignment="right", transform=axh.transAxes)
-plt.savefig(outDir+f"/weighted_hist_slopes.{fmt}")
-plt.close()
+    axh.set_xlabel("Slopes of fits")
+    axh.set_ylabel("Integrated luminosity [/pb]")
+    #log.info(slopes)
+    #log.info(yRef_lumi_per_fill)
+    axh.hist(slopes.values(), weights=yRef_lumi_per_fill.values(), bins=len(slopes))
+    axh.text(0.97, 0.97, "$\\mu$ = {0} \n $\\sigma$ = {1}".format(round(np.mean(list(slopes.values())),3), round(np.std(list(slopes.values())),3)),verticalalignment='top', horizontalalignment="right", transform=axh.transAxes)
+    plt.savefig(outDir+f"/weighted_hist_slopes.{fmt}")
+    plt.close()
 
 

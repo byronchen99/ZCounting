@@ -37,8 +37,12 @@ def extract_results(directory, m, cHLT, hPV, mcCorrelations):
     NbkgHLT1 = utils.unorm(NbkgHLT1)
     NbkgIDFail = utils.unorm(NbkgIDFail)
 
-    effHLT = (2 * NsigHLT2) / (2 * NsigHLT2 + NsigHLT1)
-    effID = (2 * NsigHLT2 + NsigHLT1) / (2 * NsigHLT2 + NsigHLT1 + NsigIDFail)
+    if NsigHLT2 + NsigHLT1 <= 0:
+        effHLT = utils.unorm(0)
+        effID = utils.unorm(0)
+    else:
+        effHLT = (2 * NsigHLT2) / (2 * NsigHLT2 + NsigHLT1)
+        effID = (2 * NsigHLT2 + NsigHLT1) / (2 * NsigHLT2 + NsigHLT1 + NsigIDFail)
     
     # Extract signal and bkg quantities 
     NsigGloPass, NbkgGloPass, chi2GloPass, meanGloPass, sigmaGloPass = utils.open_workspace_yield(directory, "Glo_{0}_1".format(etaRegion), m, signal_parameters=True)
@@ -59,8 +63,15 @@ def extract_results(directory, m, cHLT, hPV, mcCorrelations):
     NbkgStaPass = utils.unorm(NbkgStaPass)
     NbkgStaFail = utils.unorm(NbkgStaFail)
 
-    effGlo = NsigGloPass / (NsigGloPass + NsigGloFail)
-    effSta = NsigStaPass / (NsigStaPass + NsigStaFail)
+    if NsigGloPass + NsigGloFail <= 0:
+        effGlo = utils.unorm(0)
+    else:
+        effGlo = NsigGloPass / (NsigGloPass + NsigGloFail)
+
+    if NsigStaPass + NsigStaFail <= 0:
+        effSta = utils.unorm(0)
+    else:
+        effSta = NsigStaPass / (NsigStaPass + NsigStaFail)
 
     effMu = effID*effGlo*effSta
 
@@ -68,6 +79,11 @@ def extract_results(directory, m, cHLT, hPV, mcCorrelations):
     cIO = utils.getCorrelation(hPV, mcCorrelations, which="IO")
     cAcceptanceInner = utils.getCorrelation(hPV, mcCorrelations, which="AcceptanceInner")
     cAcceptanceOuter = utils.getCorrelation(hPV, mcCorrelations, which="AcceptanceOuter")
+
+    if effMu <= 0 or NsigHLT2 <=0:
+        recZCount = utils.unorm(0)
+    else:
+        recZCount = (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 / effMu**2 * cHLT * cID * cIO**2 * cAcceptanceInner *cAcceptanceOuter
 
     res = {
         # mean of gaussian signal resolution function
@@ -99,17 +115,9 @@ def extract_results(directory, m, cHLT, hPV, mcCorrelations):
         "NbkgHLT2": NbkgHLT2,
         "NbkgIDFail": NbkgIDFail,
         "NbkgGloPass": NbkgGloPass,
-         "NbkgGloFail": NbkgGloFail,
+        "NbkgGloFail": NbkgGloFail,
         "NbkgStaPass": NbkgStaPass,
         "NbkgStaFail": NbkgStaFail,
-        # fractions
-        "fracHLT1":NbkgHLT1/(NbkgHLT1 + NsigHLT1),
-        "fracHLT2":NbkgHLT2/(NbkgHLT2 + NsigHLT2),
-        "fracIDFail": NbkgIDFail/(NbkgIDFail/NsigIDFail),
-        "fracGloPass": NbkgGloPass/(NbkgGloPass+NsigGloPass), 
-        "fracGloFail": NbkgGloFail/(NbkgGloFail+NsigGloFail),
-        "fracStaPass": NbkgStaPass/(NbkgStaPass+NsigStaPass), 
-        "fracStaFail": NbkgStaFail/(NbkgStaFail+NsigStaFail), 
         # Chi2s from fits
         "chi2HLT2": chi2HLT2,
         "chi2HLT1": chi2HLT1,
@@ -130,7 +138,7 @@ def extract_results(directory, m, cHLT, hPV, mcCorrelations):
         "cAcceptanceInner": cAcceptanceInner,
         "cAcceptanceOuter": cAcceptanceOuter,
         # Efficiency corrected number of Z bosons
-        "recZCount": (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 / effMu**2 * cHLT * cID * cIO**2 * cAcceptanceInner *cAcceptanceOuter
+        "recZCount": recZCount
     }
 
     return res
@@ -261,9 +269,7 @@ if __name__ == '__main__':
 
     #etaRegions = ["BB","BE","EE"] if etaRegion == "I" else ["BB"]
 
-    if not args.collect:
-        #load_makros(args.bkgModel, args.ptCut, args.etaCut, year, MassMin_, MassMax_, MassBin_, npvMin_, npvMax_)
-        
+    if not args.collect:        
         load_makros(args.bkgModel, args.ptCut, args.etaMin, args.etaCut, year, MassMin_, MassMax_, MassBin_, npvMin_, npvMax_)
 
 
@@ -303,12 +309,17 @@ if __name__ == '__main__':
 
         log.info(f"Looping over measurements in intervals of {LumiPerMeasurement}/pb")
         for m, goodLSlist in enumerate(
-            utils.get_ls_for_next_measurement(lumisections=LSlist, luminosities=Lumilist, zcounts=ZCountlist, 
+            utils.get_ls_for_next_measurement(lumisections=LSlist, 
+                #luminosities=Lumilist, 
+                # zcounts=ZCountlist, 
                 lumiPerMeasurement=LumiPerMeasurement)
         ):
             if measurement is not None and measurement < m:
                 break
-                    
+
+            log.debug("Running measurement {0}".format(m))
+            log.debug("Good lumi list: {0}".format(goodLSlist))
+
             # create datafram byLS for measurement
             byLS_m = byLS_run.loc[byLS_run['ls'].isin(goodLSlist)]
 
@@ -396,8 +407,8 @@ if __name__ == '__main__':
                 # total time window from the beginning of the first to the end of the last lumisection
                 totaltimewindow = (endTime - beginTime).total_seconds()
 
-                # delivered, efficiency and deadtime corrected, Z boson count
-                delZCount = result["recZCount"] / deadtime * (totaltimewindow / timewindow)
+                # delivered, efficiency corrected Z boson count extrapolated using reference luminosity
+                delZCount = result["recZCount"] / recLumi * delLumi
 
                 # instantaneous delivered Z rate (corrected for deadtime)
                 ZRate = result["recZCount"] / (timewindow * deadtime)

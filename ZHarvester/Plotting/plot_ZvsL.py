@@ -25,7 +25,7 @@ parser.add_argument("-x","--xsec",  type=str, help="csv file where xsec should b
 args = parser.parse_args()
 log = logging.setup_logger(__file__, args.verbose)
 
-year = 2022
+year = 2023
 
 colors, textsize, labelsize, markersize = plotting.set_matplotlib_style()
 
@@ -52,7 +52,7 @@ def make_plots(df,
     valid xAxis: 'lumi', 'pileUp', 'measurement', 'time'
     """
 
-    if year == "2022":
+    if year in ["2022", "2023"]:
         lefttitle = "$\sqrt{s}=13.6\,\mathrm{TeV}$"
     else:
         lefttitle = "$\sqrt{s}=13\,\mathrm{TeV}$"

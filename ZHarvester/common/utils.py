@@ -173,7 +173,7 @@ def getFileName(directory, run):
     if len(eosFileList) == 0:
         eosFileList = glob.glob(f'{directory}/000{str(run)[:-2]}xx/*{run}*.root')
     if len(eosFileList) == 0:
-        eosFileList = glob.glob(f'{directory}/Muon/000{str(run)[:-2]}xx/*{run}*.root')
+        eosFileList = glob.glob(f'{directory}/Muon*/000{str(run)[:-2]}xx/*{run}*.root')
     if len(eosFileList) == 0:
         eosFileList = glob.glob(f'{directory}/SingleMuon/000{str(run)[:-2]}xx/*{run}*.root')
     if len(eosFileList) == 0:
@@ -183,8 +183,9 @@ def getFileName(directory, run):
         return None
         
     elif len(eosFileList) > 1:
-        log.warning(f"Multiple files found for run: {run}")
-        return None
+        log.info(f"Multiple ({len(eosFileList)}) files found for run {run}, return all:")
+        log.info(eosFileList)
+        return eosFileList
     else:
         return eosFileList[0]
 
@@ -221,6 +222,19 @@ def load_histogram(
     entries : Boolean
         Return the number of entries per lumisection
     """
+
+    if isinstance(fileName, list):
+        hist_summed = None
+        for f in fileName:
+            hist = load_histogram(name, f, lumisections, run, prefix, MassBin, MassMin, MassMax, pileup, entries)
+            if hist is None:
+                log.error(f"Not able to get histogram for {n}")
+                return None
+            elif hist_summed is None:
+                hist_summed = hist
+            else:
+                hist_summed += hist
+        return hist_summed        
 
     # in case multiple names are specified, the hists with the corresponding names are summed together
     if isinstance(name,list):
@@ -322,11 +336,12 @@ def np_to_hist(y, nBins=None, binLow=None, binHigh=None, histtype="TH1", name=""
 # ------------------------------------------------------------------------------
 def get_ls_for_next_measurement(
     lumisections, luminosities=None, zcounts=None, 
-    lumiPerMeasurement=20, lsPerMeasurement=100, 
+    lumiPerMeasurement=20, 
+    lsPerMeasurement=52, #52 lumisections correspond to 20 min. and 12 sec.
     threshold = 0.02
 ):
     """
-    generator that takes the set of lumisections that are process 
+    generator that takes the set of lumisections that are processed 
     and yields slizes of lists of these lumisections 
     that should be used in the next measurement. 
     It can be run in two modes: 
@@ -425,6 +440,10 @@ def getCorrelation(hPV_data, correlationsFileName, which, region="I"):
         eta region for the correlation factor, can be: "I", "BB", "BE", "EE"
     """
 
+    if hPV_data.Integral() <=0:
+        log.warning("No entries in PV data histogram found, return c{0}_{1} = 1".format(which, region))
+        return 1
+
     avgPV = hPV_data.GetMean()
 
     with uproot.open(f"{correlationsFileName}:C{which}_{region}") as th_:
@@ -477,8 +496,16 @@ def writeSummaryCSV(outCSVDir, outName="Mergedcsvfile", writeByLS=False, keys=No
     log.info("Writing overall CSV file")
     rateFileList = sorted(glob.glob(outCSVDir + '/csvfile??????.csv'))
     df_merged = pd.concat([pd.read_csv(m) for m in rateFileList], ignore_index=True, sort=False)
-    
+
     if keys:
+        for col in ["ZRate", "delZCount", "recZCount"]:
+            if col in df_merged.keys() and df_merged[col].dtype==object:
+                df_merged[col] = df_merged[col].apply(lambda x: unc.ufloat_fromstr(x).n)
+
+
+        df_merged["ZRate"] = df_merged["recZCount"] / (df_merged["timewindow"] * df_merged["recLumi"] / df_merged["delLumi"])
+        df_merged["instDelLumi"] = df_merged["recLumi"] / (df_merged["timewindow"] * df_merged["recLumi"] / df_merged["delLumi"])
+
         df_merged = df_merged[keys]
     
     with open(outCSVDir + '/' + outName + '_perMeasurement.csv', 'w') as file:
@@ -521,6 +548,9 @@ def open_workspace_yield(directory, filename, m, signal_parameters=False):
 
     f, w = open_workspace(directory, "workspace_yield_"+filename, m)
     
+    if w is None:
+        return 0, 0, 0, 0, 0
+
     Nsig = w.var("Nsig").getVal()
     Nbkg = w.var("Nbkg").getVal()
     chi2 = w.arg("chi2").getVal()

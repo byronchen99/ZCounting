@@ -1193,6 +1193,12 @@ void getZyield(
     RooDataHist *data = new RooDataHist("ZReco","ZReco",RooArgList(m), h_yield);
 
     const Double_t NsigMax = h_yield->Integral();
+
+    if(NsigMax <= 0){
+        std::cout<<"WARNING: Empty histogram! return 0" <<std::endl;
+        return;
+    }
+
     Double_t NsigInit = 0;  // initial signal contribution
     Double_t NbkgInit = 0;  // initial background contribution
     if(effType == "HLT"){

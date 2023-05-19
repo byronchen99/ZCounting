@@ -19,7 +19,7 @@ os.sys.path.append(os.path.expandvars('$CMSSW_BASE/src/ZCounting/'))
 from common.utils import to_DateTime
 from common.corrections import apply_muon_prefire, apply_ECAL_prefire
 
-from common import parsing, plotting, logging
+from common import parsing, plotting, logging, utils
 
 parser = parsing.parser_plot()
 parser.add_argument("-r","--rates", required=True, nargs='+', help="Nominator csv file with z rates per measurement")
@@ -33,19 +33,15 @@ if not os.path.isdir(outDir):
     os.mkdir(outDir)
 
 # --- settings
-run2 = True
-secPerLS=float(23.3)
-
 colors, textsize, labelsize, markersize = plotting.set_matplotlib_style()
 
 
 # --- PHYSICS luminosity
-
 lumi_2016 = 36.33
 lumi_2017 = 38.48 # unprescaled 42.04
 
 # --- uncertainties on PHYSICS luminosity
-include_unc_PHYSICS = run2
+include_unc_PHYSICS = True
 unc_2016 = np.sqrt((0.012)**2 + (0.017)**2 - 2*0.012*0.017*0.26)
 unc_2017 = np.sqrt((0.023)**2 + (0.017)**2 - 2*0.023*0.017*0.76)
 unc_2018 = np.sqrt((0.025)**2 + (0.017)**2 - 2*0.025*0.017*0.43)
@@ -56,25 +52,31 @@ log.info("2017: "+str(unc_2017))
 log.info("2018: "+str(unc_2018))
 
 # --- if averages should be plotted
-plot_averages = run2
+plot_averages = True
 
 ########## Data Acquisition ##########
 
 
 # --- get Z xsec
 if args.xsec:
-    log.info("get Z cross section")
-    data_xsec = pd.read_csv(str(args.xsec), sep=',',low_memory=False)#, skiprows=[1,2,3,4,5])
+    if os.path.isfile(args.xsec):
+        log.info("get Z cross section")
+        data_xsec = pd.read_csv(str(args.xsec), sep=',',low_memory=False)#, skiprows=[1,2,3,4,5])
 
-    if data_xsec['recZCount'].dtype==object:
-        data_xsec['recZCount'] = data_xsec['recZCount'].apply(lambda x: unc.ufloat_fromstr(x).n)
+        if data_xsec['recZCount'].dtype==object:
+            data_xsec['recZCount'] = data_xsec['recZCount'].apply(lambda x: unc.ufloat_fromstr(x).n)
 
-    apply_muon_prefire(data_xsec)
-    apply_ECAL_prefire(data_xsec)
+        apply_muon_prefire(data_xsec)
+        apply_ECAL_prefire(data_xsec)
 
-    log.info("apply prefire corrections - done")
+        log.info("apply prefire corrections - done")
 
-    xsec = sum(data_xsec['recZCount'])/sum(data_xsec['recLumi'])
+        xsec = sum(data_xsec['recZCount'])/sum(data_xsec['recLumi'])
+
+    else:
+        xsec = int(args.xsec)
+
+    
     normalize = False
 else:
     # normalize everything as no cross section is specified
@@ -87,7 +89,7 @@ else:
     
 # --- z luminosity
 log.info("get Z luminosity")
-data = pd.concat([pd.read_csv(csv, sep=',',low_memory=False) for csv in args.rates], ignore_index=True, sort=False)
+data = utils.load_result(args.rates)
 
 if data['recZCount'].dtype==object:
     data['recZCount'] = data['recZCount'].apply(lambda x: unc.ufloat_fromstr(x).n)
@@ -95,20 +97,10 @@ if data['recZCount'].dtype==object:
 # --->>> prefire corrections
 apply_muon_prefire(data)
 apply_ECAL_prefire(data)
-    
+
+   
 # <<<---
-
 data['zLumi'] = data['recZCount'] / xsec
-
-data['timeDown'] = data['beginTime'].apply(lambda x: to_DateTime(x))
-data['timeUp'] = data['endTime'].apply(lambda x: to_DateTime(x))
-
-# bring them in format to sort and plot them
-data['timeDown'] = mpl.dates.date2num(data['timeDown'])
-data['timeUp'] = mpl.dates.date2num(data['timeUp'])
-
-# center of each time slice
-data['time'] = data['timeDown'] + (data['timeUp'] - data['timeDown'])/2
 
 data = data[data['recLumi'] > 0.]
 data = data[data['zLumi'] > 0.]
@@ -167,7 +159,7 @@ def make_hist(
     legend='upper right',
     rangey=[0.89,1.11]
 ):
-    if "2022" in title:
+    if "2022" in title or "2023" in title or "Run 3" in title:
         lefttitle = "$13.6\,\mathrm{TeV}$"
     else:
         lefttitle = "$13\,\mathrm{TeV}$"
@@ -309,7 +301,7 @@ def make_hist(
             # rms = (sum((ww*yy)**2)/sum(ww))**0.5
             # log.info(f"RMS = {rms}")
 
-            if suffix1 == "lumi" and plot_averages:
+            if plot_averages:
                 # average lumi bars at centered at half of the lumi in each bar
                 xxNew = np.array([xx[0]/2., ])
                 xxNew = np.append(xxNew, xx[:-1]+(xx[1:] - xx[:-1])/2.)
@@ -330,7 +322,7 @@ def make_hist(
             # ax.set_ylim(rangey)
             ax.set_ylim(rangey)
             ax.set_xlim(rangex)
-            if suffix1 in ("lumi", "fill", "run"):
+            if suffix1 in ("lumi", "fill", "run", "time"):
                 # plot horizontal line at 1
                 ax.plot(np.array(rangex), np.array([1.,1.]), 'k--', linewidth=1, zorder=3)
 
@@ -428,7 +420,11 @@ def make_hist(
 # 
 # make_hist(data, run_range=(315252,325175), saveas="2018_zcount", title="2018",rangey=[0.92,1.08])
 
-make_hist(data, saveas="2022_zcount", title="2022",  legend="lower right")
+make_hist(data, saveas="Run3_zcount", title="Run 3",  legend="lower right")
+
+make_hist(data, saveas="2022_zcount", title="2022",  legend="lower right", run_range=(355065, 362760))
 make_hist(data, saveas="2022BCD_zcount", title="2022(B,C,D)",  legend="lower right", run_range=(355065, 359021))
 make_hist(data, saveas="2022EFG_zcount", title="2022(E,F,G)",  legend="lower right", run_range=(359022, 362760))
+
+make_hist(data, saveas="2023_zcount", title="2023",  legend="lower right", run_range=(366403, 367475))
 
