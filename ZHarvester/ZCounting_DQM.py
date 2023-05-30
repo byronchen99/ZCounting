@@ -231,7 +231,7 @@ if __name__ == '__main__':
             log.warning("Directory already exists ...")
 
     ########### Constant settings ##########
-    secPerLS = float(23.3)
+    secPerLS = float(23.31112)
     
     LumiPerMeasurement = args.LumiPerMeasurement  # minimum recorded lumi for one measurement in pb-1
 

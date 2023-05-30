@@ -178,16 +178,33 @@ def getFileName(directory, run):
         eosFileList = glob.glob(f'{directory}/SingleMuon/000{str(run)[:-2]}xx/*{run}*.root')
     if len(eosFileList) == 0:
         eosFileList = glob.glob(f'{directory}/*/*{run}*.root')
-    if not len(eosFileList) > 0:
+    if len(eosFileList) == 0:
         log.warning(f"The file does not (yet) exist for run: {run}")
         return None
-        
+    elif len(eosFileList) == 1:
+        return eosFileList[0]   
     elif len(eosFileList) > 1:
-        log.info(f"Multiple ({len(eosFileList)}) files found for run {run}, return all:")
-        log.info(eosFileList)
-        return eosFileList
-    else:
-        return eosFileList[0]
+        # in 2023 the files were split into Muon0 and Muon1 for even and odd event numbers
+        # in some cases, multiple versions are available we take the highest one
+
+        fileList = []
+
+        def get_lst(key="__Muon__"):
+            lst = list(filter(lambda x: key in x, eosFileList))
+            if len(lst) == 0:
+                return []
+            lst_idx = list(map(lambda x: int(x.split("__DQMIO.root")[0].split("v")[-1]), lst))
+
+            fileList.append(lst[np.argmax(lst_idx)])
+        
+        get_lst("__Muon0__") 
+        get_lst("__Muon1__")
+        get_lst("__Muon__")
+        get_lst("__SingleMuon__")
+
+        log.info(f"Mutliple ({len(fileList)}) files found for run {run}:")
+        log.info(fileList)
+        return fileList
 
 # ------------------------------------------------------------------------------
 def load_histogram(
