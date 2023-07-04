@@ -204,8 +204,10 @@ if __name__ == '__main__':
         log.error(f"Eta cut {args.etaCut} not supported for DQM histograms!")
 
     if not args.collect:
-        load_makros(args.bkgModel, args.ptCut, args.etaCut, year, MassMin_, MassMax_, MassBin_, npvMin_, npvMax_)
-    
+        #load_makros(args.bkgModel, args.ptCut, args.etaCut, year, MassMin_, MassMax_, MassBin_, npvMin_, npvMax_)
+        load_makros(args.bkgModel, args.ptCut, args.etaMin, args.etaCut, year, MassMin_, MassMax_, MassBin_, npvMin_, npvMax_)
+
+
     byLS_data = utils.load_input_csv(byLS_filename)
     byLS_data = byLS_data.loc[(byLS_data['run'] >= int(args.beginRun)) & (byLS_data['run'] < int(args.endRun))]
 
