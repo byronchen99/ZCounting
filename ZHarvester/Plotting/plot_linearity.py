@@ -450,7 +450,7 @@ rates['xsec'] = rates['xsec_mc'] / (rates['cIO']**2 * rates['cID'] * rates['cHLT
 # only keep necessary data
 # rates = rates[["xsec_mc", "xsec", "recLumi", "timewindow", "run", "pileUp", "effHLT", "effID", "effGlo", "effSta"]]
 
-for xAxis in ["pileUp", ]:
+for xAxis in ["pileUp","lumi" ]:
     for key, ylabel, region, mcRes in (
         # ("xsec_mc", "sigma", "I", ""),
         ('effHLT' ,'Muon HLT efficiency', "", "HLT"),

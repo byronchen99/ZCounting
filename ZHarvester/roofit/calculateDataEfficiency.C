@@ -119,8 +119,8 @@ void set_etaCut(Float_t eta_){
 }
 
 void set_etaRange(Float_t etaMin, Float_t etaMax){
-    etaMin < etaCutTag < etaMax;
-    etaMin < etaCutProbe < etaMax;
+    etaMin <= etaCutTag <= etaMax;
+    etaMin <= etaCutProbe <= etaMax;
     std::cout<<"Set eta cut of tag and probe muons to " << etaMin << " < |eta| < " << etaMax <<" "<<std::endl;
 }
 
