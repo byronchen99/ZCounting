@@ -1,13 +1,14 @@
-import uproot
-import numpy as np
 import awkward as ak
-import vector
+import numpy as np
 from hist import Hist
+import vector
+import uproot
 import coffea
 from coffea import lookup_tools
 
-import argparse
 import h5py
+import argparse
+import pdb
 
 
 def _get_rochester_corr(rochester_filename):
@@ -22,766 +23,504 @@ def _get_rochester_corr(rochester_filename):
     return rochester
 
 
-#####################################
+# get rochester corrected values of pt
+def get_corrections(data_reco, rochester):
+    for inner_type in ["Muon", "Track"]:
+        data_reco["correct_charge_genPt"] = (data_reco["{0}_charge".format(inner_type)] + 1)/2 * data_reco["antiMuon_genPt"] - (data_reco["{0}_charge".format(inner_type)] - 1)/2 * data_reco["muon_genPt"]
 
-def generate_templates_HLT(data_reco, rochester, bin_in_PV = True):
-      
-        
-    # define delta_R2
-    data_reco["delR2_minus"] = (data_reco["Muon_eta"] - data_reco["muon_genEta"])**2 + (data_reco["Muon_phi"] - data_reco["muon_genPhi"])**2
-    data_reco["delR2_plus"] = (data_reco["Muon_eta"] - data_reco["antiMuon_genEta"])**2 + (data_reco["Muon_phi"] - data_reco["antiMuon_genPhi"])**2
+        scale = rochester.kScaleDT(data_reco["{0}_charge".format(inner_type)], data_reco["{0}_pt".format(inner_type)], data_reco["{0}_eta".format(inner_type)], data_reco["{0}_phi".format(inner_type)])
+        spread = rochester.kSpreadMC(data_reco["{0}_charge".format(inner_type)], data_reco["{0}_pt".format(inner_type)], data_reco["{0}_eta".format(inner_type)], data_reco["{0}_phi".format(inner_type)], data_reco["correct_charge_genPt"])
 
-    # format nPV into usable shape for masks
-    data_reco["primary_vertices"]  = ak.ones_like(data_reco["Muon_eta"]) * data_reco["nPV"]
+        scale_error = rochester.kScaleDTerror(data_reco["{0}_charge".format(inner_type)], data_reco["{0}_pt".format(inner_type)], data_reco["{0}_eta".format(inner_type)], data_reco["{0}_phi".format(inner_type)])
+        spread_error = rochester.kSpreadMCerror(data_reco["{0}_charge".format(inner_type)], data_reco["{0}_pt".format(inner_type)], data_reco["{0}_eta".format(inner_type)], data_reco["{0}_phi".format(inner_type)], data_reco["correct_charge_genPt"])
+
+        data_reco["{0}_pt_RC_none".format(inner_type)] = data_reco["{0}_pt".format(inner_type)]
+        data_reco["{0}_pt_RC_nominal".format(inner_type)] = data_reco["{0}_pt".format(inner_type)] * scale * spread
+        data_reco["{0}_pt_RC_plus_scale".format(inner_type)] = data_reco["{0}_pt".format(inner_type)] * (scale + scale_error) * spread
+        data_reco["{0}_pt_RC_minus_scale".format(inner_type)] = data_reco["{0}_pt".format(inner_type)] * (scale - scale_error) * spread
+        data_reco["{0}_pt_RC_plus_spread".format(inner_type)] = data_reco["{0}_pt".format(inner_type)] * scale * (spread + spread_error)
+        data_reco["{0}_pt_RC_minus_spread".format(inner_type)] = data_reco["{0}_pt".format(inner_type)] * scale * (spread - spread_error)
     
+    return data_reco
+
+# define similiar for outer type correction (to be completed)
+
+
+def get_inner_variables_with_trk(data_reco, correction_type):
+    for variable in ["eta", "phi", "charge"]:
+        data_reco["inner_{0}".format(variable)] = ak.concatenate((data_reco["Muon_{0}".format(variable)], data_reco["Track_{0}".format(variable)]), axis = 1)
+    data_reco["inner_pt_RC_{0}".format(correction_type)] = ak.concatenate((data_reco["Muon_pt_RC_{0}".format(correction_type)], data_reco["Track_pt_RC_{0}".format(correction_type)]), axis = 1)
+    data_reco["inner_pt"] = ak.concatenate((data_reco["Muon_pt"], data_reco["Track_pt"]), axis = 1)
     
-    data_reco["correct_charge_genPt"] = (data_reco["Muon_charge"] + 1)/2 * data_reco["antiMuon_genPt"] - (data_reco["Muon_charge"] - 1)/2 * data_reco["muon_genPt"]
-
-    # format gen variables into usable shape for masks
-    data_reco["gen_pt"]  = ak.ones_like(data_reco["Muon_eta"]) * data_reco["muon_genPt"]
-    data_reco["gen_eta"]  = ak.ones_like(data_reco["Muon_eta"]) * data_reco["muon_genEta"]
-    data_reco["gen_phi"]  = ak.ones_like(data_reco["Muon_eta"]) * data_reco["muon_genPhi"]
-    data_reco["anti_gen_pt"]  = ak.ones_like(data_reco["Muon_eta"]) * data_reco["antiMuon_genPt"]
-    data_reco["anti_gen_eta"]  = ak.ones_like(data_reco["Muon_eta"]) * data_reco["antiMuon_genEta"]
-    data_reco["anti_gen_phi"]  = ak.ones_like(data_reco["Muon_eta"]) * data_reco["antiMuon_genPhi"]
-
+    for variable in ["nPixelHits", "nTrackerLayers", "trackAlgo"]:
+        data_reco["{0}".format(variable)] = ak.concatenate((data_reco["Muon_{0}".format(variable)], data_reco["Track_{0}".format(variable)]), axis = 1)
     
-    # define masks, except pt requirement
-    mask_minus = (data_reco["delR2_minus"]<0.01) & (data_reco["Muon_charge"] == -1) & (abs(data_reco["Muon_eta"]) < 2.4) & (data_reco["Muon_ID"] >= 4) 
-    mask_plus  = (data_reco["delR2_plus"]<0.01)  & (data_reco["Muon_charge"] == 1)  & (abs(data_reco["Muon_eta"]) < 2.4) & (data_reco["Muon_ID"] >= 4) 
+    for variable in ["HLT_trigger_pass", "Muon_ID"]:
+        criteria_muons = data_reco["{0}".format(variable)]
+        criteria_tracks = ak.ones_like(data_reco["Track_pt"])==0
+        data_reco["inner_{0}".format(variable)] = ak.concatenate((criteria_muons, criteria_tracks), axis = 1)
     
+    return data_reco
+
+def get_inner_variables_without_trk(data_reco, correction_type):
+    for variable in ["eta", "phi", "charge"]:
+        data_reco["inner_{0}".format(variable)] = data_reco["Muon_{0}".format(variable)]
+    data_reco["inner_pt_RC_{0}".format(correction_type)] = data_reco["Muon_pt_RC_{0}".format(correction_type)]
+    data_reco["inner_pt"] = data_reco["Muon_pt"]
     
-    data_reco["HLT_trigger_pass"] = data_reco["Muon_triggerBits"]&1 == 1
+    for variable in ["HLT_trigger_pass", "Muon_ID"]:
+        data_reco["inner_{0}".format(variable)] = data_reco["{0}".format(variable)]
     
+    return data_reco
+
+
+def get_reco_variables(data_reco, template_type, correction_type):
+    if template_type == "Glo" or template_type == "Glo_Trk": # (modify for pt once there are outer corrections)
+        for variable in ["pt", "eta", "phi", "charge"]:
+            data_reco["reco_{0}".format(variable)] = data_reco["outer_{0}".format(variable)]
+
+    else:
+        for variable in ["eta", "phi", "charge"]:
+            data_reco["reco_{0}".format(variable)] = data_reco["inner_{0}".format(variable)]
+        data_reco["reco_pt"] = data_reco["inner_pt_RC_{0}".format(correction_type)]
     
-    # apply mask for all reconstructed muons:
-    muon_plus = data_reco[["Muon_charge", "Muon_eta","Muon_phi", "Muon_pt", "HLT_trigger_pass", "primary_vertices", "correct_charge_genPt", "anti_gen_eta", "anti_gen_phi", "anti_gen_pt"]][mask_plus]
-    muon_minus = data_reco[["Muon_charge", "Muon_eta","Muon_phi", "Muon_pt", "HLT_trigger_pass", "primary_vertices", "correct_charge_genPt", "gen_eta", "gen_phi", "gen_pt"]][mask_minus]
-        
-     
-        
-    # apply rochester correction, and its errors
-        
-    scale_plus = rochester.kScaleDT(muon_plus["Muon_charge"], muon_plus["Muon_pt"], muon_plus["Muon_eta"], muon_plus["Muon_phi"])
-    scale_minus = rochester.kScaleDT(muon_minus["Muon_charge"], muon_minus["Muon_pt"], muon_minus["Muon_eta"], muon_minus["Muon_phi"])
-    spread_plus = rochester.kSpreadMC(muon_plus["Muon_charge"], muon_plus["Muon_pt"], muon_plus["Muon_eta"], muon_plus["Muon_phi"], muon_plus["correct_charge_genPt"])
-    spread_minus = rochester.kSpreadMC(muon_minus["Muon_charge"], muon_minus["Muon_pt"], muon_minus["Muon_eta"], muon_minus["Muon_phi"], muon_minus["correct_charge_genPt"])
-
-    scale_plus_error = rochester.kScaleDTerror(muon_plus["Muon_charge"], muon_plus["Muon_pt"], muon_plus["Muon_eta"], muon_plus["Muon_phi"])
-    scale_minus_error = rochester.kScaleDTerror(muon_minus["Muon_charge"], muon_minus["Muon_pt"], muon_minus["Muon_eta"], muon_minus["Muon_phi"])
-    spread_plus_error = rochester.kSpreadMCerror(muon_plus["Muon_charge"], muon_plus["Muon_pt"], muon_plus["Muon_eta"], muon_plus["Muon_phi"], muon_plus["correct_charge_genPt"])
-    spread_minus_error = rochester.kSpreadMCerror(muon_minus["Muon_charge"], muon_minus["Muon_pt"], muon_minus["Muon_eta"], muon_minus["Muon_phi"], muon_minus["correct_charge_genPt"])
-
-   
-    # all the templates
-    template_types = ["none", "nominal", "plus_scale", "minus_scale", "plus_spread", "minus_spread"]
-    result = {}
+    return data_reco
 
 
-    muon_plus["Muon_pt_RC_none"] = muon_plus["Muon_pt"]
-    muon_minus["Muon_pt_RC_none"] = muon_minus["Muon_pt"]
-    
-    muon_plus["Muon_pt_RC_nominal"] = muon_plus["Muon_pt"] * scale_plus * spread_plus
-    muon_minus["Muon_pt_RC_nominal"] = muon_minus["Muon_pt"] * scale_minus * spread_minus
-
-    muon_plus["Muon_pt_RC_plus_scale"] = muon_plus["Muon_pt"] * (scale_plus + scale_plus_error) * spread_plus
-    muon_minus["Muon_pt_RC_plus_scale"] = muon_minus["Muon_pt"] * (scale_minus + scale_minus_error) * spread_minus
-
-    muon_plus["Muon_pt_RC_minus_scale"] = muon_plus["Muon_pt"] * (scale_plus - scale_plus_error) * spread_plus
-    muon_minus["Muon_pt_RC_minus_scale"] = muon_minus["Muon_pt"] * (scale_minus - scale_minus_error) * spread_minus
-
-    muon_plus["Muon_pt_RC_plus_spread"] = muon_plus["Muon_pt"] * scale_plus * (spread_plus + spread_plus_error)
-    muon_minus["Muon_pt_RC_plus_spread"] = muon_minus["Muon_pt"] * scale_minus * (spread_minus + spread_minus_error)
-
-    muon_plus["Muon_pt_RC_minus_spread"] = muon_plus["Muon_pt"] * scale_plus * (spread_plus - spread_plus_error)
-    muon_minus["Muon_pt_RC_minus_spread"] = muon_minus["Muon_pt"] * scale_minus * (spread_minus - spread_minus_error)
-
-
-    for rochester_error_type in template_types:
-            
-        # mask for pt
-        muon_reco_plus = muon_plus[muon_plus["Muon_pt_RC_{0}".format(rochester_error_type)] > 25]
-        muon_reco_minus = muon_minus[muon_minus["Muon_pt_RC_{0}".format(rochester_error_type)] > 25]
-            
-        
-        
-        # define masks for HLT:
-
-        pairs_HLT = ak.cartesian([muon_reco_plus["HLT_trigger_pass"], muon_reco_minus["HLT_trigger_pass"]])
-        l_idx_HLT, r_idx_HLT = ak.unzip(pairs_HLT)
-
-        mask_HLT2 = (l_idx_HLT == r_idx_HLT) & (l_idx_HLT + r_idx_HLT == True)
-        mask_HLT0 = (l_idx_HLT + r_idx_HLT)==False
-        mask_HLT1 = (l_idx_HLT != r_idx_HLT)
-        no_mask_HLT = ak.ones_like(l_idx_HLT)==1
-
-        HLT_trigger_types = ["HLT2", "HLT1", "HLT0", "noHLT"]
-
-        for HLT_trigger in HLT_trigger_types:
-
-            if HLT_trigger == "HLT2":
-                mask_HLT = mask_HLT2
-            elif HLT_trigger == "HLT1":
-                mask_HLT = mask_HLT1
-            elif HLT_trigger == "HLT0":
-                mask_HLT = mask_HLT0
-            elif HLT_trigger == "noHLT":
-                mask_HLT = no_mask_HLT
+def get_paired_outer_value(data_reco): # only for template_type "Sta_Trk"
+        # Note: data_reco splitting
+        data_reco1 = data_reco[ak.num(data_reco["outer_pt"])==0]
+        data_reco2 = data_reco[ak.num(data_reco["outer_pt"])!=0] 
                 
-            cuts = ["gen_cut", "reco_cut"]
-            for cut in cuts:
+         # pairing inner and outer tracks
+        for value in ["pt", "eta", "phi", "charge"]:
+            pairing_values = ak.cartesian([data_reco2["reco_{0}".format(value)], data_reco2["outer_{0}".format(value)]])
+            inner_value, outer_value = ak.unzip(pairing_values)
 
-                if cut == "gen_cut":
-                    eta_values_plus, eta_values_minus, phi_values_plus, phi_values_minus, pt_values_plus, pt_values_minus = "anti_gen_eta", "gen_eta", "anti_gen_phi", "gen_phi", "anti_gen_pt", "gen_pt"
-                elif cut == "reco_cut":
-                    eta_values_plus, eta_values_minus, phi_values_plus, phi_values_minus, pt_values_plus, pt_values_minus = "Muon_eta", 'Muon_eta', "Muon_phi", "Muon_phi", "Muon_pt_RC_{0}".format(rochester_error_type), "Muon_pt_RC_{0}".format(rochester_error_type)
+            counts = ak.flatten(ak.num(outer_value, axis=1) / ak.num(data_reco2["reco_{0}".format(value)], axis=1) * ak.ones_like(data_reco2["reco_{0}".format(value)]))
+            counts = ak.values_astype(counts, "int")
+            array = outer_value
+            data_reco2["paired_outer_{0}".format(value)] = ak.unflatten(array, counts, axis=1)
+ 
+        # define delta_R2 between inner and outer
+        data_reco2["delR2_io"] = ((data_reco2["paired_outer_eta"] - data_reco2["reco_eta"])**2 + (data_reco2["paired_outer_phi"] - data_reco2["reco_phi"])**2)
+        data_reco2["delR2_io_min"] = ak.min(data_reco2["delR2_io"], axis=-1)
 
-
-                # pairing, and applying HLT masks:
-                pairs_eta = ak.cartesian([muon_reco_plus[eta_values_plus], muon_reco_minus[eta_values_minus]])[mask_HLT]
-                pairs_phi = ak.cartesian([muon_reco_plus[phi_values_plus], muon_reco_minus[phi_values_minus]])[mask_HLT]
-                pairs_pt = ak.cartesian([muon_reco_plus[pt_values_plus], muon_reco_minus[pt_values_minus]])[mask_HLT]
-                pairs_PV = ak.cartesian([muon_reco_plus["primary_vertices"], muon_reco_minus["primary_vertices"]])[mask_HLT]
-
-                l_idx_eta, r_idx_eta = ak.unzip(pairs_eta)
-                l_idx_phi, r_idx_phi = ak.unzip(pairs_phi)
-                l_idx_pt, r_idx_pt = ak.unzip(pairs_pt)
-                l_idx_PV, r_idx_PV = ak.unzip(pairs_PV)
-
-                l_eta = ak.flatten(l_idx_eta)
-                r_eta = ak.flatten(r_idx_eta)
-                l_phi = ak.flatten(l_idx_phi)
-                r_phi = ak.flatten(r_idx_phi)
-                l_pt = ak.flatten(l_idx_pt)
-                r_pt = ak.flatten(r_idx_pt)
-                l_PV = ak.flatten(l_idx_PV)
-                r_PV = ak.flatten(r_idx_PV)
-
-
-                muonMass = 0.105658369
-                mu1 = vector.arr({"pt":l_pt, "phi":l_phi, "eta": l_eta, "mass": l_pt*0+muonMass})
-                mu2 = vector.arr({"pt":r_pt, "phi":r_phi, "eta": r_eta, "mass": r_pt*0+muonMass})
-
-                mass = (mu1+mu2).mass
-
-                PV = l_PV
-
-
-                # binning
-                if bin_in_PV == True:
-                    hist = Hist.new.Regular(50, 66, 116, name="mass").Regular(100, 0.5, 100.5, name="PV").Double()
-                    hist.fill(mass, PV)
-                    result["hist_{0}_{1}_{2}".format(rochester_error_type, HLT_trigger, cut)] = hist.view()
-                else:
-                    hist = Hist.new.Regular(50, 66, 116, name="mass").Double()
-                    hist.fill(mass)
-                    result["hist_{0}_{1}_{2}".format(rochester_error_type, HLT_trigger, cut)] =  hist.view()           
-
-    
-    rochester_corrections = {}
-    rochester_corrections["scale_plus"] = scale_plus
-    rochester_corrections["scale_minus"] = scale_minus
-    rochester_corrections["spread_plus"] = spread_plus
-    rochester_corrections["spread_minus"] = spread_minus
-    rochester_corrections["scale_plus_error"] = scale_plus_error
-    rochester_corrections["scale_minus_error"] = scale_minus_error
-    rochester_corrections["spread_plus_error"] = spread_plus_error
-    rochester_corrections["spread_minus_error"] = spread_minus_error
-    
-    return result, rochester_corrections
-
-
-#####################################
-
-def generate_templates_ID(data_reco, rochester, bin_in_PV = True):
-      
+        data_reco1["delR2_io_min"] = ak.ones_like(data_reco1["reco_pt"]) # sets to a value larger than 0.09
         
-    # define delta_R2
-    data_reco["delR2_minus"] = (data_reco["Muon_eta"] - data_reco["muon_genEta"])**2 + (data_reco["Muon_phi"] - data_reco["muon_genPhi"])**2
-    data_reco["delR2_plus"] = (data_reco["Muon_eta"] - data_reco["antiMuon_genEta"])**2 + (data_reco["Muon_phi"] - data_reco["antiMuon_genPhi"])**2
-
-    # format nPV into usable shape for masks
-    data_reco["primary_vertices"]  = ak.ones_like(data_reco["Muon_eta"]) * data_reco["nPV"]
-    
-    
-    data_reco["correct_charge_genPt"] = (data_reco["Muon_charge"] + 1)/2 * data_reco["antiMuon_genPt"] - (data_reco["Muon_charge"] - 1)/2 * data_reco["muon_genPt"]
-
-    
-    # format gen variables into usable shape for masks
-    data_reco["gen_pt"]  = ak.ones_like(data_reco["Muon_eta"]) * data_reco["muon_genPt"]
-    data_reco["gen_eta"]  = ak.ones_like(data_reco["Muon_eta"]) * data_reco["muon_genEta"]
-    data_reco["gen_phi"]  = ak.ones_like(data_reco["Muon_eta"]) * data_reco["muon_genPhi"]
-    data_reco["anti_gen_pt"]  = ak.ones_like(data_reco["Muon_eta"]) * data_reco["antiMuon_genPt"]
-    data_reco["anti_gen_eta"]  = ak.ones_like(data_reco["Muon_eta"]) * data_reco["antiMuon_genEta"]
-    data_reco["anti_gen_phi"]  = ak.ones_like(data_reco["Muon_eta"]) * data_reco["antiMuon_genPhi"]
-
-    
-    # define masks, except pt requirement
-    mask_minus = (data_reco["delR2_minus"]<0.01) & (data_reco["Muon_charge"] == -1) & (abs(data_reco["Muon_eta"]) < 2.4)
-    mask_plus  = (data_reco["delR2_plus"]<0.01)  & (data_reco["Muon_charge"] == 1)  & (abs(data_reco["Muon_eta"]) < 2.4)
-
-     
-    data_reco["HLT_trigger_pass"] = data_reco["Muon_triggerBits"]&1 == 1
-    data_reco["criteria_tag"] = (data_reco["HLT_trigger_pass"] == True) & (data_reco["Muon_ID"] >= 4)
-    data_reco["criteria_probe_fail"] = data_reco["Muon_ID"] == 3
-
-    data_reco["ID_pass"] = data_reco["Muon_ID"] >= 4
-    
-    
-    # apply mask for all reconstructed muons:
-    muon_plus = data_reco[["Muon_charge", "Muon_eta","Muon_phi", "Muon_pt", "HLT_trigger_pass", "primary_vertices", "correct_charge_genPt", "anti_gen_eta", "anti_gen_phi", "anti_gen_pt", "criteria_tag", "criteria_probe_fail", "ID_pass"]][mask_plus]
-    muon_minus = data_reco[["Muon_charge", "Muon_eta","Muon_phi", "Muon_pt", "HLT_trigger_pass", "primary_vertices", "correct_charge_genPt", "gen_eta", "gen_phi", "gen_pt", "criteria_tag", "criteria_probe_fail", "ID_pass"]][mask_minus]    
-     
-        
-    # apply rochester correction, and its errors
-        
-    scale_plus = rochester.kScaleDT(muon_plus["Muon_charge"], muon_plus["Muon_pt"], muon_plus["Muon_eta"], muon_plus["Muon_phi"])
-    scale_minus = rochester.kScaleDT(muon_minus["Muon_charge"], muon_minus["Muon_pt"], muon_minus["Muon_eta"], muon_minus["Muon_phi"])
-    spread_plus = rochester.kSpreadMC(muon_plus["Muon_charge"], muon_plus["Muon_pt"], muon_plus["Muon_eta"], muon_plus["Muon_phi"], muon_plus["correct_charge_genPt"])
-    spread_minus = rochester.kSpreadMC(muon_minus["Muon_charge"], muon_minus["Muon_pt"], muon_minus["Muon_eta"], muon_minus["Muon_phi"], muon_minus["correct_charge_genPt"])
-
-    scale_plus_error = rochester.kScaleDTerror(muon_plus["Muon_charge"], muon_plus["Muon_pt"], muon_plus["Muon_eta"], muon_plus["Muon_phi"])
-    scale_minus_error = rochester.kScaleDTerror(muon_minus["Muon_charge"], muon_minus["Muon_pt"], muon_minus["Muon_eta"], muon_minus["Muon_phi"])
-    spread_plus_error = rochester.kSpreadMCerror(muon_plus["Muon_charge"], muon_plus["Muon_pt"], muon_plus["Muon_eta"], muon_plus["Muon_phi"], muon_plus["correct_charge_genPt"])
-    spread_minus_error = rochester.kSpreadMCerror(muon_minus["Muon_charge"], muon_minus["Muon_pt"], muon_minus["Muon_eta"], muon_minus["Muon_phi"], muon_minus["correct_charge_genPt"])
-
-   
-    # all the templates
-    template_types = ["none", "nominal", "plus_scale", "minus_scale", "plus_spread", "minus_spread"]
-    result = {}
-
-
-    muon_plus["Muon_pt_RC_none"] = muon_plus["Muon_pt"]
-    muon_minus["Muon_pt_RC_none"] = muon_minus["Muon_pt"]
-    
-    muon_plus["Muon_pt_RC_nominal"] = muon_plus["Muon_pt"] * scale_plus * spread_plus
-    muon_minus["Muon_pt_RC_nominal"] = muon_minus["Muon_pt"] * scale_minus * spread_minus
-
-    muon_plus["Muon_pt_RC_plus_scale"] = muon_plus["Muon_pt"] * (scale_plus + scale_plus_error) * spread_plus
-    muon_minus["Muon_pt_RC_plus_scale"] = muon_minus["Muon_pt"] * (scale_minus + scale_minus_error) * spread_minus
-
-    muon_plus["Muon_pt_RC_minus_scale"] = muon_plus["Muon_pt"] * (scale_plus - scale_plus_error) * spread_plus
-    muon_minus["Muon_pt_RC_minus_scale"] = muon_minus["Muon_pt"] * (scale_minus - scale_minus_error) * spread_minus
-
-    muon_plus["Muon_pt_RC_plus_spread"] = muon_plus["Muon_pt"] * scale_plus * (spread_plus + spread_plus_error)
-    muon_minus["Muon_pt_RC_plus_spread"] = muon_minus["Muon_pt"] * scale_minus * (spread_minus + spread_minus_error)
-
-    muon_plus["Muon_pt_RC_minus_spread"] = muon_plus["Muon_pt"] * scale_plus * (spread_plus - spread_plus_error)
-    muon_minus["Muon_pt_RC_minus_spread"] = muon_minus["Muon_pt"] * scale_minus * (spread_minus - spread_minus_error)
-
-
-    for rochester_error_type in template_types:
+        # select inner and outer pair
+        mask_io_pair = data_reco2["delR2_io_min"] == data_reco2["delR2_io"]
+        for value in ["pt", "eta", "phi", "charge"]:
+            min_outer_value = data_reco2["paired_outer_{0}".format(value)][mask_io_pair]
+            data_reco2["outer_{0}_min".format(value)] = ak.flatten(min_outer_value, axis=-1)
             
-        # mask for pt
-        muon_glo_plus = muon_plus[muon_plus["Muon_pt_RC_{0}".format(rochester_error_type)] > 25]
-        muon_glo_minus = muon_minus[muon_minus["Muon_pt_RC_{0}".format(rochester_error_type)] > 25]
-            
+            data_reco1["outer_{0}_min".format(value)] = ak.ones_like(data_reco1["reco_pt"]) # designed to fail outer pt in probe mask
+
+        data_reco3 = ak.concatenate((data_reco2, data_reco1))
         
-        # define masks for IDfail:
+        return data_reco3
+    
 
-        pairs_1 = ak.cartesian([muon_glo_plus["criteria_tag"], muon_glo_minus["criteria_probe_fail"]])
-        l_idx_1, r_idx_1 = ak.unzip(pairs_1)
-        mask_1 = (l_idx_1 == r_idx_1) & (l_idx_1 + r_idx_1 == True)
+def get_paired_inner_value(data_reco): # only for template_type "Glo" and "Glo_Trk"
+    # Note: data_reco selection
+    data_reco = data_reco[ak.num(data_reco["outer_pt"])!=0]
+           
+    # pairing inner and outer tracks
+    for value in ["pt", "eta", "phi", "charge"]:
+        pairing_values = ak.cartesian([data_reco["reco_{0}".format(value)], data_reco["inner_{0}".format(value)]])
+        outer_value, inner_value = ak.unzip(pairing_values)
 
-        pairs_2 = ak.cartesian([muon_glo_plus["criteria_probe_fail"], muon_glo_minus["criteria_tag"]])
+        counts = ak.flatten(ak.num(inner_value, axis=1) / ak.num(data_reco["reco_{0}".format(value)], axis=1) * ak.ones_like(data_reco["reco_{0}".format(value)]))
+        counts = ak.values_astype(counts, "int")
+        array = inner_value
+        data_reco["paired_inner_{0}".format(value)] = ak.unflatten(array, counts, axis=1)
+         
+    # define delta_R2 between inner and outer
+    data_reco["delR2_io"] = ((data_reco["paired_inner_eta"] - data_reco["outer_eta"])**2 + (data_reco["paired_inner_phi"] - data_reco["outer_phi"])**2)
+    data_reco["delR2_io_min"] = ak.min(data_reco["delR2_io"], axis=-1)
+    
+    # select inner and outer pair
+    mask_io_pair = data_reco["delR2_io_min"] == data_reco["delR2_io"]
+    for value in ["pt", "eta", "phi", "charge"]:
+        min_inner_value = data_reco["paired_inner_{0}".format(value)][mask_io_pair]
+        data_reco["inner_{0}_min".format(value)] = ak.flatten(min_inner_value, axis=-1)
+    
+    return data_reco
+
+
+def tag_criteria(data_reco, template_type):
+    if template_type == "Glo" or template_type == "Glo_Trk":
+        criteria_tag_0 = (data_reco["inner_HLT_trigger_pass"] == True) & (data_reco["inner_Muon_ID"] >= 4)
+        
+        #reshape (pair criteria tag)
+        pair = ak.cartesian([data_reco["outer_pt"], criteria_tag_0])
+        outer_value, inner_value = ak.unzip(pair)
+
+        counts = ak.flatten(ak.num(inner_value, axis=1) / ak.num(data_reco["outer_pt"], axis=1) * ak.ones_like(data_reco["outer_pt"]))
+        counts = ak.values_astype(counts, "int")
+        array = inner_value
+        paired_value = ak.unflatten(array, counts, axis=1)
+        
+        
+        mask_io_pair = data_reco["delR2_io_min"] == data_reco["delR2_io"]
+        min_inner_value = paired_value[mask_io_pair]
+        tag_criteria = ak.flatten(min_inner_value, axis=-1)
+        
+    else:
+        tag_criteria = (data_reco["inner_HLT_trigger_pass"] == True) & (data_reco["inner_Muon_ID"] >= 4)
+        
+    return tag_criteria
+
+
+def base_criteria(data_reco, template_type):
+    if template_type == "HLT":
+        base_mask = (data_reco["inner_Muon_ID"] >= 4)
+        
+    elif template_type == "ID":
+        base_mask = (data_reco["inner_Muon_ID"] >= 3)
+    
+    elif template_type == "Glo":  
+        base_mask = (data_reco["inner_pt_min"] > 20) & (abs(data_reco["inner_eta_min"]) < 2.5)
+    
+    elif template_type == "Sta_Trk":
+        base_mask = (data_reco["nPixelHits"] > 0 ) & (data_reco["nTrackerLayers"] > 5) & (data_reco["trackAlgo"] != 13) & (data_reco["trackAlgo"] != 14)
+
+    elif template_type == "HLT_Trk":
+        track_mask = (data_reco["nPixelHits"] > 0 ) & (data_reco["nTrackerLayers"] > 5) & (data_reco["trackAlgo"] != 13) & (data_reco["trackAlgo"] != 14)
+        base_mask = (data_reco["inner_Muon_ID"] >= 4) & track_mask
+
+    elif template_type == "ID_Trk":
+        track_mask = (data_reco["nPixelHits"] > 0 ) & (data_reco["nTrackerLayers"] > 5) & (data_reco["trackAlgo"] != 13) & (data_reco["trackAlgo"] != 14)
+        base_mask = (data_reco["inner_Muon_ID"] >= 3) & track_mask
+
+    elif template_type == "Glo_Trk":
+        track_mask = (data_reco["nPixelHits"] > 0 ) & (data_reco["nTrackerLayers"] > 5) & (data_reco["trackAlgo"] != 13) & (data_reco["trackAlgo"] != 14)
+        
+        #reshape (pair criteria tag)
+        pair = ak.cartesian([data_reco["outer_pt"], track_mask])
+        outer_value, inner_value = ak.unzip(pair)
+
+        counts = ak.flatten(ak.num(inner_value, axis=1) / ak.num(data_reco["outer_pt"], axis=1) * ak.ones_like(data_reco["outer_pt"]))
+        counts = ak.values_astype(counts, "int")
+        array = inner_value
+        paired_value = ak.unflatten(array, counts, axis=1)
+        
+        
+        mask_io_pair = data_reco["delR2_io_min"] == data_reco["delR2_io"]
+        min_inner_value = paired_value[mask_io_pair]
+        reshaped_track_mask = ak.flatten(min_inner_value, axis=-1)
+        
+        base_mask = (data_reco["inner_pt_min"] > 20) & (abs(data_reco["inner_eta_min"]) < 2.5) & reshaped_track_mask
+        
+    return base_mask
+
+
+def probe_criteria_pass(data_reco, template_type):
+    if template_type == "HLT" or template_type == "HLT_Trk":
+        pass_mask = (data_reco["inner_HLT_trigger_pass"] == True)
+        
+    elif template_type == "ID" or template_type == "ID_Trk":
+        pass_mask = (data_reco["inner_Muon_ID"] > 3)
+        
+    
+    elif template_type == "Glo" or template_type == "Glo_Trk": 
+        pass_ID_0 = data_reco["inner_Muon_ID"] >= 3
+        
+        # reshape (pair ID to outer)
+        pair = ak.cartesian([data_reco["outer_pt"], pass_ID_0])
+        outer_value, inner_value = ak.unzip(pair)
+
+        counts = ak.flatten(ak.num(inner_value, axis=1) / ak.num(data_reco["outer_pt"], axis=1) * ak.ones_like(data_reco["outer_pt"]))
+        counts = ak.values_astype(counts, "int")
+        array = inner_value
+        paired_value = ak.unflatten(array, counts, axis=1)
+         
+        mask_io_pair = data_reco["delR2_io_min"] == data_reco["delR2_io"]
+        min_inner_value = paired_value[mask_io_pair]
+        pass_ID = ak.flatten(min_inner_value, axis=-1)
+        
+        pass_mask = (pass_ID == True) &  (data_reco["delR2_io_min"]<0.09)
+        
+        
+    elif template_type == "Sta_Trk":
+        pass_mask = (data_reco["delR2_io_min"]<0.09) & (data_reco["outer_pt_min"] > 20) & (abs(data_reco["outer_eta_min"]) < 2.5)
+    
+    return pass_mask
+
+
+def probe_criteria_fail(data_reco, template_type):
+    if template_type == "HLT" or template_type == "HLT_Trk":
+        fail_mask = (data_reco["inner_HLT_trigger_pass"] == False)
+    
+    elif template_type == "ID" or template_type == "ID_Trk":
+        fail_mask = (data_reco["inner_Muon_ID"] == 3)
+        
+    
+    elif template_type == "Glo" or template_type == "Glo_Trk": 
+        fail_ID_0 = data_reco["inner_Muon_ID"] == 2
+        
+        # reshape (pair ID to outer)
+        pair = ak.cartesian([data_reco["outer_pt"], fail_ID_0])
+        outer_value, inner_value = ak.unzip(pair)
+
+        counts = ak.flatten(ak.num(inner_value, axis=1) / ak.num(data_reco["outer_pt"], axis=1) * ak.ones_like(data_reco["outer_pt"]))
+        counts = ak.values_astype(counts, "int")
+        array = inner_value
+        paired_value = ak.unflatten(array, counts, axis=1)
+         
+        mask_io_pair = data_reco["delR2_io_min"] == data_reco["delR2_io"]
+        min_inner_value = paired_value[mask_io_pair]
+        fail_ID = ak.flatten(min_inner_value, axis=-1)
+        
+        fail_mask = (fail_ID == True) | (data_reco["delR2_io_min"] >= 0.09)
+        
+        
+    elif template_type == "Sta_Trk":
+        fail_mask = (data_reco["delR2_io_min"] >= 0.09) | (data_reco["outer_pt_min"] < 20) | (abs(data_reco["outer_eta_min"]) > 2.5)
+    
+    return fail_mask
+
+
+def pair_mask_reco(muon_plus, muon_minus, criteria_1, criteria_2):
+    pairs_1 = ak.cartesian([muon_plus[criteria_1], muon_minus[criteria_2]])
+    l_idx_1, r_idx_1 = ak.unzip(pairs_1)
+    mask_1 = (l_idx_1 == r_idx_1) & (l_idx_1 + r_idx_1 == True)
+    
+    if criteria_1 == criteria_2: # to prevent double counting
+        mask_2 = ak.ones_like(mask_1) == 0
+        
+    else:
+        pairs_2 = ak.cartesian([muon_plus[criteria_2], muon_minus[criteria_1]])
         l_idx_2, r_idx_2 = ak.unzip(pairs_2)
         mask_2 = (l_idx_2 == r_idx_2) & (l_idx_2 + r_idx_2 == True)
-
-        mask_IDfail = mask_1 + mask_2
-
-        # define masks for ID0, ID1, ID2:
-        pairs_ID = ak.cartesian([muon_glo_plus["ID_pass"], muon_glo_minus["ID_pass"]])
-        l_idx_ID, r_idx_ID = ak.unzip(pairs_ID)
-
-        mask_ID2 = (l_idx_ID == r_idx_ID) & (l_idx_ID + r_idx_ID == True)
-        mask_ID0 = (l_idx_ID + r_idx_ID)==False
-        mask_ID1 = (l_idx_ID != r_idx_ID)
-        no_mask_ID = ak.ones_like(l_idx_ID)==1
-
-
-        ID_mask_types = ["ID2", "ID1", "ID0", "IDfail"]
-
-        for ID_type in ID_mask_types:
-
-            if ID_type == "ID2":
-                mask_ID = mask_ID2
-            elif ID_type == "ID1":
-                mask_ID = mask_ID1
-            elif ID_type == "ID0":
-                mask_ID = mask_ID0
-            elif ID_type == "IDfail":
-                mask_ID = mask_IDfail       
-
-            cuts = ["gen_cut", "reco_cut"]
-            for cut in cuts:
-
-                if cut == "gen_cut":
-                    eta_values_plus, eta_values_minus, phi_values_plus, phi_values_minus, pt_values_plus, pt_values_minus = "anti_gen_eta", "gen_eta", "anti_gen_phi", "gen_phi", "anti_gen_pt", "gen_pt"
-                elif cut == "reco_cut":
-                    eta_values_plus, eta_values_minus, phi_values_plus, phi_values_minus, pt_values_plus, pt_values_minus = "Muon_eta", 'Muon_eta', "Muon_phi", "Muon_phi", "Muon_pt_RC_{0}".format(rochester_error_type), "Muon_pt_RC_{0}".format(rochester_error_type)
-
-
-                # pairing, and applying HLT masks:
-                pairs_eta = ak.cartesian([muon_glo_plus[eta_values_plus], muon_glo_minus[eta_values_minus]])[mask_ID]
-                pairs_phi = ak.cartesian([muon_glo_plus[phi_values_plus], muon_glo_minus[phi_values_minus]])[mask_ID]
-                pairs_pt = ak.cartesian([muon_glo_plus[pt_values_plus], muon_glo_minus[pt_values_minus]])[mask_ID]
-                pairs_PV = ak.cartesian([muon_glo_plus["primary_vertices"], muon_glo_minus["primary_vertices"]])[mask_ID]
-
-                l_idx_eta, r_idx_eta = ak.unzip(pairs_eta)
-                l_idx_phi, r_idx_phi = ak.unzip(pairs_phi)
-                l_idx_pt, r_idx_pt = ak.unzip(pairs_pt)
-                l_idx_PV, r_idx_PV = ak.unzip(pairs_PV)
-
-                l_eta = ak.flatten(l_idx_eta)
-                r_eta = ak.flatten(r_idx_eta)
-                l_phi = ak.flatten(l_idx_phi)
-                r_phi = ak.flatten(r_idx_phi)
-                l_pt = ak.flatten(l_idx_pt)
-                r_pt = ak.flatten(r_idx_pt)
-                l_PV = ak.flatten(l_idx_PV)
-                r_PV = ak.flatten(r_idx_PV)
-
-
-                muonMass = 0.105658369
-                mu1 = vector.arr({"pt":l_pt, "phi":l_phi, "eta": l_eta, "mass": l_pt*0+muonMass})
-                mu2 = vector.arr({"pt":r_pt, "phi":r_phi, "eta": r_eta, "mass": r_pt*0+muonMass})
-
-                mass = (mu1+mu2).mass
-
-                PV = l_PV
-        
-
-                # binning
-                if bin_in_PV == True:
-                    hist = Hist.new.Regular(50, 66, 116, name="mass").Regular(100, 0.5, 100.5, name="PV").Double()
-                    hist.fill(mass, PV)
-                    result["hist_{0}_{1}_{2}".format(rochester_error_type, ID_type, cut)] = hist.view()
-                else:
-                    hist = Hist.new.Regular(50, 66, 116, name="mass").Double()
-                    hist.fill(mass)
-                    result["hist_{0}_{1}_{2}".format(rochester_error_type, ID_type, cut)] =  hist.view()           
-
     
-    rochester_corrections = {}
-    rochester_corrections["scale_plus"] = scale_plus
-    rochester_corrections["scale_minus"] = scale_minus
-    rochester_corrections["spread_plus"] = spread_plus
-    rochester_corrections["spread_minus"] = spread_minus
-    rochester_corrections["scale_plus_error"] = scale_plus_error
-    rochester_corrections["scale_minus_error"] = scale_minus_error
-    rochester_corrections["spread_plus_error"] = spread_plus_error
-    rochester_corrections["spread_minus_error"] = spread_minus_error
+    return mask_1, mask_2
+
+
+def pair_mask_gen(data_reco, criteria_1, criteria_2):
     
-    return result, rochester_corrections
+    l_idx_1, r_idx_1 = data_reco["{0}_plus".format(criteria_1)] & data_reco["gen_cut_plus"], data_reco["{0}_minus".format(criteria_2)] & data_reco["gen_cut_minus"]
+    mask_1 = (l_idx_1 == r_idx_1) & (l_idx_1 + r_idx_1 == True)
 
-
-#####################################
-
-def generate_templates_Glo(data_reco, rochester, bin_in_PV = True): # note binning resolution
-
-    # define outer pt, eta, phi, charge
-    data_reco["outer_pt"] = data_reco["Muon_useUpdated"] * data_reco["Muon_ptStaUpd"] + (1 - data_reco["Muon_useUpdated"]) * data_reco["Muon_ptStaReg"] 
-    data_reco["outer_eta"] = data_reco["Muon_useUpdated"] * data_reco["Muon_etaStaUpd"] + (1 - data_reco["Muon_useUpdated"]) * data_reco["Muon_etaStaReg"] 
-    data_reco["outer_phi"] = data_reco["Muon_useUpdated"] * data_reco["Muon_phiStaUpd"] + (1 - data_reco["Muon_useUpdated"]) * data_reco["Muon_phiStaReg"] 
-    data_reco["outer_charge"] = data_reco["Muon_useUpdated"] * data_reco["Muon_chargeStaUpd"] + (1 - data_reco["Muon_useUpdated"]) * data_reco["Muon_chargeStaReg"] 
-      
-
-    data_reco2 = {}    
-    # pairing inner and outer tracks
-    kinematics = ["pt", "eta", "phi", "charge"]
-    for value in kinematics:
-        data_reco2["pairing_{0}".format(value)] = ak.cartesian([data_reco["Muon_{0}".format(value)], data_reco["outer_{0}".format(value)]])
-        data_reco["paired_inner_{0}".format(value)], data_reco["paired_outer_{0}".format(value)] = ak.unzip(data_reco2["pairing_{0}".format(value)])
+    if criteria_1 == criteria_2: # to prevent double counting
+        mask_2 = ak.ones_like(mask_1) == 0
     
-    # define delta_R2 between inner and outer
-    data_reco["delR2_io"] = (data_reco["paired_outer_eta"] - data_reco["paired_inner_eta"])**2 + (data_reco["paired_outer_phi"] - data_reco["paired_inner_phi"])**2
-
+    else:
+        l_idx_2, r_idx_2 = data_reco["{0}_plus".format(criteria_2)] & data_reco["gen_cut_plus"], data_reco["{0}_minus".format(criteria_1)] & data_reco["gen_cut_minus"]
+        mask_2 = (l_idx_2 == r_idx_2) & (l_idx_2 + r_idx_2 == True)
     
-    # define tag criteria (reshaped further below)
+    return mask_1, mask_2
+
+
+def subtype(template_subtype):
+    if template_subtype == "pass":
+        criteria_1, criteria_2 = "tag_pass", "probe_pass"
+    elif template_subtype == "fail":
+        criteria_1, criteria_2 = "tag_pass", "probe_fail"
+    elif template_subtype == "2":
+        criteria_1, criteria_2 = "probe_pass", "probe_pass"
+    elif template_subtype == "1":
+        criteria_1, criteria_2 = "probe_pass", "probe_fail"
+    elif template_subtype == "0":
+        criteria_1, criteria_2 = "probe_fail", "probe_fail"
+    
+    return criteria_1, criteria_2
+
+
+def pair_reco_to_gen(data_reco):
+    data_reco["reco_cuts"] = (data_reco["reco_eta"] < 2.5) & (data_reco["reco_pt"] > 20)
+    
+    data_reco["delR2_minus_min"] = ak.min(data_reco["delR2_minus"], axis=-1)
+    data_reco["delR2_plus_min"] = ak.min(data_reco["delR2_plus"], axis=-1)
+
+    match_gen_reco_minus = data_reco["delR2_minus"] == data_reco["delR2_minus_min"]
+    match_gen_reco_plus = data_reco["delR2_plus"] == data_reco["delR2_plus_min"]
+    
+    for value in ["tag_pass", "probe_pass", "probe_fail", "reco_cuts"]:
+        min_minus = data_reco["{0}".format(value)][match_gen_reco_minus]
+        min_minus = ak.fill_none(min_minus, value = [False], axis=0)
+        data_reco["{0}_minus".format(value)] = ak.flatten(min_minus, axis=-1)
+
+        min_plus = data_reco["{0}".format(value)][match_gen_reco_plus]
+        min_plus = ak.fill_none(min_plus, value = [False], axis=0)
+        data_reco["{0}_plus".format(value)] = ak.flatten(min_plus, axis=-1)
+    
+    return data_reco
+
+
+# arguments for generate_templates:
+# template_type = ["HLT", "ID", "Glo", "HLT_Trk", "ID_Trk", "Glo_Trk", "Sta_Trk", "all"]
+# template_subtype = ["2", "1", "0", "pass", "fail"]
+# correction_type = ["none", "nominal", "plus_scale", "minus_scale", "plus_spread", "minus_spread"]
+# cut_type = ["reco", "gen"]
+# template_type ending in "_Trk" refers to taking the Muon and Track values for inner values. Obviously, there is only "Sta_Trk" and no "Sta".
+# For all "_Trk" types, there are the additional seed and track requirements in the base mask (criteria that need to be satisfied for both pass and fail probes).
+# template_type "all" only works with cut_type = "gen", and produces all muons satisfying gen pt and eta cuts. This does not depend on "template_subtype or correction_type, so any value can be entered there.
+# template_subtype "2", "1" and "0" refer to 2 passing probes, 1 passing and 1 failing probe, and 2 failing probes respectively. "pass" and "fail" refer to a tag-and-probe with passing and failing probe respectively.
+def generate_templates(data_reco, template_type, template_subtype, correction_type, cut_type, bin_in_PV = True):
+
+    # HLT trigger
     data_reco["HLT_trigger_pass"] = data_reco["Muon_triggerBits"]&1 == 1
-    data_reco["criteria_tag"] = (data_reco["HLT_trigger_pass"] == True) & (data_reco["Muon_ID"] >= 4)
-
-          
-    # reshape gen-type variables
-    variables_type_1 = ["nPV", "muon_genPt", "muon_genEta", "muon_genPhi", "antiMuon_genPt", "antiMuon_genEta", "antiMuon_genPhi"]
-    for variable in variables_type_1:
-        data_reco["paired_{0}".format(variable)]  = ak.ones_like(data_reco["delR2_io"]) * data_reco["{0}".format(variable)]     
     
-    # reshape inner-type variables
-    variables_type_2 = ["criteria_tag", "Muon_ID"]
-    for variable in variables_type_2:
-        data_reco2["pairing_{0}".format(variable)] = ak.cartesian([data_reco["{0}".format(variable)], data_reco["outer_pt".format(variable)]])
-        data_reco["paired_{0}".format(variable)], data_reco2["paired_{0}".format(variable)] = ak.unzip(data_reco2["pairing_{0}".format(variable)])
+    # prepares inner variables (if template_type ends with "_Trk", concatenate muons and tracks; otherwise just obtains muons)
+    if template_type == "HLT_Trk" or template_type == "ID_Trk" or template_type == "Glo_Trk" or template_type == "Sta_Trk":
+        data_reco = get_inner_variables_with_trk(data_reco, correction_type)
+    else:
+        data_reco = get_inner_variables_without_trk(data_reco, correction_type)
+    
+    
+    # obtain reco variables (outer for "Glo" and "Glo_Trk", and inner for all others)
+    data_reco = get_reco_variables(data_reco, template_type, correction_type)
 
     
-    # define delta_R2 with gen
-    data_reco["delR2_minus"] = (data_reco["paired_outer_eta"] - data_reco["muon_genEta"])**2 + (data_reco["paired_outer_phi"] - data_reco["muon_genPhi"])**2
-    data_reco["delR2_plus"] = (data_reco["paired_outer_eta"] - data_reco["antiMuon_genEta"])**2 + (data_reco["paired_outer_phi"] - data_reco["antiMuon_genPhi"])**2
+    # pairing inner and outer variables (only needed for "Glo", "Glo_Trk" and "Sta_Trk")
+    # this step obtains delR2_io_min (minimum delR2 between inner and outer), and also the corresponding value of pt, eta, phi and charge
+    if template_type == "Sta_Trk": # note there is reordering of data from splitting and recombining data_reco here
+        data_reco = get_paired_outer_value(data_reco)         
+    elif template_type == "Glo" or template_type == "Glo_Trk": # note the elimination of data with no outer tracks
+        data_reco = get_paired_inner_value(data_reco)
+
+    
+    if template_type != "all":
+        # define base criteria (criteria that has to be true for both pass and fail probes, but not tag)
+        base_mask = base_criteria(data_reco, template_type)
+
+        # define passing and failing criteria
+        probe_pass_mask = probe_criteria_pass(data_reco, template_type)
+        probe_fail_mask = probe_criteria_fail(data_reco, template_type)
+
+        data_reco["probe_pass"] = (base_mask == True) & (probe_pass_mask == True)
+        data_reco["probe_fail"] = (base_mask == True) & (probe_fail_mask == True)
+
+        # define tag criteria
+        data_reco["tag_pass"] = tag_criteria(data_reco, template_type)
+
+
+        # reshape nPV into reco-shape
+        data_reco["primary_vertices"]  = ak.ones_like(data_reco["reco_pt"]) * data_reco["nPV"]
+
+    
+        # delR2 between reco and gen
+        data_reco["delR2_minus"] = (data_reco["reco_eta"] - data_reco["muon_genEta"])**2 + (data_reco["reco_phi"] - data_reco["muon_genPhi"])**2
+        data_reco["delR2_plus"] = (data_reco["reco_eta"] - data_reco["antiMuon_genEta"])**2 + (data_reco["reco_phi"] - data_reco["antiMuon_genPhi"])**2
+
+        # define delR2 cut between reco and gen values
+        if template_type == "Glo" or template_type == "Glo_Trk":
+            delR2_recogen = 0.09
+        else:
+            delR2_recogen = 0.0025
+    
+    
+    # applyng subtype mask to muon pairs:
+    if cut_type == "gen":
+        
+        if template_type == "all":
+            l_idx, r_idx = (abs(data_reco["antiMuon_genEta"]) < 2.4) & (data_reco["antiMuon_genPt"] > 25) & (data_reco["antiMuon_genPt"] < 200), (abs(data_reco["muon_genEta"]) < 2.4) & (data_reco["muon_genPt"] > 25) & (data_reco["muon_genPt"] < 200)
+            mask_1 = (l_idx == r_idx) & (l_idx + r_idx == True)
+            mask_2 = ak.ones_like(mask_1) == 0
+        
+        else:
+            # pairing reco to gen variables
+            # this step defines delR2_min, and attaches the corresponding mask value of reco
+            data_reco = pair_reco_to_gen(data_reco)
+
+            delR2_plus_min_nonone = ak.fill_none(data_reco["delR2_plus_min"], value = 1, axis=0)
+            delR2_minus_min_nonone = ak.fill_none(data_reco["delR2_minus_min"], value = 1, axis=0)
+
+            # pt-eta cuts, with delR2 matching requirements between reco and gen
+            data_reco["gen_cut_plus"] = (abs(data_reco["antiMuon_genEta"]) < 2.4) & (data_reco["antiMuon_genPt"] > 25) & (data_reco["antiMuon_genPt"] < 200) & (delR2_plus_min_nonone < delR2_recogen) & (data_reco["reco_cuts_plus"] == True)
+            data_reco["gen_cut_minus"] = (abs(data_reco["muon_genEta"]) < 2.4) & (data_reco["muon_genPt"] > 25) & (data_reco["muon_genPt"] < 200) & (delR2_minus_min_nonone < delR2_recogen) & (data_reco["reco_cuts_minus"] == True)
+
+            # mask for template subtype
+            criteria_1, criteria_2 = subtype(template_subtype)
+            mask_1, mask_2 = pair_mask_gen(data_reco, criteria_1, criteria_2)
+        
+        
+        # apply subtype mask to plus-minus muon pairs
+        mass = np.array([])
+        PV = np.array([])
+        for mask in (mask_1, mask_2):
+            l_eta = data_reco["antiMuon_genEta"][mask]
+            r_eta = data_reco["muon_genEta"][mask]
+            l_phi = data_reco["antiMuon_genPhi"][mask]
+            r_phi = data_reco["muon_genPhi"][mask]
+            l_pt = data_reco["antiMuon_genPt"][mask]
+            r_pt = data_reco["muon_genPt"][mask]
+            l_PV = data_reco["nPV"][mask]
+            r_PV = data_reco["nPV"][mask]
+            
+            muonMass = 0.105658369
+            mu1 = vector.arr({"pt":l_pt, "phi":l_phi, "eta": l_eta, "mass": l_pt*0+muonMass})
+            mu2 = vector.arr({"pt":r_pt, "phi":r_phi, "eta": r_eta, "mass": r_pt*0+muonMass})
+
+            mass = np.concatenate((mass, (mu1+mu2).mass))
+            PV = np.concatenate((PV, l_PV))
         
     
-    data_reco["correct_charge_genPt"] = (data_reco["paired_inner_charge"] + 1)/2 * data_reco["antiMuon_genPt"] - (data_reco["paired_inner_charge"] - 1)/2 * data_reco["muon_genPt"]
+    elif cut_type == "reco":
+        # split into plus and minus muons, along with pt-eta cuts and delR2 matching requirements
+        mask_plus  = (data_reco["delR2_plus"] < delR2_recogen) & (data_reco["reco_charge"] == 1)
+        mask_minus  = (data_reco["delR2_minus"] < delR2_recogen) & (data_reco["reco_charge"] == -1)
+        cut_mask = (abs(data_reco["reco_eta"]) < 2.4) & (data_reco["reco_pt"] > 25) & (data_reco["reco_pt"] < 200)
+
+        muon_plus = data_reco[["tag_pass", "probe_pass", "probe_fail", "reco_pt", "reco_eta", "reco_phi", "primary_vertices"]][mask_plus & cut_mask]
+        muon_minus = data_reco[["tag_pass", "probe_pass", "probe_fail", "reco_pt", "reco_eta", "reco_phi", "primary_vertices"]][mask_minus & cut_mask]
 
     
-    # rochester correction for inner pt
-    scale = rochester.kScaleDT(data_reco["paired_inner_charge"], data_reco["paired_inner_pt"], data_reco["paired_inner_eta"], data_reco["paired_inner_phi"])
-    spread = rochester.kSpreadMC(data_reco["paired_inner_charge"], data_reco["paired_inner_pt"], data_reco["paired_inner_eta"], data_reco["paired_inner_phi"], data_reco["correct_charge_genPt"])
+        # mask for template subtype
+        criteria_1, criteria_2 = subtype(template_subtype)
+        mask_1, mask_2 = pair_mask_reco(muon_plus, muon_minus, criteria_1, criteria_2)   
+        
+        # apply subtype mask to plus-minus muon pairs
+        mass = np.array([])
+        PV = np.array([])
+        for mask in (mask_1, mask_2):
 
-    data_reco["Muon_pt_RC"] = data_reco["paired_inner_pt"] * scale * spread
-    
-    
-    # define masks, except outer pt requirement
-    mask_minus = (data_reco["delR2_minus"]<0.09) & (data_reco["delR2_io"]<0.09) & (data_reco["paired_outer_charge"] == -1) & (abs(data_reco["paired_outer_eta"]) < 2.4) & (data_reco["Muon_pt_RC"] > 20) & (abs(data_reco["paired_inner_eta"]) < 2.5) 
-    mask_plus  = (data_reco["delR2_plus"]<0.09)  & (data_reco["delR2_io"]<0.09) & (data_reco["paired_outer_charge"] == 1)  & (abs(data_reco["paired_outer_eta"]) < 2.4) & (data_reco["Muon_pt_RC"] > 20) & (abs(data_reco["paired_inner_eta"]) < 2.5) 
+            pairs_eta = ak.cartesian([muon_plus["reco_eta"], muon_minus["reco_eta"]])[mask]
+            pairs_phi = ak.cartesian([muon_plus["reco_phi"], muon_minus["reco_phi"]])[mask]
+            pairs_pt = ak.cartesian([muon_plus["reco_pt"], muon_minus["reco_pt"]])[mask]
+            pairs_PV = ak.cartesian([muon_plus["primary_vertices"], muon_minus["primary_vertices"]])[mask]
 
+            l_idx_eta, r_idx_eta = ak.unzip(pairs_eta)
+            l_idx_phi, r_idx_phi = ak.unzip(pairs_phi)
+            l_idx_pt, r_idx_pt = ak.unzip(pairs_pt)
+            l_idx_PV, r_idx_PV = ak.unzip(pairs_PV)
+
+            l_eta = ak.flatten(l_idx_eta)
+            r_eta = ak.flatten(r_idx_eta)
+            l_phi = ak.flatten(l_idx_phi)
+            r_phi = ak.flatten(r_idx_phi)
+            l_pt = ak.flatten(l_idx_pt)
+            r_pt = ak.flatten(r_idx_pt)
+            l_PV = ak.flatten(l_idx_PV)
+            r_PV = ak.flatten(r_idx_PV)
+
+            muonMass = 0.105658369
+            mu1 = vector.arr({"pt":l_pt, "phi":l_phi, "eta": l_eta, "mass": l_pt*0+muonMass})
+            mu2 = vector.arr({"pt":r_pt, "phi":r_phi, "eta": r_eta, "mass": r_pt*0+muonMass})
+
+
+            mass = np.concatenate((mass, (mu1+mu2).mass))
+            PV = np.concatenate((PV, l_PV))
+
+            
+    # binning into mass (and PV if bin_in_PV == True (default))
+    if template_type == "Glo" or template_type == "Glo_Trk":
+        mass_bins, mass_lo, mass_hi = 70, 56, 126
+    else:
+        mass_bins, mass_lo, mass_hi = 50, 66, 116
+        
+    if bin_in_PV == True:
+        hist = Hist.new.Regular(mass_bins, mass_lo, mass_hi, name="mass").Regular(100, 0.5, 100.5, name="PV").Double()
+        hist.fill(mass, PV)
+    else:
+        hist = Hist.new.Regular(mass_bins, mass_lo, mass_hi, name="mass").Double()
+        hist.fill(mass)    
      
-    data_reco["criteria_probe_pass"] = data_reco["paired_Muon_ID"] >= 3
-    data_reco["criteria_probe_fail"] = data_reco["paired_Muon_ID"] == 2
-    
-    
-    # apply mask for all reconstructed muons:
-    muon_plus = data_reco[["paired_outer_charge", "paired_outer_eta", "paired_outer_phi", "paired_outer_pt", "paired_nPV", "correct_charge_genPt", "paired_antiMuon_genEta", "paired_antiMuon_genPhi", "paired_antiMuon_genPt", "criteria_probe_pass", "criteria_probe_fail", "paired_criteria_tag"]][mask_plus]
-    muon_minus = data_reco[["paired_outer_charge", "paired_outer_eta", "paired_outer_phi", "paired_outer_pt", "paired_nPV", "correct_charge_genPt", "paired_muon_genEta", "paired_muon_genPhi", "paired_muon_genPt", "criteria_probe_pass", "criteria_probe_fail", "paired_criteria_tag"]][mask_minus]
+    return hist.view()
 
 
-     
-        
-    # TO DO: apply corrections to outer, and its errors
-        
-    # scale_plus = rochester.kScaleDT(muon_plus["charge"], muon_plus["pt"], muon_plus["eta"], muon_plus["phi"])
-    # scale_minus = rochester.kScaleDT(muon_minus["charge"], muon_minus["pt"], muon_minus["eta"], muon_minus["phi"])
-    # spread_plus = rochester.kSpreadMC(muon_plus["charge"], muon_plus["pt"], muon_plus["eta"], muon_plus["phi"], muon_plus["correct_charge_genPt"])
-    # spread_minus = rochester.kSpreadMC(muon_minus["charge"], muon_minus["pt"], muon_minus["eta"], muon_minus["phi"], muon_minus["correct_charge_genPt"])
-
-    # scale_plus_error = rochester.kScaleDTerror(muon_plus["charge"], muon_plus["pt"], muon_plus["eta"], muon_plus["phi"])
-    # scale_minus_error = rochester.kScaleDTerror(muon_minus["charge"], muon_minus["pt"], muon_minus["eta"], muon_minus["phi"])
-    # spread_plus_error = rochester.kSpreadMCerror(muon_plus["charge"], muon_plus["pt"], muon_plus["eta"], muon_plus["phi"], muon_plus["correct_charge_genPt"])
-    # spread_minus_error = rochester.kSpreadMCerror(muon_minus["charge"], muon_minus["pt"], muon_minus["eta"], muon_minus["phi"], muon_minus["correct_charge_genPt"])
-
-   
-    # all the templates
-    # template_types = ["none", "nominal", "plus_scale", "minus_scale", "plus_spread", "minus_spread"]
-    template_types = ["none"]
-    result = {}
-
-
-    muon_plus["Muon_pt_RC_none"] = muon_plus["paired_outer_pt"]
-    muon_minus["Muon_pt_RC_none"] = muon_minus["paired_outer_pt"]
-    
-    # muon_plus["Muon_pt_RC_nominal"] = muon_plus["paired_outer_pt"] * scale_plus * spread_plus
-    # muon_minus["Muon_pt_RC_nominal"] = muon_minus["paired_outer_pt"] * scale_minus * spread_minus
-
-    # muon_plus["Muon_pt_RC_plus_scale"] = muon_plus["paired_outer_pt"] * (scale_plus + scale_plus_error) * spread_plus
-    # muon_minus["Muon_pt_RC_plus_scale"] = muon_minus["paired_outer_pt"] * (scale_minus + scale_minus_error) * spread_minus
-
-    # muon_plus["Muon_pt_RC_minus_scale"] = muon_plus["paired_outer_pt"] * (scale_plus - scale_plus_error) * spread_plus
-    # muon_minus["Muon_pt_RC_minus_scale"] = muon_minus["paired_outer_pt"] * (scale_minus - scale_minus_error) * spread_minus
-
-    # muon_plus["Muon_pt_RC_plus_spread"] = muon_plus["paired_outer_pt"] * scale_plus * (spread_plus + spread_plus_error)
-    # muon_minus["Muon_pt_RC_plus_spread"] = muon_minus["paired_outer_pt"] * scale_minus * (spread_minus + spread_minus_error)
-
-    # muon_plus["Muon_pt_RC_minus_spread"] = muon_plus["paired_outer_pt"] * scale_plus * (spread_plus - spread_plus_error)
-    # muon_minus["Muon_pt_RC_minus_spread"] = muon_minus["paired_outer_pt"] * scale_minus * (spread_minus - spread_minus_error)
-
-
-    for rochester_error_type in template_types:
-            
-        # mask for pt
-        muon_sta_plus = muon_plus[muon_plus["Muon_pt_RC_{0}".format(rochester_error_type)] > 25]
-        muon_sta_minus = muon_minus[muon_minus["Muon_pt_RC_{0}".format(rochester_error_type)] > 25]
-            
-        
-        # define mask for Glopass:
-
-        pairs_1_pass = ak.cartesian([muon_sta_plus["paired_criteria_tag"], muon_sta_minus["criteria_probe_pass"]])
-        l_idx_1_pass, r_idx_1_pass = ak.unzip(pairs_1_pass)
-        mask_1_pass = (l_idx_1_pass == r_idx_1_pass) & (l_idx_1_pass + r_idx_1_pass == True)
-
-        pairs_2_pass = ak.cartesian([muon_sta_plus["criteria_probe_pass"], muon_sta_minus["paired_criteria_tag"]])
-        l_idx_2_pass, r_idx_2_pass = ak.unzip(pairs_2_pass)
-        mask_2_pass = (l_idx_2_pass == r_idx_2_pass) & (l_idx_2_pass + r_idx_2_pass == True)
-
-        mask_pass = mask_1_pass + mask_2_pass
-
-        # define mask for Glofail:
-
-        pairs_1_fail = ak.cartesian([muon_sta_plus["paired_criteria_tag"], muon_sta_minus["criteria_probe_fail"]])
-        l_idx_1_fail, r_idx_1_fail = ak.unzip(pairs_1_fail)
-        mask_1_fail = (l_idx_1_fail == r_idx_1_fail) & (l_idx_1_fail + r_idx_1_fail == True)
-
-        pairs_2_fail = ak.cartesian([muon_sta_plus["criteria_probe_fail"], muon_sta_minus["paired_criteria_tag"]])
-        l_idx_2_fail, r_idx_2_fail = ak.unzip(pairs_2_fail)
-        mask_2_fail = (l_idx_2_fail == r_idx_2_fail) & (l_idx_2_fail + r_idx_2_fail == True)
-
-        mask_fail = mask_1_fail + mask_2_fail
-               
-            
-        # pairing, and applying Glo masks:
-        mask_types = ["Glopass", "Glofail"]
-        for Glo_type in mask_types:
-            if Glo_type == "Glopass":
-                mask = mask_pass
-            elif Glo_type == "Glofail":
-                mask = mask_fail
-            
-            cuts = ["gen_cut", "reco_cut"]
-            for cut in cuts:
-                if cut == "gen_cut":
-                    eta_values_plus, eta_values_minus, phi_values_plus, phi_values_minus, pt_values_plus, pt_values_minus = "paired_antiMuon_genEta", "paired_muon_genEta", "paired_antiMuon_genPhi", "paired_muon_genPhi", "paired_antiMuon_genPt", "paired_muon_genPt"
-                elif cut == "reco_cut":
-                    eta_values_plus, eta_values_minus, phi_values_plus, phi_values_minus, pt_values_plus, pt_values_minus = "paired_outer_eta", 'paired_outer_eta', "paired_outer_phi", "paired_outer_phi", "Muon_pt_RC_{0}".format(rochester_error_type), "Muon_pt_RC_{0}".format(rochester_error_type)
-
-
-                # pairing, and applying masks:
-                pairs_eta = ak.cartesian([muon_sta_plus[eta_values_plus], muon_sta_minus[eta_values_minus]])[mask]
-                pairs_phi = ak.cartesian([muon_sta_plus[phi_values_plus], muon_sta_minus[phi_values_minus]])[mask]
-                pairs_pt = ak.cartesian([muon_sta_plus[pt_values_plus], muon_sta_minus[pt_values_minus]])[mask]
-                pairs_PV = ak.cartesian([muon_sta_plus["paired_nPV"], muon_sta_minus["paired_nPV"]])[mask]
-
-
-                l_idx_eta, r_idx_eta = ak.unzip(pairs_eta)
-                l_idx_phi, r_idx_phi = ak.unzip(pairs_phi)
-                l_idx_pt, r_idx_pt = ak.unzip(pairs_pt)
-                l_idx_PV, r_idx_PV = ak.unzip(pairs_PV)
-
-                l_eta = ak.flatten(l_idx_eta)
-                r_eta = ak.flatten(r_idx_eta)
-                l_phi = ak.flatten(l_idx_phi)
-                r_phi = ak.flatten(r_idx_phi)
-                l_pt = ak.flatten(l_idx_pt)
-                r_pt = ak.flatten(r_idx_pt)
-                l_PV = ak.flatten(l_idx_PV)
-                r_PV = ak.flatten(r_idx_PV)
-
-
-                muonMass = 0.105658369
-                mu1 = vector.arr({"pt":l_pt, "phi":l_phi, "eta": l_eta, "mass": l_pt*0+muonMass})
-                mu2 = vector.arr({"pt":r_pt, "phi":r_phi, "eta": r_eta, "mass": r_pt*0+muonMass})
-
-                mass0 = (mu1+mu2).mass
-                mask_repeats = np.concatenate((np.array([1]), np.diff(mass0))) != 0
-
-                mass = mass0[mask_repeats]
-                PV = l_PV[mask_repeats]
-
-
-                # binning
-                if bin_in_PV == True:
-                    hist = Hist.new.Regular(70, 56, 126, name="mass").Regular(100, 0.5, 100.5, name="PV").Double()
-                    hist.fill(mass, PV)
-                    result["hist_{0}_{1}".format(rochester_error_type, Glo_type)] = hist.view()
-                else:
-                    hist = Hist.new.Regular(70, 56, 126, name="mass").Double()
-                    hist.fill(mass)
-                    result["hist_{0}_{1}".format(rochester_error_type, Glo_type)] =  hist.view()           
-    
-    return result
-
-
-#####################################
-
-def generate_templates_Sta(data_reco, rochester, bin_in_PV = True):
-
-    # define outer pt, eta, phi, charge
-    data_reco["outer_pt"] = data_reco["Muon_useUpdated"] * data_reco["Muon_ptStaUpd"] + (1 - data_reco["Muon_useUpdated"]) * data_reco["Muon_ptStaReg"] 
-    data_reco["outer_eta"] = data_reco["Muon_useUpdated"] * data_reco["Muon_etaStaUpd"] + (1 - data_reco["Muon_useUpdated"]) * data_reco["Muon_etaStaReg"] 
-    data_reco["outer_phi"] = data_reco["Muon_useUpdated"] * data_reco["Muon_phiStaUpd"] + (1 - data_reco["Muon_useUpdated"]) * data_reco["Muon_phiStaReg"] 
-    data_reco["outer_charge"] = data_reco["Muon_useUpdated"] * data_reco["Muon_chargeStaUpd"] + (1 - data_reco["Muon_useUpdated"]) * data_reco["Muon_chargeStaReg"] 
-    
-       
-    # define inner parameters
-    inner_types1 = ["pt", "eta", "phi", "charge"]
-    inner_types2 = ["nPixelHits", "nTrackerLayers", "trackAlgo"]
-    for inner_type in inner_types1:
-        data_reco["inner_{0}".format(inner_type)] = ak.concatenate((data_reco["Muon_{0}Trk".format(inner_type)], data_reco["Track_{0}".format(inner_type)]), axis = 1)
-    for inner_type in inner_types2:
-        data_reco["{0}".format(inner_type)] = ak.concatenate((data_reco["Muon_{0}".format(inner_type)], data_reco["Track_{0}".format(inner_type)]), axis = 1)
-
-    
-    data_reco2 = {}
-    # pairing inner and outer tracks
-    kinematics = ["pt", "eta", "phi", "charge"]
-    for value in kinematics:
-        data_reco2["pairing_{0}".format(value)] = ak.cartesian([data_reco["inner_{0}".format(value)], data_reco["outer_{0}".format(value)]])
-        data_reco["paired_inner_{0}".format(value)], data_reco["paired_outer_{0}".format(value)] = ak.unzip(data_reco2["pairing_{0}".format(value)])
-
-    # define delta_R2 between inner and outer
-    data_reco["delR2_io"] = (data_reco["paired_outer_eta"] - data_reco["paired_inner_eta"])**2 + (data_reco["paired_outer_phi"] - data_reco["paired_inner_phi"])**2
-
-
-    # define tag criteria
-    data_reco["HLT_trigger_pass"] = data_reco["Muon_triggerBits"]&1 == 1
-    data_reco["criteria_tag_muons"] = (data_reco["HLT_trigger_pass"] == True) & (data_reco["Muon_ID"] >= 4)
-    data_reco["criteria_tag_tracks"] = ak.ones_like(data_reco["Track_pt"])==0
-    data_reco["criteria_tag"] = ak.concatenate((data_reco["criteria_tag_muons"], data_reco["criteria_tag_tracks"]), axis = 1)
-
-        
-    # reshape gen-type variables
-    variables_gen = ["nPV", "muon_genPt", "muon_genEta", "muon_genPhi", "antiMuon_genPt", "antiMuon_genEta", "antiMuon_genPhi"]
-    for variable in variables_gen:
-        data_reco["paired_{0}".format(variable)]  = ak.ones_like(data_reco["delR2_io"]) * data_reco["{0}".format(variable)]     
-        
-    # reshape nongen-type variables
-    variables_nongen = ["nPixelHits", "nTrackerLayers", "trackAlgo", "criteria_tag"]
-    for variable in variables_nongen:
-        data_reco2["pairing_{0}".format(variable)] = ak.cartesian([data_reco["{0}".format(variable)], data_reco["outer_pt".format(variable)]])
-        data_reco["paired_{0}".format(variable)], data_reco2["paired_{0}".format(variable)] = ak.unzip(data_reco2["pairing_{0}".format(variable)])
-
-    
-    
-    # define delta_R2 with gen
-    data_reco["delR2_minus"] = (data_reco["paired_inner_eta"] - data_reco["muon_genEta"])**2 + (data_reco["paired_inner_phi"] - data_reco["muon_genPhi"])**2
-    data_reco["delR2_plus"] = (data_reco["paired_inner_eta"] - data_reco["antiMuon_genEta"])**2 + (data_reco["paired_inner_phi"] - data_reco["antiMuon_genPhi"])**2
-        
-        
-    data_reco["correct_charge_genPt"] = (data_reco["paired_inner_charge"] + 1)/2 * data_reco["antiMuon_genPt"] - (data_reco["paired_inner_charge"] - 1)/2 * data_reco["muon_genPt"]
-
-    # define masks
-    mask_minus = (data_reco["delR2_minus"]<0.09) & (data_reco["paired_inner_charge"] == -1) & (abs(data_reco["paired_inner_eta"]) < 2.4) & (data_reco["paired_inner_pt"] > 25) & (data_reco["paired_nPixelHits"] > 0 ) & (data_reco["paired_nTrackerLayers"] > 5) & (data_reco["paired_trackAlgo"] != 13) & (data_reco["paired_trackAlgo"] != 14) & (data_reco["paired_outer_pt"] > 20) & (abs(data_reco["paired_outer_eta"]) < 2.5) 
-    mask_plus  = (data_reco["delR2_plus"]<0.09) & (data_reco["paired_inner_charge"] == 1)  & (abs(data_reco["paired_inner_eta"]) < 2.4) & (data_reco["paired_inner_pt"] > 25) & (data_reco["paired_nPixelHits"] > 0 ) & (data_reco["paired_nTrackerLayers"] > 5) & (data_reco["paired_trackAlgo"] != 13) & (data_reco["paired_trackAlgo"] != 14) & (data_reco["paired_outer_pt"] > 20) & (abs(data_reco["paired_outer_eta"]) < 2.5) 
-
-        
-    data_reco["criteria_probe_pass"] = (data_reco["delR2_io"]<0.09)
-    data_reco["criteria_probe_fail"] = (data_reco["delR2_io"]>=0.09)
-        
-        
-    muon_plus = data_reco[["paired_inner_charge", "paired_inner_eta", "paired_inner_phi", "paired_inner_pt", "paired_nPV", "correct_charge_genPt", "paired_antiMuon_genEta", "paired_antiMuon_genPhi", "paired_antiMuon_genPt", "criteria_probe_pass", "criteria_probe_fail", "paired_criteria_tag"]][mask_plus]
-    muon_minus = data_reco[["paired_inner_charge", "paired_inner_eta", "paired_inner_phi", "paired_inner_pt", "paired_nPV", "correct_charge_genPt", "paired_muon_genEta", "paired_muon_genPhi", "paired_muon_genPt", "criteria_probe_pass", "criteria_probe_fail", "paired_criteria_tag"]][mask_minus]
-
-
-    # rochester corrections
-    scale_plus = rochester.kScaleDT(muon_plus["paired_inner_charge"], muon_plus["paired_inner_pt"], muon_plus["paired_inner_eta"], muon_plus["paired_inner_phi"])
-    scale_minus = rochester.kScaleDT(muon_minus["paired_inner_charge"], muon_minus["paired_inner_pt"], muon_minus["paired_inner_eta"], muon_minus["paired_inner_phi"])
-    spread_plus = rochester.kSpreadMC(muon_plus["paired_inner_charge"], muon_plus["paired_inner_pt"], muon_plus["paired_inner_eta"], muon_plus["paired_inner_phi"], muon_plus["correct_charge_genPt"])
-    spread_minus = rochester.kSpreadMC(muon_minus["paired_inner_charge"], muon_minus["paired_inner_pt"], muon_minus["paired_inner_eta"], muon_minus["paired_inner_phi"], muon_minus["correct_charge_genPt"])
-
-    scale_plus_error = rochester.kScaleDTerror(muon_plus["paired_inner_charge"], muon_plus["paired_inner_pt"], muon_plus["paired_inner_eta"], muon_plus["paired_inner_phi"])
-    scale_minus_error = rochester.kScaleDTerror(muon_minus["paired_inner_charge"], muon_minus["paired_inner_pt"], muon_minus["paired_inner_eta"], muon_minus["paired_inner_phi"])
-    spread_plus_error = rochester.kSpreadMCerror(muon_plus["paired_inner_charge"], muon_plus["paired_inner_pt"], muon_plus["paired_inner_eta"], muon_plus["paired_inner_phi"], muon_plus["correct_charge_genPt"])
-    spread_minus_error = rochester.kSpreadMCerror(muon_minus["paired_inner_charge"], muon_minus["paired_inner_pt"], muon_minus["paired_inner_eta"], muon_minus["paired_inner_phi"], muon_minus["correct_charge_genPt"])
-
-        
-    # all the rochester templates
-    template_types = ["none", "nominal", "plus_scale", "minus_scale", "plus_spread", "minus_spread"]
-
-    muon_plus["Muon_pt_RC_none"] = muon_plus["paired_inner_pt"]
-    muon_minus["Muon_pt_RC_none"] = muon_minus["paired_inner_pt"]
-
-    muon_plus["Muon_pt_RC_nominal"] = muon_plus["paired_inner_pt"] * scale_plus * spread_plus
-    muon_minus["Muon_pt_RC_nominal"] = muon_minus["paired_inner_pt"] * scale_minus * spread_minus
-
-    muon_plus["Muon_pt_RC_plus_scale"] = muon_plus["paired_inner_pt"] * (scale_plus + scale_plus_error) * spread_plus
-    muon_minus["Muon_pt_RC_plus_scale"] = muon_minus["paired_inner_pt"] * (scale_minus + scale_minus_error) * spread_minus
-
-    muon_plus["Muon_pt_RC_minus_scale"] = muon_plus["paired_inner_pt"] * (scale_plus - scale_plus_error) * spread_plus
-    muon_minus["Muon_pt_RC_minus_scale"] = muon_minus["paired_inner_pt"] * (scale_minus - scale_minus_error) * spread_minus
-
-    muon_plus["Muon_pt_RC_plus_spread"] = muon_plus["paired_inner_pt"] * scale_plus * (spread_plus + spread_plus_error)
-    muon_minus["Muon_pt_RC_plus_spread"] = muon_minus["paired_inner_pt"] * scale_minus * (spread_minus + spread_minus_error)
-
-    muon_plus["Muon_pt_RC_minus_spread"] = muon_plus["paired_inner_pt"] * scale_plus * (spread_plus - spread_plus_error)
-    muon_minus["Muon_pt_RC_minus_spread"] = muon_minus["paired_inner_pt"] * scale_minus * (spread_minus - spread_minus_error)
-    
-    
-    result = {}
-    for rochester_error_type in template_types:
-
-        # mask for pt
-        muon_trk_plus = muon_plus[muon_plus["Muon_pt_RC_{0}".format(rochester_error_type)] > 25]
-        muon_trk_minus = muon_minus[muon_minus["Muon_pt_RC_{0}".format(rochester_error_type)] > 25]
-
-
-        # define mask for Stapass:
-        pairs_1_pass = ak.cartesian([muon_trk_plus["paired_criteria_tag"], muon_trk_minus["criteria_probe_pass"]])
-        l_idx_1_pass, r_idx_1_pass = ak.unzip(pairs_1_pass)
-        mask_1_pass = (l_idx_1_pass == r_idx_1_pass) & (l_idx_1_pass + r_idx_1_pass == True)
-
-        pairs_2_pass = ak.cartesian([muon_trk_plus["criteria_probe_pass"], muon_trk_minus["paired_criteria_tag"]])
-        l_idx_2_pass, r_idx_2_pass = ak.unzip(pairs_2_pass)
-        mask_2_pass = (l_idx_2_pass == r_idx_2_pass) & (l_idx_2_pass + r_idx_2_pass == True)
-
-        mask_pass = mask_1_pass + mask_2_pass
-
-        # define mask for Stafail:
-        pairs_1_fail = ak.cartesian([muon_trk_plus["paired_criteria_tag"], muon_trk_minus["criteria_probe_fail"]])
-        l_idx_1_fail, r_idx_1_fail = ak.unzip(pairs_1_fail)
-        mask_1_fail = (l_idx_1_fail == r_idx_1_fail) & (l_idx_1_fail + r_idx_1_fail == True)
-
-        pairs_2_fail = ak.cartesian([muon_trk_plus["criteria_probe_fail"], muon_trk_minus["paired_criteria_tag"]])
-        l_idx_2_fail, r_idx_2_fail = ak.unzip(pairs_2_fail)
-        mask_2_fail = (l_idx_2_fail == r_idx_2_fail) & (l_idx_2_fail + r_idx_2_fail == True)
-
-        mask_fail = mask_1_fail + mask_2_fail
-
-
-        # pairing, and applying Sta masks:
-        mask_types = ["Stapass", "Stafail"]
-        for Sta_type in mask_types:
-            if Sta_type == "Stapass":
-                mask = mask_pass 
-            elif Sta_type == "Stafail":
-                mask = mask_fail
-
-
-            cuts = ["gen_cut", "reco_cut"]
-            for cut in cuts:
-
-                if cut == "gen_cut":
-                    eta_values_plus, eta_values_minus, phi_values_plus, phi_values_minus, pt_values_plus, pt_values_minus = "paired_antiMuon_genEta", "paired_muon_genEta", "paired_antiMuon_genPhi", "paired_muon_genPhi", "paired_antiMuon_genPt", "paired_muon_genPt"
-                elif cut == "reco_cut":
-                    eta_values_plus, eta_values_minus, phi_values_plus, phi_values_minus, pt_values_plus, pt_values_minus = "paired_inner_eta", 'paired_inner_eta', "paired_inner_phi", "paired_inner_phi", "Muon_pt_RC_{0}".format(rochester_error_type), "Muon_pt_RC_{0}".format(rochester_error_type)
-
-
-                # pairing, and applying masks:
-                pairs_eta = ak.cartesian([muon_trk_plus[eta_values_plus], muon_trk_minus[eta_values_minus]])[mask]
-                pairs_phi = ak.cartesian([muon_trk_plus[phi_values_plus], muon_trk_minus[phi_values_minus]])[mask]
-                pairs_pt = ak.cartesian([muon_trk_plus[pt_values_plus], muon_trk_minus[pt_values_minus]])[mask]
-                pairs_PV = ak.cartesian([muon_trk_plus["paired_nPV"], muon_trk_minus["paired_nPV"]])[mask]
-
-                l_idx_eta, r_idx_eta = ak.unzip(pairs_eta)
-                l_idx_phi, r_idx_phi = ak.unzip(pairs_phi)
-                l_idx_pt, r_idx_pt = ak.unzip(pairs_pt)
-                l_idx_PV, r_idx_PV = ak.unzip(pairs_PV)
-
-                l_eta = ak.flatten(l_idx_eta)
-                r_eta = ak.flatten(r_idx_eta)
-                l_phi = ak.flatten(l_idx_phi)
-                r_phi = ak.flatten(r_idx_phi)
-                l_pt = ak.flatten(l_idx_pt)
-                r_pt = ak.flatten(r_idx_pt)
-                l_PV = ak.flatten(l_idx_PV)
-                r_PV = ak.flatten(r_idx_PV)
-
-
-                muonMass = 0.105658369
-                mu1 = vector.arr({"pt":l_pt, "phi":l_phi, "eta": l_eta, "mass": l_pt*0+muonMass})
-                mu2 = vector.arr({"pt":r_pt, "phi":r_phi, "eta": r_eta, "mass": r_pt*0+muonMass})
-
-                mass0 = (mu1+mu2).mass
-                mask_repeats = np.concatenate((np.array([1]), np.diff(mass0))) != 0
-
-                mass = mass0[mask_repeats]
-                PV = l_PV[mask_repeats]
-
-
-                # binning
-                if bin_in_PV == True:
-                    hist = Hist.new.Regular(50, 66, 116, name="mass").Regular(100, 0.5, 100.5, name="PV").Double()
-                    hist.fill(mass, PV)
-                    result["hist_{0}_{1}_{2}".format(rochester_error_type, Sta_type, cut)] = hist.view()
-                else:
-                    hist = Hist.new.Regular(50, 66, 116, name="mass").Double()
-                    hist.fill(mass)
-                    result["hist_{0}_{1}_{2}".format(rochester_error_type, Sta_type, cut)] =  hist.view()
-
-                    
-    return result
-
-result = generate_templates_Sta(data_reco, rochester)
-
-
-#####################################
-
-
+#######################
 
 parser = argparse.ArgumentParser()
 parser.add_argument("mc_data_file")
@@ -796,13 +535,13 @@ rochester_filename = args.rochester_file
 # filename_ntuples = "C:/Users/byron/ZCounting/DYJetsToLL_M_50_LO_FlatPU0to75_Autumn18.root"
 # rochester_filename = "C:/Users/byron/ZCounting/ZHarvester/res/Rocco/RoccoR2018.txt"
 
-
 f1 = uproot.open(filename_ntuples)
 
 treename = "zcounting/tree"
 data = uproot.open(filename_ntuples+":"+treename)
 
-data_reco = data.arrays(["muon_genPt","muon_genEta", "muon_genPhi",
+
+columns = ["muon_genPt","muon_genEta", "muon_genPhi",
  "antiMuon_genPt","antiMuon_genEta","antiMuon_genPhi",
  "Muon_pt", "Muon_eta", "Muon_phi", "Muon_charge",
  "Muon_ID", "Muon_triggerBits", "nPV",
@@ -811,27 +550,110 @@ data_reco = data.arrays(["muon_genPt","muon_genEta", "muon_genPhi",
  "Track_pt", "Track_eta", "Track_phi", "Track_charge",
  "Muon_ptTrk", "Muon_etaTrk", "Muon_phiTrk", "Muon_chargeTrk",
  "Track_nPixelHits", "Track_nTrackerLayers", "Track_trackAlgo",
- "Muon_nPixelHits", "Muon_nTrackerLayers","Muon_trackAlgo"], "(decayMode==13) & (nMuon>=2)")
+ 'Muon_nPixelHits', 'Muon_nTrackerLayers','Muon_trackAlgo', "decayMode", "nMuon"]
 
-# data_reco = data.arrays(["muon_genPt","muon_genEta", "muon_genPhi",
-#  "antiMuon_genPt","antiMuon_genEta","antiMuon_genPhi",
-#  "Muon_pt", "Muon_eta", "Muon_phi", "Muon_charge",
-#  "Muon_ID", "Muon_triggerBits", "nPV"], "(decayMode==13) & (nMuon>=2)")
 
+keys_reco1 = ["HLT2", "HLT1", "IDfail", "Sta_Trkpass", "Sta_Trkfail"] 
+keys_reco2 = ["Glopass", "Glofail"]
+keys_gen1 = ["HLT2", "HLT1", "HLT0", "ID2", "ID1", "ID0", "IDpass", "IDfail",
+ "Sta_Trk2", "Sta_Trk1", "Sta_Trk0", "Sta_Trkpass", "Sta_Trkfail", "HLT_Trkpass", "HLT_Trkfail", "ID_Trkpass", "ID_Trkfail", "all"]
+keys_gen2 = ["Glo2", "Glo1", "Glo0", "Glopass", "Glofail", "Glo_Trkfail"]
 
 rochester = _get_rochester_corr(rochester_filename)
 
-templates = generate_templates_Sta(data_reco, rochester, bin_in_PV = True)[0]
-# rochester_corrections = generate_templates_Glo(data_reco, rochester)[1]
+
+result_gen = {}
+result_reco = {}
+for key in keys_reco1:
+    result_reco[key] = np.zeros((50,100))
+for key in keys_reco2:
+    result_reco[key] = np.zeros((70,100))
+for key in keys_gen1:
+    result_gen[key] = np.zeros((50,100))
+for key in keys_gen2:
+    result_gen[key] = np.zeros((70,100))
+
+keys_gen = keys_gen1 + keys_gen2
+keys_reco = keys_reco1 + keys_reco2
 
 
-with h5py.File('templates_Sta.hdf5', 'w') as outfile:
-    for dset_name in templates:
-        dset = outfile.create_dataset(dset_name, data = templates[dset_name])
+def produce_all_templates(data_reco, rochester, keys_gen, keys_reco, result_gen, result_reco):
+    
+    # define outer pt, eta, phi, charge
+    data_reco["outer_pt"] = data_reco["Muon_useUpdated"] * data_reco["Muon_ptStaUpd"] + (1 - data_reco["Muon_useUpdated"]) * data_reco["Muon_ptStaReg"] 
+    data_reco["outer_eta"] = data_reco["Muon_useUpdated"] * data_reco["Muon_etaStaUpd"] + (1 - data_reco["Muon_useUpdated"]) * data_reco["Muon_etaStaReg"] 
+    data_reco["outer_phi"] = data_reco["Muon_useUpdated"] * data_reco["Muon_phiStaUpd"] + (1 - data_reco["Muon_useUpdated"]) * data_reco["Muon_phiStaReg"] 
+    data_reco["outer_charge"] = data_reco["Muon_useUpdated"] * data_reco["Muon_chargeStaUpd"] + (1 - data_reco["Muon_useUpdated"]) * data_reco["Muon_chargeStaReg"]
 
-# with h5py.File('rochester_IDfail.hdf5', 'w') as outfile:
-#     for dset_name in rochester_corrections:
-#         dset = outfile.create_dataset(dset_name, data = rochester_corrections[dset_name])
+    # get corrections
+    data_reco1 = get_corrections(data_reco, rochester)
+
+    # produce templates
+    #reco templates
+    reco_templates = {}
+    for template_type in ["HLT"]:
+        for template_subtype in ["2", "1"]:
+            reco_templates["{0}{1}".format(template_type, template_subtype)] = generate_templates(data_reco1, template_type, template_subtype, "nominal", "reco")
+
+    for template_type in ["ID"]:
+        for template_subtype in ["fail"]:
+            reco_templates["{0}{1}".format(template_type, template_subtype)] = generate_templates(data_reco1, template_type, template_subtype, "nominal", "reco")
+        
+    for template_type in ["Glo"]:
+        for template_subtype in ["pass", "fail"]:
+            reco_templates["{0}{1}".format(template_type, template_subtype)] = generate_templates(data_reco1, template_type, template_subtype, "none", "reco")
+    
+    for template_type in ["Sta_Trk"]:
+        for template_subtype in ["pass", "fail"]:
+            reco_templates["{0}{1}".format(template_type, template_subtype)] = generate_templates(data_reco1, template_type, template_subtype, "nominal", "reco")
+    
+    #gen templates
+    gen_templates = {}
+    for template_type in ["HLT"]:
+        for template_subtype in ["2", "1", "0"]:
+            gen_templates["{0}{1}".format(template_type, template_subtype)] = generate_templates(data_reco1, template_type, template_subtype, "nominal", "gen")
+
+    for template_type in ["ID", "Sta_Trk"]:
+        for template_subtype in ["pass", "fail", "2", "1", "0"]:
+            gen_templates["{0}{1}".format(template_type, template_subtype)] = generate_templates(data_reco1, template_type, template_subtype, "nominal", "gen")
+        
+    for template_type in ["Glo"]:
+        for template_subtype in ["pass", "fail", "2", "1", "0"]:
+            gen_templates["{0}{1}".format(template_type, template_subtype)] = generate_templates(data_reco1, template_type, template_subtype, "none", "gen")
+
+    for template_type in ["HLT_Trk", "ID_Trk"]:
+        for template_subtype in ["pass", "fail"]:
+            gen_templates["{0}{1}".format(template_type, template_subtype)] = generate_templates(data_reco1, template_type, template_subtype, "nominal", "gen")
+
+    for template_type in ["Glo_Trk"]:
+        for template_subtype in ["fail"]:
+            gen_templates["{0}{1}".format(template_type, template_subtype)] = generate_templates(data_reco1, template_type, template_subtype, "none", "gen")
+    
+    gen_templates["all"] = generate_templates(data_reco1, "all", "pass", "none", "gen")
+    
+    
+    # add into total templates
+    for key in keys_gen:
+        result_gen[key] = result_gen[key] + gen_templates[key]
+    
+    for key in keys_reco:
+        result_reco[key] = result_reco[key] + reco_templates[key]
+
+    return result_gen, result_reco
 
 
-# pdb.set_trace()
+for array in uproot.iterate(filename_ntuples+":"+treename, expressions = columns, step_size=10000):
+    data_reco = array[columns]
+    data_reco = data_reco[(data_reco["decayMode"]==13)]
+
+    result_gen, result_reco = produce_all_templates(data_reco, rochester, keys_gen, keys_reco, result_gen, result_reco)
+
+
+with h5py.File('templates_gen.hdf5', 'w') as outfile:
+    for dset_name in result_gen:
+        dset = outfile.create_dataset(dset_name, data = result_gen[dset_name])
+
+with h5py.File('templates_reco.hdf5', 'w') as outfile:
+    for dset_name in result_reco:
+        dset = outfile.create_dataset(dset_name, data = result_reco[dset_name])
+
