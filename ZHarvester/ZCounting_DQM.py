@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 
-import ROOT
+#import ROOT
 import pandas as pd
 import glob
 import os
 import pdb
 import datetime
 import numpy as np
-from roofit.utils import load_makros
+import uncertainties as unc
+# from roofit.utils import load_makros
+import h5py
+from zfit_tools.fit import fit, fit_2
+from zfit_tools.get_acceptance import get_acceptance, acceptance_uncertainties
+# from templates.fitting_templates import templates_2d_to_1d
 
 from common import utils, logging, parsing
 
@@ -15,27 +20,29 @@ from common import utils, logging, parsing
 pd.options.mode.chained_assignment = None
 
 # turn off graphical output on screen
-ROOT.gROOT.SetBatch(True)
+# ROOT.gROOT.SetBatch(True)
 
 # -------------------------------------------------------------------------------------
 # -------------------------------------------------------------------------------------
-def extract_results(directory, m, cHLT, hPV, mcCorrelations):
-    log.info("Extracting fit results in {0} for {1}".format(directory,m))  
 
-    # --- For identification (ID) efficiency  
-    #
-    # New function version       
-    NsigHLT2, NbkgHLT2, chi2HLT2, meanHLT2, sigmaHLT2 = utils.open_workspace_yield(directory, "HLT_{0}_2".format(etaRegionZ), m, signal_parameters=True)
-    NsigHLT1, NbkgHLT1, chi2HLT1, meanHLT1, sigmaHLT1 = utils.open_workspace_yield(directory, "HLT_{0}_1".format(etaRegionZ), m, signal_parameters=True)
-    NsigIDFail, NbkgIDFail, chi2ID, meanIDFail, sigmaIDFail = utils.open_workspace_yield(directory, "ID_{0}_0".format(etaRegion), m, signal_parameters=True)
- 
-    NsigHLT2 = utils.unorm(NsigHLT2)
-    NsigHLT1 = utils.unorm(NsigHLT1)
-    NsigIDFail = utils.unorm(NsigIDFail)
 
-    NbkgHLT2 = utils.unorm(NbkgHLT2)
-    NbkgHLT1 = utils.unorm(NbkgHLT1)
-    NbkgIDFail = utils.unorm(NbkgIDFail)
+def extract_results(data_histograms, templates_1d, correlation_templates, acceptance_templates, hPV):
+
+    # MassBin_, MassMin_, MassMax_ = massbins["Other_Categories"]
+    # MassBinSta_, MassMinSta_, MassMaxSta_ = massbins["Glo"]
+    data_hist_HLT2 = data_histograms["HLT2"]
+    data_hist_HLT1 = data_histograms["HLT1"]
+    data_hist_IDfail = data_histograms["IDfail"]
+    data_hist_Glopass = data_histograms["Glopass"]
+    data_hist_Glofail = data_histograms["Glofail"]
+    data_hist_Stapass = data_histograms["Stapass"]
+    data_hist_Stafail = data_histograms["Stafail"]
+    
+
+    # fitting
+    NsigHLT2, alphaHLT2, betaHLT2, NbkgHLT2 = fit(templates_1d, data_hist_HLT2, "HLT2")
+    NsigHLT1, alphaHLT1, betaHLT1, NbkgHLT1  = fit(templates_1d, data_hist_HLT1, "HLT1")
+    NsigIDFail, alphaIDFail, betaIDFail, NbkgIDFail  = fit(templates_1d, data_hist_IDfail, "IDfail")
 
     if NsigHLT2 + NsigHLT1 <= 0:
         effHLT = utils.unorm(0)
@@ -43,25 +50,15 @@ def extract_results(directory, m, cHLT, hPV, mcCorrelations):
     else:
         effHLT = (2 * NsigHLT2) / (2 * NsigHLT2 + NsigHLT1)
         effID = (2 * NsigHLT2 + NsigHLT1) / (2 * NsigHLT2 + NsigHLT1 + NsigIDFail)
-    
-    # Extract signal and bkg quantities 
-    NsigGloPass, NbkgGloPass, chi2GloPass, meanGloPass, sigmaGloPass = utils.open_workspace_yield(directory, "Glo_{0}_1".format(etaRegion), m, signal_parameters=True)
-    NsigGloFail, NbkgGloFail, chi2GloFail, meanGloFail, sigmaGloFail = utils.open_workspace_yield(directory, "Glo_{0}_0".format(etaRegion), m, signal_parameters=True)
 
-    NsigStaPass, NbkgStaPass, chi2StaPass, meanStaPass, sigmaStaPass = utils.open_workspace_yield(directory, "Sta_{0}_1".format(etaRegion), m, signal_parameters=True)
-    NsigStaFail, NbkgStaFail, chi2StaFail, meanStaFail, sigmaStaFail = utils.open_workspace_yield(directory, "Sta_{0}_0".format(etaRegion), m, signal_parameters=True)
 
-    NsigGloPass = utils.unorm(NsigGloPass)
-    NsigGloFail = utils.unorm(NsigGloFail)
+    NsigGloPass, NbkgGloPass = fit_2(templates_1d, data_hist_Glopass, "Glopass") # for now use only a template yield fit as there are no corrections for Glo yet
+    NsigGloFail, NbkgGloFail = fit_2(templates_1d, data_hist_Glofail, "Glofail")
+    # NsigGloPass, alphaGloPass, betaGloPass, NbkgGloPass = fit(templates_1d, data_hist_Glopass, "Glopass")
+    # NsigGloFail, alphaGloFail, betaGloFail, NbkgGloFail  = fit(templates_1d, data_hist_Glofail, "Glofail")
+    NsigStaPass, alphaStaPass, betaStaPass, NbkgStaPass = fit(templates_1d, data_hist_Stapass, "Stapass")
+    NsigStaFail, alphaStaFail, betaStaFail, NbkgStaFail  = fit(templates_1d, data_hist_Stafail, "Stafail")
 
-    NsigStaPass = utils.unorm(NsigStaPass)
-    NsigStaFail = utils.unorm(NsigStaFail)
-
-    NbkgGloPass = utils.unorm(NbkgGloPass)
-    NbkgGloFail = utils.unorm(NbkgGloFail)
-
-    NbkgStaPass = utils.unorm(NbkgStaPass)
-    NbkgStaFail = utils.unorm(NbkgStaFail)
 
     if NsigGloPass + NsigGloFail <= 0:
         effGlo = utils.unorm(0)
@@ -74,74 +71,100 @@ def extract_results(directory, m, cHLT, hPV, mcCorrelations):
         effSta = NsigStaPass / (NsigStaPass + NsigStaFail)
 
     effMu = effID*effGlo*effSta
+    
+    
+    nPV = hPV.view()
+    
+    cHLT = sum(correlation_templates["HLT"] * nPV) / sum(nPV)
+    cID = sum(correlation_templates["ID_total"] * nPV) / sum(nPV)
+    cIO = sum(correlation_templates["io"] * nPV) / sum(nPV)
 
-    cID = utils.getCorrelation(hPV, mcCorrelations, which="ID")
-    cIO = utils.getCorrelation(hPV, mcCorrelations, which="IO")
-    cAcceptanceInner = utils.getCorrelation(hPV, mcCorrelations, which="AcceptanceInner")
-    cAcceptanceOuter = utils.getCorrelation(hPV, mcCorrelations, which="AcceptanceOuter")
+    
+    # get acceptance
+    morphing_params = morphing_params = {"HLT2_alpha": alphaHLT2, "HLT1_alpha": alphaHLT1, "IDfail_alpha": alphaIDFail, "Stapass_alpha": alphaStaPass, "Stafail_alpha": alphaStaFail,
+     "HLT2_beta": betaHLT2, "HLT1_beta": betaHLT1, "IDfail_beta": betaIDFail, "Stapass_beta": betaStaPass, "Stafail_beta": betaStaFail}
+    
+    morphing_params_nominal, morphing_params_unc = {}, {}
+    for key in morphing_params.keys():
+        morphing_params_nominal[key] = morphing_params[key].nominal_value
+        morphing_params_unc[key] = morphing_params[key].std_dev
+   
+    
+    acceptance_by_PV = get_acceptance(morphing_params_nominal, acceptance_templates, plot = True)
+    acceptance_0 = sum(acceptance_by_PV * nPV) / sum(nPV)
+
+    acceptance_uncertainty_plus_PV, acceptance_uncertainty_minus_PV = acceptance_uncertainties(morphing_params_nominal, morphing_params_unc, acceptance_templates, acceptance_by_PV)
+    acceptance_uncertainty_plus = sum(acceptance_uncertainty_plus_PV * nPV) / sum(nPV)
+    acceptance_uncertainty_minus = sum(acceptance_uncertainty_minus_PV * nPV) / sum(nPV)
+    acceptance_uncertainty = max(acceptance_uncertainty_plus, acceptance_uncertainty_minus)
+
+    acceptance = unc.ufloat(acceptance_0, acceptance_uncertainty)
+
 
     if effMu <= 0 or NsigHLT2 <=0:
         recZCount = utils.unorm(0)
     else:
-        recZCount = (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 / effMu**2 * cHLT * cID * cIO**2 * cAcceptanceInner *cAcceptanceOuter
+        recZCount = (NsigHLT2 + 0.5*NsigHLT1)**2/NsigHLT2 / effMu**2 * cHLT * cID / cIO**2 * acceptance  # Note the divide by cIO!
+        
 
     res = {
-        # mean of gaussian signal resolution function
-        "meanHLT2": meanHLT2,
-        "meanHLT1": meanHLT1,
-        "meanIDFail": meanIDFail,
-        "meanGloPass": meanGloPass,
-        "meanGloFail": meanGloFail,
-        "meanStaPass": meanStaPass,
-        "meanStaFail": meanStaFail,
-        # standard deviation of gaussian signal resolution function
-        "sigmaHLT2": sigmaHLT2,
-        "sigmaHLT1": sigmaHLT1,
-        "sigmaIDFail": sigmaIDFail,
-        "sigmaGloPass": sigmaGloPass,
-        "sigmaGloFail": sigmaGloFail,
-        "sigmaStaPass": sigmaStaPass,
-        "sigmaStaFail": sigmaStaFail,
-        # Signal numbers in mutual exclusive categories
-        "NsigHLT2": NsigHLT2,
-        "NsigHLT1": NsigHLT1,
-        "NsigIDFail": NsigIDFail,
-        "NsigGloPass": NsigGloPass,
-        "NsigGloFail": NsigGloFail,
-        "NsigStaPass": NsigStaPass,
-        "NsigStaFail": NsigStaFail,
-        # Background numbers in mutual exclusive categories
-        "NbkgHLT1": NbkgHLT1,
-        "NbkgHLT2": NbkgHLT2,
-        "NbkgIDFail": NbkgIDFail,
-        "NbkgGloPass": NbkgGloPass,
-        "NbkgGloFail": NbkgGloFail,
-        "NbkgStaPass": NbkgStaPass,
-        "NbkgStaFail": NbkgStaFail,
-        # Chi2s from fits
-        "chi2HLT2": chi2HLT2,
-        "chi2HLT1": chi2HLT1,
-        "chi2GloPass": chi2GloPass,
-        "chi2GloFail": chi2GloFail,
-        "chi2StaPass": chi2StaPass,
-        "chi2StaFail": chi2StaFail,
-        # Efficiencies
-        "effHLT": effHLT,
-        "effID": effID,
-        "effGlo": effGlo,
-        "effSta": effSta,
-        "effMu": effMu,
-        # Corrections from MC
-        "cHLT": cHLT,
-        "cIO": cIO,
-        "cID": cID,
-        "cAcceptanceInner": cAcceptanceInner,
-        "cAcceptanceOuter": cAcceptanceOuter,
-        # Efficiency corrected number of Z bosons
-        "recZCount": recZCount
+    # Signal numbers in mutual exclusive categories
+    "NsigHLT2": NsigHLT2,
+    "NsigHLT1": NsigHLT1,
+    "NsigIDFail": NsigIDFail,
+    "NsigGloPass": NsigGloPass,
+    "NsigGloFail": NsigGloFail,
+    "NsigStaPass": NsigStaPass,
+    "NsigStaFail": NsigStaFail,
+    # Background numbers in mutual exclusive categories
+    "NbkgHLT1": NbkgHLT1,
+    "NbkgHLT2": NbkgHLT2,
+    "NbkgIDFail": NbkgIDFail,
+    "NbkgGloPass": NbkgGloPass,
+    "NbkgGloFail": NbkgGloFail,
+    "NbkgStaPass": NbkgStaPass,
+    "NbkgStaFail": NbkgStaFail,
+    # Chi2s from fits
+    # "chi2HLT2": chi2HLT2,
+    # "chi2HLT1": chi2HLT1,
+    # "chi2GloPass": chi2GloPass,
+    # "chi2GloFail": chi2GloFail,
+    # "chi2StaPass": chi2StaPass,
+    # "chi2StaFail": chi2StaFail,
+    # Efficiencies
+    "effHLT": effHLT,
+    "effID": effID,
+    "effGlo": effGlo,
+    "effSta": effSta,
+    "effMu": effMu,
+    # Corrections from MC
+    "cHLT": cHLT,
+    "cIO": cIO,
+    "cID": cID,
+    # "cAcceptanceInner": cAcceptanceInner,
+    # "cAcceptanceOuter": cAcceptanceOuter,
+    "acceptance": acceptance,
+    # Efficiency corrected number of Z bosons
+    "recZCount": recZCount,  
+    # # Fitting Parameters
+    "alphaHLT2": alphaHLT2,
+    "betaHLT2": betaHLT2,
+    "alphaHLT1": alphaHLT1,
+    "betaHLT1": betaHLT1,
+    "alphaIDFail": alphaIDFail,
+    "betaIDFail": betaIDFail,
+    # "alphaGloPass": alphaGloPass,
+    # "betaGlopass": betaGloPass,
+    # "alphaGloFail": alphaGloFail,
+    # "betaGloFail": betaGloFail,
+    "alphaStaPass": alphaStaPass,
+    "betaStaPass": betaStaPass,
+    "alphaStaFail": alphaStaFail,
+    "betaStaFail": betaStaFail
     }
 
     return res
+
 
 ################################################################################
 if __name__ == '__main__':
@@ -164,38 +187,39 @@ if __name__ == '__main__':
     year = utils.get_year_by_run(args.beginRun)
     energy = 13.6 if year >= 2022 else 13
 
-    cmsswbase = os.environ['CMSSW_BASE']
-    resPath = cmsswbase + "/src/ZCounting/ZHarvester/res/"
-    if( args.beginRun >= 272007 and args.beginRun < 278808
-        # there is an overlap for 2016 F in runs with pre and post VFP settings
-        and args.beginRun not in [278769, 278801, 278802, 278803, 278804, 278805, 278808]
-    ):                                                          # 2016 pre VFP
-        byLsCSV          = resPath+"/FillByLs_2016.csv"
-        mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2016preVFP.root"
-    elif args.beginRun < 294645:                                # 2016 post VFP
-        byLsCSV          = resPath+"/FillByLs_2016.csv"
-        mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2016postVFP.root"
-    elif args.beginRun > 297020 and args.beginRun < 306828:     # 2017
-        byLsCSV          = resPath+"/FillByLs_2017_IsoMu24.csv"
-        mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2017.root"
-    elif args.beginRun >= 306926 and args.beginRun < 307083:    # 2017 H
-        byLsCSV          = resPath+"/FillByLs_2017_lowPU.csv"
-        mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2017.root"
-    elif args.beginRun >= 315252 and args.beginRun < 325273:    # 2018
-        byLsCSV          = resPath+"/FillByLs_2018.csv"
-        mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2018.root"
-    elif args.beginRun >= 355100 and args.beginRun < 362760:    # 2022
-        byLsCSV = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/brilcalcByLS/byLS_Collisions22_355100_362760_Muon_20230210.csv"
-        mcCorrelations  = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/CorrelationFactors/MCClosure_V19_07/c_nPV_2022.root"
-        sigTemplates = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/SignalTemplates/ZCountingInOut-V19_07-Winter22-DYJetsToLL_M_50_LO.root"
-    elif args.beginRun >= 366403:    # 2023
-        byLsCSV = "/eos/cms/store/group/comm_luminosity/ZCounting/2023/brilcalcByLS/byLS_Collisions23_366403_367111_Muon_20230508.csv"
-        mcCorrelations  = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/CorrelationFactors/MCClosure_V19_07/c_nPV_2022.root"
-        sigTemplates = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/SignalTemplates/ZCountingInOut-V19_07-Winter22-DYJetsToLL_M_50_LO.root"
+    # cmsswbase = os.environ['CMSSW_BASE']
+    # resPath = cmsswbase + "/src/ZCounting/ZHarvester/res/"
+    # if( args.beginRun >= 272007 and args.beginRun < 278808
+    #     # there is an overlap for 2016 F in runs with pre and post VFP settings
+    #     and args.beginRun not in [278769, 278801, 278802, 278803, 278804, 278805, 278808]
+    # ):                                                          # 2016 pre VFP
+    #     byLsCSV          = resPath+"/FillByLs_2016.csv"
+    #     mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2016preVFP.root"
+    # elif args.beginRun < 294645:                                # 2016 post VFP
+    #     byLsCSV          = resPath+"/FillByLs_2016.csv"
+    #     mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2016postVFP.root"
+    # elif args.beginRun > 297020 and args.beginRun < 306828:     # 2017
+    #     byLsCSV          = resPath+"/FillByLs_2017_IsoMu24.csv"
+    #     mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2017.root"
+    # elif args.beginRun >= 306926 and args.beginRun < 307083:    # 2017 H
+    #     byLsCSV          = resPath+"/FillByLs_2017_lowPU.csv"
+    #     mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2017.root"
+    # elif args.beginRun >= 315252 and args.beginRun < 325273:    # 2018
+    #     byLsCSV          = resPath+"/FillByLs_2018.csv"
+    #     mcCorrelations   = resPath+"mcCorrections/V17_38/c_nPV_2018.root"
+    # elif args.beginRun >= 355100 and args.beginRun < 362760:    # 2022
+    #     byLsCSV = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/brilcalcByLS/byLS_Collisions22_355100_362760_Muon_20230210.csv"
+    #     mcCorrelations  = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/CorrelationFactors/MCClosure_V19_07/c_nPV_2022.root"
+    #     sigTemplates = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/SignalTemplates/ZCountingInOut-V19_07-Winter22-DYJetsToLL_M_50_LO.root"
+    # elif args.beginRun >= 366403:    # 2023
+    #     byLsCSV = "/eos/cms/store/group/comm_luminosity/ZCounting/2023/brilcalcByLS/byLS_Collisions23_366403_367111_Muon_20230508.csv"
+    #     mcCorrelations  = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/CorrelationFactors/MCClosure_V19_07/c_nPV_2022.root"
+    #     sigTemplates = "/eos/cms/store/group/comm_luminosity/ZCounting/2022/SignalTemplates/ZCountingInOut-V19_07-Winter22-DYJetsToLL_M_50_LO.root"
 
 
-    byLsCSV = byLsCSV          if args.byLsCSV       == "default"   else args.byLsCSV
+    byLsCSV = args.byLsCSV
     eosDir  = args.input
+    sigTemplates = None
 
     measurement      = args.measurement
 
@@ -269,8 +293,8 @@ if __name__ == '__main__':
 
     #etaRegions = ["BB","BE","EE"] if etaRegion == "I" else ["BB"]
 
-    if not args.collect:        
-        load_makros(args.bkgModel, args.ptCut, args.etaMin, args.etaCut, year, MassMin_, MassMax_, MassBin_, npvMin_, npvMax_)
+    # if not args.collect:        
+    #     load_makros(args.bkgModel, args.ptCut, args.etaMin, args.etaCut, year, MassMin_, MassMax_, MassBin_, npvMin_, npvMax_)
 
 
     byLS_data = utils.load_input_csv(byLS_filename)
@@ -328,14 +352,14 @@ if __name__ == '__main__':
             
             # get histogram with primary vertex distribution
             hPV = utils.load_histogram("h_npv", fileName, goodLSlist, run=run, prefix=dqmPrefix, pileup=True)
-            hPV = utils.np_to_hist(hPV, npvBin_, npvMin_, npvMax_, "TH1", "hPV")
+            hPV = utils.np_to_hist(hPV, npvBin_, npvMin_, npvMax_, "hist", "hPV")
 
             # get histograms binned in mass
             def load(name_, mBins=MassBin_, mMin=MassMin_, mMax=MassMax_):
                 hist_np = utils.load_histogram([f"h_mass_{name_}_{r}" for r in etaRegions], fileName, goodLSlist, run=run, 
                     MassBin=mBins, MassMin=mMin, MassMax=mMax, 
                     prefix=dqmPrefix)
-                return utils.np_to_hist(hist_np, mBins, mMin, mMax, "TH1", name_) #convert numpy array into ROOT.TH1
+                return utils.np_to_hist(hist_np, mBins, mMin, mMax, "hist", name_) #convert numpy array into ROOT.TH1
 
             # load histograms for hlt efficiency and Z yield
             h2HLT = load("2HLT")
@@ -370,27 +394,76 @@ if __name__ == '__main__':
                 
                     if not os.path.isdir(outSubDir):
                         os.mkdir(outSubDir)
-                    
-                    ROOT.set_output(outSubDir)
-                    ROOT.set_luminosity(recLumi)
 
-                    ROOT.getZyield(h2HLT, m, "HLT", etaRegionZ, sigModel, bkgModelPass, 2, sigTemplates, 0)
-                    ROOT.getZyield(h1HLT, m, "HLT", etaRegionZ, sigModel, bkgModelPass, 1, sigTemplates, 0)
-                    ROOT.getZyield(hIDfail, m, "ID", etaRegion, sigModel, bkgModelPass, 0, sigTemplates, 0)
+                    #result = fit(h2HLT, MassBin_, MassMin_, MassMax_, "HLT_2")
+                    #pdb.set_trace()
 
-                    ROOT.set_massRange(MassMinSta_, MassMaxSta_, MassBinSta_)
-                    ROOT.getZyield(hGlopass, m, "Glo", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
-                    ROOT.getZyield(hGlofail, m, "Glo", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, 0)
-                    ROOT.set_massRange(MassMin_, MassMax_, MassBin_)
+                    # ROOT.set_output(outSubDir)
+                    # ROOT.set_luminosity(recLumi)
 
-                    ROOT.getZyield(hStapass, m, "Sta", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
-                    ROOT.getZyield(hStafail, m, "Sta", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, 0)
+                    # ROOT.getZyield(h2HLT, m, "HLT", etaRegionZ, sigModel, bkgModelPass, 2, sigTemplates, 0)
+                    # ROOT.getZyield(h1HLT, m, "HLT", etaRegionZ, sigModel, bkgModelPass, 1, sigTemplates, 0)
+                    # ROOT.getZyield(hIDfail, m, "ID", etaRegion, sigModel, bkgModelPass, 0, sigTemplates, 0)
+
+                    # ROOT.set_massRange(MassMinSta_, MassMaxSta_, MassBinSta_)
+                    # ROOT.getZyield(hGlopass, m, "Glo", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
+                    # ROOT.getZyield(hGlofail, m, "Glo", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, 0)
+                    # ROOT.set_massRange(MassMin_, MassMax_, MassBin_)
+
+                    # ROOT.getZyield(hStapass, m, "Sta", etaRegion, sigModel, bkgModelPass, 1, sigTemplates, 0)
+                    # ROOT.getZyield(hStafail, m, "Sta", etaRegion, sigModel, bkgModelFail, 0, sigTemplates, 0)
 
                     # remove the histogram templates, not needed anymore
                     os.system("rm {0}/histTemplates_*".format(outSubDir))
 
-            cHLT = ROOT.extractCorrelation_HLT(sigTemplates, hPV, etaRegionZ)
-            result = extract_results(outSubDir, m, cHLT, hPV, mcCorrelations)
+            # cHLT = ROOT.extractCorrelation_HLT(sigTemplates, hPV, etaRegionZ)
+            # result = extract_results(outSubDir, m, 1, hPV, mcCorrelations)
+
+            loaded_histograms = {"HLT2": h2HLT, "HLT1": h1HLT, "IDfail": hIDfail, "Glopass": hGlopass, "Glofail": hGlofail, "Stapass": hStapass, "Stafail": hStafail}
+            # massbins = {"Other_Categories": (MassBin_, MassMin_, MassMax_), "Glo": (MassBinSta_, MassMinSta_, MassMaxSta_)}
+
+            
+            # load templates, correlations, acceptance
+            # load reco-cut histograms
+            templates_reco_hdf5 = h5py.File('templates/templates_reco.hdf5', 'r')
+
+            templates_reco = {}
+            for key in templates_reco_hdf5.keys():
+                templates_reco[key] = np.array(templates_reco_hdf5[key])
+
+            # reduce to 1d template in mass
+            nPV = hPV.view()
+            templates_1d = {}
+
+            for key in templates_reco.keys():
+                templates_1d[key] = np.matmul(templates_reco[key], nPV)
+
+            # for key in templates_reco.keys():
+            #     templates_1d[key] = np.sum(templates_reco[key], axis = 1)
+            
+  
+              # load correlation templates
+            correlation_hdf5 = h5py.File("templates/correlations.hdf5", 'r')
+
+            correlation_templates = {}
+            for key in correlation_hdf5.keys():
+                correlation_templates[key] = np.array(correlation_hdf5[key])
+                correlation_templates[key] = np.nan_to_num(correlation_templates[key], nan=1)
+
+
+            # load acceptance templates
+            acceptance_hdf5 = h5py.File("templates/acceptance.hdf5", 'r')
+
+            acceptance_templates = {}
+            for key in acceptance_hdf5.keys():
+                acceptance_templates[key] = np.array(acceptance_hdf5[key])
+
+            pdb.set_trace()
+
+            result = extract_results(loaded_histograms, templates_1d, correlation_templates, acceptance_templates, hPV)
+            
+
+            pdb.set_trace()
 
             if result:
                 delLumi = byLS_m['delivered(/pb)'].sum()
