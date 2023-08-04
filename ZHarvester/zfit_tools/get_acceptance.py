@@ -5,8 +5,6 @@ from hist import Hist
 import h5py
 import matplotlib.pyplot as plt
 
-import pdb
-
 
 def get_acceptance(morphing_params, acceptance_templates, indexing = "", plot = False):
     # obtain normalized 1d arrays
@@ -114,17 +112,3 @@ def acceptance_uncertainties(morphing_params_nominal, morphing_params_unc, accep
     
     return np.sqrt(uncertainty_plus), np.sqrt(uncertainty_minus)
     
-
-
-# acceptance_hdf5 = h5py.File("C:/Users/byron/ZCounting/ZHarvester/templates/acceptance_small.hdf5", 'r')
-
-# acceptance_templates = {}
-# for key in acceptance_hdf5.keys():
-#     acceptance_templates[key] = np.array(acceptance_hdf5[key])
-
-# morphing_params = {"HLT2_alpha": 0, "HLT1_alpha": 0, "IDfail_alpha": 0, "Stapass_alpha": 0, "Stafail_alpha": 0,
-#  "HLT2_beta": 0, "HLT1_beta": 0, "IDfail_beta": 0, "Stapass_beta": 0, "Stafail_beta": 0}
-
-# result = get_acceptance(morphing_params, acceptance_templates)
-
-# pdb.set_trace()

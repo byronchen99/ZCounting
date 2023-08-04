@@ -131,8 +131,6 @@ def fit(templates_1d, data_hist, category):
     bkg_yield = unc.ufloat(bkg1_yield_nominal, bkg1_yield_unc) + unc.ufloat(bkg2_yield_nominal, bkg2_yield_unc)
 
 
-    # plot_comp_model(model_nobin, data, bkg=bkg, name=category)
-
     # plotting
     model_total = combinedPDF.values()
     model_bkg = bkg_binned.values()
@@ -141,7 +139,6 @@ def fit(templates_1d, data_hist, category):
 
 
     return sig_yield, alpha, beta, bkg_yield
-    # return result.params['sig_yield_{0}'.format(category)]["value"], result.params['alpha_{0}'.format(category)]["value"], result.params['beta_{0}'.format(category)]["value"]
 
 
 def fit_2(templates_1d, data_hist, category): # temporary solution for templates without corrections yet, only gives yield
